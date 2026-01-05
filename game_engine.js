@@ -168,14 +168,15 @@ class GameState {
     resolveBattlecry(battlecry, target) {
         // Simplified Battlecry: Damage
         if (battlecry.type === 'DAMAGE') {
-            // Logic to apply damage to target
-            // Need a valid target resolution system
-            // For now, auto-target opponent hero if no target specified or simple logic
-            if (!target) {
+            if (!target || target.type === 'HERO') {
                 this.opponent.hero.hp -= battlecry.value;
-            } else {
-                // Detailed targeting logic needed later
+            } else if (target.type === 'MINION') {
+                const minion = this.opponent.board[target.index];
+                if (minion) {
+                    minion.currentHealth -= battlecry.value;
+                }
             }
+            this.resolveDeaths();
         }
     }
 

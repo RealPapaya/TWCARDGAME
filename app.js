@@ -376,6 +376,10 @@ function createMinionEl(minion, index, isPlayer) {
         </div>
     `;
 
+    // Preview Interaction
+    el.addEventListener('mouseenter', () => showPreview(minion));
+    el.addEventListener('mouseleave', hidePreview);
+
     // Attack Drag Start
     if (isPlayer && minion.canAttack && gameState.currentPlayerIdx === 0) {
         el.addEventListener('mousedown', (e) => onDragStart(e, index));
@@ -393,108 +397,199 @@ function createMinionEl(minion, index, isPlayer) {
 let dragging = false;
 let attackerIndex = null;
 let draggingFromHand = false;
+let draggedEl = null;
+let isBattlecryTargeting = false;
+let battlecrySourceIndex = null;
+
 const dragLine = document.getElementById('drag-line');
 
 function onDragStart(e, index, fromHand = false) {
     if (gameState.currentPlayerIdx !== 0) return;
+    if (isBattlecryTargeting) return; // Finish targeting first
+
     dragging = true;
     attackerIndex = index;
     draggingFromHand = fromHand;
 
-    // If from hand, we don't necessarily want a red line from the hand position immediately,
-    // but the original logic uses clientX/Y which is fine.
+    dragLine.classList.remove('battlecry-line');
     dragLine.setAttribute('x1', e.clientX);
     dragLine.setAttribute('y1', e.clientY);
+    dragLine.setAttribute('x2', e.clientX);
+    dragLine.setAttribute('y2', e.clientY);
     dragLine.style.display = 'block';
 
-    if (fromHand) hidePreview();
+    if (fromHand) {
+        hidePreview();
+        // Visual feedback: clone the card to follow mouse
+        const originalEl = document.getElementById('player-hand').children[index];
+        draggedEl = originalEl.cloneNode(true);
+        draggedEl.style.position = 'fixed';
+        draggedEl.style.zIndex = '10000';
+        draggedEl.style.pointerEvents = 'none';
+        draggedEl.style.opacity = '0.8';
+        draggedEl.style.transform = 'scale(0.8)';
+        document.body.appendChild(draggedEl);
+        updateDraggedElPosition(e.clientX, e.clientY);
+
+        originalEl.style.opacity = '0.2';
+    }
+}
+
+function updateDraggedElPosition(x, y) {
+    if (!draggedEl) return;
+    draggedEl.style.left = `${x - 60}px`;
+    draggedEl.style.top = `${y - 85}px`;
 }
 
 function onDragMove(e) {
-    if (!dragging) return;
-    dragLine.setAttribute('x2', e.clientX);
-    dragLine.setAttribute('y2', e.clientY);
+    if (!dragging && !isBattlecryTargeting) return;
+
+    if (dragging) {
+        dragLine.setAttribute('x2', e.clientX);
+        dragLine.setAttribute('y2', e.clientY);
+
+        if (draggingFromHand) {
+            updateDraggedElPosition(e.clientX, e.clientY);
+
+            // Highlight board if hovering
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            const board = document.getElementById('player-board');
+            if (targetEl?.closest('.player-area.player')) {
+                board.classList.add('drop-highlight');
+            } else {
+                board.classList.remove('drop-highlight');
+            }
+        }
+    } else if (isBattlecryTargeting) {
+        // Redraw green line from the "pending" card to mouse
+        dragLine.setAttribute('x2', e.clientX);
+        dragLine.setAttribute('y2', e.clientY);
+    }
 }
 
 async function onDragEnd(e) {
-    if (!dragging) return;
-    dragging = false;
-    dragLine.style.display = 'none';
+    if (!dragging && !isBattlecryTargeting) return;
 
-    // Find drop target
-    const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+    const board = document.getElementById('player-board');
+    board.classList.remove('drop-highlight');
 
-    if (draggingFromHand) {
-        // Drop on Board to Play
-        const isBoard = targetEl?.closest('#player-board');
-        if (isBoard) {
-            try {
+    if (dragging) {
+        dragging = false;
+        dragLine.style.display = 'none';
+
+        if (draggingFromHand) {
+            // Cleanup visual ghost
+            if (draggedEl) {
+                draggedEl.remove();
+                draggedEl = null;
+            }
+            const originalEl = document.getElementById('player-hand').children[attackerIndex];
+            if (originalEl) originalEl.style.opacity = '1';
+
+            // Find drop target
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            const isPlayerArea = targetEl?.closest('.player-area.player');
+
+            if (isPlayerArea) {
                 const card = gameState.currentPlayer.hand[attackerIndex];
-                // Check if card needs target (e.g. battlecry damage)
-                // For simplicity, we just play it if it's on board
-                gameState.playCard(attackerIndex);
-                render();
 
-                // If it was the damage dealer "演說家", we need to handle target for its battlecry
-                // Note: The baseline engine might handle target automatically if it's coded there,
-                // but if not, we need to trigger the green arrow logic.
-                // Assuming keywords.battlecry.type === 'DAMAGE' needs special handling.
-                if (card.keywords?.battlecry?.type === 'DAMAGE') {
-                    // This version needs manual target for battlecry after play
-                    // but the requirement says "造成一點傷害是不用本身去攻擊 是無條件造成一點傷害"
-                    // and "用綠色箭頭表示".
-                    // Let's check for any battlecry that triggered damage and animate it to random enemy or first enemy.
-                    handleBattlecryVisuals();
+                // Targeted Battlecry check
+                if (card.keywords?.battlecry?.type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') {
+                    startBattlecryTargeting(attackerIndex, e.clientX, e.clientY);
+                    return;
                 }
-            } catch (err) {
-                logMessage(err.message);
+
+                try {
+                    gameState.playCard(attackerIndex);
+                    render();
+                } catch (err) {
+                    logMessage(err.message);
+                }
+            }
+            return;
+        }
+
+        // Standard Attack
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const targetData = targetEl?.closest('[data-type]');
+        if (targetData) {
+            const type = targetData.dataset.type;
+            const index = parseInt(targetData.dataset.index);
+
+            if (type === 'HERO' && targetData.id === 'opp-hero'
+                || type === 'MINION' && targetEl.closest('#opp-board')) {
+
+                try {
+                    const sourceEl = document.getElementById('player-board').children[attackerIndex];
+                    if (sourceEl && targetData) {
+                        await animateAttack(sourceEl, targetData);
+                    }
+                    gameState.attack(attackerIndex, { type, index });
+                    render();
+                } catch (err) {
+                    logMessage(err.message);
+                }
             }
         }
-        return;
-    }
+    } else if (isBattlecryTargeting) {
+        // Finishing targeted battlecry
+        isBattlecryTargeting = false;
+        dragLine.style.display = 'none';
 
-    const targetData = targetEl?.closest('[data-type]');
-    if (targetData) {
-        const type = targetData.dataset.type;
-        const index = parseInt(targetData.dataset.index); // NaN for HERO
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const targetData = targetEl?.closest('[data-type]');
 
-        if (type === 'HERO' && targetData.id === 'opp-hero'
-            || type === 'MINION' && targetEl.closest('#opp-board')) {
-
-            try {
-                // Visual Animation First
-                const sourceEl = document.getElementById('player-board').children[attackerIndex];
-                const destEl = targetData; // The hero or minion element
-
-                if (sourceEl && destEl) {
-                    await animateAttack(sourceEl, destEl);
-                }
-
-                gameState.attack(attackerIndex, { type, index });
-                render();
-            } catch (err) {
-                logMessage(err.message);
+        let target = null;
+        if (targetData) {
+            const type = targetData.dataset.type;
+            const index = parseInt(targetData.dataset.index);
+            if (type === 'HERO' && targetData.id === 'opp-hero'
+                || type === 'MINION' && targetEl.closest('#opp-board')) {
+                target = { type, index };
             }
+        }
+
+        try {
+            const handIndex = battlecrySourceIndex;
+            const card = gameState.currentPlayer.hand[handIndex];
+
+            gameState.playCard(handIndex, target);
+            render();
+
+            if (target) {
+                // Animate green arrow from the newly played minion to target
+                const board = document.getElementById('player-board');
+                const sourceEl = board.lastElementChild;
+                const destEl = target.type === 'HERO' ? document.getElementById('opp-hero') : document.getElementById('opp-board').children[target.index];
+                if (sourceEl && destEl) {
+                    await animateAbility(sourceEl, destEl, '#43e97b');
+                }
+            }
+        } catch (err) {
+            logMessage(err.message);
+            render(); // Reset UI
         }
     }
 }
 
+function startBattlecryTargeting(handIndex, x, y) {
+    isBattlecryTargeting = true;
+    battlecrySourceIndex = handIndex;
+
+    dragLine.classList.add('battlecry-line');
+    dragLine.setAttribute('x1', x);
+    dragLine.setAttribute('y1', y);
+    dragLine.setAttribute('x2', x);
+    dragLine.setAttribute('y2', y);
+    dragLine.style.display = 'block';
+
+    logMessage("Choose a target for Battlecry!");
+}
+
 /**
- * Handles visual effects for battlecries (like the green arrow for damage).
+ * Handles visual effects for battlecries (Now handled in onDragEnd)
  */
-async function handleBattlecryVisuals() {
-    // Detect if a damage event just happened (this requires state knowledge)
-    // For now, let's find the most recently played minion with damage battlecry
-    // and animate to a simple target (e.g. enemy Hero or random enemy minion)
-    // In a real HS clone, you'd pick a target, but here it might be "Random ANY"
-
-    // Simple mock: Animate from the last board unit of player to the enemy hero
-    const playerBoard = document.getElementById('player-board');
-    if (playerBoard.children.length === 0) return;
-
-    const sourceEl = playerBoard.lastElementChild;
-    const targetEl = document.getElementById('opp-hero');
-
+async function handleBattlecryVisuals(sourceEl, targetEl) {
     if (sourceEl && targetEl) {
         await animateAbility(sourceEl, targetEl, '#43e97b'); // Green arrow
     }
