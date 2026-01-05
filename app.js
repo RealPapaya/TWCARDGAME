@@ -284,6 +284,12 @@ function render() {
         oppBoardEl.appendChild(minionEl);
     });
 
+    // Update Deck/Discard Counts (Title attribute for hover info)
+    document.getElementById('player-deck').title = `Cards: ${p1.deck.length}`;
+    document.getElementById('player-discard').title = `Cards: ${p1.graveyard?.length || 0}`;
+    document.getElementById('opp-deck').title = `Cards: ${p2.deck.length}`;
+    document.getElementById('opp-discard').title = `Cards: ${p2.graveyard?.length || 0}`;
+
     if (gameState.lastAction === 'attack') {
         // Implement visual shake if hit
     }
@@ -495,7 +501,18 @@ async function onDragEnd(e) {
 
                 // Targeted Battlecry check
                 if (card.keywords?.battlecry?.type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') {
-                    startBattlecryTargeting(attackerIndex, e.clientX, e.clientY);
+                    try {
+                        // 1. Play card with 'PENDING' target first
+                        const dragX = e.clientX;
+                        const dragY = e.clientY;
+                        gameState.playCard(attackerIndex, 'PENDING');
+                        render();
+
+                        // 2. Start targeting from the newly placed minion
+                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY);
+                    } catch (err) {
+                        logMessage(err.message);
+                    }
                     return;
                 }
 
@@ -550,16 +567,21 @@ async function onDragEnd(e) {
         }
 
         try {
-            const handIndex = battlecrySourceIndex;
-            const card = gameState.currentPlayer.hand[handIndex];
+            // Note: In the new flow, the card is already on the board.
+            // We just need to trigger the battlecry effect manually.
+            const minionIndex = battlecrySourceIndex;
+            const minion = gameState.currentPlayer.board[minionIndex];
 
-            gameState.playCard(handIndex, target);
-            render();
+            if (minion && minion.keywords?.battlecry) {
+                // Manually trigger the effect in the engine since it was 'PENDING' before
+                gameState.resolveBattlecry(minion.keywords.battlecry, target);
+                render();
+            }
 
             if (target) {
-                // Animate green arrow from the newly played minion to target
+                // Animate green arrow from the already played minion to target
                 const board = document.getElementById('player-board');
-                const sourceEl = board.lastElementChild;
+                const sourceEl = board.children[minionIndex];
                 const destEl = target.type === 'HERO' ? document.getElementById('opp-hero') : document.getElementById('opp-board').children[target.index];
                 if (sourceEl && destEl) {
                     await animateAbility(sourceEl, destEl, '#43e97b');

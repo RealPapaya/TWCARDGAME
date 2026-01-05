@@ -166,6 +166,7 @@ class GameState {
     }
 
     resolveBattlecry(battlecry, target) {
+        if (target === 'PENDING') return; // Do nothing, wait for final target
         // Simplified Battlecry: Damage
         if (battlecry.type === 'DAMAGE') {
             if (!target || target.type === 'HERO') {
