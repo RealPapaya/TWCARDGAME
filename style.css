@@ -63,6 +63,23 @@ body {
     max-width: 1000px;
 }
 
+.deck-list {
+    width: 280px;
+    background: rgba(10, 10, 20, 0.8);
+    border-left: 2px solid var(--neon-blue);
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow-y: auto;
+}
+
+#my-deck-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+}
+
 .deck-slot {
     background: rgba(20, 20, 30, 0.8);
     border: 2px solid var(--neon-blue);
@@ -754,6 +771,17 @@ body {
     line-height: 1.1;
 }
 
+.card-category {
+    font-size: 8px;
+    font-weight: bold;
+    color: var(--neon-blue);
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    background: rgba(0, 243, 255, 0.1);
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
 .card-desc {
     font-size: 10px;
     color: var(--text-secondary);
@@ -897,7 +925,47 @@ body {
     z-index: 9999;
 }
 
-/* Animations */
+/* Taunt Shield Frame */
+.minion.taunt {
+    border-radius: 10px 10px 50% 50% / 10% 10% 20% 20%;
+    border-width: 4px;
+    border-color: #ffd700;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 15px rgba(255, 215, 0, 0.3);
+    position: relative;
+}
+
+.minion.taunt::before {
+    content: "🛡️";
+    position: absolute;
+    top: -15px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    text-shadow: 0 0 10px var(--neon-yellow);
+    z-index: 10;
+}
+
+/* Toast Notification */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%) translateY(100px);
+    background: var(--neon-blue);
+    color: #000;
+    padding: 12px 40px;
+    border-radius: 50px;
+    font-weight: bold;
+    font-size: 18px;
+    box-shadow: 0 0 20px var(--neon-blue);
+    transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    z-index: 99999;
+}
+
+.toast.show {
+    transform: translateX(-50%) translateY(0);
+}
+
 @keyframes glow {
     0% {
         box-shadow: 0 0 5px var(--neon-blue);

@@ -2,23 +2,26 @@ let gameEngine;
 let gameState;
 // Embedded Card Data to avoid CORS issues
 const CARD_DATA = [
-    { "id": "c001", "name": "村長", "title": "村長", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "普通的村長。" },
-    { "id": "c002", "name": "忠誠護衛", "title": "忠誠護衛", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷" },
-    { "id": "tw001", "name": "白袍外科醫", "title": "柯P", "cost": 4, "attack": 3, "health": 5, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "taunt": true }, "description": "牆頭草：嘲諷。" },
-    { "id": "tw002", "name": "賣菜郎", "title": "韓總", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：友方隨從 +1 攻擊力。" },
-    { "id": "tw003", "name": "戰貓", "title": "小英戰貓", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：友方隨從 +1 生命值。" },
-    { "id": "tw004", "name": "發財支票", "title": "發財支票", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。" },
-    { "id": "tw005", "name": "用愛發電", "title": "用愛發電", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。" },
-    { "id": "c004", "name": "演說家", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。" },
-    { "id": "c005", "name": "鐵腕保安", "cost": 4, "attack": 4, "health": 5, "type": "MINION", "rarity": "COMMON", "description": "厚實的防禦。" },
-    { "id": "c006", "name": "巷弄刺客", "cost": 3, "attack": 4, "health": 2, "type": "MINION", "rarity": "RARE", "description": "高攻擊低生命。" },
-    { "id": "c007", "name": "路邊攤小販", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "平凡的生意人。" },
-    { "id": "c008", "name": "碼頭工人", "cost": 5, "attack": 5, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "充滿力量。" },
-    { "id": "c009", "name": "都市獵人", "cost": 6, "attack": 6, "health": 5, "type": "MINION", "rarity": "RARE", "description": "在鋼鐵叢林中狩獵。" },
-    { "id": "c010", "name": "夜市食客", "cost": 1, "attack": 2, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "快節奏的生活。" },
-    { "id": "c011", "name": "科技工程師", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "RARE", "description": "加班是常態。" },
-    { "id": "c012", "name": "傳統裁縫", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "一針一線。" },
-    { "id": "c013", "name": "廟口管委", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維護秩序。" }
+    { "id": "c001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生。" },
+    { "id": "c002", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。無。" },
+    { "id": "tw001", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。" },
+    { "id": "tw002", "name": "賣菜郎", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：友方隨從 +1 攻擊力。" },
+    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：友方隨從 +1 生命值。" },
+    { "id": "tw004", "name": "發財支票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。" },
+    { "id": "tw005", "name": "彈劾總統囉", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。" },
+    { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。" },
+    { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。" },
+    { "id": "tw006", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌" },
+    { "id": "tw007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "戰吼:可以直接攻擊 大喊我是外送師" },
+    { "id": "tw008", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "耐操" },
+    { "id": "tw009", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷" },
+    { "id": "tw010", "name": "水電徒弟", "category": "勞工", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "總有一天會變師傅" },
+    { "id": "tw011", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target_category": "民進黨政治人物" } }, "description": "戰吼: 對一個非民進黨政治人物造成3點傷害" },
+    { "id": "tw012", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": "ANY" } }, "description": "戰吼: 直接擊殺一個單位" },
+    { "id": "tw013", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "description": "戰吼: 賦予所有\"勞工\"血量上限+2" },
+    { "id": "tw014", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": "ANY" } }, "description": "戰吼: 回復一個單位2點血量" },
+    { "id": "tw015", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "激將: 增加3點攻擊" },
+    { "id": "tw016", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害" }
 ];
 
 let cardDB = [];
@@ -89,7 +92,7 @@ function init() {
         const nameInput = document.getElementById('deck-name-input');
         userDecks[editingDeckIdx].name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
         localStorage.setItem('userDecks', JSON.stringify(userDecks));
-        alert("存檔成功！");
+        showToast("保存成功！");
         renderDeckBuilder();
     });
 
@@ -436,6 +439,7 @@ function showPreview(card) {
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:100%; height:100%; transform:none !important;">
             <div class="card-cost">${card.cost}</div>
             <div class="card-title">${card.name}</div>
+            <div class="card-category">${card.category || ""}</div>
             <div class="card-desc">${card.description || ""}</div>
             ${statsHtml}
         </div>
@@ -464,6 +468,7 @@ function createCardEl(card, index) {
     el.innerHTML = `
         <div class="card-cost">${card.cost}</div>
         <div class="card-title">${card.name}</div>
+        <div class="card-category">${card.category || ""}</div>
         <div class="card-desc">${card.description || ""}</div>
         ${statsHtml}
     `;
@@ -516,6 +521,7 @@ let draggingFromHand = false;
 let draggedEl = null;
 let isBattlecryTargeting = false;
 let battlecrySourceIndex = null;
+let draggingMode = 'DAMAGE'; // 'DAMAGE' or 'HEAL'
 
 const dragLine = document.getElementById('drag-line');
 
@@ -619,7 +625,19 @@ async function onDragEnd(e) {
                         render();
 
                         // 2. Start targeting from the newly placed minion
-                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY);
+                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, 'DAMAGE');
+                    } catch (err) {
+                        logMessage(err.message);
+                    }
+                    return;
+                } else if (card.keywords?.battlecry?.type === 'HEAL' && card.keywords.battlecry.target === 'ANY') {
+                    try {
+                        const dragX = e.clientX;
+                        const dragY = e.clientY;
+                        gameState.playCard(attackerIndex, 'PENDING');
+                        render();
+
+                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, 'HEAL');
                     } catch (err) {
                         logMessage(err.message);
                     }
@@ -692,9 +710,11 @@ async function onDragEnd(e) {
                 // Animate green arrow from the already played minion to target
                 const board = document.getElementById('player-board');
                 const sourceEl = board.children[minionIndex];
-                const destEl = target.type === 'HERO' ? document.getElementById('opp-hero') : document.getElementById('opp-board').children[target.index];
+                const destEl = target.type === 'HERO' ? (targetData.id === 'opp-hero' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) : (targetEl.closest('#opp-board') ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
+
                 if (sourceEl && destEl) {
-                    await animateAbility(sourceEl, destEl, '#43e97b');
+                    const isHeal = draggingMode === 'HEAL';
+                    await animateAbility(sourceEl, destEl, isHeal ? '#43e97b' : '#ff0000');
                 }
             }
         } catch (err) {
@@ -704,11 +724,18 @@ async function onDragEnd(e) {
     }
 }
 
-function startBattlecryTargeting(handIndex, x, y) {
+function startBattlecryTargeting(handIndex, x, y, mode = 'DAMAGE') {
     isBattlecryTargeting = true;
     battlecrySourceIndex = handIndex;
+    draggingMode = mode;
 
     dragLine.classList.add('battlecry-line');
+    if (mode === 'HEAL') {
+        dragLine.classList.add('heal-line');
+    } else {
+        dragLine.classList.remove('heal-line');
+    }
+
     dragLine.setAttribute('x1', x);
     dragLine.setAttribute('y1', y);
     dragLine.setAttribute('x2', x);
@@ -845,3 +872,18 @@ function logMessage(msg) {
 
 // Start
 init();
+
+function showToast(message) {
+    let toast = document.getElementById('toast-notification');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'toast-notification';
+        toast.className = 'toast';
+        document.body.appendChild(toast);
+    }
+    toast.innerText = message;
+    toast.classList.add('show');
+    setTimeout(() => {
+        toast.classList.remove('show');
+    }, 2000);
+}

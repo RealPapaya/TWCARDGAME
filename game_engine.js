@@ -175,19 +175,96 @@ class GameState {
     }
 
     resolveBattlecry(battlecry, target) {
-        if (target === 'PENDING') return; // Do nothing, wait for final target
-        // Simplified Battlecry: Damage
+        if (target === 'PENDING') return;
+
         if (battlecry.type === 'DAMAGE') {
-            if (!target || target.type === 'HERO') {
-                this.opponent.hero.hp -= battlecry.value;
-            } else if (target.type === 'MINION') {
-                const minion = this.opponent.board[target.index];
-                if (minion) {
-                    minion.currentHealth -= battlecry.value;
+            const targetUnit = this.getTargetUnit(target) || this.opponent.hero;
+            this.applyDamage(targetUnit, battlecry.value);
+        } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
+            this.currentPlayer.board.forEach(m => {
+                m.currentHealth = m.health;
+            });
+        } else if (battlecry.type === 'BOUNCE_ALL_ENEMY') {
+            const opp = this.opponent;
+            while (opp.board.length > 0) {
+                const m = opp.board.shift();
+                const originalCard = this.players[0].buildDeck([m.id], [m])[0];
+                if (opp.hand.length < 10) opp.hand.push(originalCard);
+            }
+        } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.category !== battlecry.target_category) {
+                this.applyDamage(targetUnit, battlecry.value);
+            }
+        } else if (battlecry.type === 'HEAL') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit) {
+                targetUnit.currentHealth = Math.min((targetUnit.health || targetUnit.maxHp || 30), targetUnit.currentHealth + battlecry.value);
+                if (target.type === 'HERO') targetUnit.hp = targetUnit.currentHealth;
+            }
+        } else if (battlecry.type === 'DESTROY') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit) {
+                this.applyDamage(targetUnit, 999);
+            }
+        } else if (battlecry.type === 'BUFF_CATEGORY') {
+            this.currentPlayer.board.forEach(m => {
+                if (m.category === battlecry.target_category) {
+                    m.health += battlecry.value;
+                    m.currentHealth += battlecry.value;
+                }
+            });
+        } else if (battlecry.type === 'DAMAGE_RANDOM_FRIENDLY') {
+            const friendlyBoard = this.currentPlayer.board;
+            if (friendlyBoard.length > 0) {
+                const randomIdx = Math.floor(Math.random() * friendlyBoard.length);
+                this.applyDamage(friendlyBoard[randomIdx], battlecry.value);
+            } else {
+                this.applyDamage(this.currentPlayer.hero, battlecry.value);
+            }
+        }
+    }
+
+    getTargetUnit(target) {
+        if (!target) return null;
+        if (target.type === 'HERO') {
+            return (target.index === 0 ? this.players[0].hero : this.players[1].hero);
+        }
+        if (target.type === 'MINION') {
+            // Check both boards
+            const m = this.players[1].board[target.index] || this.players[0].board[target.index];
+            return m;
+        }
+        return null;
+    }
+
+    applyDamage(unit, amount) {
+        if (!unit) return;
+        const oldHealth = unit.currentHealth !== undefined ? unit.currentHealth : unit.hp;
+        unit.currentHealth = oldHealth - amount;
+        if (unit.hp !== undefined) unit.hp = unit.currentHealth;
+
+        // Enrage (激將) Check
+        if (unit.type === 'MINION' && unit.keywords && unit.keywords.enrage) {
+            const isDamaged = unit.currentHealth < unit.health;
+            if (isDamaged && !unit.isEnraged) {
+                unit.isEnraged = true;
+                if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                    if (unit.keywords.enrage.stat === 'ATTACK') {
+                        unit.attack += unit.keywords.enrage.value;
+                    }
+                }
+            } else if (!isDamaged && unit.isEnraged) {
+                // If healed back to full
+                unit.isEnraged = false;
+                if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                    if (unit.keywords.enrage.stat === 'ATTACK') {
+                        unit.attack -= unit.keywords.enrage.value;
+                    }
                 }
             }
-            this.resolveDeaths();
         }
+        this.resolveDeaths();
     }
 
     /**
@@ -220,12 +297,13 @@ class GameState {
 
         if (!targetUnit) throw new Error("Invalid target");
 
-        // Damage Exchange
-        targetUnit.currentHealth = (targetUnit.currentHealth !== undefined ? targetUnit.currentHealth : targetUnit.hp) - attacker.attack;
-        if (target.type === 'HERO') targetUnit.hp = targetUnit.currentHealth;
+        // Use applyDamage for proper enrage/death triggers
+        const attackerAtk = attacker.attack;
+        const targetAtk = targetUnit.attack || 0;
 
+        this.applyDamage(targetUnit, attackerAtk);
         if (target.type === 'MINION') {
-            attacker.currentHealth -= targetUnit.attack;
+            this.applyDamage(attacker, targetAtk);
         }
 
         attacker.canAttack = false;
