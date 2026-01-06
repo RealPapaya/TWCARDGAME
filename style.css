@@ -187,28 +187,152 @@ body {
 
 .neon-button {
     background: transparent;
-    border: 2px solid var(--neon-cyan);
-    color: var(--neon-cyan);
+    border: 2px solid var(--neon-blue);
+    color: var(--neon-blue);
     padding: 15px 40px;
-    font-size: 24px;
+    font-size: 20px;
     cursor: pointer;
     text-transform: uppercase;
-    letter-spacing: 3px;
-    transition: all 0.3s ease;
-    box-shadow: 0 0 10px var(--neon-cyan);
+    letter-spacing: 2px;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+    position: relative;
+    overflow: hidden;
 }
 
 .neon-button:hover {
-    background: var(--neon-cyan);
+    background: var(--neon-blue);
     color: #000;
-    box-shadow: 0 0 30px var(--neon-cyan);
+    box-shadow: 0 0 25px var(--neon-blue);
+    transform: translateY(-2px);
 }
 
-.neon-button:disabled {
+.neon-button:active {
+    transform: translateY(1px);
+}
+
+.neon-button.secondary {
+    border-color: var(--neon-pink);
+    color: var(--neon-pink);
+    box-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+}
+
+.neon-button.secondary:hover {
+    background: var(--neon-pink);
+    color: #fff;
+    box-shadow: 0 0 25px var(--neon-pink);
+}
+
+.neon-button.danger {
+    border-color: #ff4b2b;
+    color: #ff4b2b;
+}
+
+.neon-button.danger:hover {
+    background: #ff4b2b;
+    color: #fff;
+    box-shadow: 0 0 25px #ff4b2b;
+}
+
+.neon-button:disabled,
+.neon-button.disabled-mode {
     border-color: #444;
     color: #444;
     box-shadow: none;
     cursor: not-allowed;
+    background: transparent !important;
+    transform: none !important;
+}
+
+.sub-title {
+    font-size: 40px;
+    margin-bottom: 40px;
+    color: var(--neon-blue);
+    text-shadow: 0 0 15px var(--neon-blue);
+    letter-spacing: 5px;
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(8px);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 10000;
+}
+
+.modal-content {
+    background: #1a1a20;
+    border: 2px solid var(--neon-blue);
+    padding: 40px;
+    border-radius: 12px;
+    text-align: center;
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.2);
+}
+
+.modal-content h3 {
+    font-size: 24px;
+    margin-bottom: 30px;
+    color: #fff;
+}
+
+.modal-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+/* Result Overlay */
+.result-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+    animation: fadeIn 0.5s ease;
+}
+
+.result-content {
+    text-align: center;
+}
+
+.result-text {
+    font-size: 15vw;
+    font-weight: 900;
+    margin-bottom: 50px;
+    letter-spacing: 20px;
+    text-transform: uppercase;
+}
+
+.victory-text {
+    color: var(--neon-yellow);
+    text-shadow: 0 0 50px var(--neon-yellow);
+}
+
+.defeat-text {
+    color: #ff0000;
+    text-shadow: 0 0 50px #ff0000;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
 }
 
 /* Deck Builder Styles */

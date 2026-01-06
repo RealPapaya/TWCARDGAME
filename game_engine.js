@@ -239,7 +239,7 @@ class GameState {
             // Hero Death
             if (p.hero.hp <= 0) {
                 this.gameOver = true;
-                this.winner = (p === this.players[0] ? this.players[1] : this.players[0]);
+                this.winner = (p === this.players[0] ? 1 : 0);
             }
 
             // Minion Death

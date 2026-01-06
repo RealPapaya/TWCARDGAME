@@ -2,116 +2,23 @@ let gameEngine;
 let gameState;
 // Embedded Card Data to avoid CORS issues
 const CARD_DATA = [
-    {
-        "id": "c001",
-        "name": "村長",
-        "title": "村長",
-        "cost": 1,
-        "attack": 1,
-        "health": 2,
-        "type": "MINION",
-        "rarity": "COMMON",
-        "description": "普通的村長。"
-    },
-    {
-        "id": "c002",
-        "name": "忠誠護衛",
-        "title": "忠誠護衛",
-        "cost": 2,
-        "attack": 2,
-        "health": 3,
-        "type": "MINION",
-        "rarity": "COMMON",
-        "keywords": {
-            "taunt": true
-        },
-        "description": "嘲諷"
-    },
-    {
-        "id": "tw001",
-        "name": "白袍外科醫",
-        "title": "柯P",
-        "cost": 4,
-        "attack": 3,
-        "health": 5,
-        "type": "MINION",
-        "rarity": "LEGENDARY",
-        "keywords": {
-            "taunt": true
-        },
-        "description": "牆頭草 (Fence-sitter): 嘲諷。他總是卡在其餘兩個勢力中間。"
-    },
-    {
-        "id": "tw002",
-        "name": "賣菜郎",
-        "title": "韓總",
-        "cost": 5,
-        "attack": 5,
-        "health": 4,
-        "type": "MINION",
-        "rarity": "EPIC",
-        "keywords": {
-            "battlecry": {
-                "type": "BUFF_ALL",
-                "value": 1,
-                "stat": "ATTACK"
-            }
-        },
-        "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。"
-    },
-    {
-        "id": "tw003",
-        "name": "戰貓",
-        "title": "小英戰貓",
-        "cost": 3,
-        "attack": 2,
-        "health": 4,
-        "type": "MINION",
-        "rarity": "RARE",
-        "keywords": {
-            "battlecry": {
-                "type": "BUFF_ALL",
-                "value": 1,
-                "stat": "HEALTH"
-            }
-        },
-        "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。"
-    },
-    {
-        "id": "tw004",
-        "name": "發財支票",
-        "title": "發財支票",
-        "cost": 2,
-        "type": "SPELL",
-        "rarity": "COMMON",
-        "description": "選舉支票 (Electoral Promise): 下回合開始時，抽 2 張牌。"
-    },
-    {
-        "id": "tw005",
-        "name": "用愛發電",
-        "title": "用愛發電",
-        "cost": 10,
-        "type": "SPELL",
-        "rarity": "EPIC",
-        "description": "造成 10 點傷害，隨機分配給所有敵人。如果你的牌堆沒有牌，改為造成 20 點。"
-    },
-    {
-        "id": "c004",
-        "name": "演說家",
-        "cost": 3,
-        "attack": 2,
-        "health": 2,
-        "type": "MINION",
-        "rarity": "RARE",
-        "keywords": {
-            "battlecry": {
-                "type": "DAMAGE",
-                "value": 1,
-                "target": "ANY"
-            }
-        },
-        "description": "戰吼：造成 1 點傷害。"
-    }
+    { "id": "c001", "name": "村長", "title": "村長", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "普通的村長。" },
+    { "id": "c002", "name": "忠誠護衛", "title": "忠誠護衛", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷" },
+    { "id": "tw001", "name": "白袍外科醫", "title": "柯P", "cost": 4, "attack": 3, "health": 5, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "taunt": true }, "description": "牆頭草：嘲諷。" },
+    { "id": "tw002", "name": "賣菜郎", "title": "韓總", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：友方隨從 +1 攻擊力。" },
+    { "id": "tw003", "name": "戰貓", "title": "小英戰貓", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：友方隨從 +1 生命值。" },
+    { "id": "tw004", "name": "發財支票", "title": "發財支票", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。" },
+    { "id": "tw005", "name": "用愛發電", "title": "用愛發電", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。" },
+    { "id": "c004", "name": "演說家", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。" },
+    { "id": "c005", "name": "鐵腕保安", "cost": 4, "attack": 4, "health": 5, "type": "MINION", "rarity": "COMMON", "description": "厚實的防禦。" },
+    { "id": "c006", "name": "巷弄刺客", "cost": 3, "attack": 4, "health": 2, "type": "MINION", "rarity": "RARE", "description": "高攻擊低生命。" },
+    { "id": "c007", "name": "路邊攤小販", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "平凡的生意人。" },
+    { "id": "c008", "name": "碼頭工人", "cost": 5, "attack": 5, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "充滿力量。" },
+    { "id": "c009", "name": "都市獵人", "cost": 6, "attack": 6, "health": 5, "type": "MINION", "rarity": "RARE", "description": "在鋼鐵叢林中狩獵。" },
+    { "id": "c010", "name": "夜市食客", "cost": 1, "attack": 2, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "快節奏的生活。" },
+    { "id": "c011", "name": "科技工程師", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "RARE", "description": "加班是常態。" },
+    { "id": "c012", "name": "傳統裁縫", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "一針一線。" },
+    { "id": "c013", "name": "廟口管委", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維護秩序。" }
 ];
 
 let cardDB = [];
@@ -123,24 +30,61 @@ let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
     { name: "預設牌組 2", cards: [] },
     { name: "預設牌組 3", cards: [] }
 ];
+
+// Ensure valid Slot 2 if empty or broken (for testing convenience)
+if (userDecks[1].cards.length === 0) {
+    const defaultDeck = [];
+    const allIds = CARD_DATA.map(c => c.id);
+    for (let i = 0; i < 30; i++) {
+        defaultDeck.push(allIds[i % allIds.length]);
+    }
+    userDecks[1].cards = defaultDeck;
+}
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let editingDeckIdx = 0;
+let pendingViewMode = 'BATTLE'; // 'BATTLE' or 'BUILDER'
 
 function init() {
     gameEngine = new GameEngine(CARD_DATA);
 
-    // UI Event Listeners
-    document.getElementById('btn-deck-builder-main')?.addEventListener('click', () => {
-        editingDeckIdx = selectedDeckIdx;
-        showView('deck-builder');
-        renderDeckBuilder();
+    // --- Main Menu Listeners ---
+    document.getElementById('btn-main-battle').addEventListener('click', () => {
+        showView('mode-selection');
     });
 
-    document.getElementById('btn-back-to-menu').addEventListener('click', () => {
-        showView('main-menu');
-        renderDeckSlots();
+    document.getElementById('btn-main-builder').addEventListener('click', () => {
+        pendingViewMode = 'BUILDER';
+        showView('deck-selection');
+        document.getElementById('deck-select-title').innerText = '選擇要編修的牌組';
+        renderDeckSelect();
     });
 
+    // --- Mode Selection Listeners ---
+    document.getElementById('btn-mode-ai').addEventListener('click', () => {
+        pendingViewMode = 'BATTLE';
+        showView('deck-selection');
+        document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
+        renderDeckSelect();
+    });
+
+    // --- Back Buttons ---
+    document.querySelectorAll('.btn-back').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (document.getElementById('mode-selection').style.display === 'flex') {
+                showView('main-menu');
+            } else if (document.getElementById('deck-selection').style.display === 'flex') {
+                if (pendingViewMode === 'BATTLE') showView('mode-selection');
+                else showView('main-menu');
+            }
+        });
+    });
+
+    document.getElementById('btn-builder-back').addEventListener('click', () => {
+        showView('deck-selection');
+        renderDeckSelect();
+    });
+
+    // --- Deck Builder Listeners ---
     document.getElementById('btn-save-deck').addEventListener('click', () => {
         const nameInput = document.getElementById('deck-name-input');
         userDecks[editingDeckIdx].name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
@@ -149,6 +93,7 @@ function init() {
         renderDeckBuilder();
     });
 
+    // --- Battle Listeners ---
     document.getElementById('end-turn-btn').addEventListener('click', () => {
         try {
             gameState.endTurn();
@@ -159,17 +104,34 @@ function init() {
         } catch (e) { logMessage(e.message); }
     });
 
+    document.getElementById('btn-surrender').addEventListener('click', () => {
+        document.getElementById('surrender-modal').style.display = 'flex';
+    });
+
+    document.getElementById('btn-surrender-confirm').addEventListener('click', () => {
+        document.getElementById('surrender-modal').style.display = 'none';
+        endGame('DEFEAT');
+    });
+
+    document.getElementById('btn-surrender-cancel').addEventListener('click', () => {
+        document.getElementById('surrender-modal').style.display = 'none';
+    });
+
+    // --- Result View Listeners ---
+    document.getElementById('btn-result-continue').addEventListener('click', () => {
+        showView('main-menu');
+    });
+
     // Global drag events
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
 
     // Initial view
     showView('main-menu');
-    renderDeckSlots();
 }
 
-function renderDeckSlots() {
-    const container = document.getElementById('deck-slots');
+function renderDeckSelect() {
+    const container = document.getElementById('deck-select-slots');
     container.innerHTML = '';
 
     userDecks.forEach((deck, idx) => {
@@ -179,42 +141,37 @@ function renderDeckSlots() {
             <h3>${deck.name}</h3>
             <div class="slot-info">${deck.cards.length} / 30 張卡</div>
             <div class="deck-slot-actions">
-                <button class="neon-button edit-btn">編輯</button>
-                <button class="neon-button battle-btn">戰鬥</button>
+                <button class="neon-button action-btn">${pendingViewMode === 'BATTLE' ? '出戰' : '編輯'}</button>
             </div>
         `;
 
-        slot.querySelector('.edit-btn').addEventListener('click', (e) => {
+        slot.querySelector('.action-btn').addEventListener('click', (e) => {
             e.stopPropagation();
-            editingDeckIdx = idx;
-            showView('deck-builder');
-            renderDeckBuilder();
-        });
-
-        slot.querySelector('.battle-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            selectedDeckIdx = idx;
-            localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-
-            if (deck.cards.length === 30) {
-                startBattle(deck.cards);
-            } else {
-                alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+            if (pendingViewMode === 'BUILDER') {
                 editingDeckIdx = idx;
                 showView('deck-builder');
                 renderDeckBuilder();
+            } else {
+                selectedDeckIdx = idx;
+                localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+                if (deck.cards.length === 30) {
+                    startBattle(deck.cards);
+                } else {
+                    alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+                }
             }
         });
 
         slot.addEventListener('click', () => {
             selectedDeckIdx = idx;
             localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-            renderDeckSlots();
+            renderDeckSelect();
         });
 
         container.appendChild(slot);
     });
 }
+
 
 function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
@@ -426,6 +383,24 @@ function render() {
     if (gameState.lastAction === 'attack') {
         // Implement visual shake if hit
     }
+
+    // Check for Win/Loss
+    if (gameState.winner !== null) {
+        setTimeout(() => {
+            endGame(gameState.winner === 0 ? 'VICTORY' : 'DEFEAT');
+        }, 1000);
+    }
+}
+
+function endGame(result) {
+    const resultView = document.getElementById('game-result-view');
+    const resultText = document.getElementById('result-status-text');
+
+    resultText.innerText = result === 'VICTORY' ? '勝利' : '敗北';
+    resultText.className = `result-text ${result === 'VICTORY' ? 'victory-text' : 'defeat-text'}`;
+
+    showView('game-result-view');
+    document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex
 }
 
 function renderMana(containerId, mana) {

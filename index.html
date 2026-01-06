@@ -18,11 +18,34 @@
     <div id="main-menu" class="view">
         <div class="menu-content">
             <h1 class="game-title">寶島遊戲王</h1>
+            <div class="menu-buttons main-nav">
+                <button id="btn-main-battle" class="neon-button">進入戰鬥</button>
+                <button id="btn-main-builder" class="neon-button">牌組組建</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mode Selection View -->
+    <div id="mode-selection" class="view" style="display: none;">
+        <div class="menu-content">
+            <h2 class="sub-title">選擇對戰模式</h2>
             <div class="menu-buttons">
-                <div class="deck-slots-container" id="deck-slots">
-                    <!-- Slots will be rendered by JS -->
-                </div>
-                <button id="btn-deck-builder-main" class="neon-button" style="display:none;">進入組建器</button>
+                <button id="btn-mode-ai" class="neon-button">電腦對戰 (VS AI)</button>
+                <button id="btn-mode-player" class="neon-button disabled-mode" disabled>玩家對戰 (VS Player) - 敬請期待</button>
+                <button class="neon-button secondary btn-back">返回</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deck Selection View (Used for both Battle and Builder entry) -->
+    <div id="deck-selection" class="view" style="display: none;">
+        <div class="menu-content">
+            <h2 id="deck-select-title" class="sub-title">選擇牌組</h2>
+            <div class="deck-slots-container" id="deck-select-slots">
+                <!-- Slots will be rendered by JS -->
+            </div>
+            <div class="menu-buttons" style="margin-top: 40px;">
+                <button class="neon-button secondary btn-back">返回</button>
             </div>
         </div>
     </div>
@@ -31,7 +54,7 @@
     <div id="deck-builder" class="view" style="display: none;">
         <div class="deck-builder-header">
             <div class="header-left">
-                <button id="btn-back-to-menu" class="neon-button"
+                <button id="btn-builder-back" class="neon-button"
                     style="padding: 5px 15px; font-size: 14px;">返回</button>
                 <input type="text" id="deck-name-input" placeholder="牌組名稱..." maxlength="10">
             </div>
@@ -67,6 +90,8 @@
             </div>
 
             <div class="center-line">
+                <button id="btn-surrender" class="neon-button danger"
+                    style="padding: 8px 20px; font-size: 16px;">投降</button>
                 <button id="end-turn-btn">結束回合</button>
                 <div id="turn-indicator">Turn: 1</div>
             </div>
@@ -86,6 +111,25 @@
         </div>
     </div>
 
+    <!-- Surrender Confirmation Modal -->
+    <div id="surrender-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3>確定要投降嗎？</h3>
+            <div class="modal-buttons">
+                <button id="btn-surrender-confirm" class="neon-button danger">確定投降</button>
+                <button id="btn-surrender-cancel" class="neon-button">返回戰鬥</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Full Screen Result View -->
+    <div id="game-result-view" class="view result-overlay" style="display: none;">
+        <div class="result-content">
+            <h1 id="result-status-text" class="result-text">敗北</h1>
+            <button id="btn-result-continue" class="neon-button">繼續</button>
+        </div>
+    </div>
+
     <!-- Drag Line SVG Layer -->
     <svg id="drag-layer">
         <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="4"
@@ -95,5 +139,6 @@
     <div id="card-preview"></div>
     <div id="message-log"></div>
 </body>
+
 
 </html>
