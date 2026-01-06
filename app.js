@@ -5,12 +5,12 @@ const CARD_DATA = [
     { "id": "c001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生。", "image": "img/c001.png" },
     { "id": "c002", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。無。", "image": "img/c002.png" },
     { "id": "tw001", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。", "image": "img/tw001.png" },
-    { "id": "tw002", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 3, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
+    { "id": "tw002", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 1, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
     { "id": "tw003", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
     { "id": "tw004", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。", "image": "img/tw004.png" },
-    { "id": "tw005", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" },
+    { "id": "tw005", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 1 點傷害。", "image": "img/tw005.png" },
     { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：隨機 10 點傷害。", "image": "img/c004.png" },
-    { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
+    { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
     { "id": "tw006", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌", "image": "img/tw006.png" },
     { "id": "tw007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "戰吼:可以直接攻擊 大喊我是外送師", "image": "img/tw007.png" },
     { "id": "tw008", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "耐操", "image": "img/tw008.png" },
@@ -1093,44 +1093,80 @@ async function onDragEnd(e) {
         }
 
         try {
-            // Note: In the new flow, the card is already on the board.
-            // We just need to trigger the battlecry effect manually.
-            const minionIndex = battlecrySourceIndex;
-            const minion = gameState.currentPlayer.board[minionIndex];
-
-            if (minion && minion.keywords?.battlecry) {
-                // Manually trigger the effect in the engine since it was 'PENDING' before
-                gameState.resolveBattlecry(minion.keywords.battlecry, target);
-                render();
-                await resolveDeaths();
-            }
-
             if (target) {
-                // Animate green arrow from the already played minion to target
-                const board = document.getElementById('player-board');
-                const sourceEl = board.children[minionIndex];
-                const destEl = target.type === 'HERO' ? (targetData.id === 'opp-hero' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) : (targetEl.closest('#opp-board') ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
+                // 1. Identify Source & Dest for Animation
+                let sourceEl;
+                if (battlecrySourceType === 'SPELL') {
+                    // Source is Hand Card (it's hidden but element exists until render)
+                    sourceEl = document.getElementById('player-hand').children[battlecrySourceIndex];
+                } else {
+                    // Source is Minion on Board (already placed)
+                    sourceEl = document.getElementById('player-board').children[battlecrySourceIndex];
+                }
 
+                const destEl = target.type === 'HERO' ?
+                    (targetData.id === 'opp-hero' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) :
+                    (targetEl.closest('#opp-board') ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
+
+                // 2. Animate BEFORE applying logic (so target is still alive)
                 if (sourceEl && destEl) {
                     let color = '#ff0000'; // Default Damage Red
                     let effectType = 'DAMAGE';
+
+                    // Determine color based on card/mode
                     if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
 
                     await animateAbility(sourceEl, destEl, color);
                     triggerCombatEffect(destEl, effectType);
+
+                    // Small delay for impact feel
+                    await new Promise(r => setTimeout(r, 200));
                 }
-            } else if (minion.keywords?.battlecry) {
-                // Handle non-targeted (buff all, heal all)
-                const bcType = minion.keywords.battlecry.type;
-                setTimeout(() => { // Add delay for board-wide effects
-                    if (bcType === 'BUFF_ALL' || bcType === 'BUFF_CATEGORY') {
-                        document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
-                    } else if (bcType === 'HEAL_ALL_FRIENDLY') {
-                        document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
-                        triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
+
+                // 3. Execute Game Logic (Phase 2)
+                if (battlecrySourceType === 'SPELL') {
+                    // For Spell: Now we play it
+                    const card = gameState.currentPlayer.hand[battlecrySourceIndex];
+                    if (card) showCardPlayPreview(card); // Post-animation preview
+                    gameState.playCard(battlecrySourceIndex, target);
+                } else {
+                    // For Minion: It's already pending on board, just resolve battlecry
+                    const minionInfo = gameState.currentPlayer.board[battlecrySourceIndex];
+                    if (minionInfo && minionInfo.keywords?.battlecry) {
+                        gameState.resolveBattlecry(minionInfo.keywords.battlecry, target);
                     }
-                }, 100);
+                }
+
+                render();
+                await resolveDeaths();
+
+            } else {
+                // Non-targeted logic (Fallback for Minions played without target if flow allows, or AOE)
+                // Note: If battlecrySourceType is SPELL and target is null, we cancelled (handled in 'else' of outer block if exists, but here structure is try/catch)
+                // Actually, earlier we checked 'if (target)'. If not target...
+                // If it's a MINION with non-targeted battlecry (e.g. AOE), we should trigger it.
+
+                if (battlecrySourceType === 'MINION') {
+                    const minion = gameState.currentPlayer.board[battlecrySourceIndex];
+                    if (minion && minion.keywords?.battlecry) {
+                        gameState.resolveBattlecry(minion.keywords.battlecry, null);
+                        render();
+                        await resolveDeaths();
+
+                        // Visuals for AOE
+                        const bcType = minion.keywords.battlecry.type;
+                        setTimeout(() => {
+                            if (bcType === 'BUFF_ALL' || bcType === 'BUFF_CATEGORY') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                            } else if (bcType === 'HEAL_ALL_FRIENDLY') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
+                                triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
+                            }
+                        }, 100);
+                    }
+                }
+                // If Spell and no target, we do nothing (cancel).
             }
         } catch (err) {
             logMessage(err.message);
