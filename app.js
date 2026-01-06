@@ -187,7 +187,9 @@ function showView(viewId) {
     if (view) view.style.display = 'flex';
 }
 
-function startBattle(deckIds) {
+let previousPlayerHandSize = 0;
+
+async function startBattle(deckIds) {
     // Fill opponent deck with random cards
     const allIds = CARD_DATA.map(c => c.id);
     const oppDeck = [];
@@ -195,12 +197,25 @@ function startBattle(deckIds) {
 
     gameState = gameEngine.createGame(deckIds, oppDeck);
 
+    // Initial Draw Sequence Logic
+    const initialHand = [...gameState.players[0].hand];
+    gameState.players[0].hand = [];
+    previousPlayerHandSize = 0;
+
     // Init Mana Containers for the new game view
     initManaContainers('player-mana-container');
     initManaContainers('opp-mana-container');
 
     showView('battle-view');
     render();
+
+    // Animate sorting out cards one by one
+    // We don't block the UI thread completely, just delay the appearance
+    for (const card of initialHand) {
+        await new Promise(r => setTimeout(r, 400));
+        gameState.players[0].hand.push(card);
+        render();
+    }
 }
 
 function initManaContainers(id) {
@@ -472,6 +487,20 @@ function render() {
     p1.hand.forEach((card, idx) => {
         handEl.appendChild(createCardEl(card, idx));
     });
+
+    // Detect and animate new cards
+    if (p1.hand.length > previousPlayerHandSize) {
+        const newCount = p1.hand.length - previousPlayerHandSize;
+        const children = handEl.children;
+        // Only animate if it looks like a draw event (not a full reload from 0 to 30)
+        // Ensure we don't crash if children count mismatch
+        if (newCount > 0 && newCount < 15) {
+            for (let i = Math.max(0, children.length - newCount); i < children.length; i++) {
+                if (children[i]) animateCardFromDeck(children[i]);
+            }
+        }
+    }
+    previousPlayerHandSize = p1.hand.length;
 
     const oppHandEl = document.getElementById('opp-hand');
     oppHandEl.innerHTML = '';
@@ -995,6 +1024,8 @@ function animateAbility(fromEl, toEl, color) {
 
         const projectile = document.createElement('div');
         projectile.className = 'ability-projectile';
+        // Set dynamic color for ::after element
+        if (color) projectile.style.setProperty('--projectile-color', color);
         projectile.style.left = `${rectFrom.left + rectFrom.width / 2}px`;
         projectile.style.top = `${rectFrom.top + rectFrom.height / 2}px`;
 
@@ -1099,6 +1130,55 @@ function logMessage(msg) {
     line.innerText = msg;
     log.appendChild(line);
     log.scrollTop = log.scrollHeight;
+}
+
+/**
+ * Animation for drawing a card from deck to hand.
+ * @param {HTMLElement} cardEl The final destination element in hand
+ */
+function animateCardFromDeck(cardEl) {
+    const deckEl = document.getElementById('player-deck');
+    if (!deckEl || !cardEl) return;
+
+    // Temporarily hide the real card
+    cardEl.style.opacity = '0';
+
+    requestAnimationFrame(() => {
+        const deckRect = deckEl.getBoundingClientRect();
+        const cardRect = cardEl.getBoundingClientRect();
+
+        const clone = cardEl.cloneNode(true);
+        // Ensure clone clean style
+        clone.style.position = 'fixed';
+        clone.style.left = `${deckRect.left}px`;
+        clone.style.top = `${deckRect.top}px`;
+        clone.style.width = `${cardEl.offsetWidth || 100}px`;
+        clone.style.height = `${cardEl.offsetHeight || 140}px`;
+        clone.style.zIndex = '9999';
+        clone.style.margin = '0';
+        clone.style.transform = 'scale(0.5)';
+        clone.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+        clone.style.pointerEvents = 'none';
+        clone.style.opacity = '1';
+
+        // Remove hover effects/listeners (cloneNode copies attributes, listeners gone)
+        clone.className = cardEl.className;
+
+        document.body.appendChild(clone);
+
+        // Allow browser to paint initial state
+        requestAnimationFrame(() => {
+            clone.style.left = `${cardRect.left}px`;
+            clone.style.top = `${cardRect.top}px`;
+            clone.style.transform = 'scale(1)';
+        });
+
+        // Cleanup
+        clone.addEventListener('transitionend', () => {
+            clone.remove();
+            cardEl.style.opacity = '1';
+        });
+    });
 }
 
 // Start
