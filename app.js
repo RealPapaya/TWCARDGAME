@@ -45,7 +45,9 @@ if (userDecks[1].cards.length === 0) {
 }
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let editingDeckIdx = 0;
+// editingDeckIdx was duplicate
 let pendingViewMode = 'BATTLE'; // 'BATTLE' or 'BUILDER'
+let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
 function init() {
     gameEngine = new GameEngine(CARD_DATA);
@@ -118,43 +120,59 @@ function init() {
             catSelect.appendChild(opt);
         });
     }
-
-    // --- Battle Listeners ---
-    document.getElementById('end-turn-btn').addEventListener('click', () => {
-        try {
-            gameState.endTurn();
-            render();
-            if (gameState.currentPlayerIdx === 1) {
-                setTimeout(aiTurn, 1000);
-            }
-        } catch (e) { logMessage(e.message); }
-    });
-
-    document.getElementById('btn-surrender').addEventListener('click', () => {
-        document.getElementById('surrender-modal').style.display = 'flex';
-    });
-
-    document.getElementById('btn-surrender-confirm').addEventListener('click', () => {
-        document.getElementById('surrender-modal').style.display = 'none';
-        endGame('DEFEAT');
-    });
-
-    document.getElementById('btn-surrender-cancel').addEventListener('click', () => {
-        document.getElementById('surrender-modal').style.display = 'none';
-    });
-
-    // --- Result View Listeners ---
-    document.getElementById('btn-result-continue').addEventListener('click', () => {
-        showView('main-menu');
-    });
-
-    // Global drag events
-    document.addEventListener('mousemove', onDragMove);
-    document.addEventListener('mouseup', onDragEnd);
-
-    // Initial view
-    showView('main-menu');
 }
+
+// Sort Listeners
+document.querySelectorAll('.sort-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        const field = btn.dataset.sort;
+        if (currentSort.field === field) {
+            // Toggle direction
+            currentSort.direction = currentSort.direction === 'asc' ? 'desc' : 'asc';
+        } else {
+            currentSort.field = field;
+            currentSort.direction = 'asc';
+        }
+        renderDeckBuilder();
+    });
+});
+
+// --- Battle Listeners ---
+document.getElementById('end-turn-btn').addEventListener('click', () => {
+    try {
+        gameState.endTurn();
+        render();
+        if (gameState.currentPlayerIdx === 1) {
+            setTimeout(aiTurn, 1000);
+        }
+    } catch (e) { logMessage(e.message); }
+});
+
+document.getElementById('btn-surrender').addEventListener('click', () => {
+    document.getElementById('surrender-modal').style.display = 'flex';
+});
+
+document.getElementById('btn-surrender-confirm').addEventListener('click', () => {
+    document.getElementById('surrender-modal').style.display = 'none';
+    endGame('DEFEAT');
+});
+
+document.getElementById('btn-surrender-cancel').addEventListener('click', () => {
+    document.getElementById('surrender-modal').style.display = 'none';
+});
+
+// --- Result View Listeners ---
+document.getElementById('btn-result-continue').addEventListener('click', () => {
+    showView('main-menu');
+});
+
+// Global drag events
+document.addEventListener('mousemove', onDragMove);
+document.addEventListener('mouseup', onDragEnd);
+
+// Initial view
+showView('main-menu');
+
 
 function renderDeckSelect() {
     const container = document.getElementById('deck-select-slots');
@@ -278,6 +296,19 @@ function renderDeckBuilder() {
     const rarFilter = document.getElementById('filter-rarity') ? document.getElementById('filter-rarity').value : 'ALL';
     const costFilter = document.getElementById('filter-cost') ? document.getElementById('filter-cost').value : 'ALL';
 
+    // Update Sort Indicators (UI)
+    document.querySelectorAll('.sort-btn').forEach(btn => {
+        const field = btn.dataset.sort;
+        const arrow = btn.querySelector('.sort-arrow');
+        if (field === currentSort.field) {
+            btn.classList.add('active');
+            arrow.innerText = currentSort.direction === 'asc' ? '↑' : '↓';
+        } else {
+            btn.classList.remove('active');
+            arrow.innerText = '↕';
+        }
+    });
+
     CARD_DATA.filter(card => {
         const matchSearch = card.name.toLowerCase().includes(searchTerm) || (card.description && card.description.toLowerCase().includes(searchTerm));
         const matchCat = catFilter === 'ALL' || (card.category || '一般') === catFilter;
@@ -290,8 +321,25 @@ function renderDeckBuilder() {
         }
 
         return matchSearch && matchCat && matchRarity && matchCost;
+    }).sort((a, b) => {
+        const dir = currentSort.direction === 'asc' ? 1 : -1;
+        let valA, valB;
+
+        if (currentSort.field === 'cost') {
+            valA = a.cost; valB = b.cost;
+        } else if (currentSort.field === 'category') {
+            valA = a.category || '一般'; valB = b.category || '一般';
+            return valA.localeCompare(valB) * dir;
+        } else if (currentSort.field === 'rarity') {
+            const rMap = { 'COMMON': 1, 'RARE': 2, 'EPIC': 3, 'LEGENDARY': 4 };
+            valA = rMap[a.rarity || 'COMMON'] || 0;
+            valB = rMap[b.rarity || 'COMMON'] || 0;
+        }
+        return (valA - valB) * dir;
     }).forEach(card => {
         const cardEl = createCardEl(card, -1);
+
+
 
         // Count copies in current deck
         const countInDeck = deck.cards.filter(id => id === card.id).length;

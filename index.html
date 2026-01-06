@@ -66,7 +66,7 @@
                     <!-- Options populated by JS ideally, or hardcoded -->
                 </select>
                 <select id="filter-rarity" class="filter-select">
-                    <option value="ALL">所有等級</option>
+                    <option value="ALL">所有稀有度</option>
                     <option value="COMMON">一般 (Common)</option>
                     <option value="RARE">精良 (Rare)</option>
                     <option value="EPIC">史詩 (Epic)</option>
@@ -89,7 +89,14 @@
         </div>
         <div class="deck-builder-main">
             <div class="all-cards-section">
-                <h3>所有卡牌</h3>
+                <div class="cards-header-row">
+                    <h3>所有卡牌</h3>
+                    <div class="sort-controls">
+                        <button class="sort-btn" data-sort="cost">費用 <span class="sort-arrow">↕</span></button>
+                        <button class="sort-btn" data-sort="category">種族 <span class="sort-arrow">↕</span></button>
+                        <button class="sort-btn" data-sort="rarity">稀有度 <span class="sort-arrow">↕</span></button>
+                    </div>
+                </div>
                 <div id="all-cards-grid" class="cards-grid"></div>
             </div>
             <div class="my-deck-section">
