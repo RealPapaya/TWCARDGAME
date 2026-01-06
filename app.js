@@ -22,7 +22,10 @@ const CARD_DATA = [
     { "id": "tw014", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": "ANY" } }, "description": "戰吼: 回復一個單位2點血量", "image": "img/tw014.png" },
     { "id": "tw015", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "激將: 增加3點攻擊", "image": "img/tw015.png" },
     { "id": "tw016", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "image": "img/tw016.png" },
-    { "id": "tw017", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true }, "description": "嘲諷。金門坦克。", "image": "img/tw017.png" }
+    { "id": "tw017", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true }, "description": "嘲諷。金門坦克。", "image": "img/tw017.png" },
+    { "id": "tw018", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "衝鋒。激怒：+3攻擊。你在大聲甚麼！！！", "image": "img/tw018.png" },
+    { "id": "tw019", "name": "黃瀞瑩", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "HEAL", "value": 3, "target": "ANY" } }, "description": "戰吼：回復一個單位3點血量。", "image": "img/tw019.png" },
+    { "id": "tw020", "name": "高虹安", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD", "target": "ANY" } }, "description": "戰吼：賦予一個單位「光盾」。", "image": "img/tw020.png" }
 ];
 
 let cardDB = [];
@@ -787,7 +790,8 @@ function hidePreview() {
 function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
-    el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}`;
+    let dsClass = (card.keywords && card.keywords.divineShield) ? ' divine-shield' : '';
+    el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}${dsClass}`;
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';

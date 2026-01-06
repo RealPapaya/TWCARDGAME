@@ -23,8 +23,7 @@
     "health": , 
     "type": "MINION", 
     "rarity": "",
-    "keywords": { 
-    }, 
+    "keywords": {}, 
     "description": "", 
     "image": "" 
 }

@@ -1442,6 +1442,12 @@ body {
     border-color: #ffffff !important;
 }
 
+/* Divine Shield (光盾) Visual effect */
+.divine-shield {
+    box-shadow: 0 0 15px #ffff00, inset 0 0 15px #ffff77 !important;
+    border: 3px solid #ffff00 !important;
+}
+
 #play-preview-overlay {
     position: fixed;
     top: 0;

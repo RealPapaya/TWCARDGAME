@@ -253,6 +253,12 @@ class GameState {
                     targetUnit.currentHealth += battlecry.value;
                 }
             }
+        } else if (battlecry.type === 'GIVE_DIVINE_SHIELD') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                if (!targetUnit.keywords) targetUnit.keywords = {};
+                targetUnit.keywords.divineShield = true;
+            }
         }
         else if (battlecry.type === 'DESTROY') {
             const targetUnit = this.getTargetUnit(target);
@@ -316,8 +322,17 @@ class GameState {
     applyDamage(unit, amount) {
         if (!unit) return;
         const oldHealth = unit.currentHealth !== undefined ? unit.currentHealth : unit.hp;
-        unit.currentHealth = oldHealth - amount;
         if (unit.hp !== undefined) unit.hp = unit.currentHealth;
+
+        // Divine Shield (光盾) Check
+        if (unit.type === 'MINION' && unit.keywords && unit.keywords.divineShield) {
+            if (amount > 0) {
+                unit.currentHealth = oldHealth; // Revert damage
+                if (unit.hp !== undefined) unit.hp = oldHealth;
+                unit.keywords.divineShield = false; // Pop shield
+                return; // No further processing for this damage instance
+            }
+        }
 
         // Enrage (激將) Check
         if (unit.type === 'MINION' && unit.keywords && unit.keywords.enrage) {
@@ -382,6 +397,11 @@ class GameState {
         }
 
         attacker.canAttack = false;
+
+        // Remove Divine Shield after any attack
+        if (attacker.keywords && attacker.keywords.divineShield) {
+            attacker.keywords.divineShield = false;
+        }
 
         // check deaths
         this.resolveDeaths();
