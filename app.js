@@ -9,7 +9,7 @@ const CARD_DATA = [
     { "id": "tw003", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
     { "id": "tw004", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。", "image": "img/tw004.png" },
     { "id": "tw005", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" },
-    { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。", "image": "img/c004.png" },
+    { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：隨機 10 點傷害。", "image": "img/c004.png" },
     { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
     { "id": "tw006", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌", "image": "img/tw006.png" },
     { "id": "tw007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "戰吼:可以直接攻擊 大喊我是外送師", "image": "img/tw007.png" },
@@ -978,10 +978,6 @@ async function onDragEnd(e) {
 
                 if (isTargeted) {
                     try {
-                        gameState.playCard(attackerIndex, 'PENDING');
-                        render();
-
-                        // Determine visual mode (Damage=Red, Heal=Green, Buff=Orange)
                         let mode = 'DAMAGE';
                         if (type === 'HEAL') {
                             mode = 'HEAL';
@@ -991,21 +987,34 @@ async function onDragEnd(e) {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
                         }
 
-                        // Get the DOM element of the newly played minion to snap arrows
-                        const boardEl = document.getElementById('player-board');
-                        const newMinionIndex = gameState.currentPlayer.board.length - 1;
-                        const minionEl = boardEl.children[newMinionIndex];
+                        if (card.type === 'SPELL') {
+                            battlecrySourceType = 'SPELL';
+                            // Hide the card in hand to simulate it "becoming" the arrow
+                            const handCardEl = document.getElementById('player-hand').children[attackerIndex];
+                            if (handCardEl) handCardEl.style.opacity = '0';
 
-                        let startX = e.clientX;
-                        let startY = e.clientY;
+                            // For spells, we don't play pending. We just start targeting from Hand.
+                            startBattlecryTargeting(attackerIndex, e.clientX, e.clientY, mode);
+                        } else { // Minion with Battlecry
+                            gameState.playCard(attackerIndex, 'PENDING');
+                            render();
+                            battlecrySourceType = 'MINION';
 
-                        if (minionEl) {
-                            const rect = minionEl.getBoundingClientRect();
-                            startX = rect.left + rect.width / 2;
-                            startY = rect.top + rect.height / 2;
+                            // Get the DOM element of the newly played minion to snap arrows
+                            const boardEl = document.getElementById('player-board');
+                            const newMinionIndex = gameState.currentPlayer.board.length - 1;
+                            const minionEl = boardEl.children[newMinionIndex];
+
+                            let startX = e.clientX;
+                            let startY = e.clientY;
+
+                            if (minionEl) {
+                                const rect = minionEl.getBoundingClientRect();
+                                startX = rect.left + rect.width / 2;
+                                startY = rect.top + rect.height / 2;
+                            }
+                            startBattlecryTargeting(newMinionIndex, startX, startY, mode);
                         }
-
-                        startBattlecryTargeting(newMinionIndex, startX, startY, mode);
                     } catch (err) {
                         logMessage(err.message);
                     }
