@@ -16,7 +16,7 @@ const CARD_DATA = [
     { "id": "tw008", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "耐操" },
     { "id": "tw009", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷" },
     { "id": "tw010", "name": "水電徒弟", "category": "勞工", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "總有一天會變師傅" },
-    { "id": "tw011", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target_category": "民進黨政治人物" } }, "description": "戰吼: 對一個非民進黨政治人物造成3點傷害" },
+    { "id": "tw011", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
     { "id": "tw012", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": "ANY" } }, "description": "戰吼: 直接擊殺一個單位" },
     { "id": "tw013", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "description": "戰吼: 賦予所有\"勞工\"血量上限+2" },
     { "id": "tw014", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": "ANY" } }, "description": "戰吼: 回復一個單位2點血量" },
@@ -217,6 +217,40 @@ function renderDeckBuilder() {
 
     CARD_DATA.forEach(card => {
         const cardEl = createCardEl(card, -1);
+
+        // Count copies in current deck
+        const countInDeck = deck.cards.filter(id => id === card.id).length;
+        if (countInDeck > 0) {
+            const badge = document.createElement('div');
+            badge.innerText = `x${countInDeck}`;
+            badge.style.position = 'absolute';
+            badge.style.top = '5px';
+            badge.style.right = '5px';
+            badge.style.background = 'var(--neon-yellow)';
+            badge.style.color = '#000';
+            badge.style.fontWeight = 'bold';
+            badge.style.fontSize = '12px';
+            badge.style.padding = '2px 6px';
+            badge.style.borderRadius = '10px';
+            badge.style.zIndex = '20';
+            badge.style.boxShadow = '0 0 5px rgba(0,0,0,0.8)';
+            badge.style.border = '1px solid #000';
+            cardEl.appendChild(badge);
+
+            // Visual feedback for max copies
+            // Legendary: max 1 (but logic says global limit 2? Wait logic says "legendCount >= 2" is global limit, but usually deck limit is 1 per unique legendary. 
+            // In Hearthstone: 1 per legendary, 2 per non-legendary.
+            // My code handles global legendary limit of 2? "傳說卡牌在牌組中最多只能放 2 張！" -> This sounds like total legendaries in deck <= 2. 
+            // But let's look at "count >= 2" check below (lines 236-237). It applies to everything. 
+            // So currently duplicate limit is 2 for ALL cards.
+            // Let's stick to simple dimming if count >= 2.
+
+            if (countInDeck >= 2) {
+                cardEl.style.opacity = '0.5';
+                cardEl.style.filter = 'grayscale(0.5)';
+            }
+        }
+
         cardEl.addEventListener('click', (e) => {
             e.stopPropagation();
             if (deck.cards.length < 30) {
@@ -249,17 +283,63 @@ function renderDeckBuilder() {
     const listEl = document.getElementById('my-deck-list');
     listEl.innerHTML = '';
 
-    deck.cards.forEach((id, idx) => {
+    // Sort cards by cost then name
+    const sortedCards = [...deck.cards].sort((a, b) => {
+        const cardA = CARD_DATA.find(c => c.id === a);
+        const cardB = CARD_DATA.find(c => c.id === b);
+        if (cardA.cost !== cardB.cost) return cardA.cost - cardB.cost;
+        return cardA.name.localeCompare(cardB.name);
+    });
+
+    // Group cards
+    const cardCounts = {};
+    sortedCards.forEach(id => {
+        cardCounts[id] = (cardCounts[id] || 0) + 1;
+    });
+
+    // Render grouped cards
+    const processedIds = new Set();
+    sortedCards.forEach((id) => {
+        if (processedIds.has(id)) return;
+        processedIds.add(id);
+
         const card = CARD_DATA.find(c => c.id === id);
+        const count = cardCounts[id];
+
         const item = document.createElement('div');
         item.className = 'deck-item';
         // Fix: Add rarity border to deck list item
         item.style.borderLeft = `4px solid ${getBorderColor(card.rarity)}`;
-        item.innerHTML = `<span>${card.name}</span><span>${card.cost}</span>`;
+
+        // Show count if > 1
+        const countBadge = count > 1 ? `<span style="background:var(--neon-yellow); color:black; border-radius:50%; padding:0 6px; font-size:12px; margin-right:5px; font-weight:bold;">${count}</span>` : '';
+
+        item.innerHTML = `<div style="display:flex; align-items:center;">${countBadge}<span>${card.name}</span></div><span>${card.cost}</span>`;
+
         item.addEventListener('click', () => {
-            deck.cards.splice(idx, 1);
-            renderDeckBuilder();
+            // Remove one instance of this card
+            const indexToRemove = deck.cards.indexOf(id);
+            if (indexToRemove > -1) {
+                deck.cards.splice(indexToRemove, 1);
+                renderDeckBuilder();
+            }
         });
+
+        // Add hover preview for deck list items
+        item.addEventListener('mouseenter', (e) => {
+            const preview = document.getElementById('card-preview');
+            const builderView = document.getElementById('deck-builder');
+            if (builderView.style.display === 'flex') {
+                // Show on left side since list is on right
+                preview.style.right = 'auto';
+                preview.style.left = '40px';
+                preview.style.top = '50%';
+                preview.style.transform = 'translateY(-50%)';
+            }
+            showPreview(card);
+        });
+        item.addEventListener('mouseleave', hidePreview);
+
         listEl.appendChild(item);
     });
 
@@ -455,19 +535,29 @@ function showPreview(card) {
     let statsHtml = '';
     if (card.attack !== undefined && card.health !== undefined) {
         statsHtml = `
-        <div class="minion-stats">
-            <span class="stat-atk">${card.attack}</span>
-            <span class="stat-hp">${card.health}</span>
+        <div class="minion-stats" style="bottom: -20px;">
+            <span class="stat-atk" style="width: 60px; height: 60px; font-size: 30px; line-height: 60px;">${card.attack}</span>
+            <span class="stat-hp" style="width: 60px; height: 60px; font-size: 30px; line-height: 60px;">${card.health}</span>
         </div>`;
     }
 
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:100%; height:100%; transform:none !important;">
-            <div class="card-cost">${card.cost}</div>
-            <div class="card-title">${card.name}</div>
-            <div class="card-category">${card.category || ""}</div>
-            <div class="card-desc">${card.description || ""}</div>
-            ${statsHtml}
+        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:340px; height:500px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 40px;">
+            <div class="card-cost" style="width:70px; height:70px; font-size:36px; top:-25px; left:-25px;">${card.cost}</div>
+            
+            <div class="card-title" style="font-size:28px; margin-top:20px; flex-shrink: 0;">${card.name}</div>
+            
+            ${card.image ?
+            `<div class="card-art" style="width: 300px; height: 220px; background: url('${card.image}') no-repeat top center; background-size: cover; border-radius: 8px; margin: 10px auto; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.1);"></div>` :
+            `<div class="card-art" style="width: 300px; height: 100px; background: #333; margin: 10px auto; flex-shrink: 0; display:flex; align-items:center; justify-content:center; color:#555;">No Image</div>`
+        }
+            
+            <div class="card-category" style="font-size:18px; padding: 4px 12px; margin-bottom: 10px; flex-shrink: 0;">${card.category || ""}</div>
+            
+            <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center;">${card.description || ""}</div>
+            
+            <!-- Stats positioned at absolute bottom, pushing up into content if needed but keeping clear -->
+            ${statsHtml.replace(/font-size: 30px;/g, 'font-size: 32px;').replace(/width: 60px;/g, 'width: 70px;').replace(/height: 60px;/g, 'height: 70px;').replace(/bottom: -20px;/g, 'bottom: -10px;')}
         </div>
     `;
     preview.style.display = 'block';
@@ -491,16 +581,83 @@ function createCardEl(card, index) {
         </div>`;
     }
 
+    const imageStyle = card.image ? `background: url('${card.image}') no-repeat center; background-size: cover; opacity: 0.5;` : '';
+    // Use a background on the card itself or insert an element? 
+    // Let's insert an element for better control, similar to minion but restricted by space.
+    // Or set it as background of the card element?
+    // Current .card has background color.
+
+    // Let's try inserting a small art box under the title or behind text? 
+    // Given the layout "Cost(TL), Title(Top), Category, Desc", space is tight.
+    // Let's put it as a background for the whole card but darkened?
+
+    // Simple approach: Add an art div.
+    // Updated Card Layout logic
+    // Structure: 
+    // Top Row: Cost (Absolute TL), Title (Center/Right)
+    // Middle: Image (Block)
+    // Bottom: Category, Desc, Stats (Absolute Bottom)
+
+    // We need to ensure .card is flex-col
+    // But .card css is already flex-col.
+    // Let's remove absolute image and use flow.
+
+    const artHtml = card.image ?
+        `<div class="card-art-box" style="width: 100%; height: 55px; background: url('${card.image}') no-repeat top center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0;"></div>` :
+        `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
+
+    el.style.justifyContent = 'flex-start'; // Align top
+    el.style.padding = '2px';
+
     el.innerHTML = `
-        <div class="card-cost">${card.cost}</div>
-        <div class="card-title">${card.name}</div>
-        <div class="card-category">${card.category || ""}</div>
-        <div class="card-desc">${card.description || ""}</div>
+        <div class="card-cost" style="position: absolute; top: -5px; left: -5px; z-index: 10;">${card.cost}</div>
+        
+        <!-- Header spacer for Cost bubble -->
+        <div style="width: 100%; height: 10px;"></div>
+        
+        <div class="card-title" style="margin: 2px 0; font-size: 10px; z-index: 5; text-shadow: 0 1px 2px #000;">${card.name}</div>
+        
+        ${artHtml}
+        
+        <div class="card-category" style="margin: 2px 0; font-size: 7px;">${card.category || ""}</div>
+        
+        <div class="card-desc" style="font-size: 8px; line-height: 1.1; overflow: hidden; padding: 2px; flex-grow: 1; display:flex; align-items:flex-start; justify-content:center;">${card.description || ""}</div>
+        
+        <!-- Stats are absolute positioned in CSS usually, but let's check -->
         ${statsHtml}
     `;
 
     // Preview Interaction
-    el.addEventListener('mouseenter', () => showPreview(card));
+    el.addEventListener('mouseenter', (e) => {
+        const preview = document.getElementById('card-preview');
+        const builderView = document.getElementById('deck-builder');
+
+        if (builderView && builderView.style.display === 'flex') {
+            // Builder Mode: Avoid overlap
+            const screenWidth = window.innerWidth;
+            if (e.clientX < screenWidth / 2) {
+                // Cursor Left -> Show Right
+                preview.style.left = 'auto';
+                preview.style.right = '40px';
+                preview.style.top = '50%';
+                preview.style.transform = 'translateY(-50%)';
+            } else {
+                // Cursor Right -> Show Left
+                preview.style.right = 'auto';
+                preview.style.left = '40px';
+                preview.style.top = '50%';
+                preview.style.transform = 'translateY(-50%)';
+            }
+        } else {
+            // Battle Mode (Hand): Fixed Left Top
+            preview.style.top = '20%';
+            preview.style.left = '20px';
+            preview.style.right = 'auto';
+            preview.style.bottom = 'auto';
+            preview.style.transform = 'none';
+        }
+        showPreview(card);
+    });
     el.addEventListener('mouseleave', hidePreview);
 
     // Play Card Interaction (Now Drag instead of Click)
@@ -514,8 +671,9 @@ function createCardEl(card, index) {
 function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
     el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}`;
+    const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     el.innerHTML = `
-        <div class="minion-art"></div>
+        <div class="minion-art" style="${imageStyle}"></div>
         <div class="card-title">${minion.name}</div>
         <div class="minion-stats">
             <span class="stat-atk">${minion.attack}</span>
