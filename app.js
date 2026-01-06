@@ -543,6 +543,27 @@ function render() {
         oppHandEl.appendChild(back);
     });
 
+    // Apply Hearthstone-like Arc Logic
+    [handEl, oppHandEl].forEach((container, cIdx) => {
+        const cards = Array.from(container.children);
+        const total = cards.length;
+        const center = (total - 1) / 2;
+
+        // Curvature parameters
+        const degPerCard = 6;
+        const yPerCard = 12; // Stronger curve
+
+        cards.forEach((card, i) => {
+            const delta = i - center;
+            const rot = delta * degPerCard;
+            // Parabolic Curve: y = x^2 * factor roughly
+            const y = Math.abs(delta) * Math.abs(delta) * 2 + Math.abs(delta) * 5;
+
+            card.style.setProperty('--rot', `${rot}deg`);
+            card.style.setProperty('--y', `${y}px`);
+        });
+    });
+
     const boardEl = document.getElementById('player-board');
     boardEl.innerHTML = '';
     p1.board.forEach((minion, idx) => {
