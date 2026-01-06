@@ -6,8 +6,8 @@ const CARD_DATA = [
     { "id": "c002", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。無。", "image": "img/c002.png" },
     { "id": "tw001", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。", "image": "img/tw001.png" },
     { "id": "tw002", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
-    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
-    { "id": "tw004", "name": "發票中講", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "下回合開始時，抽 2 張牌。", "image": "img/tw004.png" },
+    { "id": "tw003", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
+    { "id": "tw004", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "下回合開始時，抽 2 張牌。", "image": "img/tw004.png" },
     { "id": "tw005", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" },
     { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。", "image": "img/c004.png" },
     { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
@@ -617,18 +617,18 @@ function showPreview(card) {
         `<div class="card-art" style="width: 90%; height: 100px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
 
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:340px; height:500px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
-            <div class="card-cost" style="width:70px; height:70px; font-size:36px; top:-25px; left:-25px;">${card.cost}</div>
+        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
+            <div class="card-cost" style="width:60px; height:60px; font-size:32px; top:-20px; left:-20px;">${card.cost}</div>
             
-            <div class="card-title" style="font-size:28px; margin-top:30px; flex-shrink: 0;">${card.name}</div>
+            <div class="card-title" style="font-size:24px; margin-top:25px; flex-shrink: 0;">${card.name}</div>
             
-            ${artHtml}
+            ${artHtml.replace('height: 220px', 'height: 180px')}
             
-            <div class="card-category" style="font-size:18px; padding: 4px 12px; margin-bottom: 10px; flex-shrink: 0;">${card.category || ""}</div>
+            <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; height: auto; overflow: visible;">${card.description || ""}</div>
+            <div class="card-desc" style="font-size:16px; padding: 5px 15px; line-height: 1.3; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; height: auto; overflow: visible;">${card.description || ""}</div>
             
-            ${statsHtml}
+            ${statsHtml.replace(/70px/g, '60px').replace('32px', '28px')}
         </div>
     `;
     preview.style.display = 'block';
@@ -1259,9 +1259,9 @@ async function showCardPlayPreview(card, isAI = false) {
     cardEl.className = `card rarity-${rarityClass} preview-card-3d ${card.type === 'SPELL' ? 'spell-card' : ''}`;
 
     // We override styles for the 3D preview
-    cardEl.style.width = '340px';
-    cardEl.style.height = '500px';
-    cardEl.style.fontSize = '24px'; // Base size for EM units if used
+    cardEl.style.width = '280px';
+    cardEl.style.height = '410px';
+    cardEl.style.fontSize = '20px'; // Adjusted
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
@@ -1271,22 +1271,22 @@ async function showCardPlayPreview(card, isAI = false) {
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
 
         statsHtml = `
-        <div class="minion-stats" style="margin-top: auto; padding: 20px;">
-            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
-            <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
+        <div class="minion-stats" style="margin-top: auto; padding: 15px;">
+            <span class="stat-atk ${atkClass}" style="width: 60px; height: 60px; font-size: 28px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
+            <span class="stat-hp ${hpClass}" style="width: 60px; height: 60px; font-size: 28px;">${hpValue}</span>
         </div>`;
     }
 
     const artHtml = card.image ?
-        `<div class="card-art" style="width: 90%; height: 220px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
-        `<div class="card-art" style="width: 90%; height: 100px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
+        `<div class="card-art" style="width: 90%; height: 180px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
+        `<div class="card-art" style="width: 90%; height: 80px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
 
     cardEl.innerHTML = `
-        <div class="card-cost" style="width:70px; height:70px; font-size:36px; top:-25px; left:-25px;">${card.cost}</div>
-        <div class="card-title" style="font-size:28px; margin-top:30px;">${card.name}</div>
+        <div class="card-cost" style="width:60px; height:60px; font-size:32px; top:-20px; left:-20px;">${card.cost}</div>
+        <div class="card-title" style="font-size:24px; margin-top:25px;">${card.name}</div>
         ${artHtml}
-        <div class="card-category" style="font-size:18px; padding: 4px 12px;">${card.category || ""}</div>
-        <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; height: auto; flex-grow: 1;">${card.description || ""}</div>
+        <div class="card-category" style="font-size:16px; padding: 2px 10px;">${card.category || ""}</div>
+        <div class="card-desc" style="font-size:16px; padding: 8px 15px; line-height: 1.3; height: auto; flex-grow: 1;">${card.description || ""}</div>
         ${statsHtml}
     `;
 
