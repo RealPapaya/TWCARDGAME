@@ -117,46 +117,69 @@ const CARD_DATA = [
 let cardDB = [];
 
 // Load cards manually (modified for local file access)
-async function init() {
-    try {
-        // Use embedded data instead of fetch
-        cardDB = CARD_DATA;
-        gameEngine = new GameEngine(cardDB);
+// Game state for deck builder
+let userDeck = JSON.parse(localStorage.getItem('userDeck')) || [];
 
-        // Setup simple decks
-        const deck1 = Array(15).fill('c001').concat(Array(15).fill('c004'));
-        const deck2 = Array(15).fill('c002').concat(Array(15).fill('tw001')); // Taunt heavy
+function init() {
+    gameEngine = new GameEngine(CARD_DATA);
 
-        gameState = gameEngine.createGame(deck1, deck2);
+    // UI Event Listeners
+    document.getElementById('btn-start-battle').addEventListener('click', () => {
+        if (userDeck.length === 30) {
+            startBattle(userDeck);
+        } else {
+            alert(`您的牌組目前有 ${userDeck.length} 張卡，需要剛好 30 張才能戰鬥！`);
+        }
+    });
 
-        setupUI();
-        render();
-    } catch (e) {
-        console.error("Init failed", e);
-        logMessage("Init failed: " + e.message);
-    }
-}
+    document.getElementById('btn-deck-builder').addEventListener('click', () => {
+        showView('deck-builder');
+        renderDeckBuilder();
+    });
 
-function setupUI() {
+    document.getElementById('btn-save-deck').addEventListener('click', () => {
+        localStorage.setItem('userDeck', JSON.stringify(userDeck));
+        showView('main-menu');
+    });
+
     document.getElementById('end-turn-btn').addEventListener('click', () => {
         try {
             gameState.endTurn();
-            // Simple Opponent AI
-            if (gameState.currentPlayerIdx === 1) {
-                // Determine AI Speed
-                setTimeout(() => opponentAIParams(), 500);
-            }
             render();
+            if (gameState.currentPlayerIdx === 1) {
+                setTimeout(aiTurn, 1000);
+            }
         } catch (e) { logMessage(e.message); }
     });
 
-    // Global Mouse Listener for Drag Line
+    // Global drag events
     document.addEventListener('mousemove', onDragMove);
     document.addEventListener('mouseup', onDragEnd);
 
-    // Init Mana Containers
+    // Initial view
+    showView('main-menu');
+}
+
+function showView(viewId) {
+    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
+    const view = document.getElementById(viewId);
+    if (view) view.style.display = 'flex';
+}
+
+function startBattle(deckIds) {
+    // Fill opponent deck with random cards
+    const allIds = CARD_DATA.map(c => c.id);
+    const oppDeck = [];
+    while (oppDeck.length < 30) oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
+
+    gameState = gameEngine.createGame(deckIds, oppDeck);
+
+    // Init Mana Containers for the new game view
     initManaContainers('player-mana-container');
     initManaContainers('opp-mana-container');
+
+    showView('battle-view');
+    render();
 }
 
 function initManaContainers(id) {
@@ -169,96 +192,109 @@ function initManaContainers(id) {
     }
 }
 
-async function opponentAIParams() {
+function renderDeckBuilder() {
+    const gridEl = document.getElementById('all-cards-grid');
+    gridEl.innerHTML = '';
+
+    CARD_DATA.forEach(card => {
+        const cardEl = createCardEl(card, -1);
+        cardEl.addEventListener('click', (e) => {
+            // Stop drag from hand logic for builder
+            e.stopPropagation();
+            if (userDeck.length < 30) {
+                userDeck.push(card.id);
+                renderDeckBuilder();
+            }
+        });
+        gridEl.appendChild(cardEl);
+    });
+
+    const listEl = document.getElementById('my-deck-list');
+    listEl.innerHTML = '';
+
+    userDeck.forEach((id, idx) => {
+        const card = CARD_DATA.find(c => c.id === id);
+        const item = document.createElement('div');
+        item.className = 'deck-item';
+        item.innerHTML = `<span>${card.name}</span><span>${card.cost}</span>`;
+        item.addEventListener('click', () => {
+            userDeck.splice(idx, 1);
+            renderDeckBuilder();
+        });
+        listEl.appendChild(item);
+    });
+
+    document.getElementById('deck-count-indicator').innerText = `已選擇: ${userDeck.length} / 30`;
+}
+
+async function aiTurn() {
     logMessage("Opponent is thinking...");
-    // 1. Play random card
     try {
+        // 1. Play random card
         if (gameState.currentPlayer.hand.length > 0) {
-            // Find playable
             const idx = gameState.currentPlayer.hand.findIndex(c => c.cost <= gameState.currentPlayer.mana.current);
             if (idx !== -1) {
                 gameState.playCard(idx);
-                logMessage("Opponent played " + gameState.currentPlayer.board[gameState.currentPlayer.board.length - 1].name);
+                logMessage("Opponent played a card");
                 render();
-                await new Promise(r => setTimeout(r, 800)); // Wait for play animation/perception
+                await new Promise(r => setTimeout(r, 800));
             }
         }
 
-        // 2. Attack logic (Face)
-        // Need to loop with await, so standard forEach won't work easily
+        // 2. Attack logic
         const oppBoard = gameState.currentPlayer.board;
         const playerBoard = gameState.opponent.board;
 
         for (let idx = 0; idx < oppBoard.length; idx++) {
             const m = oppBoard[idx];
             if (m.canAttack) {
-                // Simplified: Attack Face or Taunt
                 let targetType = 'HERO';
                 let targetIndex = null;
 
-                // Taunt check
                 const tauntIdx = playerBoard.findIndex(t => t.keywords?.taunt);
                 if (tauntIdx !== -1) {
                     targetType = 'MINION';
                     targetIndex = tauntIdx;
                 }
 
-                // AI Targeting Visuals matches DOM
-                // Opponent minions are in #opp-board
                 const attackerEl = document.getElementById('opp-board').children[idx];
-
-                let targetEl;
-                if (targetType === 'HERO') {
-                    targetEl = document.getElementById('player-hero');
-                } else {
-                    targetEl = document.getElementById('player-board').children[targetIndex];
-                }
+                const targetEl = targetType === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[targetIndex];
 
                 if (attackerEl && targetEl) {
                     await animateAttack(attackerEl, targetEl);
                 }
 
-                if (targetType === 'HERO') {
-                    gameState.attack(idx, { type: 'HERO' });
-                } else {
-                    gameState.attack(idx, { type: 'MINION', index: targetIndex });
-                }
+                gameState.attack(idx, { type: targetType, index: targetIndex });
                 render();
-                await new Promise(r => setTimeout(r, 500)); // Pause between attacks
+                await new Promise(r => setTimeout(r, 500));
             }
         }
 
-        // End turn
         gameState.endTurn();
         render();
     } catch (e) {
-        console.error("AI Error", e);
-        gameState.endTurn(); // Force end
+        logMessage(e.message);
+        gameState.endTurn();
         render();
     }
 }
 
 function render() {
-    // Update Turn
     document.getElementById('turn-indicator').innerText = `Turn: ${gameState.turnCount} (${gameState.currentPlayerIdx === 0 ? "You" : "Opponent"})`;
 
-    // Render Players
-    const p1 = gameState.players[0]; // You
-    const p2 = gameState.players[1]; // Opponent
+    const p1 = gameState.players[0];
+    const p2 = gameState.players[1];
 
-    // Update Player Stats
     renderMana('player-mana-container', p1.mana);
     renderMana('opp-mana-container', p2.mana);
 
     document.getElementById('player-hp').innerText = p1.hero.hp;
     document.getElementById('opp-hp').innerText = p2.hero.hp;
 
-    // Render Hand
     const handEl = document.getElementById('player-hand');
     handEl.innerHTML = '';
     p1.hand.forEach((card, idx) => {
-        const cardEl = createCardEl(card, idx);
-        handEl.appendChild(cardEl);
+        handEl.appendChild(createCardEl(card, idx));
     });
 
     const oppHandEl = document.getElementById('opp-hand');
@@ -269,26 +305,22 @@ function render() {
         oppHandEl.appendChild(back);
     });
 
-    // Render Board
     const boardEl = document.getElementById('player-board');
     boardEl.innerHTML = '';
     p1.board.forEach((minion, idx) => {
-        const minionEl = createMinionEl(minion, idx, true);
-        boardEl.appendChild(minionEl);
+        boardEl.appendChild(createMinionEl(minion, idx, true));
     });
 
     const oppBoardEl = document.getElementById('opp-board');
     oppBoardEl.innerHTML = '';
     p2.board.forEach((minion, idx) => {
-        const minionEl = createMinionEl(minion, idx, false);
-        oppBoardEl.appendChild(minionEl);
+        oppBoardEl.appendChild(createMinionEl(minion, idx, false));
     });
 
-    // Update Deck/Discard Counts (Title attribute for hover info)
-    document.getElementById('player-deck').title = `Cards: ${p1.deck.length}`;
-    document.getElementById('player-discard').title = `Cards: ${p1.graveyard?.length || 0}`;
-    document.getElementById('opp-deck').title = `Cards: ${p2.deck.length}`;
-    document.getElementById('opp-discard').title = `Cards: ${p2.graveyard?.length || 0}`;
+    document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
+    document.querySelector('#player-discard .count-badge').innerText = p1.graveyard?.length || 0;
+    document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+    document.querySelector('#opp-discard .count-badge').innerText = p2.graveyard?.length || 0;
 
     if (gameState.lastAction === 'attack') {
         // Implement visual shake if hit
@@ -365,7 +397,9 @@ function createCardEl(card, index) {
     el.addEventListener('mouseleave', hidePreview);
 
     // Play Card Interaction (Now Drag instead of Click)
-    el.addEventListener('mousedown', (e) => onDragStart(e, index, true));
+    if (index !== -1) { // Only add drag for cards in hand, not in deck builder
+        el.addEventListener('mousedown', (e) => onDragStart(e, index, true));
+    }
 
     return el;
 }
