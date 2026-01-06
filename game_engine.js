@@ -76,8 +76,9 @@ class GameEngine {
 
         // Initial Draw
         // Player 1 draws 3, Player 2 draws 4 (Coin logic could be added here, simplified for now)
-        const p1Draws = state.currentPlayer === 0 ? 3 : 4;
-        const p2Draws = state.currentPlayer === 0 ? 4 : 3;
+        // Initial Draw: Both players get 3 cards as per user request
+        const p1Draws = 3;
+        const p2Draws = 3;
 
         for (let i = 0; i < p1Draws; i++) p1.drawCard();
         for (let i = 0; i < p2Draws; i++) p2.drawCard();
@@ -129,10 +130,8 @@ class GameState {
         }
         player.mana.current = player.mana.max;
 
-        // Draw a card (Skip for the very first turn of the game - Player 1)
-        if (this.turnCount > 1) {
-            player.drawCard();
-        }
+        // Draw a card (Always draw at start of turn)
+        player.drawCard();
 
         // Wake up minions (summoning sickness wears off)
         player.board.forEach(minion => minion.canAttack = true);
