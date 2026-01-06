@@ -610,7 +610,7 @@ function showPreview(card) {
 
         statsHtml = `
         <div class="minion-stats" style="margin-top: auto; padding: 20px;">
-            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
+            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span>${card.attack}</span></span>
             <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
         </div>`;
     }
@@ -621,7 +621,7 @@ function showPreview(card) {
 
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
-            <div class="card-cost" style="width:60px; height:60px; font-size:32px;">${card.cost}</div>
+            <div class="card-cost" style="width:60px; height:60px; font-size:32px;"><span>${card.cost}</span></div>
             
             <div class="card-title" style="font-size:24px; margin-top:25px; flex-shrink: 0;">${card.name}</div>
             
@@ -692,7 +692,7 @@ function createCardEl(card, index) {
         `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
 
     el.innerHTML = `
-        <div class="card-cost">${card.cost}</div>
+        <div class="card-cost"><span>${card.cost}</span></div>
         
         <!-- Header spacer for Cost bubble -->
         <div style="width: 100%; height: 10px;"></div>

@@ -879,8 +879,8 @@ body {
     height: 32px;
     background: linear-gradient(135deg, #00c6ff, #0072ff);
     color: white;
-    border-radius: 50%;
-    /* Circle is safer and looks better */
+    border-radius: 4px; /* Small radius for diamond corners */
+    transform: rotate(45deg);
     display: flex;
     justify-content: center;
     align-items: center;
@@ -888,9 +888,13 @@ body {
     font-size: 16px;
     box-shadow: 0 0 10px rgba(0, 198, 255, 0.6);
     z-index: 10;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-}
+    border: 2px solid rgba(255, 255, 255, 0.4);}
 
+
+.card-cost span {
+    transform: rotate(-45deg);
+    display: block;
+}
 .card-cost::before {
     content: '';
     position: absolute;
@@ -984,8 +988,7 @@ body {
     box-shadow: 0 0 10px rgba(240, 152, 25, 0.5);
     /* Much wider sword shape to accommodate digits */
     clip-path: polygon(50% 0%, 80% 20%, 80% 60%, 100% 60%, 100% 80%, 70% 80%, 70% 100%, 30% 100%, 30% 80%, 0% 80%, 0% 60%, 20% 60%, 20% 20%);
-    transform: rotate(45deg);
-    display: flex;
+    /* transform: rotate(45deg); */ display: flex;
     justify-content: center;
     align-items: center;
 }
@@ -1002,15 +1005,12 @@ body {
 }
 
 .stat-atk span {
-    transform: rotate(-45deg);
+    /* transform: rotate(-45deg); */
     display: flex;
     align-items: center;
     justify-content: center;
     width: 100%;
     height: 100%;
-    margin-bottom: 2px;
-    /* Visual center adjustment */
-    margin-right: 2px;
 }
 
 .stat-hp {
@@ -1151,7 +1151,7 @@ body {
 }
 
 .minion.taunt::before {
-    content: "?›¡ï¸?;
+    content: "?ï¿½ï¿½ï¿½?;
     position: absolute;
     top: -15px;
     left: 50%;
