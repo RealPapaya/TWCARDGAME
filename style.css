@@ -7,6 +7,7 @@
     --neon-pink: #ff007f;
     --neon-blue: #00f3ff;
     --neon-yellow: #ffee00;
+    --neon-cyan: #00f3ff;
     --text-primary: #ffffff;
     --text-secondary: #b3b3b3;
     --card-frame: #2c2c35;
@@ -470,14 +471,16 @@ body {
 .board {
     width: 95%;
     max-width: 1000px;
-    height: 125px;
+    height: 160px;
+    /* Increased from 125px to fit 140px minions + padding */
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 10px;
-    margin: 5px 0;
+    margin: 10px 0;
+    /* More margin */
     background: rgba(0, 0, 0, 0.2);
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
     transition: border-color 0.3s;
@@ -588,29 +591,136 @@ body {
 }
 
 .mana-crystal {
-    width: 18px;
+    width: 20px;
     height: 20px;
     background: #1a1a1a;
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
-    transition: all 0.3s ease;
-    border: 1px solid rgba(255, 255, 255, 0.05);
+    /* Diamond shape */
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+}
+
+.mana-container.shake-error {
+    animation: shake-error 0.5s cubic-bezier(.36, .07, .19, .97) both;
+    border-color: #ff0000;
+}
+
+@keyframes shake-error {
+
+    10%,
+    90% {
+        transform: translateX(-1px);
+    }
+
+    20%,
+    80% {
+        transform: translateX(2px);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translateX(-4px);
+    }
+
+    40%,
+    60% {
+        transform: translateX(4px);
+    }
 }
 
 .mana-crystal.active {
     background: var(--neon-blue);
-    box-shadow: 0 0 10px var(--neon-blue);
+    box-shadow: 0 0 15px var(--neon-blue), inset 0 0 10px rgba(255, 255, 255, 0.5);
     transform: scale(1.1);
 }
 
 .mana-crystal.spent {
     background: rgba(0, 243, 255, 0.15);
-    border: 1px solid rgba(0, 243, 255, 0.3);
+    opacity: 0.5;
 }
 
-.mana-crystal.locked {
-    background: #0a0a0a;
-    opacity: 0.3;
+/* Dust Effect */
+.dust-cloud {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
 }
+
+.dust-particle {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    filter: blur(2px);
+    animation: dust-fade 0.6s ease-out forwards;
+}
+
+@keyframes dust-fade {
+    0% {
+        transform: translate(0, 0) scale(0.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(2);
+        opacity: 0;
+    }
+}
+
+/* Shatter Effect */
+.shatter-fragment {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2000;
+    background-size: 140px 200px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: shatter-fly 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes shatter-fly {
+    0% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) rotate(var(--dr)) scale(0);
+        opacity: 0;
+    }
+}
+
+.board-slam {
+    animation: board-shake 0.3s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes board-shake {
+
+    10%,
+    90% {
+        transform: translateY(-2px);
+    }
+
+    20%,
+    80% {
+        transform: translateY(4px);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translateY(-6px);
+    }
+
+    40%,
+    60% {
+        transform: translateY(6px);
+    }
+}
+
+
+
+
 
 /* Deck Pile */
 .deck-pile {
@@ -769,15 +879,28 @@ body {
     height: 32px;
     background: linear-gradient(135deg, #00c6ff, #0072ff);
     color: white;
-    border-radius: 50%;
+    /* Hexagon Shape */
+    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
     display: flex;
     justify-content: center;
     align-items: center;
     font-weight: 800;
     font-size: 16px;
     box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
-    border: 2px solid #fff;
-    z-index: 2;
+    z-index: 10;
+}
+
+.card-cost::before {
+    content: '';
+    position: absolute;
+    top: 1px;
+    left: 1px;
+    right: 1px;
+    bottom: 1px;
+    background: inherit;
+    clip-path: inherit;
+    background: rgba(255, 255, 255, 0.2);
+    z-index: -1;
 }
 
 .card-title {
@@ -844,25 +967,57 @@ body {
 .stat-hp {
     font-size: 18px;
     font-weight: 900;
-    text-shadow: 1px 1px 0 #000;
+    text-shadow: 1px 1px 2px #000;
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    position: relative;
+    z-index: 5;
 }
 
 .stat-atk {
     color: #fff;
     background: linear-gradient(135deg, #f09819 0%, #edde5d 100%);
-    box-shadow: 0 0 5px #f09819;
+    box-shadow: 0 0 10px rgba(240, 152, 25, 0.5);
+    /* Improved Sword shape */
+    clip-path: polygon(50% 0%, 65% 15%, 65% 65%, 85% 65%, 85% 75%, 65% 75%, 65% 100%, 35% 100%, 35% 75%, 15% 75%, 15% 65%, 35% 65%, 35% 15%);
+    transform: rotate(45deg);
+}
+
+.stat-atk::after {
+    content: '';
+    position: absolute;
+    top: 10%;
+    left: 45%;
+    width: 10%;
+    height: 40%;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 2px;
+}
+
+.stat-atk span {
+    transform: rotate(-45deg);
+    display: inline-block;
 }
 
 .stat-hp {
     color: #fff;
-    background: linear-gradient(135deg, #ff416c 0%, #ff4b2b 100%);
-    box-shadow: 0 0 5px #ff416c;
+    background: linear-gradient(180deg, #ff416c 0%, #ff4b2b 100%);
+    box-shadow: 0 0 10px rgba(255, 75, 43, 0.5);
+    /* Heart shape */
+    clip-path: polygon(50% 15%, 70% 0%, 90% 5%, 100% 25%, 100% 50%, 50% 90%, 0% 50%, 0% 25%, 10% 5%, 30% 0%);
+}
+
+.stat-buffed {
+    color: #00ff00 !important;
+    text-shadow: 0 0 5px #000, 0 0 10px rgba(0, 255, 0, 0.5);
+}
+
+.stat-damaged {
+    color: #ff4d4d !important;
+    text-shadow: 0 0 5px #000, 0 0 10px rgba(255, 0, 0, 0.5);
 }
 
 /* Hand Container */
@@ -961,6 +1116,8 @@ body {
     flex-direction: column;
     justify-content: flex-end;
     mask-image: linear-gradient(to bottom, transparent, black 20%);
+    display: none;
+    /* Hidden by default, showView will toggle */
 }
 
 #drag-layer {
@@ -1181,13 +1338,197 @@ body {
     border-color: #ffffff !important;
 }
 
-/* Deck Builder Scroll Fix */
-#my-deck-list {
-    flex-grow: 1;
-    overflow-y: auto;
-    margin-bottom: 20px;
-    max-height: 400px;
+#play-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(5px);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 50000;
+    /* Above everything */
+    perspective: 1000px;
+}
+
+.preview-card-3d {
+    animation: preview-float 1.5s ease-in-out infinite alternate, preview-entrance 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.2);
+    transform-style: preserve-3d;
+}
+
+@keyframes preview-float {
+    from {
+        transform: translateY(0) rotateX(10deg) rotateY(-5deg);
+    }
+
+    to {
+        transform: translateY(-20px) rotateX(15deg) rotateY(5deg);
+    }
+}
+
+@keyframes preview-entrance {
+    from {
+        transform: scale(0.5) rotateY(90deg);
+        opacity: 0;
+    }
+
+    to {
+        transform: scale(1) rotateY(0);
+        opacity: 1;
+    }
+}
+
+.preview-card-3d.slamming {
+    animation: preview-slam 0.3s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+@keyframes preview-slam {
+    to {
+        transform: scale(2) translateZ(500px);
+        opacity: 0;
+    }
+}
+
+/* Play Preview Overlay */
+#play-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.4);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 30000;
+    perspective: 1200px;
+    pointer-events: none;
+}
+
+.preview-card-3d {
+    width: 340px;
+    height: 500px;
+    animation: preview-enter-3d 0.8s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+    transform-style: preserve-3d;
+}
+
+@keyframes preview-enter-3d {
+    0% {
+        transform: translateZ(-500px) rotateX(45deg) scale(0.5);
+        opacity: 0;
+    }
+
+    40% {
+        transform: translateZ(100px) rotateX(-10deg) scale(1.1);
+        opacity: 1;
+    }
+
+    60% {
+        transform: translateZ(120px) rotateX(-5deg) scale(1.15);
+    }
+
+    100% {
+        transform: translateZ(0) rotateX(0) scale(1);
+    }
+}
+
+.preview-card-3d.slamming {
+    animation: preview-slam 0.4s cubic-bezier(0.6, -0.28, 0.735, 0.045) forwards;
+}
+
+@keyframes preview-slam {
+    0% {
+        transform: translateZ(0) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateZ(-500px) scale(0);
+        opacity: 0;
+    }
+}
+
+/* Dust Effect */
+.dust-cloud {
+    position: absolute;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.dust-particle {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.4);
+    border-radius: 50%;
+    filter: blur(2px);
+    animation: dust-fade 0.6s ease-out forwards;
+}
+
+@keyframes dust-fade {
+    0% {
+        transform: translate(0, 0) scale(0.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) scale(2);
+        opacity: 0;
+    }
+}
+
+/* Shatter Effect */
+.shatter-fragment {
+    position: absolute;
+    pointer-events: none;
+    z-index: 2000;
+    background: #333;
+    background-image: linear-gradient(135deg, #444, #111);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
+    animation: shatter-fly 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes shatter-fly {
+    0% {
+        transform: translate(0, 0) rotate(0deg) scale(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) rotate(var(--dr)) scale(0);
+        opacity: 0;
+    }
+}
+
+.board-slam {
+    animation: board-shake 0.3s cubic-bezier(.36, .07, .19, .97) both;
+}
+
+@keyframes board-shake {
+
+    10%,
+    90% {
+        transform: translateY(-2px);
+    }
+
+    20%,
+    80% {
+        transform: translateY(4px);
+    }
+
+    30%,
+    50%,
+    70% {
+        transform: translateY(-6px);
+    }
+
+    40%,
+    60% {
+        transform: translateY(6px);
+    }
 }
 
 /* Drag Line Styles */

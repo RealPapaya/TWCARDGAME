@@ -5,10 +5,10 @@ const CARD_DATA = [
     { "id": "c001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生。", "image": "img/c001.png" },
     { "id": "c002", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。無。", "image": "img/c002.png" },
     { "id": "tw001", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。", "image": "img/tw001.png" },
-    { "id": "tw002", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：使一個友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
-    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：使一個友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
-    { "id": "tw004", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。", "image": "img/tw004.png" },
-    { "id": "tw005", "name": "彈劾總統囉", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" },
+    { "id": "tw002", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
+    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
+    { "id": "tw004", "name": "發票中講", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "下回合開始時，抽 2 張牌。", "image": "img/tw004.png" },
+    { "id": "tw005", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" },
     { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。", "image": "img/c004.png" },
     { "id": "c013", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
     { "id": "tw006", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌", "image": "img/tw006.png" },
@@ -185,6 +185,12 @@ function showView(viewId) {
     document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
     const view = document.getElementById(viewId);
     if (view) view.style.display = 'flex';
+
+    // Toggle message log visibility
+    const log = document.getElementById('message-log');
+    if (log) {
+        log.style.display = (viewId === 'battle-view') ? 'flex' : 'none';
+    }
 }
 
 let previousPlayerHandSize = 0;
@@ -400,8 +406,12 @@ async function aiTurn() {
                 if (!card) break;
 
                 logMessage(`Opponent plays ${card.name}`);
+
+                await showCardPlayPreview(card, true);
+
                 gameState.playCard(action.index, action.target);
                 render();
+                await resolveDeaths();
 
                 // Show Battlecry Visuals
                 if (action.target) {
@@ -454,6 +464,7 @@ async function aiTurn() {
 
                 gameState.attack(attackerIdx, action.target);
                 render();
+                await resolveDeaths();
                 await new Promise(r => setTimeout(r, 600));
             }
 
@@ -539,6 +550,23 @@ function render() {
     }
 }
 
+async function resolveDeaths() {
+    const dead = gameState.checkDeaths ? gameState.checkDeaths() : [];
+    if (dead.length > 0) {
+        // Animate deaths
+        const boards = [document.getElementById('player-board'), document.getElementById('opp-board')];
+        for (const death of dead) {
+            const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
+            if (board && board.children[death.index]) {
+                const el = board.children[death.index];
+                await animateShatter(el);
+            }
+        }
+        gameState.resolveDeaths();
+        render();
+    }
+}
+
 function endGame(result) {
     const resultView = document.getElementById('game-result-view');
     const resultText = document.getElementById('result-status-text');
@@ -570,32 +598,37 @@ function showPreview(card) {
     const preview = document.getElementById('card-preview');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
 
+    const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
     if (card.attack !== undefined && card.health !== undefined) {
+        const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
+        const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
+        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
+
         statsHtml = `
-        <div class="minion-stats" style="bottom: -20px;">
-            <span class="stat-atk" style="width: 60px; height: 60px; font-size: 30px; line-height: 60px;">${card.attack}</span>
-            <span class="stat-hp" style="width: 60px; height: 60px; font-size: 30px; line-height: 60px;">${card.health}</span>
+        <div class="minion-stats" style="margin-top: auto; padding: 20px;">
+            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
+            <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
         </div>`;
     }
 
+    const artHtml = card.image ?
+        `<div class="card-art" style="width: 90%; height: 220px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
+        `<div class="card-art" style="width: 90%; height: 100px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
+
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:340px; height:500px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 40px;">
+        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:340px; height:500px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
             <div class="card-cost" style="width:70px; height:70px; font-size:36px; top:-25px; left:-25px;">${card.cost}</div>
             
-            <div class="card-title" style="font-size:28px; margin-top:20px; flex-shrink: 0;">${card.name}</div>
+            <div class="card-title" style="font-size:28px; margin-top:30px; flex-shrink: 0;">${card.name}</div>
             
-            ${card.image ?
-            `<div class="card-art" style="width: 300px; height: 220px; background: url('${card.image}') no-repeat top center; background-size: cover; border-radius: 8px; margin: 10px auto; flex-shrink: 0; border: 2px solid rgba(255,255,255,0.1);"></div>` :
-            `<div class="card-art" style="width: 300px; height: 100px; background: #333; margin: 10px auto; flex-shrink: 0; display:flex; align-items:center; justify-content:center; color:#555;">No Image</div>`
-        }
+            ${artHtml}
             
             <div class="card-category" style="font-size:18px; padding: 4px 12px; margin-bottom: 10px; flex-shrink: 0;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center;">${card.description || ""}</div>
+            <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; height: auto; overflow: visible;">${card.description || ""}</div>
             
-            <!-- Stats positioned at absolute bottom, pushing up into content if needed but keeping clear -->
-            ${statsHtml.replace(/font-size: 30px;/g, 'font-size: 32px;').replace(/width: 60px;/g, 'width: 70px;').replace(/height: 60px;/g, 'height: 70px;').replace(/bottom: -20px;/g, 'bottom: -10px;')}
+            ${statsHtml}
         </div>
     `;
     preview.style.display = 'block';
@@ -610,12 +643,17 @@ function createCardEl(card, index) {
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
     el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}`;
 
+    const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
     if (card.attack !== undefined && card.health !== undefined) {
+        const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
+        const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
+        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
+
         statsHtml = `
         <div class="minion-stats">
-            <span class="stat-atk">${card.attack}</span>
-            <span class="stat-hp">${card.health}</span>
+            <span class="stat-atk ${atkClass}"><span>${card.attack}</span></span>
+            <span class="stat-hp ${hpClass}">${hpValue}</span>
         </div>`;
     }
 
@@ -713,23 +751,22 @@ function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
     el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
+    const base = CARD_DATA.find(c => c.id === minion.id) || minion;
+    const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
+    const hpClass = minion.currentHealth < minion.health ? 'stat-damaged' : (minion.health > base.health ? 'stat-buffed' : '');
+
     el.innerHTML = `
         <div class="minion-art" style="${imageStyle}"></div>
         <div class="card-title">${minion.name}</div>
         <div class="minion-stats">
-            <span class="stat-atk">${minion.attack}</span>
-            <span class="stat-hp">${minion.currentHealth}</span>
+            <span class="stat-atk ${atkClass}"><span>${minion.attack}</span></span>
+            <span class="stat-hp ${hpClass}">${minion.currentHealth}</span>
         </div>
     `;
 
     // Preview Interaction
     el.addEventListener('mouseenter', () => showPreview(minion));
     el.addEventListener('mouseleave', hidePreview);
-
-    // Attack Drag Start
-    if (isPlayer && minion.canAttack && gameState.currentPlayerIdx === 0) {
-        el.addEventListener('mousedown', (e) => onDragStart(e, index));
-    }
 
     // Attack Drag Start
     if (isPlayer && minion.canAttack && gameState.currentPlayerIdx === 0) {
@@ -756,6 +793,11 @@ const dragLine = document.getElementById('drag-line');
 function onDragStart(e, index, fromHand = false) {
     if (gameState.currentPlayerIdx !== 0) return;
     if (isBattlecryTargeting) return; // Finish targeting first
+
+    const card = gameState.currentPlayer.hand[index];
+    if (fromHand && card && gameState.currentPlayer.mana.current < card.cost) {
+        shakeManaContainer(true);
+    }
 
     dragging = true;
     attackerIndex = index;
@@ -838,12 +880,31 @@ async function onDragEnd(e) {
             const originalEl = document.getElementById('player-hand').children[attackerIndex];
             if (originalEl) originalEl.style.opacity = '1';
 
-            // Find drop target
+            // Temporarily hide ghost to see what's underneath
+            if (draggedEl) draggedEl.style.display = 'none';
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            if (draggedEl) draggedEl.style.display = 'block';
+
             const isPlayerArea = targetEl?.closest('.player-area.player');
 
-            if (isPlayerArea) {
+            if (isPlayerArea || targetEl?.id === 'player-board') {
                 const card = gameState.currentPlayer.hand[attackerIndex];
+
+                if (gameState.currentPlayer.mana.current < card.cost) {
+                    shakeManaContainer(true);
+                    logMessage("Not enough mana!");
+                    // Cleanup visual ghost
+                    if (draggedEl) {
+                        draggedEl.remove();
+                        draggedEl = null;
+                    }
+                    const originalEl = document.getElementById('player-hand').children[attackerIndex];
+                    if (originalEl) originalEl.style.opacity = '1';
+                    return;
+                }
+
+                // Show Preview before playing
+                await showCardPlayPreview(card);
 
                 // Targeted Battlecry check
                 const type = card.keywords?.battlecry?.type;
@@ -893,6 +954,7 @@ async function onDragEnd(e) {
                 try {
                     gameState.playCard(attackerIndex);
                     render();
+                    await resolveDeaths();
                 } catch (err) {
                     logMessage(err.message);
                 }
@@ -917,6 +979,7 @@ async function onDragEnd(e) {
                     }
                     gameState.attack(attackerIndex, { type, index });
                     render();
+                    await resolveDeaths();
                 } catch (err) {
                     logMessage(err.message);
                 }
@@ -956,6 +1019,7 @@ async function onDragEnd(e) {
                 // Manually trigger the effect in the engine since it was 'PENDING' before
                 gameState.resolveBattlecry(minion.keywords.battlecry, target);
                 render();
+                await resolveDeaths();
             }
 
             if (target) {
@@ -1178,6 +1242,163 @@ function animateCardFromDeck(cardEl) {
             clone.remove();
             cardEl.style.opacity = '1';
         });
+    });
+}
+
+/**
+ * Shows a large 3D preview of the card in the center before it hits the board.
+ */
+async function showCardPlayPreview(card, isAI = false) {
+    const overlay = document.getElementById('play-preview-overlay');
+    overlay.innerHTML = '';
+    overlay.style.display = 'flex';
+
+    // Create a big version of the card manually to ensure perfect scaling
+    const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
+    const cardEl = document.createElement('div');
+    cardEl.className = `card rarity-${rarityClass} preview-card-3d ${card.type === 'SPELL' ? 'spell-card' : ''}`;
+
+    // We override styles for the 3D preview
+    cardEl.style.width = '340px';
+    cardEl.style.height = '500px';
+    cardEl.style.fontSize = '24px'; // Base size for EM units if used
+
+    const base = CARD_DATA.find(c => c.id === card.id) || card;
+    let statsHtml = '';
+    if (card.attack !== undefined && card.health !== undefined) {
+        const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
+        const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
+        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
+
+        statsHtml = `
+        <div class="minion-stats" style="margin-top: auto; padding: 20px;">
+            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
+            <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
+        </div>`;
+    }
+
+    const artHtml = card.image ?
+        `<div class="card-art" style="width: 90%; height: 220px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
+        `<div class="card-art" style="width: 90%; height: 100px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
+
+    cardEl.innerHTML = `
+        <div class="card-cost" style="width:70px; height:70px; font-size:36px; top:-25px; left:-25px;">${card.cost}</div>
+        <div class="card-title" style="font-size:28px; margin-top:30px;">${card.name}</div>
+        ${artHtml}
+        <div class="card-category" style="font-size:18px; padding: 4px 12px;">${card.category || ""}</div>
+        <div class="card-desc" style="font-size:20px; padding: 10px 20px; line-height: 1.4; height: auto; flex-grow: 1;">${card.description || ""}</div>
+        ${statsHtml}
+    `;
+
+    overlay.appendChild(cardEl);
+
+    // AI cards might need a slight delay to be noticed
+    await new Promise(r => setTimeout(r, 800));
+
+    // Slam phase
+    cardEl.classList.add('slamming');
+
+    // Board shake and dust
+    const boardId = isAI ? 'opp-board' : 'player-board';
+    const boardEl = document.getElementById(boardId);
+    if (boardEl) {
+        boardEl.classList.remove('board-slam');
+        void boardEl.offsetWidth;
+        boardEl.classList.add('board-slam');
+        spawnDustEffect(boardEl);
+        setTimeout(() => boardEl.classList.remove('board-slam'), 500);
+    }
+
+    await new Promise(r => setTimeout(r, 400));
+
+    overlay.style.display = 'none';
+    overlay.innerHTML = '';
+}
+
+/**
+ * Spawns dust particles on a target element (board).
+ */
+function spawnDustEffect(targetEl) {
+    const rect = targetEl.getBoundingClientRect();
+    const cloud = document.createElement('div');
+    cloud.className = 'dust-cloud';
+    cloud.style.left = `${rect.left + rect.width / 2}px`;
+    cloud.style.top = `${rect.top + rect.height / 2}px`;
+    document.body.appendChild(cloud);
+
+    for (let i = 0; i < 12; i++) {
+        const p = document.createElement('div');
+        p.className = 'dust-particle';
+        const angle = Math.random() * Math.PI * 2;
+        const dist = 50 + Math.random() * 80;
+        p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+        p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+        p.style.width = p.style.height = `${10 + Math.random() * 20}px`;
+        cloud.appendChild(p);
+    }
+    setTimeout(() => cloud.remove(), 1000);
+}
+
+/**
+ * Shatters a minion element into fragments.
+ */
+function animateShatter(el) {
+    return new Promise(resolve => {
+        const rect = el.getBoundingClientRect();
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = `${rect.left}px`;
+        container.style.top = `${rect.top}px`;
+        container.style.width = `${rect.width}px`;
+        container.style.height = `${rect.height}px`;
+        container.style.pointerEvents = 'none';
+        container.style.zIndex = '2000';
+        document.body.appendChild(container);
+
+        // Hide original
+        el.style.visibility = 'hidden';
+
+        const cols = 4; // More fragments
+        const rows = 5;
+        const fragW = rect.width / cols;
+        const fragH = rect.height / rows;
+
+        // Get original image if any
+        const artEl = el.querySelector('.minion-art');
+        const bgImg = artEl ? artEl.style.backgroundImage : null;
+
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                const frag = document.createElement('div');
+                frag.className = 'shatter-fragment';
+                frag.style.width = `${fragW}px`;
+                frag.style.height = `${fragH}px`;
+                frag.style.left = `${c * fragW}px`;
+                frag.style.top = `${r * fragH}px`;
+
+                if (bgImg) {
+                    frag.style.backgroundImage = bgImg;
+                    frag.style.backgroundSize = `${rect.width}px ${rect.height}px`;
+                    frag.style.backgroundPosition = `-${c * fragW}px -${r * fragH}px`;
+                } else {
+                    frag.style.backgroundColor = '#333';
+                    frag.style.backgroundImage = 'linear-gradient(135deg, #444, #111)';
+                }
+
+                const angle = Math.random() * Math.PI * 2;
+                const dist = 50 + Math.random() * 150;
+                frag.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
+                frag.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
+                frag.style.setProperty('--dr', `${(Math.random() - 0.5) * 600}deg`);
+
+                container.appendChild(frag);
+            }
+        }
+
+        setTimeout(() => {
+            container.remove();
+            resolve();
+        }, 800);
     });
 }
 

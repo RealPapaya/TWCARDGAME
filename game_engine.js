@@ -112,6 +112,17 @@ class GameState {
         this.turnCount++;
         const player = this.currentPlayer;
 
+        // Execute Turn Start Effects
+        if (player.onTurnStart && player.onTurnStart.length > 0) {
+            const effects = [...player.onTurnStart];
+            player.onTurnStart = [];
+            effects.forEach(effect => {
+                if (effect.type === 'DRAW') {
+                    for (let i = 0; i < effect.count; i++) player.drawCard();
+                }
+            });
+        }
+
         // Increase Mana
         if (player.mana.max < 10) {
             player.mana.max++;
@@ -169,6 +180,30 @@ class GameState {
             if (minion.keywords && minion.keywords.battlecry) {
                 this.resolveBattlecry(minion.keywords.battlecry, target);
             }
+        } else if (card.type === 'SPELL') {
+            // Trigger Spell Effect (Battlecry logic reused for simplicity)
+            if (card.keywords && card.keywords.battlecry) {
+                this.resolveBattlecry(card.keywords.battlecry, target);
+            } else if (card.id === 'tw004') { // Election Promise: Draw 2 at start of next turn
+                player.onTurnStart = player.onTurnStart || [];
+                player.onTurnStart.push({ type: 'DRAW', count: 2 });
+            } else if (card.id === 'tw005') { // Green Energy: Damage split
+                const damage = player.deck.length === 0 ? 20 : 10;
+                const enemies = [this.opponent.hero, ...this.opponent.board];
+
+                for (let i = 0; i < damage; i++) {
+                    const target = enemies[Math.floor(Math.random() * enemies.length)];
+                    this.applyDamage(target, 1);
+                    // Filter out dead minions after each hit? 
+                    // Actually, Hearthstone "Randomly split" usually can hit already dead (at 0 HP) things in some cases, 
+                    // but better to filter. 
+                    if (target.type === 'MINION' && target.currentHealth <= 0) {
+                        const idx = enemies.indexOf(target);
+                        if (idx > -1) enemies.splice(idx, 1);
+                    }
+                    if (enemies.length === 0) break;
+                }
+            }
         }
     }
 
@@ -184,10 +219,12 @@ class GameState {
             });
         } else if (battlecry.type === 'BOUNCE_ALL_ENEMY') {
             const opp = this.opponent;
+            const collection = this.players[0].collection || []; // Fallback
             while (opp.board.length > 0) {
                 const m = opp.board.shift();
-                const originalCard = this.players[0].buildDeck([m.id], [m])[0];
-                if (opp.hand.length < 10) opp.hand.push(originalCard);
+                // Find original card data to put back in hand
+                const originalCard = (this.collection || []).find(c => c.id === m.id) || m;
+                if (opp.hand.length < 10) opp.hand.push(JSON.parse(JSON.stringify(originalCard)));
             }
         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
             const targetUnit = this.getTargetUnit(target);
@@ -222,6 +259,15 @@ class GameState {
         } else if (battlecry.type === 'BUFF_CATEGORY') {
             this.currentPlayer.board.forEach(m => {
                 if (m.category === battlecry.target_category) {
+                    m.health += battlecry.value;
+                    m.currentHealth += battlecry.value;
+                }
+            });
+        } else if (battlecry.type === 'BUFF_ALL') {
+            this.currentPlayer.board.forEach(m => {
+                if (battlecry.stat === 'ATTACK') {
+                    m.attack += battlecry.value;
+                } else if (battlecry.stat === 'HEALTH') {
                     m.health += battlecry.value;
                     m.currentHealth += battlecry.value;
                 }
@@ -379,6 +425,7 @@ class Player {
         this.hand = [];
         this.board = [];
         this.graveyard = [];
+        this.onTurnStart = []; // Queued effects for start of turn
     }
 
     buildDeck(ids, collection) {
