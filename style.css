@@ -378,6 +378,14 @@ body {
     overflow: hidden;
 }
 
+.deck-builder-main .all-cards-section {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    overflow: hidden;
+    /* Ensure consistent container */
+}
+
 .cards-grid {
     display: grid;
     grid-template-columns: repeat(6, 1fr);
@@ -386,10 +394,14 @@ body {
     /* Ensure enough space for 6 cards (6*140 + gaps) */
     gap: 15px;
     overflow-y: auto;
-    padding-right: 10px;
-    height: 100%;
+    padding: 20px;
+    /* Added padding to prevent cropping */
     padding-bottom: 50px;
     /* Extra space for bottom cards */
+    flex: 1;
+    /* Allow filling remaining space */
+    height: auto;
+    /* Let flex control height */
 }
 
 .deck-list {
