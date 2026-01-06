@@ -421,30 +421,33 @@ async function aiTurn() {
 
                     let destEl = null;
                     if (action.target.type === 'HERO') {
-                        destEl = (action.target.side === 'OPPONENT') ? document.getElementById('opp-hero') : document.getElementById('player-hero');
-                        // Note: AI perspective 'OPPONENT' is AI's opponent (Player).
-                        // Wait, getBattlecryTarget returns 'OPPONENT' meaning AI's enemy (Player).
-                        // Let's verify side logic in getBattlecryTarget:
-                        // "return { type: 'HERO', side: 'OPPONENT' }"
-                        // In GameState.getTargetUnit: target.side === 'OPPONENT' -> this.opponent (Player).
-                        // So destEl should be Player Hero.
-                        // BUT `document.getElementById('player-hero')` is correct.
+                        // AI perspective side: 'OPPONENT' is Player, 'PLAYER' is AI.
+                        destEl = (action.target.side === 'OPPONENT') ? document.getElementById('player-hero') : document.getElementById('opp-hero');
                     } else if (action.target.type === 'MINION') {
-                        // side 'OPPONENT' -> Player Board
-                        // side 'PLAYER' -> Opp Board
-                        const isPlayerSide = (action.target.side === 'OPPONENT');
-                        const targetBoardId = isPlayerSide ? 'player-board' : 'opp-board';
+                        const targetBoardId = (action.target.side === 'OPPONENT') ? 'player-board' : 'opp-board';
                         destEl = document.getElementById(targetBoardId).children[action.target.index];
                     }
 
                     if (sourceEl && destEl) {
-                        let color = '#ff0000';
                         const type = card.keywords?.battlecry?.type;
-                        if (type === 'HEAL' || type === 'HEAL_ALL_FRIENDLY') color = '#43e97b';
-                        else if (type === 'BUFF_STAT_TARGET') color = '#ffa500';
+                        let color = '#ff0000';
+                        let effectType = 'DAMAGE';
+                        if (type === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
+                        else if (type === 'BUFF_STAT_TARGET') { color = '#ffa500'; effectType = 'BUFF'; }
 
                         await animateAbility(sourceEl, destEl, color);
+                        triggerCombatEffect(destEl, effectType);
                     }
+                } else if (card.keywords?.battlecry) {
+                    const type = card.keywords.battlecry.type;
+                    setTimeout(() => {
+                        if (type === 'BUFF_ALL' || type === 'BUFF_CATEGORY') {
+                            document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                        } else if (type === 'HEAL_ALL_FRIENDLY') {
+                            document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
+                            triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
+                        }
+                    }, 100);
                 }
 
                 await new Promise(r => setTimeout(r, 1000));
@@ -618,7 +621,7 @@ function showPreview(card) {
 
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
-            <div class="card-cost" style="width:60px; height:60px; font-size:32px; top:-20px; left:-20px;">${card.cost}</div>
+            <div class="card-cost" style="width:60px; height:60px; font-size:32px;">${card.cost}</div>
             
             <div class="card-title" style="font-size:24px; margin-top:25px; flex-shrink: 0;">${card.name}</div>
             
@@ -689,7 +692,7 @@ function createCardEl(card, index) {
         `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
 
     el.innerHTML = `
-        <div class="card-cost" style="position: absolute; top: -5px; left: -5px; z-index: 10;">${card.cost}</div>
+        <div class="card-cost">${card.cost}</div>
         
         <!-- Header spacer for Cost bubble -->
         <div style="width: 100%; height: 10px;"></div>
@@ -952,9 +955,22 @@ async function onDragEnd(e) {
                 }
 
                 try {
+                    const card = gameState.currentPlayer.hand[attackerIndex];
                     gameState.playCard(attackerIndex);
                     render();
                     await resolveDeaths();
+
+                    if (card && card.keywords?.battlecry) {
+                        const bcType = card.keywords.battlecry.type;
+                        setTimeout(() => {
+                            if (bcType === 'BUFF_ALL' || bcType === 'BUFF_CATEGORY') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                            } else if (bcType === 'HEAL_ALL_FRIENDLY') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
+                                triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
+                            }
+                        }, 100);
+                    }
                 } catch (err) {
                     logMessage(err.message);
                 }
@@ -1030,11 +1046,24 @@ async function onDragEnd(e) {
 
                 if (sourceEl && destEl) {
                     let color = '#ff0000'; // Default Damage Red
-                    if (draggingMode === 'HEAL') color = '#43e97b'; // Green
-                    else if (draggingMode === 'BUFF') color = '#ffa500'; // Orange
+                    let effectType = 'DAMAGE';
+                    if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
+                    else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
 
                     await animateAbility(sourceEl, destEl, color);
+                    triggerCombatEffect(destEl, effectType);
                 }
+            } else if (minion.keywords?.battlecry) {
+                // Handle non-targeted (buff all, heal all)
+                const bcType = minion.keywords.battlecry.type;
+                setTimeout(() => { // Add delay for board-wide effects
+                    if (bcType === 'BUFF_ALL' || bcType === 'BUFF_CATEGORY') {
+                        document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                    } else if (bcType === 'HEAL_ALL_FRIENDLY') {
+                        document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
+                        triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
+                    }
+                }, 100);
             }
         } catch (err) {
             logMessage(err.message);
@@ -1162,24 +1191,8 @@ function animateAttack(fromEl, toEl) {
             toEl.classList.add('shaking');
             setTimeout(() => toEl.classList.remove('shaking'), 500);
 
-            // Create Impact Flare (Optional, simple flash)
-            const flash = document.createElement('div');
-            flash.style.position = 'absolute';
-            flash.style.left = `${rectTo.left}px`;
-            flash.style.top = `${rectTo.top}px`;
-            flash.style.width = `${rectTo.width}px`;
-            flash.style.height = `${rectTo.height}px`;
-            flash.style.backgroundColor = 'rgba(255, 255, 255, 0.8)';
-            flash.style.zIndex = '10000';
-            flash.style.pointerEvents = 'none';
-            flash.style.mixBlendMode = 'overlay';
-            flash.style.transition = 'opacity 0.2s';
-            document.body.appendChild(flash);
-
-            setTimeout(() => {
-                flash.style.opacity = '0';
-                setTimeout(() => flash.remove(), 200);
-            }, 50);
+            // Trigger Combat Effect (Slash)
+            triggerCombatEffect(toEl, 'DAMAGE');
 
             // Cleanup Clone
             clone.remove();
@@ -1282,7 +1295,7 @@ async function showCardPlayPreview(card, isAI = false) {
         `<div class="card-art" style="width: 90%; height: 80px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
 
     cardEl.innerHTML = `
-        <div class="card-cost" style="width:60px; height:60px; font-size:32px; top:-20px; left:-20px;">${card.cost}</div>
+        <div class="card-cost" style="width:60px; height:60px; font-size:32px;">${card.cost}</div>
         <div class="card-title" style="font-size:24px; margin-top:25px;">${card.name}</div>
         ${artHtml}
         <div class="card-category" style="font-size:16px; padding: 2px 10px;">${card.category || ""}</div>
@@ -1305,7 +1318,10 @@ async function showCardPlayPreview(card, isAI = false) {
         boardEl.classList.remove('board-slam');
         void boardEl.offsetWidth;
         boardEl.classList.add('board-slam');
-        spawnDustEffect(boardEl);
+
+        // Intensify dust for high cost cards
+        const intensity = card.cost >= 7 ? 2.5 : 1;
+        spawnDustEffect(boardEl, intensity);
         setTimeout(() => boardEl.classList.remove('board-slam'), 500);
     }
 
@@ -1318,22 +1334,26 @@ async function showCardPlayPreview(card, isAI = false) {
 /**
  * Spawns dust particles on a target element (board).
  */
-function spawnDustEffect(targetEl) {
+function spawnDustEffect(targetEl, intensity = 1) {
     const rect = targetEl.getBoundingClientRect();
     const cloud = document.createElement('div');
     cloud.className = 'dust-cloud';
     cloud.style.left = `${rect.left + rect.width / 2}px`;
     cloud.style.top = `${rect.top + rect.height / 2}px`;
+    cloud.style.zIndex = "60000"; // Higher than overlay if needed
     document.body.appendChild(cloud);
 
-    for (let i = 0; i < 12; i++) {
+    const count = Math.floor(15 * intensity);
+    for (let i = 0; i < count; i++) {
         const p = document.createElement('div');
         p.className = 'dust-particle';
         const angle = Math.random() * Math.PI * 2;
-        const dist = 50 + Math.random() * 80;
+        const dist = (60 + Math.random() * 100) * (intensity > 1 ? 1.8 : 1);
         p.style.setProperty('--dx', `${Math.cos(angle) * dist}px`);
         p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
-        p.style.width = p.style.height = `${10 + Math.random() * 20}px`;
+        const size = (15 + Math.random() * 25) * (intensity > 1 ? 1.6 : 1);
+        p.style.width = p.style.height = `${size}px`;
+        p.style.backgroundColor = intensity > 1 ? 'rgba(255, 238, 0, 0.6)' : 'rgba(200, 200, 200, 0.4)';
         cloud.appendChild(p);
     }
     setTimeout(() => cloud.remove(), 1000);
@@ -1400,6 +1420,54 @@ function animateShatter(el) {
             resolve();
         }, 800);
     });
+}
+
+/**
+ * Spawns a floating combat effect on a unit.
+ * @param {HTMLElement} el The target element
+ * @param {string} type 'DAMAGE', 'HEAL', or 'BUFF'
+ */
+function triggerCombatEffect(el, type) {
+    if (!el) return;
+    const container = document.createElement('div');
+    container.className = 'combat-effect';
+
+    if (type === 'DAMAGE') {
+        const slash = document.createElement('div');
+        slash.className = 'slash-effect';
+        container.appendChild(slash);
+    } else if (type === 'HEAL') {
+        const count = 6;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'heal-particle';
+            p.innerText = '+';
+            p.style.left = `${Math.random() * 60 + 20}%`;
+            p.style.top = `${Math.random() * 60 + 20}%`;
+            p.style.fontSize = `${16 + Math.random() * 14}px`;
+            p.style.animationDelay = `${Math.random() * 0.4}s`;
+            container.appendChild(p);
+        }
+    } else if (type === 'BUFF') {
+        const count = 5;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'buff-particle';
+            p.innerText = '↑';
+            p.style.left = `${Math.random() * 60 + 20}%`;
+            p.style.top = `${Math.random() * 60 + 20}%`;
+            p.style.fontSize = `${18 + Math.random() * 12}px`;
+            p.style.animationDelay = `${Math.random() * 0.4}s`;
+            container.appendChild(p);
+        }
+    }
+
+    el.appendChild(container);
+    // Ensure visibility
+    container.style.display = 'flex';
+    setTimeout(() => {
+        container.remove();
+    }, 1500);
 }
 
 // Start

@@ -652,17 +652,17 @@ body {
     background: rgba(255, 255, 255, 0.4);
     border-radius: 50%;
     filter: blur(2px);
-    animation: dust-fade 0.6s ease-out forwards;
+    animation: dust-fade 1.0s ease-out forwards;
 }
 
 @keyframes dust-fade {
     0% {
         transform: translate(0, 0) scale(0.5);
-        opacity: 0.8;
+        opacity: 0.99; filter: brightness(2) blur(3px);
     }
 
     100% {
-        transform: translate(var(--dx), var(--dy)) scale(2);
+        transform: translate(var(--dx), var(--dy)) scale(4.5); filter: blur(15px);
         opacity: 0;
     }
 }
@@ -873,21 +873,22 @@ body {
 /* Card Internals */
 .card-cost {
     position: absolute;
-    top: -8px;
-    left: -8px;
+    top: 5px;
+    left: 5px;
     width: 32px;
     height: 32px;
     background: linear-gradient(135deg, #00c6ff, #0072ff);
     color: white;
-    /* Hexagon Shape */
-    clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+    border-radius: 50%;
+    /* Circle is safer and looks better */
     display: flex;
     justify-content: center;
     align-items: center;
     font-weight: 800;
     font-size: 16px;
-    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 10px rgba(0, 198, 255, 0.6);
     z-index: 10;
+    border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
 .card-cost::before {
@@ -981,9 +982,12 @@ body {
     color: #fff;
     background: linear-gradient(135deg, #f09819 0%, #edde5d 100%);
     box-shadow: 0 0 10px rgba(240, 152, 25, 0.5);
-    /* Improved Sword shape */
-    clip-path: polygon(50% 0%, 65% 15%, 65% 65%, 85% 65%, 85% 75%, 65% 75%, 65% 100%, 35% 100%, 35% 75%, 15% 75%, 15% 65%, 35% 65%, 35% 15%);
+    /* Much wider sword shape to accommodate digits */
+    clip-path: polygon(50% 0%, 80% 20%, 80% 60%, 100% 60%, 100% 80%, 70% 80%, 70% 100%, 30% 100%, 30% 80%, 0% 80%, 0% 60%, 20% 60%, 20% 20%);
     transform: rotate(45deg);
+    display: flex;
+    justify-content: center;
+    align-items: center;
 }
 
 .stat-atk::after {
@@ -999,7 +1003,14 @@ body {
 
 .stat-atk span {
     transform: rotate(-45deg);
-    display: inline-block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    margin-bottom: 2px;
+    /* Visual center adjustment */
+    margin-right: 2px;
 }
 
 .stat-hp {
@@ -1140,7 +1151,7 @@ body {
 }
 
 .minion.taunt::before {
-    content: "üõ°Ô∏è";
+    content: "?õ°Ô∏?;
     position: absolute;
     top: -15px;
     left: 50%;
@@ -1270,7 +1281,7 @@ body {
 }
 
 .ability-projectile::after {
-    content: '‚ûî';
+    content: '??;
     font-size: 30px;
     display: block;
     color: var(--projectile-color, #43e97b);
@@ -1464,17 +1475,17 @@ body {
     background: rgba(255, 255, 255, 0.4);
     border-radius: 50%;
     filter: blur(2px);
-    animation: dust-fade 0.6s ease-out forwards;
+    animation: dust-fade 1.0s ease-out forwards;
 }
 
 @keyframes dust-fade {
     0% {
         transform: translate(0, 0) scale(0.5);
-        opacity: 0.8;
+        opacity: 0.99; filter: brightness(2) blur(3px);
     }
 
     100% {
-        transform: translate(var(--dx), var(--dy)) scale(2);
+        transform: translate(var(--dx), var(--dy)) scale(4.5); filter: blur(15px);
         opacity: 0;
     }
 }
@@ -1574,7 +1585,80 @@ body {
     border-color: #ffffff !important;
 }
 
-/* Deck Builder Scroll Fix */
+/* Combat Effects */
+.combat-effect {
+    position: absolute;
+    pointer-events: none;
+    z-index: 10000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+}
+
+.slash-effect {
+    width: 120%;
+    height: 10px;
+    background: #ff0000;
+    box-shadow: 0 0 15px #ff0000;
+    transform: rotate(-45deg);
+    animation: slash-fade 0.4s ease-out forwards;
+}
+
+@keyframes slash-fade {
+    0% {
+        transform: rotate(-45deg) scaleX(0);
+        opacity: 1;
+    }
+
+    50% {
+        transform: rotate(-45deg) scaleX(1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: rotate(-45deg) scaleX(1.2);
+        opacity: 0;
+    }
+}
+
+.heal-particle,
+.buff-particle {
+    position: absolute;
+    font-size: 32px;
+    /* Larger */
+    font-weight: 900;
+    animation: float-up 1.2s ease-out forwards;
+    pointer-events: none;
+    z-index: 10001;
+}
+
+.heal-particle {
+    color: #00ff00;
+    text-shadow: 0 0 10px #00ff00;
+}
+
+.buff-particle {
+    color: #ffa500;
+    text-shadow: 0 0 10px #ffa500;
+}
+
+@keyframes float-up {
+    0% {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    100% {
+        transform: translateY(-50px);
+        opacity: 0;
+    }
+}
+
+/* Original Deck Builder Scroll Fix */
 #my-deck-list {
     flex-grow: 1;
     overflow-y: auto;
