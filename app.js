@@ -486,7 +486,25 @@ async function aiTurn() {
 }
 
 function render() {
-    document.getElementById('turn-indicator').innerText = `Turn: ${gameState.turnCount} (${gameState.currentPlayerIdx === 0 ? "You" : "Opponent"})`;
+    document.getElementById('turn-indicator').innerText = `TURN: ${gameState.turnCount}`;
+
+    // Toggle Turn Lights
+    const isPlayerTurn = gameState.currentPlayerIdx === 0;
+    const playerInd = document.getElementById('indicator-player');
+    const oppInd = document.getElementById('indicator-opp');
+    const endBtn = document.getElementById('end-turn-btn');
+
+    if (playerInd && oppInd) {
+        if (isPlayerTurn) {
+            playerInd.classList.add('active');
+            oppInd.classList.remove('active');
+            if (endBtn) endBtn.disabled = false;
+        } else {
+            playerInd.classList.remove('active');
+            oppInd.classList.add('active');
+            if (endBtn) endBtn.disabled = true;
+        }
+    }
 
     const p1 = gameState.players[0];
     const p2 = gameState.players[1];

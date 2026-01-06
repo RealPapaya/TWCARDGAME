@@ -450,7 +450,7 @@ body {
     padding: 5px 20px;
     position: relative;
     transition: all 0.3s ease;
-    overflow: hidden;
+    overflow: visible;
 }
 
 .opponent {
@@ -471,7 +471,7 @@ body {
 .board {
     width: 95%;
     max-width: 1000px;
-    height: 160px;
+    height: 170px;
     /* Increased from 125px to fit 140px minions + padding */
     border: 2px solid rgba(255, 255, 255, 0.1);
     border-radius: 12px;
@@ -815,9 +815,9 @@ body {
 /* Minions on Board */
 .minion {
     width: 100px;
-    /* Increased from 85px */
+    /* Revert to 100px */
     height: 140px;
-    /* Increased from 115px */
+    /* Revert to 140px */
     background: var(--card-inner);
     border-radius: var(--card-border-radius);
     border: 2px solid transparent;
@@ -1072,18 +1072,16 @@ body {
 
 /* Center Line Controls */
 .center-line {
-    height: 60px;
-    background: rgba(0, 0, 0, 0.4);
+    height: 50px;
+    /* Spacer */
+    background: transparent;
+    border: none;
+    backdrop-filter: none;
     display: flex;
     justify-content: center;
-    /* Center aligns items (Turn Indicator) */
     align-items: center;
-    padding: 0 30px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    backdrop-filter: blur(5px);
     position: relative;
-    /* For absolute positioning */
+    z-index: 50;
 }
 
 #btn-surrender {
@@ -1091,13 +1089,21 @@ body {
     left: 40px;
 }
 
-#end-turn-btn {
+.end-turn-group {
     position: absolute;
     right: 40px;
-    /* Middle Right position */
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 5px;
+}
+
+#end-turn-btn {
+    /* Position is now static inside flex group */
+    position: static;
     background: var(--neon-yellow);
     border: none;
-    padding: 12px 30px;
+    padding: 8px 20px;
     font-weight: 800;
     font-size: 16px;
     text-transform: uppercase;
@@ -1106,6 +1112,33 @@ body {
     clip-path: polygon(10% 0, 100% 0, 100% 80%, 90% 100%, 0 100%, 0 20%);
     transition: all 0.2s;
     box-shadow: 0 0 15px rgba(255, 238, 0, 0.4);
+}
+
+.turn-light {
+    font-size: 12px;
+    font-weight: bold;
+    color: #444;
+    /* Dark by default */
+    text-shadow: none;
+    transition: all 0.3s;
+    letter-spacing: 2px;
+}
+
+.turn-light.active {
+    color: var(--neon-cyan);
+    /* Active Color */
+    text-shadow: 0 0 10px var(--neon-cyan);
+}
+
+/* Specific colors for Opponent vs Player? */
+#indicator-player.active {
+    color: var(--neon-blue);
+    text-shadow: 0 0 15px var(--neon-blue);
+}
+
+#indicator-opp.active {
+    color: var(--neon-pink);
+    text-shadow: 0 0 15px var(--neon-pink);
 }
 
 #end-turn-btn:hover {
@@ -1119,6 +1152,10 @@ body {
 }
 
 #turn-indicator {
+    display: none;
+    position: absolute;
+    right: 180px;
+    /* To the left of the button group */
     font-size: 20px;
     font-weight: bold;
     color: var(--neon-blue);
@@ -1169,7 +1206,7 @@ body {
 
 .minion.taunt::before {
     content: "🛡️";
- position: absolute;
+    position: absolute;
     top: -15px;
     left: 50%;
     transform: translateX(-50%);

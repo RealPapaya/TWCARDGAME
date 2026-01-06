@@ -101,8 +101,16 @@
             <div class="center-line">
                 <button id="btn-surrender" class="neon-button danger"
                     style="padding: 8px 20px; font-size: 16px;">投降</button>
-                <button id="end-turn-btn">結束回合</button>
+
+                <!-- Turn Text moved to right side via CSS, but let's keep it here -->
                 <div id="turn-indicator">Turn: 1</div>
+
+                <!-- End Turn Group -->
+                <div class="end-turn-group">
+                    <div id="indicator-opp" class="turn-light">對方回合</div>
+                    <button id="end-turn-btn">結束回合</button>
+                    <div id="indicator-player" class="turn-light">你的回合</div>
+                </div>
             </div>
 
             <!-- Player Area -->
