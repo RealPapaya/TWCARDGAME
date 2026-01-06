@@ -103,7 +103,7 @@
                 <div class="board" id="player-board"></div>
                 <div class="hero player-hero" id="player-hero" data-type="HERO">
                     <div class="avatar"></div>
-                    <!-- Stats moved to separate cluster -->
+                    <div class="stats">HP: <span id="player-hp">30</span></div>
                 </div>
 
                 <div class="hand" id="player-hand"></div>
@@ -115,10 +115,9 @@
 
                 <!-- New Status Cluster in Bottom Right -->
                 <div id="player-status-cluster" class="status-cluster">
-                    <div class="hero-stats-pill">HP: <span id="player-hp">30</span></div>
+                    <div id="player-mana-text" class="mana-text">0/0</div>
                     <div id="player-mana-container" class="mana-container frame-style">
                         <!-- Mana Text will be injected by JS -->
-                        <div id="player-mana-text" class="mana-text">0/0</div>
                     </div>
                 </div>
             </div>

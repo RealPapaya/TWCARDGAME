@@ -226,22 +226,12 @@ async function startBattle(deckIds) {
 
 function initManaContainers(id) {
     const container = document.getElementById(id);
-    // container.innerHTML = ''; // Don't wipe if text exists
-
-    // Check for existing text
-    const children = Array.from(container.children);
-    const existingText = children.find(c => c.classList.contains('mana-text'));
-
-    // Clear old crystals
-    children.forEach(c => {
-        if (!c.classList.contains('mana-text')) container.removeChild(c);
-    });
+    container.innerHTML = '';
 
     for (let i = 0; i < 10; i++) {
         const crystal = document.createElement('div');
         crystal.className = 'mana-crystal locked';
-        if (existingText) container.insertBefore(crystal, existingText);
-        else container.appendChild(crystal);
+        container.appendChild(crystal);
     }
 }
 
@@ -594,29 +584,10 @@ function endGame(result) {
 
 function renderMana(containerId, mana) {
     const container = document.getElementById(containerId);
-    // Be careful not to wipe the text element if it exists inside
-    // My previous code cleared innerHTML. Now I have structure inside index.html for player.
-    // Opponent mana container is still empty div in index.html (checked?)
-    // Actually, I modified index.html only for player. Opponent still uses .mana-container empty.
+    const textEl = document.getElementById(containerId === 'player-mana-container' ? 'player-mana-text' : 'opp-mana-text-placeholder');
 
-    // Check if we have the text element
-    const textEl = document.getElementById(containerId === 'player-mana-container' ? 'player-mana-text' : 'opp-mana-text-placeholder'); // Opponent doesn't have text request yet
+    container.innerHTML = '';
 
-    // Clear crystals but keep text? 
-    // Easier to just rebuild everything or scope crystals to a sub-container.
-    // But currently structure is: container -> [crystals] + [text div]
-
-    // Let's protect the text div.
-    const children = Array.from(container.children);
-    const existingText = children.find(c => c.classList.contains('mana-text'));
-
-    // Remove only crystals (elements with class mana-crystal)
-    children.forEach(c => {
-        if (c.classList.contains('mana-crystal')) container.removeChild(c);
-    });
-
-    // Re-create crystals
-    // Insert before text if text exists
     for (let i = 0; i < 10; i++) {
         const crystal = document.createElement('div');
         crystal.className = 'mana-crystal';
@@ -627,16 +598,11 @@ function renderMana(containerId, mana) {
         } else {
             crystal.classList.add('locked');
         }
-
-        if (existingText) {
-            container.insertBefore(crystal, existingText);
-        } else {
-            container.appendChild(crystal);
-        }
+        container.appendChild(crystal);
     }
 
-    if (existingText) {
-        existingText.innerText = `${mana.current}/${mana.max}`;
+    if (textEl) {
+        textEl.innerText = `${mana.current}/${mana.max}`;
     }
 }
 

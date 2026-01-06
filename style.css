@@ -1725,3 +1725,17 @@ body {
     margin-left: 10px;
     text-shadow: 0 0 5px rgba(0, 243, 255, 0.8);
 }
+
+/* Override Mana Text for Top Positioning */
+.mana-text {
+    position: static; /* Remove absolute */
+    width: 100%;
+    text-align: center;
+    margin-right: 0;
+    margin-bottom: 2px;
+    margin-left: 0;
+    right: auto;
+    font-size: 18px; /* Make it visible */
+    color: #00f2fe;
+    text-shadow: 0 0 5px rgba(0, 243, 255, 0.8);
+}
