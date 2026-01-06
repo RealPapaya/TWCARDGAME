@@ -222,6 +222,11 @@ async function startBattle(deckIds) {
         gameState.players[0].hand.push(card);
         render();
     }
+
+    // If opponent starts, trigger AI
+    if (gameState.currentPlayerIdx === 1) {
+        setTimeout(aiTurn, 1000);
+    }
 }
 
 function initManaContainers(id) {
