@@ -49,7 +49,140 @@ body {
 .menu-buttons {
     display: flex;
     flex-direction: column;
+    gap: 30px;
+    align-items: center;
+    width: 100%;
+}
+
+.deck-slots-container {
+    display: flex;
     gap: 20px;
+    justify-content: center;
+    flex-wrap: wrap;
+    width: 100%;
+    max-width: 1000px;
+}
+
+.deck-slot {
+    background: rgba(20, 20, 30, 0.8);
+    border: 2px solid var(--neon-blue);
+    border-radius: 12px;
+    padding: 15px;
+    width: 200px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.3s ease;
+    cursor: pointer;
+    position: relative;
+}
+
+.deck-slot:hover {
+    box-shadow: 0 0 15px var(--neon-blue);
+    transform: translateY(-5px);
+}
+
+.deck-slot.selected {
+    border-color: var(--neon-yellow);
+    box-shadow: 0 0 20px var(--neon-yellow);
+}
+
+.deck-slot.selected::after {
+    content: "SELECTED";
+    position: absolute;
+    top: -10px;
+    background: var(--neon-yellow);
+    color: #000;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    font-weight: bold;
+}
+
+.deck-slot h3 {
+    margin: 5px 0;
+    font-size: 1.1rem;
+    color: white;
+}
+
+.deck-slot .slot-info {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.deck-slot-actions {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+}
+
+.deck-slot-actions button {
+    flex: 1;
+    padding: 5px;
+    font-size: 0.8rem;
+}
+
+.deck-slot:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
+}
+
+.deck-slot h3 {
+    margin: 0;
+    font-size: 1.4rem;
+    color: #fff;
+    text-shadow: 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.deck-slot .slot-info {
+    font-size: 0.9rem;
+    color: #ccc;
+}
+
+.deck-slot .slot-actions {
+    display: flex;
+    gap: 10px;
+    width: 100%;
+}
+
+.deck-slot .slot-actions button {
+    flex: 1;
+    padding: 8px;
+    font-size: 0.9rem;
+}
+
+.neon-button.danger {
+    border-color: #ff4b2b;
+    color: #ff4b2b;
+    box-shadow: 0 0 5px rgba(255, 75, 43, 0.3);
+}
+
+.neon-button.danger:hover {
+    background: rgba(255, 75, 43, 0.2);
+    box-shadow: 0 0 15px rgba(255, 75, 43, 0.6);
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+#deck-name-input {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid #00f2fe;
+    border-radius: 5px;
+    color: white;
+    padding: 8px 12px;
+    font-size: 1rem;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+#deck-name-input:focus {
+    border-color: #4facfe;
+    box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
 }
 
 .neon-button {
@@ -163,9 +296,10 @@ body {
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: 10px 40px;
+    padding: 5px 20px;
     position: relative;
     transition: all 0.3s ease;
+    overflow: hidden;
 }
 
 .opponent {
@@ -184,16 +318,16 @@ body {
 
 /* Board Area */
 .board {
-    width: 90%;
+    width: 95%;
     max-width: 1000px;
-    height: 160px;
+    height: 125px;
     border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 16px;
+    border-radius: 12px;
     display: flex;
     justify-content: center;
     align-items: center;
-    gap: 15px;
-    margin: 10px 0;
+    gap: 10px;
+    margin: 5px 0;
     background: rgba(0, 0, 0, 0.2);
     box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
     transition: border-color 0.3s;
@@ -215,12 +349,12 @@ body {
 
 /* Hero Section */
 .hero {
-    width: 110px;
-    height: 110px;
+    width: 80px;
+    height: 80px;
     border-radius: 50%;
     background: var(--bg-panel);
     border: 3px solid var(--neon-yellow);
-    box-shadow: 0 0 20px rgba(255, 238, 0, 0.3);
+    box-shadow: 0 0 15px rgba(255, 238, 0, 0.3);
     position: relative;
     display: flex;
     justify-content: center;
@@ -271,10 +405,10 @@ body {
 }
 
 .avatar {
-    width: 95px;
-    height: 95px;
+    width: 70px;
+    height: 70px;
     border-radius: 50%;
-    background: url('https://placehold.co/95x95/222/FFF?text=Hero') no-repeat center;
+    background: url('https://placehold.co/70x70/222/FFF?text=Hero') no-repeat center;
     background-size: cover;
     border: 2px solid rgba(255, 255, 255, 0.1);
 }
@@ -389,8 +523,8 @@ body {
 
 /* Cards */
 .card {
-    width: 120px;
-    height: 170px;
+    width: 100px;
+    height: 140px;
     background: var(--card-frame);
     border-radius: var(--card-border-radius);
     position: relative;
@@ -406,9 +540,9 @@ body {
 
 /* Hover effect for cards in hand only */
 .hand .card:hover {
-    transform: translateY(-40px) scale(1.1) !important;
+    transform: translateY(-20px) scale(1.05) !important;
     z-index: 100;
-    box-shadow: 0 0 20px rgba(0, 243, 255, 0.4);
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
     border-color: var(--neon-blue);
 }
 
@@ -418,8 +552,8 @@ body {
 
 /* Minions on Board */
 .minion {
-    width: 100px;
-    height: 130px;
+    width: 85px;
+    height: 115px;
     background: var(--card-inner);
     border-radius: var(--card-border-radius);
     border: 2px solid transparent;
@@ -487,20 +621,20 @@ body {
 }
 
 .card-title {
-    font-size: 13px;
+    font-size: 11px;
     font-weight: 700;
-    margin: 35px 5px 5px;
+    margin: 28px 5px 2px;
     text-align: center;
     color: var(--neon-yellow);
     text-shadow: 0 0 2px rgba(0, 0, 0, 0.8);
-    line-height: 1.2;
+    line-height: 1.1;
 }
 
 .card-desc {
-    font-size: 11px;
+    font-size: 10px;
     color: var(--text-secondary);
     text-align: center;
-    padding: 0 10px;
+    padding: 0 8px;
     flex-grow: 1;
     display: flex;
     align-items: center;
@@ -546,10 +680,10 @@ body {
 .hand {
     display: flex;
     justify-content: center;
-    height: 140px;
+    height: 120px;
     width: 100%;
     margin-top: auto;
-    padding-bottom: 20px;
+    padding-bottom: 10px;
     perspective: 1000px;
 }
 
@@ -706,10 +840,10 @@ body {
 /* Card Preview */
 #card-preview {
     position: fixed;
-    right: 30px;
-    bottom: 30px;
-    width: 200px;
-    height: 280px;
+    right: 20px;
+    bottom: 20px;
+    width: 140px;
+    height: 195px;
     z-index: 1000;
     pointer-events: none;
     display: none;

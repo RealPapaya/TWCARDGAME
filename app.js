@@ -118,28 +118,35 @@ let cardDB = [];
 
 // Load cards manually (modified for local file access)
 // Game state for deck builder
-let userDeck = JSON.parse(localStorage.getItem('userDeck')) || [];
+let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
+    { name: "預設牌組 1", cards: [] },
+    { name: "預設牌組 2", cards: [] },
+    { name: "預設牌組 3", cards: [] }
+];
+let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
+let editingDeckIdx = 0;
 
 function init() {
     gameEngine = new GameEngine(CARD_DATA);
 
     // UI Event Listeners
-    document.getElementById('btn-start-battle').addEventListener('click', () => {
-        if (userDeck.length === 30) {
-            startBattle(userDeck);
-        } else {
-            alert(`您的牌組目前有 ${userDeck.length} 張卡，需要剛好 30 張才能戰鬥！`);
-        }
-    });
-
-    document.getElementById('btn-deck-builder').addEventListener('click', () => {
+    document.getElementById('btn-deck-builder-main')?.addEventListener('click', () => {
+        editingDeckIdx = selectedDeckIdx;
         showView('deck-builder');
         renderDeckBuilder();
     });
 
-    document.getElementById('btn-save-deck').addEventListener('click', () => {
-        localStorage.setItem('userDeck', JSON.stringify(userDeck));
+    document.getElementById('btn-back-to-menu').addEventListener('click', () => {
         showView('main-menu');
+        renderDeckSlots();
+    });
+
+    document.getElementById('btn-save-deck').addEventListener('click', () => {
+        const nameInput = document.getElementById('deck-name-input');
+        userDecks[editingDeckIdx].name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
+        localStorage.setItem('userDecks', JSON.stringify(userDecks));
+        alert("存檔成功！");
+        renderDeckBuilder();
     });
 
     document.getElementById('end-turn-btn').addEventListener('click', () => {
@@ -158,6 +165,55 @@ function init() {
 
     // Initial view
     showView('main-menu');
+    renderDeckSlots();
+}
+
+function renderDeckSlots() {
+    const container = document.getElementById('deck-slots');
+    container.innerHTML = '';
+
+    userDecks.forEach((deck, idx) => {
+        const slot = document.createElement('div');
+        slot.className = `deck-slot ${idx === selectedDeckIdx ? 'selected' : ''}`;
+        slot.innerHTML = `
+            <h3>${deck.name}</h3>
+            <div class="slot-info">${deck.cards.length} / 30 張卡</div>
+            <div class="deck-slot-actions">
+                <button class="neon-button edit-btn">編輯</button>
+                <button class="neon-button battle-btn">戰鬥</button>
+            </div>
+        `;
+
+        slot.querySelector('.edit-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            editingDeckIdx = idx;
+            showView('deck-builder');
+            renderDeckBuilder();
+        });
+
+        slot.querySelector('.battle-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectedDeckIdx = idx;
+            localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+
+            if (deck.cards.length === 30) {
+                startBattle(deck.cards);
+            } else {
+                alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+                editingDeckIdx = idx;
+                showView('deck-builder');
+                renderDeckBuilder();
+            }
+        });
+
+        slot.addEventListener('click', () => {
+            selectedDeckIdx = idx;
+            localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+            renderDeckSlots();
+        });
+
+        container.appendChild(slot);
+    });
 }
 
 function showView(viewId) {
@@ -193,16 +249,37 @@ function initManaContainers(id) {
 }
 
 function renderDeckBuilder() {
+    const deck = userDecks[editingDeckIdx];
+    document.getElementById('deck-name-input').value = deck.name;
+
     const gridEl = document.getElementById('all-cards-grid');
     gridEl.innerHTML = '';
 
     CARD_DATA.forEach(card => {
         const cardEl = createCardEl(card, -1);
         cardEl.addEventListener('click', (e) => {
-            // Stop drag from hand logic for builder
             e.stopPropagation();
-            if (userDeck.length < 30) {
-                userDeck.push(card.id);
+            if (deck.cards.length < 30) {
+                // Check legendary limit
+                if (card.rarity === 'LEGENDARY') {
+                    const legendCount = deck.cards.filter(id => {
+                        const c = CARD_DATA.find(x => x.id === id);
+                        return c?.rarity === 'LEGENDARY';
+                    }).length;
+                    if (legendCount >= 2) {
+                        alert("傳說卡牌在牌組中最多只能放 2 張！");
+                        return;
+                    }
+                }
+
+                // Normal 2 copies limit
+                const count = deck.cards.filter(id => id === card.id).length;
+                if (count >= 2) {
+                    alert("每種卡牌最多只能放 2 張！");
+                    return;
+                }
+
+                deck.cards.push(card.id);
                 renderDeckBuilder();
             }
         });
@@ -212,19 +289,19 @@ function renderDeckBuilder() {
     const listEl = document.getElementById('my-deck-list');
     listEl.innerHTML = '';
 
-    userDeck.forEach((id, idx) => {
+    deck.cards.forEach((id, idx) => {
         const card = CARD_DATA.find(c => c.id === id);
         const item = document.createElement('div');
         item.className = 'deck-item';
         item.innerHTML = `<span>${card.name}</span><span>${card.cost}</span>`;
         item.addEventListener('click', () => {
-            userDeck.splice(idx, 1);
+            deck.cards.splice(idx, 1);
             renderDeckBuilder();
         });
         listEl.appendChild(item);
     });
 
-    document.getElementById('deck-count-indicator').innerText = `已選擇: ${userDeck.length} / 30`;
+    document.getElementById('deck-count-indicator').innerText = `已選擇: ${deck.cards.length} / 30`;
 }
 
 async function aiTurn() {
@@ -234,9 +311,33 @@ async function aiTurn() {
         if (gameState.currentPlayer.hand.length > 0) {
             const idx = gameState.currentPlayer.hand.findIndex(c => c.cost <= gameState.currentPlayer.mana.current);
             if (idx !== -1) {
-                gameState.playCard(idx);
-                logMessage("Opponent played a card");
+                const card = gameState.currentPlayer.hand[idx];
+                let target = null;
+
+                // Simple AI Targeting for Battlecry
+                if (card.keywords?.battlecry?.type === 'DAMAGE') {
+                    // Decide target: random minion or hero
+                    if (gameState.opponent.board.length > 0 && Math.random() < 0.7) {
+                        target = { type: 'MINION', index: Math.floor(Math.random() * gameState.opponent.board.length) };
+                    } else {
+                        target = { type: 'HERO', index: null };
+                    }
+                }
+
+                gameState.playCard(idx, target);
+                logMessage(`Opponent played ${card.name}`);
                 render();
+
+                // Show Battlecry Visuals for AI
+                if (target) {
+                    const board = document.getElementById('opp-board');
+                    const sourceEl = board.children[board.children.length - 1]; // Newest minion
+                    const destEl = target.type === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[target.index];
+                    if (sourceEl && destEl) {
+                        await animateAbility(sourceEl, destEl, '#43e97b');
+                    }
+                }
+
                 await new Promise(r => setTimeout(r, 800));
             }
         }

@@ -19,8 +19,10 @@
         <div class="menu-content">
             <h1 class="game-title">寶島遊戲王</h1>
             <div class="menu-buttons">
-                <button id="btn-start-battle" class="neon-button">戰鬥匹配</button>
-                <button id="btn-deck-builder" class="neon-button">卡牌組建</button>
+                <div class="deck-slots-container" id="deck-slots">
+                    <!-- Slots will be rendered by JS -->
+                </div>
+                <button id="btn-deck-builder-main" class="neon-button" style="display:none;">進入組建器</button>
             </div>
         </div>
     </div>
@@ -28,9 +30,13 @@
     <!-- Deck Builder View -->
     <div id="deck-builder" class="view" style="display: none;">
         <div class="deck-builder-header">
-            <h2>卡牌組建</h2>
+            <div class="header-left">
+                <button id="btn-back-to-menu" class="neon-button"
+                    style="padding: 5px 15px; font-size: 14px;">返回</button>
+                <input type="text" id="deck-name-input" placeholder="牌組名稱..." maxlength="10">
+            </div>
             <div id="deck-count-indicator">已選擇: 0 / 30</div>
-            <button id="btn-save-deck" class="neon-button">保存並返回</button>
+            <button id="btn-save-deck" class="neon-button">保存</button>
         </div>
         <div class="deck-builder-main">
             <div class="all-cards-section">
@@ -49,15 +55,15 @@
         <div id="game-container">
             <!-- Opponent Area -->
             <div class="player-area opponent">
+                <div class="hand" id="opp-hand"></div>
                 <div class="hero opponent-hero" id="opp-hero" data-type="HERO">
                     <div class="avatar"></div>
                     <div class="stats">HP: <span id="opp-hp">30</span></div>
                 </div>
+                <div id="opp-mana-container" class="mana-container"></div>
+                <div class="board" id="opp-board"></div>
                 <div class="deck-pile" id="opp-deck">Deck <span class="count-badge">0</span></div>
                 <div class="discard-pile" id="opp-discard">Discard <span class="count-badge">0</span></div>
-                <div id="opp-mana-container" class="mana-container"></div>
-                <div class="hand" id="opp-hand"></div>
-                <div class="board" id="opp-board"></div>
             </div>
 
             <div class="center-line">
@@ -67,15 +73,15 @@
 
             <!-- Player Area -->
             <div class="player-area player">
-                <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
-                <div class="discard-pile" id="player-discard">Discard <span class="count-badge">0</span></div>
-                <div id="player-mana-container" class="mana-container"></div>
                 <div class="board" id="player-board"></div>
-                <div class="hand" id="player-hand"></div>
                 <div class="hero player-hero" id="player-hero" data-type="HERO">
                     <div class="avatar"></div>
                     <div class="stats">HP: <span id="player-hp">30</span></div>
                 </div>
+                <div id="player-mana-container" class="mana-container"></div>
+                <div class="hand" id="player-hand"></div>
+                <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
+                <div class="discard-pile" id="player-discard">Discard <span class="count-badge">0</span></div>
             </div>
         </div>
     </div>

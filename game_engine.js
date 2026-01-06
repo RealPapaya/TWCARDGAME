@@ -30,6 +30,7 @@ class GameEngine {
         }
 
         const counts = {};
+        let totalLegendaries = 0;
         for (const id of deckIds) {
             const card = this.collection.find(c => c.id === id);
             if (!card) {
@@ -39,10 +40,18 @@ class GameEngine {
                 return { valid: false, message: `Card ${card.name} (${id}) is not collectible.` };
             }
 
+            if (card.rarity === 'LEGENDARY') {
+                totalLegendaries++;
+            }
+
             counts[id] = (counts[id] || 0) + 1;
-            if (counts[id] > 30) { // Changed to 30 for testing
+            if (counts[id] > 2) {
                 return { valid: false, message: `Card ${card.name} (${id}) has more than 2 copies.` };
             }
+        }
+
+        if (totalLegendaries > 2) {
+            return { valid: false, message: `Deck has too many legendaries (${totalLegendaries}). Max is 2.` };
         }
 
         return { valid: true, message: "Deck is valid." };
