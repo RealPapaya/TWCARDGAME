@@ -1855,7 +1855,42 @@ body {
     background: rgba(255, 0, 127, 0.15);
 }
 
-.opponent-cluster .mana-text {
-    color: #ff007f;
-    text-shadow: 0 0 5px rgba(255, 0, 127, 0.8);
+
+/* Turn Announcement Overlay */
+.turn-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.5);
+    /* Semi-transparent dim */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+    /* Default no interaction */
+}
+
+.turn-overlay.active {
+    opacity: 1;
+    pointer-events: auto;
+    /* Block interaction while showing */
+}
+
+.turn-overlay .turn-text {
+    font-size: 100px;
+    font-weight: 900;
+    color: #fff;
+    text-shadow: 0 0 20px var(--neon-cyan), 0 0 40px var(--neon-blue), 0 0 80px var(--neon-blue);
+    transform: scale(0.2);
+    transition: transform 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    white-space: nowrap;
+}
+
+.turn-overlay.active .turn-text {
+    transform: scale(1);
 }
