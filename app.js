@@ -630,17 +630,17 @@ function showPreview(card) {
 
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
-            <div class="card-cost" style="width:60px; height:60px; font-size:32px;"><span>${card.cost}</span></div>
+            <div class="card-cost" style="width:60px; height:60px; font-size:32px; top: -5px; left: -5px;"><span>${card.cost}</span></div>
             
-            <div class="card-title" style="font-size:24px; margin-top:25px; flex-shrink: 0;">${card.name}</div>
+            <div class="card-title" style="font-size:24px; margin-top:80px; flex-shrink: 0;">${card.name}</div>
             
-            ${artHtml.replace('height: 220px', 'height: 180px')}
+            ${artHtml.replace('height: 220px', 'height: 160px')}
             
             <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0;">${card.category || ""}</div>
             
             <div class="card-desc" style="font-size:16px; padding: 5px 15px; line-height: 1.3; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; height: auto; overflow: visible;">${card.description || ""}</div>
             
-            ${statsHtml.replace(/70px/g, '60px').replace('32px', '28px')}
+            ${statsHtml.replace(/70px/g, '65px').replace('32px', '30px')}
         </div>
     `;
     preview.style.display = 'block';
@@ -1294,7 +1294,7 @@ async function showCardPlayPreview(card, isAI = false) {
 
         statsHtml = `
         <div class="minion-stats" style="margin-top: auto; padding: 15px;">
-            <span class="stat-atk ${atkClass}" style="width: 60px; height: 60px; font-size: 28px;"><span style="transform: rotate(-45deg); display: inline-block;">${card.attack}</span></span>
+            <span class="stat-atk ${atkClass}" style="width: 60px; height: 60px; font-size: 28px;"><span>${card.attack}</span></span>
             <span class="stat-hp ${hpClass}" style="width: 60px; height: 60px; font-size: 28px;">${hpValue}</span>
         </div>`;
     }
@@ -1304,10 +1304,10 @@ async function showCardPlayPreview(card, isAI = false) {
         `<div class="card-art" style="width: 90%; height: 80px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
 
     cardEl.innerHTML = `
-        <div class="card-cost" style="width:60px; height:60px; font-size:32px;">${card.cost}</div>
-        <div class="card-title" style="font-size:24px; margin-top:25px;">${card.name}</div>
+        <div class="card-cost" style="width:60px; height:60px; font-size:32px; top: -5px; left: -5px;"><span>${card.cost}</span></div>
+        <div class="card-title" style="font-size:24px; margin-top:80px; flex-shrink: 0;">${card.name}</div>
         ${artHtml}
-        <div class="card-category" style="font-size:16px; padding: 2px 10px;">${card.category || ""}</div>
+        <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0;">${card.category || ""}</div>
         <div class="card-desc" style="font-size:16px; padding: 8px 15px; line-height: 1.3; height: auto; flex-grow: 1;">${card.description || ""}</div>
         ${statsHtml}
     `;
