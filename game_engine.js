@@ -25,9 +25,11 @@ class GameEngine {
             return { valid: false, message: "Deck must be an array of card IDs." };
         }
 
-        if (deckIds.length !== 30) {
-            return { valid: false, message: `Deck must have exactly 30 cards. Current count: ${deckIds.length}` };
+        // Relaxed Rules for Testing/Fun
+        if (deckIds.length < 1) {
+            return { valid: false, message: "Deck cannot be empty." };
         }
+        // Removed 30 card strict limit check -> Allow small decks
 
         const counts = {};
         let totalLegendaries = 0;
@@ -36,23 +38,18 @@ class GameEngine {
             if (!card) {
                 return { valid: false, message: `Invalid card ID: ${id}` };
             }
-            if (card.collectible === false) {
-                return { valid: false, message: `Card ${card.name} (${id}) is not collectible.` };
-            }
+
+            // Removed collectible check
 
             if (card.rarity === 'LEGENDARY') {
                 totalLegendaries++;
             }
 
             counts[id] = (counts[id] || 0) + 1;
-            if (counts[id] > 2) {
-                return { valid: false, message: `Card ${card.name} (${id}) has more than 2 copies.` };
-            }
+            // Removed max 2 copies check for fun
         }
 
-        if (totalLegendaries > 2) {
-            return { valid: false, message: `Deck has too many legendaries (${totalLegendaries}). Max is 2.` };
-        }
+        // Removed legendary limit
 
         return { valid: true, message: "Deck is valid." };
     }

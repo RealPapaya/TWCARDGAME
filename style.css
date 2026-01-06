@@ -1083,3 +1083,107 @@ body {
 #drag-line.battlecry-line {
     stroke: #43e97b;
 }
+
+/* Drag Line Styles */
+#drag-line {
+    stroke: #ff0000;
+    /* Default Damage Red */
+    stroke-width: 4;
+    stroke-dasharray: 10;
+    animation: dash 1s linear infinite;
+    pointer-events: none;
+    display: none;
+    position: absolute;
+    z-index: 9999;
+}
+
+#drag-line.heal-line {
+    stroke: #43e97b !important;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+/* Rarity Borders */
+.rarity-legendary {
+    border-color: #ffa500 !important;
+    box-shadow: 0 0 10px #ffa500;
+}
+
+.rarity-epic {
+    border-color: #a335ee !important;
+    box-shadow: 0 0 10px #a335ee;
+}
+
+.rarity-rare {
+    border-color: #0070dd !important;
+    box-shadow: 0 0 10px #0070dd;
+}
+
+.rarity-common {
+    border-color: #ffffff !important;
+}
+
+/* Deck Builder Scroll Fix */
+#my-deck-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    max-height: 400px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Drag Line Styles */
+#drag-line {
+    stroke: #ff0000;
+    /* Default Damage Red */
+    stroke-width: 4;
+    stroke-dasharray: 10;
+    animation: dash 1s linear infinite;
+    pointer-events: none;
+    display: none;
+    position: absolute;
+    z-index: 9999;
+}
+
+#drag-line.heal-line {
+    stroke: #43e97b !important;
+}
+
+@keyframes dash {
+    to {
+        stroke-dashoffset: -20;
+    }
+}
+
+/* Rarity Borders */
+.rarity-legendary {
+    border-color: #ffa500 !important;
+    box-shadow: 0 0 10px #ffa500;
+}
+
+.rarity-epic {
+    border-color: #a335ee !important;
+    box-shadow: 0 0 10px #a335ee;
+}
+
+.rarity-rare {
+    border-color: #0070dd !important;
+    box-shadow: 0 0 10px #0070dd;
+}
+
+.rarity-common {
+    border-color: #ffffff !important;
+}
+
+/* Deck Builder Scroll Fix */
+#my-deck-list {
+    flex-grow: 1;
+    overflow-y: auto;
+    margin-bottom: 20px;
+    max-height: 400px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}

@@ -293,8 +293,10 @@ async function aiTurn() {
                     const board = document.getElementById('opp-board');
                     const sourceEl = board.children[board.children.length - 1]; // Newest minion
                     const destEl = target.type === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[target.index];
+
                     if (sourceEl && destEl) {
-                        await animateAbility(sourceEl, destEl, '#43e97b');
+                        const isHeal = card.keywords?.battlecry?.type === 'HEAL'; // Determine if it's a heal based on the card's battlecry type
+                        await animateAbility(sourceEl, destEl, isHeal ? '#43e97b' : '#ff0000');
                     }
                 }
 
@@ -688,8 +690,8 @@ async function onDragEnd(e) {
         if (targetData) {
             const type = targetData.dataset.type;
             const index = parseInt(targetData.dataset.index);
-            if (type === 'HERO' && targetData.id === 'opp-hero'
-                || type === 'MINION' && targetEl.closest('#opp-board')) {
+            if (type === 'HERO' && (targetData.id === 'opp-hero' || targetData.id === 'player-hero')
+                || type === 'MINION' && (targetEl.closest('#opp-board') || targetEl.closest('#player-board'))) {
                 target = { type, index };
             }
         }
