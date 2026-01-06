@@ -791,8 +791,7 @@ function hidePreview() {
 function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
-    let dsClass = (card.keywords && card.keywords.divineShield) ? ' divine-shield' : '';
-    el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}${dsClass}`;
+    el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}`;
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
@@ -900,7 +899,8 @@ function createCardEl(card, index) {
 
 function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}`;
+    let dsClass = (minion.keywords && minion.keywords.divineShield) ? ' divine-shield' : '';
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}${dsClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
@@ -1064,6 +1064,7 @@ async function onDragEnd(e) {
                     (type === 'HEAL' && card.keywords.battlecry.target === 'ANY') ||
                     (type === 'DAMAGE_NON_CATEGORY') ||
                     (type === 'BUFF_STAT_TARGET') ||
+                    (type === 'GIVE_DIVINE_SHIELD') ||
                     (type === 'DESTROY' && card.keywords.battlecry.target === 'ANY');
 
                 if (isTargeted) {
@@ -1071,7 +1072,7 @@ async function onDragEnd(e) {
                         let mode = 'DAMAGE';
                         if (type === 'HEAL') {
                             mode = 'HEAL';
-                        } else if (type === 'BUFF_STAT_TARGET') {
+                        } else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') {
                             mode = 'BUFF';
                         } else if (type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
@@ -1508,14 +1509,16 @@ async function showCardPlayPreview(card, isAI = false) {
     const boardId = isAI ? 'opp-board' : 'player-board';
     const boardEl = document.getElementById(boardId);
     if (boardEl) {
-        boardEl.classList.remove('board-slam');
-        void boardEl.offsetWidth;
-        boardEl.classList.add('board-slam');
+        setTimeout(() => {
+            boardEl.classList.remove('board-slam');
+            void boardEl.offsetWidth;
+            boardEl.classList.add('board-slam');
 
-        // Intensify dust for high cost cards
-        const intensity = card.cost >= 7 ? 2.5 : 1;
-        spawnDustEffect(boardEl, intensity);
-        setTimeout(() => boardEl.classList.remove('board-slam'), 500);
+            // Intensify dust for high cost cards
+            const intensity = card.cost >= 7 ? 2.5 : 1;
+            spawnDustEffect(boardEl, intensity);
+            setTimeout(() => boardEl.classList.remove('board-slam'), 500);
+        }, 300); // Wait for card to hit the board
     }
 
     await new Promise(r => setTimeout(r, 400));

@@ -322,17 +322,21 @@ class GameState {
     applyDamage(unit, amount) {
         if (!unit) return;
         const oldHealth = unit.currentHealth !== undefined ? unit.currentHealth : unit.hp;
-        if (unit.hp !== undefined) unit.hp = unit.currentHealth;
 
         // Divine Shield (光盾) Check
         if (unit.type === 'MINION' && unit.keywords && unit.keywords.divineShield) {
             if (amount > 0) {
-                unit.currentHealth = oldHealth; // Revert damage
-                if (unit.hp !== undefined) unit.hp = oldHealth;
                 unit.keywords.divineShield = false; // Pop shield
-                return; // No further processing for this damage instance
+                return; // No damage taken
             }
         }
+
+        const newHealth = oldHealth - amount;
+
+        // Update currentHealth (minions)
+        if (unit.currentHealth !== undefined) unit.currentHealth = newHealth;
+        // Update hp (heroes)
+        if (unit.hp !== undefined) unit.hp = newHealth;
 
         // Enrage (激將) Check
         if (unit.type === 'MINION' && unit.keywords && unit.keywords.enrage) {
