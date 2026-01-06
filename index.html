@@ -103,12 +103,24 @@
                 <div class="board" id="player-board"></div>
                 <div class="hero player-hero" id="player-hero" data-type="HERO">
                     <div class="avatar"></div>
-                    <div class="stats">HP: <span id="player-hp">30</span></div>
+                    <!-- Stats moved to separate cluster -->
                 </div>
-                <div id="player-mana-container" class="mana-container"></div>
+
                 <div class="hand" id="player-hand"></div>
+
                 <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
-                <div class="discard-pile" id="player-discard">Discard <span class="count-badge">0</span></div>
+                <!-- Discard Pile moved next to deck -->
+                <div class="discard-pile" id="player-discard" style="right: auto; left: 110px;">Discard <span
+                        class="count-badge">0</span></div>
+
+                <!-- New Status Cluster in Bottom Right -->
+                <div id="player-status-cluster" class="status-cluster">
+                    <div class="hero-stats-pill">HP: <span id="player-hp">30</span></div>
+                    <div id="player-mana-container" class="mana-container frame-style">
+                        <!-- Mana Text will be injected by JS -->
+                        <div id="player-mana-text" class="mana-text">0/0</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
