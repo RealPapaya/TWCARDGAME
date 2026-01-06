@@ -1,4 +1,4 @@
-/* Taiwan Retro / Cyberpunk Style Refined */
+﻿/* Taiwan Retro / Cyberpunk Style Refined */
 @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
 
 :root {
@@ -835,19 +835,30 @@ body {
 }
 
 .minion-art {
-    width: 90%;
-    /* Slightly withdraw from edges? No, keep 100% or adjust */
-    width: 90%;
-    height: 65%;
-    /* Reduced from 75% */
+    width: 94%;
+    height: 85px;
+    /* Increased height for bigger image */
     background-color: #555;
     background-size: cover;
-    /* Key change */
-    background-position: center center;
+    background-position: center top;
+    /* Focus on faces usually at top */
     border-radius: 8px;
-    margin-top: 15px;
-    /* Move down */
+    margin-top: 4px;
     margin-bottom: 2px;
+    flex-shrink: 0;
+    /* Prevent shrinking */
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.minion .card-title {
+    margin: 2px 0;
+    font-size: 10px;
+    text-shadow: none;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    width: 95%;
+    flex-shrink: 0;
 }
 
 .minion.can-attack {
@@ -1157,7 +1168,7 @@ body {
 }
 
 .minion.taunt::before {
-    content: "?���?;
+    content: "🛡️";
  position: absolute;
     top: -15px;
     left: 50%;
@@ -1287,8 +1298,8 @@ body {
 }
 
 .ability-projectile::after {
-    content: '??;
- font-size: 30px;
+    content: "🔥";
+    font-size: 30px;
     display: block;
     color: var(--projectile-color, #43e97b);
     text-shadow: 0 0 10px var(--projectile-color, #43e97b);
