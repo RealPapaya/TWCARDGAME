@@ -199,7 +199,18 @@ class GameState {
                 targetUnit.currentHealth = Math.min((targetUnit.health || targetUnit.maxHp || 30), targetUnit.currentHealth + battlecry.value);
                 if (target.type === 'HERO') targetUnit.hp = targetUnit.currentHealth;
             }
-        } else if (battlecry.type === 'DESTROY') {
+        } else if (battlecry.type === 'BUFF_STAT_TARGET') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                if (battlecry.stat === 'ATTACK') {
+                    targetUnit.attack += battlecry.value;
+                } else if (battlecry.stat === 'HEALTH') {
+                    targetUnit.health += battlecry.value;
+                    targetUnit.currentHealth += battlecry.value;
+                }
+            }
+        }
+        else if (battlecry.type === 'DESTROY') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
                 this.applyDamage(targetUnit, 999);
@@ -224,14 +235,28 @@ class GameState {
 
     getTargetUnit(target) {
         if (!target) return null;
-        if (target.type === 'HERO') {
-            return (target.index === 0 ? this.players[0].hero : this.players[1].hero);
+
+        let sidePlayers = this.players;
+        // In GameState, we might not know who is "PLAYER" or "OPPONENT" relative to the command unless we map it.
+        // Assuming 'PLAYER' means currentPlayer and 'OPPONENT' means opponent
+        // OR better: rely on the side string matching how we store players?
+        // Actually, simpler:
+        // side 'PLAYER' -> currentPlayer
+        // side 'OPPONENT' -> opponent
+
+        let targetPlayer = null;
+        if (target.side === 'PLAYER') targetPlayer = this.currentPlayer;
+        else if (target.side === 'OPPONENT') targetPlayer = this.opponent;
+        else {
+            // Fallback for AI or legacy: try to guess or use old logic (risky)
+            // Old logic check:
+            if (target.type === 'HERO') return (target.index === 0 ? this.players[0].hero : this.players[1].hero); // Legacy index check
+            // Fallback for minions is hard. Let's assume correct side provided now.
+            return null;
         }
-        if (target.type === 'MINION') {
-            // Check both boards
-            const m = this.players[1].board[target.index] || this.players[0].board[target.index];
-            return m;
-        }
+
+        if (target.type === 'HERO') return targetPlayer.hero;
+        if (target.type === 'MINION') return targetPlayer.board[target.index];
         return null;
     }
 

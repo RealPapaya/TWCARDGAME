@@ -5,8 +5,8 @@ const CARD_DATA = [
     { "id": "c001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生。" },
     { "id": "c002", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。無。" },
     { "id": "tw001", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。" },
-    { "id": "tw002", "name": "賣菜郎", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：友方隨從 +1 攻擊力。" },
-    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：友方隨從 +1 生命值。" },
+    { "id": "tw002", "name": "賣菜郎", "category": "國民黨政治人物", "cost": 5, "attack": 5, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：使一個友方隨從 +1 攻擊力。" },
+    { "id": "tw003", "name": "四叉貓", "category": "民進黨政治人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：使一個友方隨從 +1 生命值。" },
     { "id": "tw004", "name": "發財支票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。" },
     { "id": "tw005", "name": "彈劾總統囉", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。" },
     { "id": "c004", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：造成 1 點傷害。" },
@@ -253,6 +253,8 @@ function renderDeckBuilder() {
         const card = CARD_DATA.find(c => c.id === id);
         const item = document.createElement('div');
         item.className = 'deck-item';
+        // Fix: Add rarity border to deck list item
+        item.style.borderLeft = `4px solid ${getBorderColor(card.rarity)}`;
         item.innerHTML = `<span>${card.name}</span><span>${card.cost}</span>`;
         item.addEventListener('click', () => {
             deck.cards.splice(idx, 1);
@@ -262,6 +264,16 @@ function renderDeckBuilder() {
     });
 
     document.getElementById('deck-count-indicator').innerText = `已選擇: ${deck.cards.length} / 30`;
+}
+
+function getBorderColor(rarity) {
+    if (!rarity) return '#ffffff';
+    switch (rarity.toUpperCase()) {
+        case 'LEGENDARY': return '#ffa500';
+        case 'EPIC': return '#a335ee';
+        case 'RARE': return '#0070dd';
+        default: return '#ffffff';
+    }
 }
 
 async function aiTurn() {
@@ -618,28 +630,27 @@ async function onDragEnd(e) {
                 const card = gameState.currentPlayer.hand[attackerIndex];
 
                 // Targeted Battlecry check
-                if (card.keywords?.battlecry?.type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') {
-                    try {
-                        // 1. Play card with 'PENDING' target first
-                        const dragX = e.clientX;
-                        const dragY = e.clientY;
-                        gameState.playCard(attackerIndex, 'PENDING');
-                        render();
+                const type = card.keywords?.battlecry?.type;
+                const isTargeted =
+                    (type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') ||
+                    (type === 'HEAL' && card.keywords.battlecry.target === 'ANY') ||
+                    (type === 'DAMAGE_NON_CATEGORY') ||
+                    (type === 'BUFF_STAT_TARGET');
 
-                        // 2. Start targeting from the newly placed minion
-                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, 'DAMAGE');
-                    } catch (err) {
-                        logMessage(err.message);
-                    }
-                    return;
-                } else if (card.keywords?.battlecry?.type === 'HEAL' && card.keywords.battlecry.target === 'ANY') {
+                if (isTargeted) {
                     try {
                         const dragX = e.clientX;
                         const dragY = e.clientY;
                         gameState.playCard(attackerIndex, 'PENDING');
                         render();
 
-                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, 'HEAL');
+                        // Determine visual mode (Damage=Red, Heal/Buff=Green)
+                        let mode = 'DAMAGE';
+                        if (type === 'HEAL' || type === 'BUFF_STAT_TARGET') {
+                            mode = 'HEAL';
+                        }
+
+                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, mode);
                     } catch (err) {
                         logMessage(err.message);
                     }
@@ -690,9 +701,15 @@ async function onDragEnd(e) {
         if (targetData) {
             const type = targetData.dataset.type;
             const index = parseInt(targetData.dataset.index);
-            if (type === 'HERO' && (targetData.id === 'opp-hero' || targetData.id === 'player-hero')
-                || type === 'MINION' && (targetEl.closest('#opp-board') || targetEl.closest('#player-board'))) {
-                target = { type, index };
+            if (type === 'HERO' && (targetData.id === 'opp-hero' || targetData.id === 'player-hero')) {
+                // Determine side based on ID
+                target = { type, index, side: targetData.id === 'opp-hero' ? 'OPPONENT' : 'PLAYER' };
+            } else if (type === 'MINION') {
+                if (targetEl.closest('#opp-board')) {
+                    target = { type, index, side: 'OPPONENT' };
+                } else if (targetEl.closest('#player-board')) {
+                    target = { type, index, side: 'PLAYER' };
+                }
             }
         }
 
