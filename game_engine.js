@@ -402,11 +402,6 @@ class GameState {
 
         attacker.canAttack = false;
 
-        // Remove Divine Shield after any attack
-        if (attacker.keywords && attacker.keywords.divineShield) {
-            attacker.keywords.divineShield = false;
-        }
-
         // check deaths
         this.resolveDeaths();
     }

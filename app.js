@@ -953,8 +953,9 @@ function onDragStart(e, index, fromHand = false) {
     dragging = true;
     attackerIndex = index;
     draggingFromHand = fromHand;
+    draggingMode = 'DAMAGE'; // Reset to default
 
-    dragLine.classList.remove('battlecry-line');
+    dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line');
     dragLine.setAttribute('x1', e.clientX);
     dragLine.setAttribute('y1', e.clientY);
     dragLine.setAttribute('x2', e.clientX);
@@ -1208,7 +1209,7 @@ async function onDragEnd(e) {
                     if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
 
-                    await animateAbility(sourceEl, destEl, color);
+                    await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
 
                     // Small delay for impact feel
@@ -1302,9 +1303,9 @@ async function handleBattlecryVisuals(sourceEl, targetEl) {
 }
 
 /**
- * Animates a projectile (Green Arrow) from start to end.
+ * Animates a projectile from start to end.
  */
-function animateAbility(fromEl, toEl, color) {
+function animateAbility(fromEl, toEl, color, shouldShake = true) {
     return new Promise(resolve => {
         const rectFrom = fromEl.getBoundingClientRect();
         const rectTo = toEl.getBoundingClientRect();
@@ -1335,8 +1336,10 @@ function animateAbility(fromEl, toEl, color) {
 
         setTimeout(() => {
             // Shake Target
-            toEl.classList.add('shaking');
-            setTimeout(() => toEl.classList.remove('shaking'), 500);
+            if (shouldShake) {
+                toEl.classList.add('shaking');
+                setTimeout(() => toEl.classList.remove('shaking'), 500);
+            }
 
             projectile.remove();
             resolve();
