@@ -538,9 +538,9 @@ function render() {
     });
 
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
-    document.querySelector('#player-discard .count-badge').innerText = p1.graveyard?.length || 0;
+    // document.querySelector('#player-discard .count-badge').innerText = p1.graveyard?.length || 0;
     document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
-    document.querySelector('#opp-discard .count-badge').innerText = p2.graveyard?.length || 0;
+    // document.querySelector('#opp-discard .count-badge').innerText = p2.graveyard?.length || 0;
 
     if (gameState.lastAction === 'attack') {
         // Implement visual shake if hit
@@ -584,7 +584,7 @@ function endGame(result) {
 
 function renderMana(containerId, mana) {
     const container = document.getElementById(containerId);
-    const textEl = document.getElementById(containerId === 'player-mana-container' ? 'player-mana-text' : 'opp-mana-text-placeholder');
+    const textEl = document.getElementById(containerId === 'player-mana-container' ? 'player-mana-text' : 'opp-mana-text');
 
     container.innerHTML = '';
 

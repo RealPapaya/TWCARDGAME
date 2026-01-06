@@ -129,8 +129,10 @@ class GameState {
         }
         player.mana.current = player.mana.max;
 
-        // Draw a card
-        player.drawCard();
+        // Draw a card (Skip for the very first turn of the game - Player 1)
+        if (this.turnCount > 1) {
+            player.drawCard();
+        }
 
         // Wake up minions (summoning sickness wears off)
         player.board.forEach(minion => minion.canAttack = true);

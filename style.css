@@ -658,11 +658,13 @@ body {
 @keyframes dust-fade {
     0% {
         transform: translate(0, 0) scale(0.5);
-        opacity: 0.99; filter: brightness(2) blur(3px);
+        opacity: 0.99;
+        filter: brightness(2) blur(3px);
     }
 
     100% {
-        transform: translate(var(--dx), var(--dy)) scale(4.5); filter: blur(15px);
+        transform: translate(var(--dx), var(--dy)) scale(4.5);
+        filter: blur(15px);
         opacity: 0;
     }
 }
@@ -879,7 +881,8 @@ body {
     height: 32px;
     background: linear-gradient(135deg, #00c6ff, #0072ff);
     color: white;
-    border-radius: 4px; /* Small radius for diamond corners */
+    border-radius: 4px;
+    /* Small radius for diamond corners */
     transform: rotate(45deg);
     display: flex;
     justify-content: center;
@@ -888,13 +891,15 @@ body {
     font-size: 16px;
     box-shadow: 0 0 10px rgba(0, 198, 255, 0.6);
     z-index: 10;
-    border: 2px solid rgba(255, 255, 255, 0.4);}
+    border: 2px solid rgba(255, 255, 255, 0.4);
+}
 
 
 .card-cost span {
     transform: rotate(-45deg);
     display: block;
 }
+
 .card-cost::before {
     content: '';
     position: absolute;
@@ -988,7 +993,8 @@ body {
     box-shadow: 0 0 10px rgba(240, 152, 25, 0.5);
     /* Much wider sword shape to accommodate digits */
     clip-path: polygon(50% 0%, 80% 20%, 80% 60%, 100% 60%, 100% 80%, 70% 80%, 70% 100%, 30% 100%, 30% 80%, 0% 80%, 0% 60%, 20% 60%, 20% 20%);
-    /* transform: rotate(45deg); */ display: flex;
+    /* transform: rotate(45deg); */
+    display: flex;
     justify-content: center;
     align-items: center;
 }
@@ -1152,7 +1158,7 @@ body {
 
 .minion.taunt::before {
     content: "?���?;
-    position: absolute;
+ position: absolute;
     top: -15px;
     left: 50%;
     transform: translateX(-50%);
@@ -1282,7 +1288,7 @@ body {
 
 .ability-projectile::after {
     content: '??;
-    font-size: 30px;
+ font-size: 30px;
     display: block;
     color: var(--projectile-color, #43e97b);
     text-shadow: 0 0 10px var(--projectile-color, #43e97b);
@@ -1481,11 +1487,13 @@ body {
 @keyframes dust-fade {
     0% {
         transform: translate(0, 0) scale(0.5);
-        opacity: 0.99; filter: brightness(2) blur(3px);
+        opacity: 0.99;
+        filter: brightness(2) blur(3px);
     }
 
     100% {
-        transform: translate(var(--dx), var(--dy)) scale(4.5); filter: blur(15px);
+        transform: translate(var(--dx), var(--dy)) scale(4.5);
+        filter: blur(15px);
         opacity: 0;
     }
 }
@@ -1686,22 +1694,26 @@ body {
     border-radius: 20px;
     font-weight: 700;
     font-size: 18px;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-    border: 2px solid rgba(255,255,255,0.2);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
+    border: 2px solid rgba(255, 255, 255, 0.2);
     min-width: 80px;
     text-align: center;
-    z-index: 51; /* On top of mana bar */
-    margin-bottom: -10px; /* Slight overlap */
+    z-index: 51;
+    /* On top of mana bar */
+    margin-bottom: -10px;
+    /* Slight overlap */
 }
 
 /* Updated Mana Container Style */
 .mana-container.frame-style {
-    position: relative; /* relative to cluster */
+    position: relative;
+    /* relative to cluster */
     background: rgba(0, 0, 0, 0.8);
     border: 2px solid #00f2fe;
     border-radius: 12px;
     padding: 10px 15px;
-    padding-top: 15px; /* Space for overlap */
+    padding-top: 15px;
+    /* Space for overlap */
     display: flex;
     gap: 4px;
     box-shadow: 0 0 15px rgba(0, 243, 255, 0.2);
@@ -1712,7 +1724,8 @@ body {
 
 .mana-text {
     position: absolute;
-    right: -40px; /* To the right of the bar? Or inside? User said "Show number (Cur/Max)" */
+    right: -40px;
+    /* To the right of the bar? Or inside? User said "Show number (Cur/Max)" */
     /* Let's put it absolutely or flex */
     /* User said "Show number" */
     /* Let's actually put it inside or on the side. */
@@ -1728,14 +1741,46 @@ body {
 
 /* Override Mana Text for Top Positioning */
 .mana-text {
-    position: static; /* Remove absolute */
+    position: static;
+    /* Remove absolute */
     width: 100%;
     text-align: center;
     margin-right: 0;
     margin-bottom: 2px;
     margin-left: 0;
     right: auto;
-    font-size: 18px; /* Make it visible */
+    font-size: 18px;
+    /* Make it visible */
     color: #00f2fe;
     text-shadow: 0 0 5px rgba(0, 243, 255, 0.8);
+}
+
+/* Opponent Cluster Positioning */
+.status-cluster.opponent-cluster {
+    top: 20px;
+    left: 30px;
+    bottom: auto;
+    right: auto;
+    align-items: center;
+}
+
+/* Ensure Opponent Frame has correct styling */
+.player-area.opponent .mana-container.frame-style {
+    border-color: #ff007f;
+    /* Pinkish for opponent */
+    box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+}
+
+.player-area.opponent .mana-crystal.active {
+    background: #ff007f;
+    box-shadow: 0 0 15px #ff007f, inset 0 0 10px rgba(255, 255, 255, 0.5);
+}
+
+.player-area.opponent .mana-crystal.spent {
+    background: rgba(255, 0, 127, 0.15);
+}
+
+.opponent-cluster .mana-text {
+    color: #ff007f;
+    text-shadow: 0 0 5px rgba(255, 0, 127, 0.8);
 }

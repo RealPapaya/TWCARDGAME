@@ -85,10 +85,17 @@
                     <div class="avatar"></div>
                     <div class="stats">HP: <span id="opp-hp">30</span></div>
                 </div>
-                <div id="opp-mana-container" class="mana-container"></div>
+
+                <!-- Opponent Status Cluster (Top Left) -->
+                <div id="opp-status-cluster" class="status-cluster opponent-cluster">
+                    <div id="opp-mana-text" class="mana-text">0/0</div>
+                    <div id="opp-mana-container" class="mana-container frame-style"></div>
+                </div>
+
                 <div class="board" id="opp-board"></div>
-                <div class="deck-pile" id="opp-deck">Deck <span class="count-badge">0</span></div>
-                <div class="discard-pile" id="opp-discard">Discard <span class="count-badge">0</span></div>
+                <!-- Opponent Deck moved to Top Right -->
+                <div class="deck-pile" id="opp-deck" style="left: auto; right: 30px;">Deck <span
+                        class="count-badge">0</span></div>
             </div>
 
             <div class="center-line">
@@ -109,9 +116,7 @@
                 <div class="hand" id="player-hand"></div>
 
                 <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
-                <!-- Discard Pile moved next to deck -->
-                <div class="discard-pile" id="player-discard" style="right: auto; left: 110px;">Discard <span
-                        class="count-badge">0</span></div>
+                <!-- Discard Pile Removed -->
 
                 <!-- New Status Cluster in Bottom Right -->
                 <div id="player-status-cluster" class="status-cluster">
