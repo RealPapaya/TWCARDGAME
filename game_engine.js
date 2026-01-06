@@ -196,7 +196,10 @@ class GameState {
         } else if (battlecry.type === 'HEAL') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
-                targetUnit.currentHealth = Math.min((targetUnit.health || targetUnit.maxHp || 30), targetUnit.currentHealth + battlecry.value);
+                // Allow triggering even if full HP, just clamp result
+                // The visual is handled by app.js, this just updates state
+                const max = targetUnit.maxHp || targetUnit.health || 30; // fallback max
+                targetUnit.currentHealth = Math.min(max, (targetUnit.currentHealth || targetUnit.hp) + battlecry.value);
                 if (target.type === 'HERO') targetUnit.hp = targetUnit.currentHealth;
             }
         } else if (battlecry.type === 'BUFF_STAT_TARGET') {

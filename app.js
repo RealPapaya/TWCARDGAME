@@ -611,7 +611,9 @@ async function onDragEnd(e) {
 
     if (dragging) {
         dragging = false;
-        dragLine.style.display = 'none';
+        dragLine.style.display = 'none'; // Ensure hide when dragging ends
+        dragLine.setAttribute('x1', 0); // Reset coords
+        dragLine.setAttribute('y1', 0);
 
         if (draggingFromHand) {
             // Cleanup visual ghost
@@ -635,7 +637,8 @@ async function onDragEnd(e) {
                     (type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') ||
                     (type === 'HEAL' && card.keywords.battlecry.target === 'ANY') ||
                     (type === 'DAMAGE_NON_CATEGORY') ||
-                    (type === 'BUFF_STAT_TARGET');
+                    (type === 'BUFF_STAT_TARGET') ||
+                    (type === 'DESTROY' && card.keywords.battlecry.target === 'ANY');
 
                 if (isTargeted) {
                     try {
@@ -644,10 +647,12 @@ async function onDragEnd(e) {
                         gameState.playCard(attackerIndex, 'PENDING');
                         render();
 
-                        // Determine visual mode (Damage=Red, Heal/Buff=Green)
+                        // Determine visual mode (Damage=Red, Heal=Green, Buff=Orange)
                         let mode = 'DAMAGE';
-                        if (type === 'HEAL' || type === 'BUFF_STAT_TARGET') {
+                        if (type === 'HEAL') {
                             mode = 'HEAL';
+                        } else if (type === 'BUFF_STAT_TARGET') {
+                            mode = 'BUFF';
                         }
 
                         startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, mode);
@@ -692,7 +697,7 @@ async function onDragEnd(e) {
     } else if (isBattlecryTargeting) {
         // Finishing targeted battlecry
         isBattlecryTargeting = false;
-        dragLine.style.display = 'none';
+        dragLine.style.display = 'none'; // Critical: Hide line
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
         const targetData = targetEl?.closest('[data-type]');
@@ -732,8 +737,11 @@ async function onDragEnd(e) {
                 const destEl = target.type === 'HERO' ? (targetData.id === 'opp-hero' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) : (targetEl.closest('#opp-board') ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
 
                 if (sourceEl && destEl) {
-                    const isHeal = draggingMode === 'HEAL';
-                    await animateAbility(sourceEl, destEl, isHeal ? '#43e97b' : '#ff0000');
+                    let color = '#ff0000'; // Default Damage Red
+                    if (draggingMode === 'HEAL') color = '#43e97b'; // Green
+                    else if (draggingMode === 'BUFF') color = '#ffa500'; // Orange
+
+                    await animateAbility(sourceEl, destEl, color);
                 }
             }
         } catch (err) {
@@ -751,8 +759,13 @@ function startBattlecryTargeting(handIndex, x, y, mode = 'DAMAGE') {
     dragLine.classList.add('battlecry-line');
     if (mode === 'HEAL') {
         dragLine.classList.add('heal-line');
+        dragLine.classList.remove('buff-line');
+    } else if (mode === 'BUFF') {
+        dragLine.classList.remove('heal-line');
+        dragLine.classList.add('buff-line');
     } else {
         dragLine.classList.remove('heal-line');
+        dragLine.classList.remove('buff-line');
     }
 
     dragLine.setAttribute('x1', x);

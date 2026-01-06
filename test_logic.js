@@ -23,6 +23,7 @@ try {
     const p1Stats = { deck: ['tw015', 'tw016'], hand: [] };
     const p2Stats = { deck: [], hand: [] };
     const state = engine.createGame(p1Stats.deck, p2Stats.deck);
+    state.currentPlayerIdx = 0; // Force Player 1 turn
     state.players[0].mana.current = 10;
 
     // Force specific hand
@@ -43,6 +44,7 @@ try {
 // --- Test 2: Ma Ying-jeou (Destroy) ---
 try {
     const state = engine.createGame(['tw012'], []);
+    state.currentPlayerIdx = 0;
     state.players[0].mana.current = 10;
     state.players[0].hand = [JSON.parse(JSON.stringify(TEST_CARDS.find(c => c.id == 'tw012')))];
 
@@ -50,7 +52,7 @@ try {
     state.players[1].board.push({ id: 'dummy', name: 'Dummy', attack: 1, health: 10, currentHealth: 10, type: 'MINION' });
 
     // Play Ma targeting index 0 of opponent board
-    state.playCard(0, { type: 'MINION', index: 0 });
+    state.playCard(0, { type: 'MINION', index: 0, side: 'OPPONENT' });
 
     logResult('Ma Destroy', state.players[1].board.length === 0, `Enemy board count: ${state.players[1].board.length}`);
 } catch (e) { logResult('Ma Test', false, e.message); }
@@ -58,6 +60,7 @@ try {
 // --- Test 3: Tsai Ing-wen (Bounce) ---
 try {
     const state = engine.createGame(['tw006'], []);
+    state.currentPlayerIdx = 0;
     state.players[0].mana.current = 10;
     state.players[0].hand = [JSON.parse(JSON.stringify(TEST_CARDS.find(c => c.id == 'tw006')))];
 
@@ -73,6 +76,7 @@ try {
 // --- Test 4: Bubble Tea (Heal) ---
 try {
     const state = engine.createGame(['tw014'], []);
+    state.currentPlayerIdx = 0;
     state.players[0].mana.current = 10;
     state.players[0].hand = [JSON.parse(JSON.stringify(TEST_CARDS.find(c => c.id == 'tw014')))];
 
@@ -80,7 +84,45 @@ try {
     state.players[0].hero.currentHealth = 20;
     state.players[0].hero.hp = 20;
 
-    state.playCard(0, { type: 'HERO', index: 0 });
+    state.playCard(0, { type: 'HERO', index: 0, side: 'PLAYER' });
 
     logResult('Heal Hero', state.players[0].hero.currentHealth === 22, `Hero HP: ${state.players[0].hero.currentHealth} (Expected 22)`);
 } catch (e) { logResult('Heal Test', false, e.message); }
+
+// --- Test 5: Hsieh (Damage Non-DPP) ---
+try {
+    const state = engine.createGame(['tw011'], []);
+    state.currentPlayerIdx = 0;
+    state.players[0].mana.current = 10;
+    const hsiehCard = TEST_CARDS.find(c => c.id === 'tw011') || {
+        "id": "tw011", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC",
+        "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target_category": "民進黨政治人物" } }
+    };
+    state.players[0].hand = [JSON.parse(JSON.stringify(hsiehCard))];
+
+    // Spawn 1 KMT (Valid Target) and 1 DPP (Invalid Target) for Opponent
+    state.players[1].board.push({ id: 'kmt', category: '國民黨政治人物', health: 5, currentHealth: 5, type: 'MINION' });
+    state.players[1].board.push({ id: 'dpp', category: '民進黨政治人物', health: 5, currentHealth: 5, type: 'MINION' });
+
+    // Try to hit KMT (Index 0)
+    state.playCard(0, { type: 'MINION', index: 0, side: 'OPPONENT' });
+
+    const kmt = state.players[1].board[0];
+    const dpp = state.players[1].board[1];
+
+    logResult('Hsieh Valid Target (KMT)', kmt.currentHealth === 2, `KMT HP: ${kmt.currentHealth} (Expected 2)`);
+
+    // Reset Hand and try to hit DPP (Index 1) - Should fail
+    state.players[0].hand = [JSON.parse(JSON.stringify(hsiehCard))];
+    state.players[0].mana.current = 10; // refill mana
+
+    // Note: KMT is at 0, DPP at 1. Wait, playCard puts Hsieh on board.
+    // So player0 board has 1 Hsieh.
+    // Opponent board has KMT (hurt), DPP.
+    // We play another Hsieh.
+
+    state.playCard(0, { type: 'MINION', index: 1, side: 'OPPONENT' });
+
+    logResult('Hsieh Invalid Target (DPP)', dpp.currentHealth === 5, `DPP HP: ${dpp.currentHealth} (Expected 5)`);
+
+} catch (e) { logResult('Hsieh Test', false, e.message); }
