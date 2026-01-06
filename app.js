@@ -279,76 +279,88 @@ function getBorderColor(rarity) {
 async function aiTurn() {
     logMessage("Opponent is thinking...");
     try {
-        // 1. Play random card
-        if (gameState.currentPlayer.hand.length > 0) {
-            const idx = gameState.currentPlayer.hand.findIndex(c => c.cost <= gameState.currentPlayer.mana.current);
-            if (idx !== -1) {
-                const card = gameState.currentPlayer.hand[idx];
-                let target = null;
+        // Simple loop to execute actions one by one
+        let moves = 0;
+        const maxMoves = 10; // Prevent infinite loops
 
-                // Simple AI Targeting for Battlecry
-                if (card.keywords?.battlecry?.type === 'DAMAGE') {
-                    // Decide target: random minion or hero
-                    if (gameState.opponent.board.length > 0 && Math.random() < 0.7) {
-                        target = { type: 'MINION', index: Math.floor(Math.random() * gameState.opponent.board.length) };
-                    } else {
-                        target = { type: 'HERO', index: null };
-                    }
-                }
+        while (moves < maxMoves) {
+            // Recalculate best move each time state changes
+            const action = gameEngine.ai.getNextMove(gameState);
 
-                gameState.playCard(idx, target);
-                logMessage(`Opponent played ${card.name}`);
+            if (!action) {
+                break; // No more good moves
+            }
+
+            if (action.type === 'PLAY_CARD') {
+                const card = gameState.currentPlayer.hand[action.index];
+                if (!card) break;
+
+                logMessage(`Opponent plays ${card.name}`);
+                gameState.playCard(action.index, action.target);
                 render();
 
-                // Show Battlecry Visuals for AI
-                if (target) {
+                // Show Battlecry Visuals
+                if (action.target) {
                     const board = document.getElementById('opp-board');
-                    const sourceEl = board.children[board.children.length - 1]; // Newest minion
-                    const destEl = target.type === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[target.index];
+                    // Newest minion is at the end
+                    const sourceEl = board.children[board.children.length - 1];
+
+                    let destEl = null;
+                    if (action.target.type === 'HERO') {
+                        destEl = (action.target.side === 'OPPONENT') ? document.getElementById('opp-hero') : document.getElementById('player-hero');
+                        // Note: AI perspective 'OPPONENT' is AI's opponent (Player).
+                        // Wait, getBattlecryTarget returns 'OPPONENT' meaning AI's enemy (Player).
+                        // Let's verify side logic in getBattlecryTarget:
+                        // "return { type: 'HERO', side: 'OPPONENT' }"
+                        // In GameState.getTargetUnit: target.side === 'OPPONENT' -> this.opponent (Player).
+                        // So destEl should be Player Hero.
+                        // BUT `document.getElementById('player-hero')` is correct.
+                    } else if (action.target.type === 'MINION') {
+                        // side 'OPPONENT' -> Player Board
+                        // side 'PLAYER' -> Opp Board
+                        const isPlayerSide = (action.target.side === 'OPPONENT');
+                        const targetBoardId = isPlayerSide ? 'player-board' : 'opp-board';
+                        destEl = document.getElementById(targetBoardId).children[action.target.index];
+                    }
 
                     if (sourceEl && destEl) {
-                        const isHeal = card.keywords?.battlecry?.type === 'HEAL'; // Determine if it's a heal based on the card's battlecry type
-                        await animateAbility(sourceEl, destEl, isHeal ? '#43e97b' : '#ff0000');
+                        let color = '#ff0000';
+                        const type = card.keywords?.battlecry?.type;
+                        if (type === 'HEAL' || type === 'HEAL_ALL_FRIENDLY') color = '#43e97b';
+                        else if (type === 'BUFF_STAT_TARGET') color = '#ffa500';
+
+                        await animateAbility(sourceEl, destEl, color);
                     }
                 }
 
-                await new Promise(r => setTimeout(r, 800));
-            }
-        }
+                await new Promise(r => setTimeout(r, 1000));
 
-        // 2. Attack logic
-        const oppBoard = gameState.currentPlayer.board;
-        const playerBoard = gameState.opponent.board;
+            } else if (action.type === 'ATTACK') {
+                const attackerIdx = action.attackerIndex;
+                const targetType = action.target.type;
+                const targetIndex = action.target.index;
 
-        for (let idx = 0; idx < oppBoard.length; idx++) {
-            const m = oppBoard[idx];
-            if (m.canAttack) {
-                let targetType = 'HERO';
-                let targetIndex = null;
-
-                const tauntIdx = playerBoard.findIndex(t => t.keywords?.taunt);
-                if (tauntIdx !== -1) {
-                    targetType = 'MINION';
-                    targetIndex = tauntIdx;
-                }
-
-                const attackerEl = document.getElementById('opp-board').children[idx];
+                // Visuals
+                const attackerEl = document.getElementById('opp-board').children[attackerIdx];
                 const targetEl = targetType === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[targetIndex];
 
                 if (attackerEl && targetEl) {
                     await animateAttack(attackerEl, targetEl);
                 }
 
-                gameState.attack(idx, { type: targetType, index: targetIndex });
+                gameState.attack(attackerIdx, action.target);
                 render();
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 600));
             }
+
+            moves++;
         }
 
         gameState.endTurn();
         render();
     } catch (e) {
-        logMessage(e.message);
+        logMessage("AI Error: " + e.message);
+        console.error(e);
         gameState.endTurn();
         render();
     }
@@ -520,11 +532,14 @@ function createMinionEl(minion, index, isPlayer) {
         el.addEventListener('mousedown', (e) => onDragStart(e, index));
     }
 
-    // Attack Target Drop
-    if (!isPlayer) {
-        el.dataset.type = 'MINION';
-        el.dataset.index = index;
+    // Attack Drag Start
+    if (isPlayer && minion.canAttack && gameState.currentPlayerIdx === 0) {
+        el.addEventListener('mousedown', (e) => onDragStart(e, index));
     }
+
+    // Target Drop Data (Needed for both enemy attacks AND friendly buffs)
+    el.dataset.type = 'MINION';
+    el.dataset.index = index;
 
     return el;
 }
@@ -642,8 +657,6 @@ async function onDragEnd(e) {
 
                 if (isTargeted) {
                     try {
-                        const dragX = e.clientX;
-                        const dragY = e.clientY;
                         gameState.playCard(attackerIndex, 'PENDING');
                         render();
 
@@ -653,9 +666,25 @@ async function onDragEnd(e) {
                             mode = 'HEAL';
                         } else if (type === 'BUFF_STAT_TARGET') {
                             mode = 'BUFF';
+                        } else if (type === 'DAMAGE_NON_CATEGORY') {
+                            mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
                         }
 
-                        startBattlecryTargeting(gameState.currentPlayer.board.length - 1, dragX, dragY, mode);
+                        // Get the DOM element of the newly played minion to snap arrows
+                        const boardEl = document.getElementById('player-board');
+                        const newMinionIndex = gameState.currentPlayer.board.length - 1;
+                        const minionEl = boardEl.children[newMinionIndex];
+
+                        let startX = e.clientX;
+                        let startY = e.clientY;
+
+                        if (minionEl) {
+                            const rect = minionEl.getBoundingClientRect();
+                            startX = rect.left + rect.width / 2;
+                            startY = rect.top + rect.height / 2;
+                        }
+
+                        startBattlecryTargeting(newMinionIndex, startX, startY, mode);
                     } catch (err) {
                         logMessage(err.message);
                     }

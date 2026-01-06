@@ -132,6 +132,20 @@
 
     <!-- Drag Line SVG Layer -->
     <svg id="drag-layer">
+        <defs>
+            <marker id="arrowhead-damage" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
+                markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L6,3 z" fill="#ff0000" />
+            </marker>
+            <marker id="arrowhead-heal" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
+                markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L6,3 z" fill="#43e97b" />
+            </marker>
+            <marker id="arrowhead-buff" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
+                markerUnits="strokeWidth">
+                <path d="M0,0 L0,6 L6,3 z" fill="#ffa500" />
+            </marker>
+        </defs>
         <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="4"
             style="display:none; pointer-events: none;" />
     </svg>

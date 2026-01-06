@@ -3,6 +3,7 @@
 class GameEngine {
     constructor(cardDB) {
         this.collection = cardDB;
+        this.ai = new AIEngine();
     }
 
     /**
@@ -409,6 +410,214 @@ class Player {
             // Fatigue damage? Simplified: do nothing
             console.log("Out of cards!");
         }
+    }
+}
+
+class AIEngine {
+    decideTurn(gameState) {
+        const actions = [];
+        const aiPlayer = gameState.currentPlayer;
+        const opponent = gameState.opponent;
+
+        // 1. Lethal Check
+        const totalDamage = this.calculateTotalDamage(aiPlayer);
+        if (totalDamage >= opponent.hero.hp) {
+            console.log("AI: Lethal spotted!");
+            // Queue all attacks to face
+            aiPlayer.board.forEach((minion, index) => {
+                if (minion.canAttack) {
+                    actions.push({ type: 'ATTACK', attackerIndex: index, target: { type: 'HERO' } });
+                }
+            });
+            // Queue damage spells from hand? (Simplified: Hand logic separate)
+            // For now, if board lethal, just attack.
+            // If hand lethal needed, that logic is more complex.
+        } else {
+            // 2. Play Cycle (Board Control & Mana Efficiency)
+
+            // A. Play Minions/Spells
+            // Sort hand by cost high->low to use mana efficiently, or check keywords?
+            // Simple heuristic: Try to spend max mana.
+
+            // Loop until no more cards can be played or board full
+            let mana = aiPlayer.mana.current;
+            let playedSomething = true;
+
+            // We simulate hand indices. Since playing a card shifts indices, we need to be careful.
+            // Better strategy: Calculate best card to play, push action, assume implementation handles it.
+            // BUT: result of play changes state (mana). We assume "decideTurn" returns a sequence based on initial state?
+            // NO, `app.js` will execute one by one. But `decideTurn` needs to know subsequent mana.
+            // Let's make `decideTurn` simpler: Return ONE action at a time?
+            // Or return a list based on "snapshot".
+            // If we return list, we must simulate mana consumption.
+
+            const tempHand = [...aiPlayer.hand];
+            let boardSpace = 5 - aiPlayer.board.length;
+
+            // Simple Greedy: Find most expensive card we can play
+            while (mana > 0 && playedSomething) {
+                playedSomething = false;
+                // Filter playable cards
+                const playableIndices = tempHand.map((c, i) => ({ c, i })).filter(item => item.c && item.c.cost <= mana);
+
+                if (playableIndices.length > 0) {
+                    // Sort by cost desc
+                    playableIndices.sort((a, b) => b.c.cost - a.c.cost);
+
+                    const bestPlay = playableIndices[0];
+                    const card = bestPlay.c;
+
+                    if (card.type === 'MINION' && boardSpace > 0) {
+                        let target = null;
+                        if (card.keywords && card.keywords.battlecry) {
+                            target = this.getBattlecryTarget(card.keywords.battlecry, gameState, aiPlayer, opponent);
+                        }
+
+                        // We need original index, but `tempHand` indices might differ if we removed cards?
+                        // `actions` logic in `app.js` needs to handle "play card at index X".
+                        // If we play card at index 0, next card becomes index 0.
+                        // So we should probably do: "Find card ID" or just be careful.
+                        // EASIER: `app.js` calls `decideTurn` repeatedly? No.
+                        // Let's use `id` or just trust that if we account for shift.
+                        // Actually, if we return `play id xxx`, `app.js` finds it?
+                        // `gameEngine.playCard` takes Index.
+
+                        // Let's fallback to: Just play ONE card per turn? No, AI sucks then.
+                        // Correct approach: `actions` contains "Play card at current index X".
+                        // Wait, if I play index 2, then index 3 becomes 2.
+                        // So I should verify carefully. 
+                        // Let's just output the actions and let the executor handle re-indexing?
+                        // No, executor blindly follows index.
+
+                        // Let's just track `offset`.
+                        // Or better: `decideTurn` returns *Batch 1* of plays.
+                        // Actually, let's keep it robust:
+                        // Just use `card.id` to identify? Engine `playCard` only takes index.
+
+                        // Workaround: AI logic runs, calculates actions based on current snapshot.
+                        // If 2 cards played:
+                        // Action 1: Play index 2.
+                        // Action 2: Play index 1 (which was index 0?).
+                        // This is error prone.
+
+                        // Alternative AI Loop in `app.js`:
+                        // while(true) { const action = ai.getNextMove(state); if(!action) break; execute(action); }
+                        // This is much better.
+                        // So I will implement `getNextMove(state)` instead of `decideTurn`.
+                    }
+                }
+            }
+        }
+        return actions;
+    }
+
+    /**
+     * Returns the single best next action based on current state.
+     */
+    getNextMove(gameState) {
+        const aiPlayer = gameState.currentPlayer;
+        const opponent = gameState.opponent;
+
+        // 1. Lethal Check (Force Face if possible)
+        const totalDamage = this.calculateTotalDamage(aiPlayer);
+        if (totalDamage >= opponent.hero.hp) {
+            // Find an attacker that hasn't attacked
+            const attackerIdx = aiPlayer.board.findIndex(m => m.canAttack && !m.sleeping);
+            if (attackerIdx !== -1) {
+                return { type: 'ATTACK', attackerIndex: attackerIdx, target: { type: 'HERO' } };
+            }
+            // If all minions attacked, maybe play damage spell? (TODO)
+        }
+
+        // 2. Play Card (Prioritize Board & Mana)
+        // Check if board not full
+        if (aiPlayer.board.length < 5) {
+            // Find playable minion with highest cost
+            const playableMinions = aiPlayer.hand
+                .map((c, i) => ({ ...c, originalIndex: i }))
+                .filter(c => c.type === 'MINION' && c.cost <= aiPlayer.mana.current)
+                .sort((a, b) => b.cost - a.cost);
+
+            if (playableMinions.length > 0) {
+                const choice = playableMinions[0];
+                let target = null;
+                if (choice.keywords && choice.keywords.battlecry) {
+                    // Smart Target
+                    target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                }
+                return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+            }
+        }
+
+        // 3. Play Spell (Simple: High Cost first)
+        const playableSpells = aiPlayer.hand
+            .map((c, i) => ({ ...c, originalIndex: i }))
+            .filter(c => c.type === 'SPELL' && c.cost <= aiPlayer.mana.current)
+            .sort((a, b) => b.cost - a.cost);
+
+        if (playableSpells.length > 0) {
+            const choice = playableSpells[0];
+            // Simple spell targeting? (Mock for now, random or face)
+            let target = null;
+            // Logic for spells can be added here
+            return { type: 'PLAY_CARD', index: choice.originalIndex, target: { type: 'HERO' } };
+        }
+
+        // 4. Trade / Attack
+        // Find attacker
+        const attackers = aiPlayer.board
+            .map((m, i) => ({ ...m, index: i }))
+            .filter(m => m.canAttack && !m.sleeping);
+
+        if (attackers.length > 0) {
+            const attacker = attackers[0];
+
+            // A. Check for Free Kill (Value Trade): My Attack >= Enemy HP AND My HP > Enemy Attack
+            const validTargets = opponent.board.map((m, i) => ({ ...m, index: i }));
+
+            // Taunt filter
+            const taunts = validTargets.filter(m => m.keywords && m.keywords.taunt);
+            const actualTargets = taunts.length > 0 ? taunts : validTargets;
+
+            for (const t of actualTargets) {
+                // Value trade?
+                if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
+                    return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
+                }
+            }
+
+            // B. If no value trade, just go Face (or random trade if Taunt blocks)
+            if (taunts.length > 0) {
+                // Must attack taunt
+                return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: taunts[0].index } };
+            } else {
+                return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'HERO' } };
+            }
+        }
+
+        return null; // No more moves
+    }
+
+    calculateTotalDamage(player) {
+        return player.board
+            .filter(m => m.canAttack && !m.sleeping)
+            .reduce((sum, m) => sum + m.attack, 0);
+    }
+
+    getBattlecryTarget(battlecry, gameState, ai, opponent) {
+        // Simple Heuristic for Battlecries
+        if (battlecry.type === 'DAMAGE' || battlecry.type === 'DAMAGE_NON_CATEGORY') {
+            // Prioritize killing minions
+            // TODO: specific logic
+            if (opponent.board.length > 0) {
+                return { type: 'MINION', index: 0, side: 'OPPONENT' }; // Fallback hit first
+            }
+            return { type: 'HERO', side: 'OPPONENT' };
+        }
+        else if (battlecry.type === 'BUFF_STAT_TARGET') {
+            if (ai.board.length > 0) return { type: 'MINION', index: 0, side: 'PLAYER' };
+        }
+        return null;
     }
 }
 // Export for Node.js
