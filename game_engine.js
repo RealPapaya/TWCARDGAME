@@ -186,8 +186,8 @@ class GameState {
             if (card.keywords && card.keywords.battlecry) {
                 this.resolveBattlecry(card.keywords.battlecry, target);
             } else if (card.id === 'tw004') { // Election Promise: Draw 2 at start of next turn
-                player.onTurnStart = player.onTurnStart || [];
-                player.onTurnStart.push({ type: 'DRAW', count: 2 });
+                player.drawCard();
+                player.drawCard();
             } else if (card.id === 'tw005') { // Green Energy: Damage split
                 const damage = player.deck.length === 0 ? 20 : 10;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
