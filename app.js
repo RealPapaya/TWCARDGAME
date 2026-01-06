@@ -101,6 +101,24 @@ function init() {
         renderDeckBuilder();
     });
 
+    // Filter Listeners
+    ['filter-category', 'filter-rarity', 'filter-cost'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.addEventListener('change', renderDeckBuilder);
+    });
+
+    // Populate Category Filter
+    const categories = [...new Set(CARD_DATA.map(c => c.category || '一般'))].sort();
+    const catSelect = document.getElementById('filter-category');
+    if (catSelect) {
+        categories.forEach(cat => {
+            const opt = document.createElement('option');
+            opt.value = cat;
+            opt.innerText = cat;
+            catSelect.appendChild(opt);
+        });
+    }
+
     // --- Battle Listeners ---
     document.getElementById('end-turn-btn').addEventListener('click', () => {
         try {
@@ -251,10 +269,28 @@ function renderDeckBuilder() {
     gridEl.innerHTML = '';
 
     // Search Functionality
+    // Search Functionality & Window Filters
     const searchInput = document.getElementById('card-search-input');
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
 
-    CARD_DATA.filter(card => card.name.toLowerCase().includes(searchTerm) || (card.description && card.description.toLowerCase().includes(searchTerm))).forEach(card => {
+    // Read Filters
+    const catFilter = document.getElementById('filter-category') ? document.getElementById('filter-category').value : 'ALL';
+    const rarFilter = document.getElementById('filter-rarity') ? document.getElementById('filter-rarity').value : 'ALL';
+    const costFilter = document.getElementById('filter-cost') ? document.getElementById('filter-cost').value : 'ALL';
+
+    CARD_DATA.filter(card => {
+        const matchSearch = card.name.toLowerCase().includes(searchTerm) || (card.description && card.description.toLowerCase().includes(searchTerm));
+        const matchCat = catFilter === 'ALL' || (card.category || '一般') === catFilter;
+        const matchRarity = rarFilter === 'ALL' || (card.rarity || 'COMMON') === rarFilter; // Default rarity if missing?
+
+        let matchCost = true;
+        if (costFilter !== 'ALL') {
+            if (costFilter === '7+') matchCost = card.cost >= 7;
+            else matchCost = card.cost === parseInt(costFilter);
+        }
+
+        return matchSearch && matchCat && matchRarity && matchCost;
+    }).forEach(card => {
         const cardEl = createCardEl(card, -1);
 
         // Count copies in current deck

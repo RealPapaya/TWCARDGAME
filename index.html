@@ -59,6 +59,30 @@
                 <input type="text" id="deck-name-input" placeholder="牌組名稱..." maxlength="10">
                 <input type="text" id="card-search-input" placeholder="搜尋卡片..."
                     style="margin-left: 15px; background: rgba(255, 255, 255, 0.1); border: 1px solid #00f2fe; border-radius: 5px; color: white; padding: 8px 12px; font-size: 1rem; outline: none; transition: border-color 0.3s;">
+
+                <!-- Filters -->
+                <select id="filter-category" class="filter-select">
+                    <option value="ALL">所有種族</option>
+                    <!-- Options populated by JS ideally, or hardcoded -->
+                </select>
+                <select id="filter-rarity" class="filter-select">
+                    <option value="ALL">所有等級</option>
+                    <option value="COMMON">一般 (Common)</option>
+                    <option value="RARE">精良 (Rare)</option>
+                    <option value="EPIC">史詩 (Epic)</option>
+                    <option value="LEGENDARY">傳說 (Legendary)</option>
+                </select>
+                <select id="filter-cost" class="filter-select">
+                    <option value="ALL">所有費用</option>
+                    <option value="0">0</option>
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                    <option value="5">5</option>
+                    <option value="6">6</option>
+                    <option value="7+">7+</option>
+                </select>
             </div>
             <div id="deck-count-indicator">已選擇: 0 / 30</div>
             <button id="btn-save-deck" class="neon-button">保存</button>
