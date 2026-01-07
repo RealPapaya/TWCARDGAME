@@ -555,6 +555,31 @@ function renderDeckBuilder() {
     });
 
     document.getElementById('deck-count-indicator').innerText = `已選擇: ${deck.cards.length} / 30`;
+
+    // Calculate Stats
+    let totalCost = 0;
+    let minionCount = 0;
+    let spellCount = 0;
+
+    deck.cards.forEach(id => {
+        const card = CARD_DATA.find(c => c.id === id);
+        if (card) {
+            totalCost += card.cost;
+            if (card.type === 'MINION') minionCount++;
+            else if (card.type === 'SPELL') spellCount++;
+        }
+    });
+
+    const avgCost = deck.cards.length > 0 ? (totalCost / deck.cards.length).toFixed(1) : "0.0";
+
+    const statsEl = document.getElementById('deck-stats');
+    if (statsEl) {
+        statsEl.innerHTML = `
+            <div class="stat-row">平均花費: <span style="color:var(--neon-cyan)">${avgCost}</span></div>
+            <div class="stat-row">單位卡: <span style="color:var(--neon-yellow)">${minionCount}</span></div>
+            <div class="stat-row">技能卡: <span style="color:#ff4b2b">${spellCount}</span></div>
+        `;
+    }
 }
 
 function getBorderColor(rarity) {
