@@ -986,18 +986,19 @@ function createCardEl(card, index) {
         if (builderView && builderView.style.display === 'flex') {
             // Builder Mode: Avoid overlap
             const screenWidth = window.innerWidth;
+            // Reset conflict styles
+            preview.style.top = 'auto';
+            preview.style.transform = 'none';
+            // Use CSS bottom positioning
+
             if (e.clientX < screenWidth / 2) {
                 // Cursor Left -> Show Right
                 preview.style.left = 'auto';
                 preview.style.right = '40px';
-                preview.style.top = '50%';
-                preview.style.transform = 'translateY(-50%)';
             } else {
                 // Cursor Right -> Show Left
                 preview.style.right = 'auto';
                 preview.style.left = '40px';
-                preview.style.top = '50%';
-                preview.style.transform = 'translateY(-50%)';
             }
         } else {
             // Battle Mode (Hand): Fixed Left Top
