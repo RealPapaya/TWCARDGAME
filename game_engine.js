@@ -701,17 +701,31 @@ class AIEngine {
     }
 
     getBattlecryTarget(battlecry, gameState, ai, opponent) {
+        const rule = battlecry.target;
+        if (!rule || typeof rule !== 'object') return null;
+
         // Simple Heuristic for Battlecries
-        if (battlecry.type === 'DAMAGE' || battlecry.type === 'DAMAGE_NON_CATEGORY') {
-            // Prioritize killing minions
-            // TODO: specific logic
-            if (opponent.board.length > 0) {
-                return { type: 'MINION', index: 0, side: 'OPPONENT' }; // Fallback hit first
+        if (battlecry.type === 'DAMAGE' || battlecry.type === 'DAMAGE_NON_CATEGORY' || battlecry.type === 'DESTROY') {
+            // Target: Enemies preferred
+            if (rule.side !== 'FRIENDLY') {
+                if (rule.type !== 'HERO' && opponent.board.length > 0) {
+                    return { type: 'MINION', index: 0, side: 'OPPONENT' };
+                }
+                if (rule.type !== 'MINION') {
+                    return { type: 'HERO', side: 'OPPONENT' };
+                }
             }
-            return { type: 'HERO', side: 'OPPONENT' };
         }
-        else if (battlecry.type === 'BUFF_STAT_TARGET') {
-            if (ai.board.length > 0) return { type: 'MINION', index: 0, side: 'PLAYER' };
+        else if (battlecry.type === 'HEAL' || battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD') {
+            // Target: Friendly preferred
+            if (rule.side !== 'ENEMY') {
+                if (rule.type !== 'HERO' && ai.board.length > 0) {
+                    return { type: 'MINION', index: 0, side: 'PLAYER' };
+                }
+                if (rule.type !== 'MINION') {
+                    return { type: 'HERO', side: 'PLAYER' };
+                }
+            }
         }
         return null;
     }

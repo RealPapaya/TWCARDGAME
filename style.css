@@ -1060,6 +1060,7 @@ body {
     /* Ensure mouse interaction */
     z-index: 20;
     /* Ensure on top */
+    white-space: pre-wrap;
 }
 
 .card-desc::-webkit-scrollbar {

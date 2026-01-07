@@ -3,20 +3,20 @@ let gameState;
 // Embedded Card Data to avoid CORS issues
 const CARD_DATA = [
     { "id": "TW001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生。", "image": "img/c001.png" },
-    { "id": "TW002", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": "ANY" } }, "description": "戰吼：隨機 1 點傷害。", "image": "img/c004.png" },
+    { "id": "TW002", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": { "side": "ALL", "type": "ALL" } } }, "description": "戰吼：對一個單位造成 1 點傷害。", "image": "img/c004.png" },
     { "id": "TW003", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷。", "image": "img/c002.png" },
     { "id": "TW004", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "五杯大冰拿", "image": "img/tw008.png" },
     { "id": "TW005", "name": "水電徒弟", "category": "勞工", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/tw010.png" },
     { "id": "TW006", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "維持不需要維持的秩序。", "image": "img/c013.png" },
     { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "戰吼:可以直接攻擊 大喊我是外送師", "image": "img/tw007.png" },
-    { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": "ANY" } }, "description": "戰吼: 回復一個單位2點血量", "image": "img/tw014.png" },
+    { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": { "side": "ALL", "type": "ALL" } } }, "description": "戰吼: 回復一個單位2點血量", "image": "img/tw014.png" },
     { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "激怒: 增加3點攻擊 極度耐操", "image": "img/tw015.png" },
-    { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": "ANY", "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
-    { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。", "image": "img/tw001.png" },
+    { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": { "side": "ALL", "type": "MINION" }, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
+    { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的隨從血量全部回復。", "image": "img/tw001.png" },
     { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷", "image": "img/tw009.png" },
-    { "id": "TW014", "name": "黃瀞瑩", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "HEAL", "value": 3, "target": "ANY" } }, "description": "戰吼：回復一個單位3點血量。", "image": "img/tw019.png" },
-    { "id": "TW015", "name": "高虹安", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD", "target": "ANY" } }, "description": "戰吼：賦予一個單位「光盾」。", "image": "img/tw020.png" },
+    { "id": "TW014", "name": "黃瀞瑩", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "HEAL", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "description": "戰吼：回復一個隨從3點血量。", "image": "img/tw019.png" },
+    { "id": "TW015", "name": "高虹安", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD", "target": { "side": "ALL", "type": "MINION" } } }, "description": "戰吼：賦予一個隨從「光盾」。", "image": "img/tw020.png" },
     { "id": "TW016", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 1, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力。", "image": "img/tw002.png" },
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "image": "img/tw013.png" },
     { "id": "TW018", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "image": "img/tw016.png" },
@@ -27,7 +27,7 @@ const CARD_DATA = [
     { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "divineShield": true, "taunt": true }, "description": "光盾。嘲諷。珊言良語", "image": "img/TW026.png" },
     { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true }, "description": "嘲諷。金門坦克。", "image": "img/tw017.png" },
     { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_ALL" } }, "description": "戰吼：賦予所有友方角色「光盾」。", "image": "img/TW025.png" },
-    { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": "ANY" } }, "description": "戰吼: 直接擊殺一個單位", "image": "img/tw012.png" },
+    { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "image": "img/tw012.png" },
     { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "description": "激怒：+5攻擊。要頭腦有肌肉", "image": "img/TW027.png" },
     { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。", "image": "img/tw004.png" },
     { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" }
@@ -925,9 +925,9 @@ function showPreview(card) {
             
             ${artHtml}
             
-            <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:right; color:#aaa;">${card.category || ""}</div>
+            <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: left;">${card.description || ""}</div>
+            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center;">${card.description || ""}</div>
             
             ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
         </div>
@@ -1089,9 +1089,10 @@ let attackerIndex = null;
 let draggingFromHand = false;
 let draggedEl = null;
 let isBattlecryTargeting = false;
-let battlecrySourceIndex = null;
-let battlecrySourceType = null; // Fix ReferenceError
-let draggingMode = 'DAMAGE'; // 'DAMAGE' or 'HEAL'
+let battlecrySourceIndex = -1;
+let battlecrySourceType = 'MINION'; // 'MINION' or 'SPELL'
+let battlecryTargetRule = null;
+let draggingMode = 'DAMAGE'; // 'DAMAGE', 'HEAL', 'BUFF'
 let currentInsertionIndex = -1;
 
 const dragLine = document.getElementById('drag-line');
@@ -1186,6 +1187,29 @@ function onDragMove(e) {
         // Redraw green line from the "pending" card to mouse
         dragLine.setAttribute('x2', e.clientX);
         dragLine.setAttribute('y2', e.clientY);
+
+        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+        const unitEl = targetEl?.closest('.minion, .hero-container'); // Changed from .minion-card to .minion
+
+        if (unitEl) {
+            const targetInfo = {};
+            if (unitEl.classList.contains('hero-container')) {
+                targetInfo.type = 'HERO';
+                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+            } else {
+                targetInfo.type = 'MINION';
+                const board = unitEl.parentElement;
+                targetInfo.side = board.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
+            }
+
+            if (isTargetEligible(battlecryTargetRule, targetInfo)) {
+                // Lock-in visual (snap)
+                const rect = unitEl.getBoundingClientRect();
+                dragLine.setAttribute('x2', rect.left + rect.width / 2);
+                dragLine.setAttribute('y2', rect.top + rect.height / 2);
+                return;
+            }
+        }
     }
 }
 
@@ -1248,14 +1272,8 @@ async function onDragEnd(e) {
                 }
 
                 // Targeted Battlecry check
-                const type = card.keywords?.battlecry?.type;
-                const isTargeted =
-                    (type === 'DAMAGE' && card.keywords.battlecry.target === 'ANY') ||
-                    (type === 'HEAL' && card.keywords.battlecry.target === 'ANY') ||
-                    (type === 'DAMAGE_NON_CATEGORY') ||
-                    (type === 'BUFF_STAT_TARGET') ||
-                    (type === 'GIVE_DIVINE_SHIELD') ||
-                    (type === 'DESTROY' && card.keywords.battlecry.target === 'ANY');
+                const battlecry = card.keywords?.battlecry;
+                const isTargeted = battlecry && battlecry.target && typeof battlecry.target === 'object';
 
                 // Show Preview before playing
                 await showCardPlayPreview(card);
@@ -1265,11 +1283,11 @@ async function onDragEnd(e) {
                 if (isTargeted) {
                     try {
                         let mode = 'DAMAGE';
-                        if (type === 'HEAL') {
+                        if (battlecry.type === 'HEAL') {
                             mode = 'HEAL';
-                        } else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') {
+                        } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD') {
                             mode = 'BUFF';
-                        } else if (type === 'DAMAGE_NON_CATEGORY') {
+                        } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
                         }
 
@@ -1280,7 +1298,7 @@ async function onDragEnd(e) {
                             if (handCardEl) handCardEl.style.opacity = '0';
 
                             // For spells, we don't play pending. We just start targeting from Hand.
-                            startBattlecryTargeting(attackerIndex, e.clientX, e.clientY, mode);
+                            startBattlecryTargeting(attackerIndex, e.clientX, e.clientY, mode, battlecry.target);
                         } else { // Minion with Battlecry
                             gameState.playCard(attackerIndex, 'PENDING', currentInsertionIndex);
                             render();
@@ -1300,7 +1318,7 @@ async function onDragEnd(e) {
                                 startX = rect.left + rect.width / 2;
                                 startY = rect.top + rect.height / 2;
                             }
-                            startBattlecryTargeting(currentInsertionIndex, startX, startY, mode);
+                            startBattlecryTargeting(currentInsertionIndex, startX, startY, mode, battlecry.target);
                         }
                     } catch (err) {
                         logMessage(err.message);
@@ -1373,35 +1391,28 @@ async function onDragEnd(e) {
         dragLine.style.display = 'none'; // Critical: Hide line
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const targetData = targetEl?.closest('[data-type]');
+        const unitEl = targetEl?.closest('.minion, .hero-container'); // Changed from .minion-card to .minion
 
         let target = null;
-        if (targetData) {
-            const type = targetData.dataset.type;
-            const index = parseInt(targetData.dataset.index);
-
-            // Defend against incorrect targets for Hsieh (TW010) logic
-            const sourceCard = battlecrySourceType === 'SPELL' ?
-                gameState.currentPlayer.hand[battlecrySourceIndex] :
-                gameState.currentPlayer.board[battlecrySourceIndex];
-
-            if (sourceCard && sourceCard.id === 'TW010' && type === 'HERO') {
-                // Invalid target for Hsieh - do nothing, keep targeting
-                isBattlecryTargeting = true;
-                dragLine.style.display = 'block';
-                logMessage("Target must be a minion!");
-                return;
+        if (unitEl) {
+            const targetInfo = {};
+            if (unitEl.classList.contains('hero-container')) {
+                targetInfo.type = 'HERO';
+                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.index = unitEl.id === 'player-hero' ? -1 : -1; // Heroes don't have an index in board array
+            } else {
+                targetInfo.type = 'MINION';
+                const board = unitEl.parentElement;
+                targetInfo.side = board.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.index = parseInt(unitEl.dataset.index);
             }
 
-            if (type === 'HERO' && (targetData.id === 'opp-hero' || targetData.id === 'player-hero')) {
-                // Determine side based on ID
-                target = { type, index, side: targetData.id === 'opp-hero' ? 'OPPONENT' : 'PLAYER' };
-            } else if (type === 'MINION') {
-                if (targetEl.closest('#opp-board')) {
-                    target = { type, index, side: 'OPPONENT' };
-                } else if (targetEl.closest('#player-board')) {
-                    target = { type, index, side: 'PLAYER' };
-                }
+            if (isTargetEligible(battlecryTargetRule, targetInfo)) {
+                target = targetInfo;
+            } else {
+                logMessage("Invalid target!");
+                render(); // Reset UI
+                return;
             }
         }
 
@@ -1418,8 +1429,8 @@ async function onDragEnd(e) {
                 }
 
                 const destEl = target.type === 'HERO' ?
-                    (targetData.id === 'opp-hero' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) :
-                    (targetEl.closest('#opp-board') ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
+                    (target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero')) :
+                    (target.side === 'OPPONENT' ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
 
                 // 2. Animate BEFORE applying logic (so target is still alive)
                 if (sourceEl && destEl) {
@@ -1493,22 +1504,31 @@ async function onDragEnd(e) {
     currentInsertionIndex = -1;
 }
 
-function startBattlecryTargeting(handIndex, x, y, mode = 'DAMAGE') {
+// --- Targeting Helpers ---
+function isTargetEligible(rule, targetInfo) {
+    if (!rule || !targetInfo) return false;
+
+    // Side check
+    if (rule.side === 'ENEMY' && targetInfo.side !== 'OPPONENT') return false;
+    if (rule.side === 'FRIENDLY' && targetInfo.side !== 'PLAYER') return false;
+
+    // Type check
+    if (rule.type === 'MINION' && targetInfo.type !== 'MINION') return false;
+    if (rule.type === 'HERO' && targetInfo.type !== 'HERO') return false;
+
+    return true;
+}
+
+function startBattlecryTargeting(handIndex, x, y, mode = 'DAMAGE', targetRule = null) {
     isBattlecryTargeting = true;
     battlecrySourceIndex = handIndex;
+    battlecrySourceType = 'SPELL'; // Assume spell/play targeting
     draggingMode = mode;
+    battlecryTargetRule = targetRule; // Global to store the rule
 
     dragLine.classList.add('battlecry-line');
-    if (mode === 'HEAL') {
-        dragLine.classList.add('heal-line');
-        dragLine.classList.remove('buff-line');
-    } else if (mode === 'BUFF') {
-        dragLine.classList.remove('heal-line');
-        dragLine.classList.add('buff-line');
-    } else {
-        dragLine.classList.remove('heal-line');
-        dragLine.classList.remove('buff-line');
-    }
+    if (mode === 'HEAL') dragLine.classList.add('heal-line');
+    if (mode === 'BUFF') dragLine.classList.add('buff-line');
 
     dragLine.setAttribute('x1', x);
     dragLine.setAttribute('y1', y);
@@ -1742,8 +1762,8 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
             <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
         </div>
         ${customArtHtml}
-        <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0; text-align: right; color: #aaa;">${card.category || ""}</div>
-        <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: left;">${card.description || ""}</div>
+        <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0; text-align: center; color: #aaa;">${card.category || ""}</div>
+        <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center;">${card.description || ""}</div>
         ${statsHtml}
     `;
 
