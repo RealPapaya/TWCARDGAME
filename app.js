@@ -1114,9 +1114,18 @@ async function onDragEnd(e) {
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
             if (draggedEl) draggedEl.style.display = 'block';
 
-            const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board';
+            const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board' || targetEl?.closest('#player-hand');
 
-            if (isPlayerArea) {
+            if (isPlayerArea || !targetEl) {
+                // Return to hand visuals
+                logMessage("Play cancelled");
+                const originalEl = document.getElementById('player-hand').children[attackerIndex];
+                if (originalEl) originalEl.style.opacity = '1';
+                render();
+                return;
+            }
+
+            if (true) { // Validated landing
                 const card = gameState.currentPlayer.hand[attackerIndex];
 
                 if (gameState.currentPlayer.mana.current < card.cost) {
@@ -1263,6 +1272,20 @@ async function onDragEnd(e) {
         if (targetData) {
             const type = targetData.dataset.type;
             const index = parseInt(targetData.dataset.index);
+
+            // Defend against incorrect targets for Hsieh (TW010) logic
+            const sourceCard = battlecrySourceType === 'SPELL' ?
+                gameState.currentPlayer.hand[battlecrySourceIndex] :
+                gameState.currentPlayer.board[battlecrySourceIndex];
+
+            if (sourceCard && sourceCard.id === 'TW010' && type === 'HERO') {
+                // Invalid target for Hsieh - do nothing, keep targeting
+                isBattlecryTargeting = true;
+                dragLine.style.display = 'block';
+                logMessage("Target must be a minion!");
+                return;
+            }
+
             if (type === 'HERO' && (targetData.id === 'opp-hero' || targetData.id === 'player-hero')) {
                 // Determine side based on ID
                 target = { type, index, side: targetData.id === 'opp-hero' ? 'OPPONENT' : 'PLAYER' };
@@ -1627,9 +1650,9 @@ async function showCardPlayPreview(card, isAI = false) {
             void boardEl.offsetWidth;
             boardEl.classList.add('board-slam');
 
-            // Intensify dust for high cost cards
+            // Intensify dust for high cost cards - spawn at PREVIEW CARD
             const intensity = card.cost >= 7 ? 2.5 : 1;
-            spawnDustEffect(boardEl, intensity);
+            spawnDustEffect(cardEl, intensity);
             setTimeout(() => boardEl.classList.remove('board-slam'), 500);
         }, 300); // Wait for card to hit the board
     }

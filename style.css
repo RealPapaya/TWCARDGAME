@@ -1480,7 +1480,12 @@ body {
 
 /* Composite effect: Divine Shield + Can Attack */
 .minion.divine-shield.can-attack {
-    box-shadow: 0 0 0px var(--neon-lime) !important;
+    box-shadow: 0 0 20px var(--neon-lime) !important;
+}
+
+/* Taunt + Can Attack */
+.minion.taunt.can-attack {
+    box-shadow: 0 0 30px var(--neon-lime), 0 0 10px rgba(192, 192, 192, 0.4) !important;
 }
 
 #play-preview-overlay {

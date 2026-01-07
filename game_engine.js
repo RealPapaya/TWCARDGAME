@@ -414,6 +414,7 @@ class GameState {
         }
 
         attacker.canAttack = false;
+        attacker.allowAttackCount = (attacker.allowAttackCount || 1) - 1;
 
         // check deaths
         this.resolveDeaths();
