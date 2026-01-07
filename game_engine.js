@@ -60,7 +60,7 @@ class GameEngine {
      * @param {Array<string>} deck2Ids
      * @returns {GameState}
      */
-    createGame(deck1Ids, deck2Ids) {
+    createGame(deck1Ids, deck2Ids, debugMode = false) {
         // Validate decks first
         if (!this.validateDeck(deck1Ids).valid || !this.validateDeck(deck2Ids).valid) {
             throw new Error("Invalid decks");
@@ -72,10 +72,8 @@ class GameEngine {
         // Randomly choose starting player
         const startingIndex = Math.random() < 0.5 ? 0 : 1;
 
-        const state = new GameState([p1, p2], startingIndex);
+        const state = new GameState([p1, p2], startingIndex, debugMode);
 
-        // Initial Draw
-        // Player 1 draws 3, Player 2 draws 4 (Coin logic could be added here, simplified for now)
         // Initial Draw: Both players get 3 cards as per user request
         const p1Draws = 3;
         const p2Draws = 3;
@@ -89,13 +87,23 @@ class GameEngine {
 }
 
 class GameState {
-    constructor(players, startingIndex) {
+    constructor(players, startingIndex, debugMode = false) {
         this.gameId = Date.now().toString();
         this.turnCount = 0;
         this.players = players;
         this.currentPlayerIdx = startingIndex;
         this.gameOver = false;
         this.winner = null;
+        this.debugMode = debugMode;
+
+        if (this.debugMode) {
+            this.players.forEach(p => {
+                p.hero.hp = 100;
+                p.hero.maxHp = 100;
+                p.mana.max = 10;
+                p.mana.current = 10;
+            });
+        }
     }
 
     get currentPlayer() {

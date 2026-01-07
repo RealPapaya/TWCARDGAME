@@ -91,8 +91,8 @@ if (userDecks[1].cards.length === 0) {
 }
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let editingDeckIdx = 0;
-// editingDeckIdx was duplicate
-let pendingViewMode = 'BATTLE'; // 'BATTLE' or 'BUILDER'
+let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
+let isDebugMode = false;
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
 function init() {
@@ -101,13 +101,23 @@ function init() {
 
     // --- Main Menu Listeners ---
     document.getElementById('btn-main-battle').addEventListener('click', () => {
+        isDebugMode = false;
         showView('mode-selection');
     });
 
     document.getElementById('btn-main-builder').addEventListener('click', () => {
+        isDebugMode = false;
         pendingViewMode = 'BUILDER';
         showView('deck-selection');
         document.getElementById('deck-select-title').innerText = '選擇要編修的牌組';
+        renderDeckSelect();
+    });
+
+    document.getElementById('btn-main-test').addEventListener('click', () => {
+        isDebugMode = true;
+        pendingViewMode = 'DEBUG';
+        showView('deck-selection');
+        document.getElementById('deck-select-title').innerText = '測試模式：選擇牌組';
         renderDeckSelect();
     });
 
@@ -232,41 +242,49 @@ function renderDeckSelect() {
     if (startBtn) startBtn.style.display = 'none';
     if (editBtn) editBtn.style.display = 'none';
 
-    if (pendingViewMode === 'BATTLE') {
+    if (pendingViewMode === 'BATTLE' || pendingViewMode === 'DEBUG') {
         if (startBtn) {
             startBtn.style.display = 'block';
             startBtn.onclick = async () => {
-                // Ensure a deck is selected might be implicit by selectedDeckIdx, but let's check safety if needed
                 if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
                 const deck = userDecks[selectedDeckIdx];
-                if (deck.cards.length === 30) {
-                    startBattle(deck.cards);
+                const isTest = deck.isTest || isDebugMode;
+                if (deck.cards.length === 30 || (isTest && deck.cards.length > 0)) {
+                    startBattle(deck.cards, isDebugMode);
                 } else {
-                    await showCustomAlert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+                    await showCustomAlert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！${isTest ? '(測試模式需至少 1 張)' : ''}`);
                 }
             };
         }
-    } else if (pendingViewMode === 'BUILDER') {
+    }
+
+    if (pendingViewMode === 'BUILDER' || pendingViewMode === 'DEBUG') {
         if (editBtn) {
             editBtn.style.display = 'block';
             editBtn.onclick = () => {
                 if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
-                editingDeckIdx = selectedDeckIdx; // Set editing to selected
+                editingDeckIdx = selectedDeckIdx;
                 showView('deck-builder');
                 renderDeckBuilder();
             };
         }
     }
 
-    userDecks.forEach((deck, idx) => {
-        const slot = document.createElement('div');
-        slot.className = `deck-slot ${idx === selectedDeckIdx ? 'selected' : ''}`;
+    // Strict Isolation: Test Mode shows ONLY test decks, Normal Mode shows ONLY normal decks
+    const visibleDecks = userDecks.map((d, i) => ({ ...d, originalIdx: i }))
+        .filter(d => isDebugMode ? d.isTest : !d.isTest);
 
-        const warningIcon = deck.cards.length < 30 ? '<span title="牌組未滿30張" style="color: var(--neon-yellow); margin-right: 8px;">⚠️</span>' : '';
+    visibleDecks.forEach((deck, idx) => {
+        const slot = document.createElement('div');
+        slot.className = `deck-slot ${deck.originalIdx === selectedDeckIdx ? 'selected' : ''}`;
+
+        const isDeckIncomplete = deck.cards.length !== 30;
+        const warningIcon = (isDeckIncomplete && !deck.isTest) ? '<span title="牌組未滿30張" style="color: var(--neon-yellow); margin-right: 8px;">⚠️</span>' : '';
+        const testLabel = deck.isTest ? '<span style="color: var(--neon-pink); font-size: 10px; margin-left: 5px;">[測試]</span>' : '';
 
         slot.innerHTML = `
             <button class="btn-delete-deck" title="刪除牌組">×</button>
-            <h3>${warningIcon}${deck.name}</h3>
+            <h3>${warningIcon}${deck.name}${testLabel}</h3>
             <div class="slot-info">${deck.cards.length} / 30 張卡</div>
         `;
 
@@ -278,7 +296,7 @@ function renderDeckSelect() {
             }
             const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
             if (confirmed) {
-                userDecks.splice(idx, 1);
+                userDecks.splice(deck.originalIdx, 1);
                 if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
                 localStorage.setItem('userDecks', JSON.stringify(userDecks));
                 renderDeckSelect();
@@ -287,7 +305,7 @@ function renderDeckSelect() {
 
         // Click slot to select
         slot.addEventListener('click', () => {
-            selectedDeckIdx = idx;
+            selectedDeckIdx = deck.originalIdx;
             localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
             renderDeckSelect();
         });
@@ -295,16 +313,21 @@ function renderDeckSelect() {
         container.appendChild(slot);
     });
 
-    // Add New Deck Slot (Only in Builder Mode)
+    // Add New Deck Slot (Only in Builder or Debug Mode)
     if (pendingViewMode !== 'BATTLE' && userDecks.length < 10) {
         const addSlot = document.createElement('div');
         addSlot.className = 'deck-slot add-deck-slot';
         addSlot.innerHTML = `
             <div class="plus-icon">+</div>
-            <div>建立新牌組</div>
+            <div>建立${isDebugMode ? '測試' : '新'}牌組</div>
         `;
         addSlot.onclick = () => {
-            userDecks.push({ name: `自定義牌組 ${userDecks.length + 1}`, cards: [] });
+            const newDeck = {
+                name: (isDebugMode ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
+                cards: []
+            };
+            if (isDebugMode) newDeck.isTest = true;
+            userDecks.push(newDeck);
             localStorage.setItem('userDecks', JSON.stringify(userDecks));
             selectedDeckIdx = userDecks.length - 1;
             renderDeckSelect();
@@ -328,13 +351,13 @@ function showView(viewId) {
 
 let previousPlayerHandSize = 0;
 
-async function startBattle(deckIds) {
+async function startBattle(deckIds, debugMode = false) {
     // Fill opponent deck with random cards
     const allIds = CARD_DATA.map(c => c.id);
     const oppDeck = [];
     while (oppDeck.length < 30) oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
 
-    gameState = gameEngine.createGame(deckIds, oppDeck);
+    gameState = gameEngine.createGame(deckIds, oppDeck, debugMode);
 
     // Initial Draw Sequence Logic
     const initialHand = [...gameState.players[0].hand];
@@ -473,9 +496,9 @@ function renderDeckBuilder() {
 
         cardEl.addEventListener('click', async (e) => {
             e.stopPropagation();
-            if (deck.cards.length < 30) {
+            if (deck.cards.length < 30 || isDebugMode) {
                 // Check legendary limit
-                if (card.rarity === 'LEGENDARY') {
+                if (!isDebugMode && card.rarity === 'LEGENDARY') {
                     const legendCount = deck.cards.filter(id => {
                         const c = CARD_DATA.find(x => x.id === id);
                         return c?.rarity === 'LEGENDARY';
@@ -488,7 +511,7 @@ function renderDeckBuilder() {
 
                 // Normal 2 copies limit
                 const count = deck.cards.filter(id => id === card.id).length;
-                if (count >= 2) {
+                if (!isDebugMode && count >= 2) {
                     await showCustomAlert("每種卡牌最多只能放 2 張！");
                     return;
                 }
@@ -563,7 +586,13 @@ function renderDeckBuilder() {
         listEl.appendChild(item);
     });
 
-    document.getElementById('deck-count-indicator').innerText = `已選擇: ${deck.cards.length} / 30`;
+    if (isDebugMode) {
+        document.getElementById('deck-count-indicator').innerText = `測試模式: ${deck.cards.length} 張卡 (無數量限制)`;
+        document.getElementById('deck-count-indicator').style.color = 'var(--neon-blue)';
+    } else {
+        document.getElementById('deck-count-indicator').innerText = `已選擇: ${deck.cards.length} / 30`;
+        document.getElementById('deck-count-indicator').style.color = (deck.cards.length === 30) ? 'var(--neon-green)' : 'white';
+    }
 
     // Calculate Stats
     let totalCost = 0;
