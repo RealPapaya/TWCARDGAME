@@ -849,22 +849,22 @@ function showPreview(card) {
     }
 
     const artHtml = card.image ?
-        `<div class="card-art" style="width: 90%; height: 220px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
-        `<div class="card-art" style="width: 90%; height: 100px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
+        `<div class="card-art" style="width: 100%; height: 190px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 70px auto 2px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
+        `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 70px auto 2px auto; border-radius: 4px;"></div>`;
 
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding-bottom: 0;">
-            <div class="card-cost" style="width:60px; height:60px; font-size:32px; top: -5px; left: -5px;"><span>${card.cost}</span></div>
+        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 8px;">
+            <div class="card-cost" style="position: absolute; width:30px; height:30px; font-size:28px; top: 20px; left: 20px; z-index: 10;"><span>${card.cost}</span></div>
             
-            <div class="card-title" style="font-size:24px; margin-top:80px; flex-shrink: 0;">${card.name}</div>
+            <div class="card-title" style="font-size:32px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
             
-            ${artHtml.replace('height: 220px', 'height: 160px')}
+            ${artHtml}
             
-            <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0;">${card.category || ""}</div>
+            <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:right; color:#aaa;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:16px; padding: 5px 15px; line-height: 1.3; flex-grow: 1; display: flex; align-items: flex-start; justify-content: center; height: auto; overflow: visible;">${card.description || ""}</div>
+            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: left;">${card.description || ""}</div>
             
-            ${statsHtml.replace(/70px/g, '65px').replace('32px', '30px')}
+            ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
         </div>
     `;
     preview.style.display = 'block';
@@ -1661,16 +1661,20 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
         </div>`;
     }
 
-    const artHtml = card.image ?
-        `<div class="card-art" style="width: 90%; height: 180px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 8px; margin: 10px auto; border: 2px solid rgba(255,255,255,0.1);"></div>` :
-        `<div class="card-art" style="width: 90%; height: 80px; background: #333; margin: 10px auto; border-radius: 8px;"></div>`;
+    cardEl.style.padding = '8px'; // Slightly tighter padding
+    cardEl.style.justifyContent = 'flex-start'; // Ensure content starts at top
+
+    // Define Art HTML inline to ensure custom margin applies
+    const customArtHtml = card.image ?
+        `<div class="card-art" style="width: 100%; height: 190px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 70px auto 2px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
+        `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 70px auto 2px auto; border-radius: 4px;"></div>`;
 
     cardEl.innerHTML = `
-        <div class="card-cost" style="width:60px; height:60px; font-size:32px; top: -5px; left: -5px;"><span>${card.cost}</span></div>
-        <div class="card-title" style="font-size:24px; margin-top:80px; flex-shrink: 0;">${card.name}</div>
-        ${artHtml}
-        <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0;">${card.category || ""}</div>
-        <div class="card-desc" style="font-size:16px; padding: 8px 15px; line-height: 1.3; height: auto; flex-grow: 1;">${card.description || ""}</div>
+        <div class="card-cost" style="position: absolute; width:30px; height:30px; font-size:16px; top: -5px; left: -5px; z-index: 10;"><span>${card.cost}</span></div>
+        <div class="card-title" style="font-size:32px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
+        ${customArtHtml}
+        <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0; text-align: right; color: #aaa;">${card.category || ""}</div>
+        <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: left;">${card.description || ""}</div>
         ${statsHtml}
     `;
 
