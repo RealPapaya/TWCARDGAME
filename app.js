@@ -841,22 +841,24 @@ function showPreview(card) {
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
 
+        // 屬性在最下方 (Stats at bottom) - Revised padding for more description space
         statsHtml = `
-        <div class="minion-stats" style="margin-top: auto; padding: 20px;">
+        <div class="minion-stats" style="margin-top: auto; padding: 5px 20px 10px 20px; display: flex; justify-content: space-between; width: 100%;">
             <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span>${card.attack}</span></span>
             <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
         </div>`;
     }
-
+    // height: 140px; 圖片高度
     const artHtml = card.image ?
-        `<div class="card-art" style="width: 100%; height: 190px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 70px auto 2px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
-        `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 70px auto 2px auto; border-radius: 4px;"></div>`;
+        `<div class="card-art" style="width: 100%; height: 140px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
+        `<div class="card-art" style="width: 100%; height: 140px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
 
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 8px;">
-            <div class="card-cost" style="position: absolute; width:30px; height:30px; font-size:28px; top: 20px; left: 20px; z-index: 10;"><span>${card.cost}</span></div>
-            
-            <div class="card-title" style="font-size:28px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
+        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
+            <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
+                <div class="card-cost" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
+                <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
+            </div>
             
             ${artHtml}
             
@@ -1654,8 +1656,9 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
 
+        // 屬性在最下方 (Stats at bottom) - Revised padding for more description space
         statsHtml = `
-        <div class="minion-stats" style="margin-top: auto; padding: 15px;">
+        <div class="minion-stats" style="margin-top: auto; padding: 5px 15px 10px 15px; display: flex; justify-content: space-between; width: 100%;">
             <span class="stat-atk ${atkClass}" style="width: 60px; height: 60px; font-size: 28px;"><span>${card.attack}</span></span>
             <span class="stat-hp ${hpClass}" style="width: 60px; height: 60px; font-size: 28px;">${hpValue}</span>
         </div>`;
@@ -1666,12 +1669,14 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
 
     // Define Art HTML inline to ensure custom margin applies
     const customArtHtml = card.image ?
-        `<div class="card-art" style="width: 100%; height: 190px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 70px auto 2px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
-        `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 70px auto 2px auto; border-radius: 4px;"></div>`;
+        `<div class="card-art" style="width: 100%; height: 150px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
+        `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
 
     cardEl.innerHTML = `
-        <div class="card-cost" style="position: absolute; width:30px; height:30px; font-size:16px; top: -5px; left: -5px; z-index: 10;"><span>${card.cost}</span></div>
-        <div class="card-title" style="font-size:32px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
+        <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
+            <div class="card-cost" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
+            <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
+        </div>
         ${customArtHtml}
         <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0; text-align: right; color: #aaa;">${card.category || ""}</div>
         <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: left;">${card.description || ""}</div>
