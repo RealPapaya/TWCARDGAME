@@ -193,10 +193,10 @@ class GameState {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
             if (card.keywords && card.keywords.battlecry) {
                 this.resolveBattlecry(card.keywords.battlecry, target);
-            } else if (card.id === 'tw004') { // Election Promise: Draw 2 at start of next turn
+            } else if (card.id === 'S001') { // Invoice Win: Draw 2
                 player.drawCard();
                 player.drawCard();
-            } else if (card.id === 'tw005') { // Green Energy: Damage split
+            } else if (card.id === 'S002') { // Impeach: Damage split
                 const damage = player.deck.length === 0 ? 20 : 10;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
 
@@ -243,12 +243,17 @@ class GameState {
         } else if (battlecry.type === 'HEAL') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
-                const max = targetUnit.maxHp !== undefined ? targetUnit.maxHp : targetUnit.health;
-                const current = targetUnit.currentHealth !== undefined ? targetUnit.currentHealth : targetUnit.hp;
+                // Handle both Minion (health/currentHealth) and Hero (hp/maxHp)
+                const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
 
                 if (typeof max === 'number' && typeof current === 'number') {
-                    targetUnit.currentHealth = Math.min(max, current + battlecry.value);
-                    if (target.type === 'HERO') targetUnit.hp = targetUnit.currentHealth;
+                    const newHp = Math.min(max, current + battlecry.value);
+                    if (targetUnit.type === 'HERO') {
+                        targetUnit.hp = newHp;
+                    } else {
+                        targetUnit.currentHealth = newHp;
+                    }
                 }
             }
         } else if (battlecry.type === 'BUFF_STAT_TARGET') {

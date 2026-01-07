@@ -242,12 +242,27 @@ function renderDeckSelect() {
         const slot = document.createElement('div');
         slot.className = `deck-slot ${idx === selectedDeckIdx ? 'selected' : ''}`;
         slot.innerHTML = `
+            <button class="btn-delete-deck" title="刪除牌組">×</button>
             <h3>${deck.name}</h3>
             <div class="slot-info">${deck.cards.length} / 30 張卡</div>
             <div class="deck-slot-actions">
                 <button class="neon-button action-btn">${pendingViewMode === 'BATTLE' ? '選擇' : '編輯'}</button>
             </div>
         `;
+
+        slot.querySelector('.btn-delete-deck').addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (userDecks.length <= 1) {
+                alert("至少需保留一個牌組！");
+                return;
+            }
+            if (confirm(`確定要刪除「${deck.name}」嗎？`)) {
+                userDecks.splice(idx, 1);
+                if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
+                localStorage.setItem('userDecks', JSON.stringify(userDecks));
+                renderDeckSelect();
+            }
+        });
 
         slot.querySelector('.action-btn').addEventListener('click', (e) => {
             e.stopPropagation();
@@ -270,6 +285,23 @@ function renderDeckSelect() {
 
         container.appendChild(slot);
     });
+
+    // Add New Deck Slot
+    if (userDecks.length < 10) {
+        const addSlot = document.createElement('div');
+        addSlot.className = 'deck-slot add-deck-slot';
+        addSlot.innerHTML = `
+            <div class="plus-icon">+</div>
+            <div>建立新牌組</div>
+        `;
+        addSlot.onclick = () => {
+            userDecks.push({ name: `自定義牌組 ${userDecks.length + 1}`, cards: [] });
+            localStorage.setItem('userDecks', JSON.stringify(userDecks));
+            selectedDeckIdx = userDecks.length - 1;
+            renderDeckSelect();
+        };
+        container.appendChild(addSlot);
+    }
 }
 
 
@@ -556,7 +588,9 @@ async function aiTurn() {
 
                 logMessage(`Opponent plays ${card.name}`);
 
-                await showCardPlayPreview(card, true);
+                const oppBoard = document.getElementById('opp-board');
+                const targetSlot = oppBoard.children[oppBoard.children.length]; // Potential new slot
+                await showCardPlayPreview(card, true, targetSlot);
 
                 gameState.playCard(action.index, action.target);
                 render();
@@ -952,7 +986,8 @@ function createCardEl(card, index) {
 function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
     let dsClass = (minion.keywords && minion.keywords.divineShield) ? ' divine-shield' : '';
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}${dsClass}`;
+    let enrageClass = minion.isEnraged ? ' enraged' : '';
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}${dsClass}${enrageClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
@@ -1114,9 +1149,10 @@ async function onDragEnd(e) {
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
             if (draggedEl) draggedEl.style.display = 'block';
 
-            const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board' || targetEl?.closest('#player-hand');
+            const isHandArea = targetEl?.closest('#player-hand');
+            const isBoardArea = targetEl?.closest('#player-board') || targetEl?.id === 'player-board';
 
-            if (isPlayerArea || !targetEl) {
+            if (isHandArea || !isBoardArea) {
                 // Return to hand visuals
                 logMessage("Play cancelled");
                 const originalEl = document.getElementById('player-hand').children[attackerIndex];
@@ -1125,15 +1161,20 @@ async function onDragEnd(e) {
                 return;
             }
 
-            if (true) { // Validated landing
+            if (isBoardArea) { // Validated landing on board
                 const card = gameState.currentPlayer.hand[attackerIndex];
 
                 if (gameState.currentPlayer.mana.current < card.cost) {
                     shakeManaContainer(true);
-                    logMessage("Not enough mana!");
-                    // Handled cleanup above
+                    const originalEl = document.getElementById('player-hand').children[attackerIndex];
+                    if (originalEl) originalEl.style.opacity = '1';
+                    render();
                     return;
                 }
+
+                // Call preview with insertion target for smoke positioning
+                const targetSlot = document.getElementById('player-board').children[currentInsertionIndex];
+                showCardPlayPreview(card, false, targetSlot);
 
                 if (card.type === 'MINION' && gameState.currentPlayer.board.length >= 7) {
                     logMessage("Board full!");
@@ -1591,7 +1632,7 @@ function animateCardFromDeck(cardEl) {
 /**
  * Shows a large 3D preview of the card in the center before it hits the board.
  */
-async function showCardPlayPreview(card, isAI = false) {
+async function showCardPlayPreview(card, isAI = false, targetEl = null) {
     const overlay = document.getElementById('play-preview-overlay');
     overlay.innerHTML = '';
     overlay.style.display = 'flex';
@@ -1650,9 +1691,10 @@ async function showCardPlayPreview(card, isAI = false) {
             void boardEl.offsetWidth;
             boardEl.classList.add('board-slam');
 
-            // Intensify dust for high cost cards - spawn at PREVIEW CARD
+            // Intensify dust for high cost cards - spawn at PREVIEW CARD or TARGET SLOT
             const intensity = card.cost >= 7 ? 2.5 : 1;
-            spawnDustEffect(cardEl, intensity);
+            const smokeAnchor = targetEl || cardEl;
+            spawnDustEffect(smokeAnchor, intensity);
             setTimeout(() => boardEl.classList.remove('board-slam'), 500);
         }, 300); // Wait for card to hit the board
     }
@@ -1672,7 +1714,7 @@ function spawnDustEffect(targetEl, intensity = 1) {
     cloud.className = 'dust-cloud';
     cloud.style.left = `${rect.left + rect.width / 2}px`;
     cloud.style.top = `${rect.top + rect.height * 0.8}px`; // Bottom of element
-    cloud.style.zIndex = "60000";
+    cloud.style.zIndex = "45000"; // Below preview card
     document.body.appendChild(cloud);
 
     const count = Math.floor(15 * intensity);
@@ -1685,7 +1727,7 @@ function spawnDustEffect(targetEl, intensity = 1) {
         p.style.setProperty('--dy', `${Math.sin(angle) * dist}px`);
         const size = (15 + Math.random() * 25) * (intensity > 1 ? 1.6 : 1);
         p.style.width = p.style.height = `${size}px`;
-        p.style.backgroundColor = intensity > 1 ? 'rgba(255, 238, 0, 0.6)' : 'rgba(200, 200, 200, 0.4)';
+        p.style.backgroundColor = 'rgba(200, 200, 200, 0.4)';
         cloud.appendChild(p);
     }
     setTimeout(() => cloud.remove(), 1000);
