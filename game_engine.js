@@ -201,9 +201,8 @@ class GameState {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
             if (card.keywords && card.keywords.battlecry) {
                 this.resolveBattlecry(card.keywords.battlecry, target);
-            } else if (card.id === 'S001') { // Invoice Win: Draw 2
-                player.drawCard();
-                player.drawCard();
+            } else if (card.id === 'S001') { // Invoice Win: Draw 2 (Handled via app.js for timing)
+                // Logic moved to app.js to allow visual delay
             } else if (card.id === 'S002') { // Impeach: Damage split
                 const damage = player.deck.length === 0 ? 20 : 10;
                 const enemies = [this.opponent.hero, ...this.opponent.board];

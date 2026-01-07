@@ -24,12 +24,12 @@ const CARD_DATA = [
     { "id": "TW020", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌", "image": "img/tw006.png" },
     { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "image": "img/tw018.png" },
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "divineShield": true }, "description": "光盾", "image": "img/TW022.png" },
-    { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "divineShield": true, "taunt": true }, "description": "珊言良語\n光盾。嘲諷", "image": "img/TW026.png" },
+    { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "divineShield": true, "taunt": true }, "description": "珊言良語\n光盾+嘲諷", "image": "img/TW026.png" },
     { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true }, "description": "嘲諷。金門坦克", "image": "img/tw017.png" },
     { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_ALL" } }, "description": "戰吼：賦予所有友方角色「光盾」", "image": "img/TW025.png" },
     { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "image": "img/tw012.png" },
     { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "description": "要頭腦有肌肉\n激怒：+5攻擊", "image": "img/TW027.png" },
-    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌。", "image": "img/tw004.png" },
+    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
     { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" }
 ];
 
@@ -657,6 +657,17 @@ async function aiTurn() {
 
                 gameState.playCard(action.index, action.target);
                 render();
+
+                // Visual Delay for S001 Draw 2
+                if (card.id === 'S001') {
+                    await new Promise(r => setTimeout(r, 600));
+                    gameState.currentPlayer.drawCard();
+                    render();
+                    await new Promise(r => setTimeout(r, 600));
+                    gameState.currentPlayer.drawCard();
+                    render();
+                }
+
                 await resolveDeaths();
 
                 // Show Battlecry Visuals
@@ -1333,9 +1344,19 @@ async function onDragEnd(e) {
                 }
 
                 try {
-                    // Pre-play preview already shown above at line 1124.
+                    // Pre-play preview already shown above.
                     gameState.playCard(attackerIndex, null, currentInsertionIndex);
                     render();
+
+                    // Visual Delay for S001 Draw 2
+                    if (card.id === 'S001') {
+                        await new Promise(r => setTimeout(r, 600));
+                        gameState.currentPlayer.drawCard();
+                        render();
+                        await new Promise(r => setTimeout(r, 600));
+                        gameState.currentPlayer.drawCard();
+                        render();
+                    }
 
                     // Trigger Dust at newly played minion
                     const boardEl = document.getElementById('player-board');
@@ -1781,21 +1802,23 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
     // Slam phase
     cardEl.classList.add('slamming');
 
-    // Board shake and dust
-    const boardId = isAI ? 'opp-board' : 'player-board';
-    const boardEl = document.getElementById(boardId);
-    if (boardEl) {
-        setTimeout(() => {
-            boardEl.classList.remove('board-slam');
-            void boardEl.offsetWidth;
-            boardEl.classList.add('board-slam');
+    // Board shake and dust - ONLY for minions
+    if (card.type === 'MINION') {
+        const boardId = isAI ? 'opp-board' : 'player-board';
+        const boardEl = document.getElementById(boardId);
+        if (boardEl) {
+            setTimeout(() => {
+                boardEl.classList.remove('board-slam');
+                void boardEl.offsetWidth;
+                boardEl.classList.add('board-slam');
 
-            // Intensify dust for high cost cards - spawn at PREVIEW CARD or TARGET SLOT
-            const intensity = card.cost >= 7 ? 2.5 : 1;
-            const smokeAnchor = targetEl || cardEl;
-            spawnDustEffect(smokeAnchor, intensity);
-            setTimeout(() => boardEl.classList.remove('board-slam'), 500);
-        }, 300); // Wait for card to hit the board
+                // Intensify dust for high cost cards - spawn at PREVIEW CARD or TARGET SLOT
+                const intensity = card.cost >= 7 ? 2.5 : 1;
+                const smokeAnchor = targetEl || cardEl;
+                spawnDustEffect(smokeAnchor, intensity);
+                setTimeout(() => boardEl.classList.remove('board-slam'), 500);
+            }, 300); // Wait for card to hit the board
+        }
     }
 
     await new Promise(r => setTimeout(r, 400));
