@@ -319,29 +319,23 @@ class GameState {
     }
 
     getTargetUnit(target) {
-        if (!target) return null;
-
-        let sidePlayers = this.players;
-        // In GameState, we might not know who is "PLAYER" or "OPPONENT" relative to the command unless we map it.
-        // Assuming 'PLAYER' means currentPlayer and 'OPPONENT' means opponent
-        // OR better: rely on the side string matching how we store players?
-        // Actually, simpler:
-        // side 'PLAYER' -> currentPlayer
-        // side 'OPPONENT' -> opponent
+        if (!target || typeof target !== 'object') return null;
 
         let targetPlayer = null;
         if (target.side === 'PLAYER') targetPlayer = this.currentPlayer;
         else if (target.side === 'OPPONENT') targetPlayer = this.opponent;
-        else {
-            // Fallback for AI or legacy: try to guess or use old logic (risky)
-            // Old logic check:
-            if (target.type === 'HERO') return (target.index === 0 ? this.players[0].hero : this.players[1].hero); // Legacy index check
-            // Fallback for minions is hard. Let's assume correct side provided now.
+
+        // Final fallback if side mapping fails
+        if (!targetPlayer) {
+            if (target.type === 'HERO') return (target.side === 'OPPONENT' ? this.opponent.hero : this.currentPlayer.hero);
             return null;
         }
 
         if (target.type === 'HERO') return targetPlayer.hero;
-        if (target.type === 'MINION') return targetPlayer.board[target.index];
+        if (target.type === 'MINION') {
+            const unit = targetPlayer.board[target.index];
+            return unit || null;
+        }
         return null;
     }
 
