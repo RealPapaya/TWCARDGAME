@@ -225,10 +225,12 @@ class GameState {
     }
 
     resolveBattlecry(battlecry, target) {
+        console.log("Resolving Battlecry:", battlecry.type, "Target:", target);
         if (target === 'PENDING') return;
 
         if (battlecry.type === 'DAMAGE') {
             const targetUnit = this.getTargetUnit(target) || this.opponent.hero;
+            console.log("Applying Damage to:", targetUnit?.name || 'Hero');
             this.applyDamage(targetUnit, battlecry.value);
         } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
             this.currentPlayer.board.forEach(m => {
@@ -319,7 +321,10 @@ class GameState {
     }
 
     getTargetUnit(target) {
-        if (!target || typeof target !== 'object') return null;
+        if (!target || typeof target !== 'object') {
+            console.warn("Invalid target object in getTargetUnit:", target);
+            return null;
+        }
 
         let targetPlayer = null;
         if (target.side === 'PLAYER') targetPlayer = this.currentPlayer;

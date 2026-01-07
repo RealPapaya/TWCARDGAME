@@ -1391,12 +1391,13 @@ async function onDragEnd(e) {
             }
         }
     } else if (isBattlecryTargeting) {
-        // Finishing targeted battlecry
+        console.log("Battlecry Targeting Finished. SourceType:", battlecrySourceType);
         isBattlecryTargeting = false;
         dragLine.style.display = 'none'; // Critical: Hide line
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('.minion, .hero-container'); // Changed from .minion-card to .minion
+        const unitEl = targetEl?.closest('.minion, .hero-container');
+        console.log("Target Element Found:", unitEl?.id || unitEl?.className);
 
         let target = null;
         if (unitEl) {
