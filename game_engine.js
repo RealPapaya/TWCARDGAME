@@ -237,7 +237,7 @@ class GameState {
             }
         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
             const targetUnit = this.getTargetUnit(target);
-            if (targetUnit && targetUnit.category !== battlecry.target_category) {
+            if (targetUnit && targetUnit.type === 'MINION' && targetUnit.category !== battlecry.target_category) {
                 this.applyDamage(targetUnit, battlecry.value);
             }
         } else if (battlecry.type === 'HEAL') {
@@ -267,6 +267,11 @@ class GameState {
                 if (!targetUnit.keywords) targetUnit.keywords = {};
                 targetUnit.keywords.divineShield = true;
             }
+        } else if (battlecry.type === 'GIVE_DIVINE_SHIELD_ALL') {
+            this.currentPlayer.board.forEach(m => {
+                if (!m.keywords) m.keywords = {};
+                m.keywords.divineShield = true;
+            });
         }
         else if (battlecry.type === 'DESTROY') {
             const targetUnit = this.getTargetUnit(target);

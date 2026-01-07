@@ -1303,8 +1303,8 @@ async function onDragEnd(e) {
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
 
-                    // Impact Delay (Hsieh's kill needs to be visible)
-                    await new Promise(r => setTimeout(r, 800));
+                    // Impact Delay (Reduced for efficiency)
+                    await new Promise(r => setTimeout(r, 400));
                 }
 
                 // 3. Execute Game Logic (Phase 2)
@@ -1345,6 +1345,10 @@ async function onDragEnd(e) {
                             } else if (bcType === 'HEAL_ALL_FRIENDLY') {
                                 document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
                                 triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
+                            } else if (bcType === 'GIVE_DIVINE_SHIELD_ALL') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                            } else if (bcType === 'DAMAGE_RANDOM_FRIENDLY') {
+                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'DAMAGE'));
                             }
                         }, 100);
                     }
@@ -1457,6 +1461,7 @@ function animateAttack(fromEl, toEl) {
         clone.classList.remove('taunt');
         clone.classList.remove('sleeping');
         clone.classList.remove('can-attack');
+        clone.classList.remove('divine-shield'); // Fix: Remove shield visual during flight
         clone.style.borderRadius = '12px'; // Standard shape for attack flight
 
         // Initial Position

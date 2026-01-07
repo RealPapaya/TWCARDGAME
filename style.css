@@ -881,7 +881,7 @@ body {
 
 .minion.can-attack {
     border-color: var(--neon-lime);
-    box-shadow: 0 0 20px var(--neon-lime);
+    box-shadow: 0 0 40px var(--neon-lime);
     /* Stronger glow */
     cursor: crosshair;
 }
@@ -1228,12 +1228,13 @@ body {
     z-index: 9999;
 }
 
-/* Taunt Shield Frame */
+/* Taunt Shield Frame (Silver Style) */
 .minion.taunt {
     border-radius: 10px 10px 50% 50% / 10% 10% 20% 20%;
     border-width: 4px;
-    border-color: #ffd700;
-    box-shadow: 0 0 20px rgba(255, 215, 0, 0.6), inset 0 0 15px rgba(255, 215, 0, 0.3);
+    border-color: #C0C0C0;
+    /* Silver */
+    box-shadow: 0 0 20px rgba(192, 192, 192, 0.6), inset 0 0 15px rgba(192, 192, 192, 0.3);
     position: relative;
 }
 
@@ -1244,7 +1245,7 @@ body {
     left: 50%;
     transform: translateX(-50%);
     font-size: 24px;
-    text-shadow: 0 0 10px var(--neon-yellow);
+    text-shadow: 0 0 10px #C0C0C0;
     z-index: 10;
 }
 
@@ -1479,7 +1480,7 @@ body {
 
 /* Composite effect: Divine Shield + Can Attack */
 .minion.divine-shield.can-attack {
-    box-shadow: 0 0 30px var(--neon-lime) !important;
+    box-shadow: 0 0 0px var(--neon-lime) !important;
 }
 
 #play-preview-overlay {
