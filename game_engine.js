@@ -235,6 +235,7 @@ class GameState {
         } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
             this.currentPlayer.board.forEach(m => {
                 m.currentHealth = m.health;
+                this.updateEnrage(m);
             });
         } else if (battlecry.type === 'BOUNCE_ALL_ENEMY') {
             const opp = this.opponent;
@@ -263,6 +264,7 @@ class GameState {
                         targetUnit.hp = newHp;
                     } else {
                         targetUnit.currentHealth = newHp;
+                        this.updateEnrage(targetUnit);
                     }
                 }
             }
@@ -274,6 +276,7 @@ class GameState {
                 } else if (battlecry.stat === 'HEALTH') {
                     targetUnit.health += battlecry.value;
                     targetUnit.currentHealth += battlecry.value;
+                    this.updateEnrage(targetUnit);
                 }
             }
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD') {
@@ -363,27 +366,30 @@ class GameState {
         // Update hp (heroes)
         if (unit.hp !== undefined) unit.hp = newHealth;
 
-        // Enrage (激將) Check
-        if (unit.type === 'MINION' && unit.keywords && unit.keywords.enrage) {
-            const isDamaged = unit.currentHealth < unit.health;
-            if (isDamaged && !unit.isEnraged) {
-                unit.isEnraged = true;
-                if (unit.keywords.enrage.type === 'BUFF_STAT') {
-                    if (unit.keywords.enrage.stat === 'ATTACK') {
-                        unit.attack += unit.keywords.enrage.value;
-                    }
+        this.updateEnrage(unit);
+        this.resolveDeaths();
+    }
+
+    updateEnrage(unit) {
+        if (!unit || unit.type !== 'MINION' || !unit.keywords || !unit.keywords.enrage) return;
+
+        const isDamaged = unit.currentHealth < unit.health;
+
+        if (isDamaged && !unit.isEnraged) {
+            unit.isEnraged = true;
+            if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                if (unit.keywords.enrage.stat === 'ATTACK') {
+                    unit.attack += unit.keywords.enrage.value;
                 }
-            } else if (!isDamaged && unit.isEnraged) {
-                // If healed back to full
-                unit.isEnraged = false;
-                if (unit.keywords.enrage.type === 'BUFF_STAT') {
-                    if (unit.keywords.enrage.stat === 'ATTACK') {
-                        unit.attack -= unit.keywords.enrage.value;
-                    }
+            }
+        } else if (!isDamaged && unit.isEnraged) {
+            unit.isEnraged = false;
+            if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                if (unit.keywords.enrage.stat === 'ATTACK') {
+                    unit.attack -= unit.keywords.enrage.value;
                 }
             }
         }
-        this.resolveDeaths();
     }
 
     /**

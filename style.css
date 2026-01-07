@@ -1581,41 +1581,26 @@ body {
 
 /* Enraged: Red Inner Glow + Bubbles */
 .minion.enraged {
-    box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.8), 0 0 10px rgba(255, 0, 0, 0.3);
-    border-color: #ff4d4d !important;
+    box-shadow: inset 0 0 30px rgba(255, 0, 0, 1), 0 0 15px rgba(255, 0, 0, 0.4);
+    border-color: #ff0000 !important;
+    animation: ragePulse 1.2s infinite ease-in-out;
+}
+
+@keyframes ragePulse {
+
+    0%,
+    100% {
+        box-shadow: inset 0 0 25px rgba(255, 0, 0, 0.8), 0 0 10px rgba(255, 0, 0, 0.3);
+    }
+
+    50% {
+        box-shadow: inset 0 0 50px rgba(255, 0, 0, 1), 0 0 20px rgba(255, 0, 0, 0.6);
+    }
 }
 
 /* Enraged + Can Attack */
 .minion.enraged.can-attack {
-    box-shadow: inset 0 0 20px rgba(255, 0, 0, 0.8), 0 0 30px var(--neon-lime) !important;
-}
-
-.minion.enraged::after {
-    content: '';
-    position: absolute;
-    bottom: 10%;
-    left: 10%;
-    right: 10%;
-    height: 40%;
-    background: radial-gradient(circle, rgba(255, 0, 0, 0.6) 0%, transparent 70%);
-    filter: blur(5px);
-    animation: rageBubbles 2s infinite ease-in-out;
-    pointer-events: none;
-    z-index: 1;
-}
-
-@keyframes rageBubbles {
-
-    0%,
-    100% {
-        transform: translateY(0) scale(1);
-        opacity: 0.3;
-    }
-
-    50% {
-        transform: translateY(-30px) scale(1.5);
-        opacity: 0.7;
-    }
+    box-shadow: inset 0 0 30px rgba(255, 0, 0, 1), 0 0 35px var(--neon-lime) !important;
 }
 
 #play-preview-overlay {
