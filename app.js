@@ -856,7 +856,7 @@ function showPreview(card) {
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 8px;">
             <div class="card-cost" style="position: absolute; width:30px; height:30px; font-size:28px; top: 20px; left: 20px; z-index: 10;"><span>${card.cost}</span></div>
             
-            <div class="card-title" style="font-size:32px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
+            <div class="card-title" style="font-size:28px; position:absolute; top:2px; left:0; right:0; text-align:center; z-index: 5; text-shadow: 0 0 5px black;">${card.name}</div>
             
             ${artHtml}
             
