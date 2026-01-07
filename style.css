@@ -821,14 +821,9 @@ body {
 .player .hand .card:hover {
     transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 80px)) scale(1.3) !important;
     z-index: 1000;
-    box-shadow: 0 0 30px rgba(0, 243, 255, 0.8), 0 0 10px var(--neon-lime);
+    box-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
     border-color: var(--neon-blue);
     margin: 0 10px;
-}
-
-.card.can-play {
-    box-shadow: 0 0 12px var(--neon-lime);
-    border-color: var(--neon-lime) !important;
 }
 
 .hand .card:active {
@@ -886,7 +881,8 @@ body {
 
 .minion.can-attack {
     border-color: var(--neon-lime);
-    box-shadow: 0 0 15px var(--neon-lime);
+    box-shadow: 0 0 20px var(--neon-lime);
+    /* Stronger glow */
     cursor: crosshair;
 }
 
@@ -975,10 +971,8 @@ body {
     /* Force a height to trigger scroll if text is long */
     display: block;
     /* Required for scroll */
-    overflow-y: auto;
-    overflow-x: hidden;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.4) transparent;
+    overflow: hidden !important;
+    /* Hide scrollbar for preview */
     pointer-events: auto;
     /* Ensure mouse interaction */
     z-index: 20;
@@ -1331,7 +1325,8 @@ body {
     position: absolute;
     z-index: 100000 !important;
     /* Ensure on top of everything */
-    box-shadow: 0 0 40px rgba(255, 0, 0, 0.9) !important;
+    box-shadow: 0 0 50px rgba(255, 0, 0, 1), 0 0 100px rgba(255, 0, 0, 0.6) !important;
+    /* Strong Neon Red Glow */
     border: 3px solid #ff0000 !important;
     border-radius: 12px !important;
     transition: transform 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -1448,9 +1443,7 @@ body {
 
 /* Divine Shield (光盾) Visual effect */
 .divine-shield {
-    box-shadow: inset 0 0 15px rgba(255, 215, 0, 0.5) !important;
-    border: 4px solid #ffd700 !important;
-    border-radius: 12px;
+    /* Base minion styles maintained, inner border removed as per user request */
     position: relative;
 }
 
@@ -1513,22 +1506,22 @@ body {
 
 @keyframes preview-float {
     from {
-        transform: translateY(0) rotateX(10deg) rotateY(-5deg);
+        transform: translateY(0);
     }
 
     to {
-        transform: translateY(-20px) rotateX(15deg) rotateY(5deg);
+        transform: translateY(0);
     }
 }
 
 @keyframes preview-entrance {
     from {
-        transform: scale(0.5) rotateY(90deg);
+        transform: scale(0.5);
         opacity: 0;
     }
 
     to {
-        transform: scale(1) rotateY(0);
+        transform: scale(1);
         opacity: 1;
     }
 }

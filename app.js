@@ -669,9 +669,6 @@ function render() {
     handEl.innerHTML = '';
     p1.hand.forEach((card, idx) => {
         const cardEl = createCardEl(card, idx);
-        if (isPlayerTurn && p1.mana.current >= card.cost) {
-            cardEl.classList.add('can-play');
-        }
         handEl.appendChild(cardEl);
     });
 
@@ -992,6 +989,7 @@ let draggingFromHand = false;
 let draggedEl = null;
 let isBattlecryTargeting = false;
 let battlecrySourceIndex = null;
+let battlecrySourceType = null; // Fix ReferenceError
 let draggingMode = 'DAMAGE'; // 'DAMAGE' or 'HEAL'
 let currentInsertionIndex = -1;
 
