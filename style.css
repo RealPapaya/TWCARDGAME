@@ -1426,27 +1426,28 @@ body {
 #card-preview {
     position: fixed;
     right: 20px;
-    bottom: 20px;
+    bottom: 150px;
     width: 340px;
     height: 500px;
     z-index: 1000;
     pointer-events: none;
     display: none;
     transform-origin: bottom right;
-    animation: preview-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    animation: preview-slide-up 0.25s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
-@keyframes preview-pop {
+@keyframes preview-slide-up {
     from {
-        transform: scale(0.5) translateY(50px);
+        transform: translateY(20px);
         opacity: 0;
     }
 
     to {
-        transform: scale(1) translateY(0);
+        transform: translateY(0);
         opacity: 1;
     }
 }
+
 
 /* Ability Projectile */
 .ability-projectile {

@@ -226,37 +226,58 @@ function renderDeckSelect() {
     container.innerHTML = '';
 
     const startBtn = document.getElementById('btn-start-battle');
-    if (startBtn) {
-        startBtn.style.display = pendingViewMode === 'BATTLE' ? 'block' : 'none';
-        startBtn.onclick = () => {
-            const deck = userDecks[selectedDeckIdx];
-            if (deck.cards.length === 30) {
-                startBattle(deck.cards);
-            } else {
-                alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
-            }
-        };
+    const editBtn = document.getElementById('btn-edit-deck');
+
+    // Reset Buttons
+    if (startBtn) startBtn.style.display = 'none';
+    if (editBtn) editBtn.style.display = 'none';
+
+    if (pendingViewMode === 'BATTLE') {
+        if (startBtn) {
+            startBtn.style.display = 'block';
+            startBtn.onclick = async () => {
+                // Ensure a deck is selected might be implicit by selectedDeckIdx, but let's check safety if needed
+                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
+                const deck = userDecks[selectedDeckIdx];
+                if (deck.cards.length === 30) {
+                    startBattle(deck.cards);
+                } else {
+                    await showCustomAlert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+                }
+            };
+        }
+    } else if (pendingViewMode === 'BUILDER') {
+        if (editBtn) {
+            editBtn.style.display = 'block';
+            editBtn.onclick = () => {
+                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
+                editingDeckIdx = selectedDeckIdx; // Set editing to selected
+                showView('deck-builder');
+                renderDeckBuilder();
+            };
+        }
     }
 
     userDecks.forEach((deck, idx) => {
         const slot = document.createElement('div');
         slot.className = `deck-slot ${idx === selectedDeckIdx ? 'selected' : ''}`;
+
+        const warningIcon = deck.cards.length < 30 ? '<span title="牌組未滿30張" style="color: var(--neon-yellow); margin-right: 8px;">⚠️</span>' : '';
+
         slot.innerHTML = `
             <button class="btn-delete-deck" title="刪除牌組">×</button>
-            <h3>${deck.name}</h3>
+            <h3>${warningIcon}${deck.name}</h3>
             <div class="slot-info">${deck.cards.length} / 30 張卡</div>
-            <div class="deck-slot-actions">
-                <button class="neon-button action-btn">${pendingViewMode === 'BATTLE' ? '選擇' : '編輯'}</button>
-            </div>
         `;
 
-        slot.querySelector('.btn-delete-deck').addEventListener('click', (e) => {
+        slot.querySelector('.btn-delete-deck').addEventListener('click', async (e) => {
             e.stopPropagation();
             if (userDecks.length <= 1) {
-                alert("至少需保留一個牌組！");
+                await showCustomAlert("至少需保留一個牌組！");
                 return;
             }
-            if (confirm(`確定要刪除「${deck.name}」嗎？`)) {
+            const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
+            if (confirmed) {
                 userDecks.splice(idx, 1);
                 if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
                 localStorage.setItem('userDecks', JSON.stringify(userDecks));
@@ -264,19 +285,7 @@ function renderDeckSelect() {
             }
         });
 
-        slot.querySelector('.action-btn').addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (pendingViewMode === 'BUILDER') {
-                editingDeckIdx = idx;
-                showView('deck-builder');
-                renderDeckBuilder();
-            } else {
-                selectedDeckIdx = idx;
-                localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-                renderDeckSelect(); // Refresh for selection
-            }
-        });
-
+        // Click slot to select
         slot.addEventListener('click', () => {
             selectedDeckIdx = idx;
             localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
@@ -286,8 +295,8 @@ function renderDeckSelect() {
         container.appendChild(slot);
     });
 
-    // Add New Deck Slot
-    if (userDecks.length < 10) {
+    // Add New Deck Slot (Only in Builder Mode)
+    if (pendingViewMode !== 'BATTLE' && userDecks.length < 10) {
         const addSlot = document.createElement('div');
         addSlot.className = 'deck-slot add-deck-slot';
         addSlot.innerHTML = `
@@ -462,7 +471,7 @@ function renderDeckBuilder() {
             }
         }
 
-        cardEl.addEventListener('click', (e) => {
+        cardEl.addEventListener('click', async (e) => {
             e.stopPropagation();
             if (deck.cards.length < 30) {
                 // Check legendary limit
@@ -472,7 +481,7 @@ function renderDeckBuilder() {
                         return c?.rarity === 'LEGENDARY';
                     }).length;
                     if (legendCount >= 2) {
-                        alert("傳說卡牌在牌組中最多只能放 2 張！");
+                        await showCustomAlert("傳說卡牌在牌組中最多只能放 2 張！");
                         return;
                     }
                 }
@@ -480,7 +489,7 @@ function renderDeckBuilder() {
                 // Normal 2 copies limit
                 const count = deck.cards.filter(id => id === card.id).length;
                 if (count >= 2) {
-                    alert("每種卡牌最多只能放 2 張！");
+                    await showCustomAlert("每種卡牌最多只能放 2 張！");
                     return;
                 }
 
@@ -1914,4 +1923,45 @@ function showTurnAnnouncement(text) {
             overlay.style.display = 'none';
         }, 300); // Match transition duration
     }, 1500); // Show for 1.5s
+}
+
+function showCustomAlert(message) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('custom-modal');
+        const msgEl = document.getElementById('custom-modal-message');
+        const confirmBtn = document.getElementById('btn-custom-confirm');
+        const cancelBtn = document.getElementById('btn-custom-cancel');
+
+        msgEl.innerText = message;
+        cancelBtn.style.display = 'none'; // Alert only has OK
+        modal.style.display = 'flex';
+
+        confirmBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve();
+        };
+    });
+}
+
+function showCustomConfirm(message) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('custom-modal');
+        const msgEl = document.getElementById('custom-modal-message');
+        const confirmBtn = document.getElementById('btn-custom-confirm');
+        const cancelBtn = document.getElementById('btn-custom-cancel');
+
+        msgEl.innerText = message;
+        cancelBtn.style.display = 'inline-block'; // Confirm has Cancel
+        modal.style.display = 'flex';
+
+        confirmBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve(true);
+        };
+
+        cancelBtn.onclick = () => {
+            modal.style.display = 'none';
+            resolve(false);
+        };
+    });
 }

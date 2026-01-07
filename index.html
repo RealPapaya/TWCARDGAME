@@ -45,6 +45,7 @@
                 <!-- Slots will be rendered by JS -->
             </div>
             <div class="menu-buttons" style="margin-top: 40px; flex-direction: row; justify-content: center;">
+                <button id="btn-edit-deck" class="neon-button" style="display: none;">編輯牌組</button>
                 <button id="btn-start-battle" class="neon-button" style="display: none;">開始戰鬥</button>
                 <button class="neon-button secondary btn-back">返回</button>
             </div>
@@ -177,6 +178,18 @@
             <div class="modal-buttons">
                 <button id="btn-surrender-confirm" class="neon-button danger">確定投降</button>
                 <button id="btn-surrender-cancel" class="neon-button">返回戰鬥</button>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Generic Custom Modal -->
+    <div id="custom-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h3 id="custom-modal-message">訊息</h3>
+            <div class="modal-buttons">
+                <button id="btn-custom-confirm" class="neon-button">確定</button>
+                <button id="btn-custom-cancel" class="neon-button danger" style="display:none;">取消</button>
             </div>
         </div>
     </div>
