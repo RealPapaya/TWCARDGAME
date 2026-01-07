@@ -11,7 +11,7 @@ const CARD_DATA = [
     { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "戰吼:可以直接攻擊 大喊我是外送師", "image": "img/tw007.png" },
     { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": "ANY" } }, "description": "戰吼: 回復一個單位2點血量", "image": "img/tw014.png" },
     { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "激怒: 增加3點攻擊 極度耐操", "image": "img/tw015.png" },
-    { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
+    { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": "ANY", "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
     { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的卡牌血量全部回復。", "image": "img/tw001.png" },
     { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：深綠能量！賦予所有友方隨從 +1 生命值。", "image": "img/tw003.jpg" },
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷", "image": "img/tw009.png" },
@@ -225,6 +225,19 @@ function renderDeckSelect() {
     const container = document.getElementById('deck-select-slots');
     container.innerHTML = '';
 
+    const startBtn = document.getElementById('btn-start-battle');
+    if (startBtn) {
+        startBtn.style.display = pendingViewMode === 'BATTLE' ? 'block' : 'none';
+        startBtn.onclick = () => {
+            const deck = userDecks[selectedDeckIdx];
+            if (deck.cards.length === 30) {
+                startBattle(deck.cards);
+            } else {
+                alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
+            }
+        };
+    }
+
     userDecks.forEach((deck, idx) => {
         const slot = document.createElement('div');
         slot.className = `deck-slot ${idx === selectedDeckIdx ? 'selected' : ''}`;
@@ -232,7 +245,7 @@ function renderDeckSelect() {
             <h3>${deck.name}</h3>
             <div class="slot-info">${deck.cards.length} / 30 張卡</div>
             <div class="deck-slot-actions">
-                <button class="neon-button action-btn">${pendingViewMode === 'BATTLE' ? '出戰' : '編輯'}</button>
+                <button class="neon-button action-btn">${pendingViewMode === 'BATTLE' ? '選擇' : '編輯'}</button>
             </div>
         `;
 
@@ -245,11 +258,7 @@ function renderDeckSelect() {
             } else {
                 selectedDeckIdx = idx;
                 localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-                if (deck.cards.length === 30) {
-                    startBattle(deck.cards);
-                } else {
-                    alert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！`);
-                }
+                renderDeckSelect(); // Refresh for selection
             }
         });
 
@@ -1181,9 +1190,15 @@ async function onDragEnd(e) {
                 }
 
                 try {
-                    const card = gameState.currentPlayer.hand[attackerIndex];
+                    // Pre-play preview already shown above at line 1124.
                     gameState.playCard(attackerIndex, null, currentInsertionIndex);
                     render();
+
+                    // Trigger Dust at newly played minion
+                    const boardEl = document.getElementById('player-board');
+                    const newMinionEl = boardEl.children[currentInsertionIndex];
+                    if (newMinionEl) spawnDustEffect(newMinionEl, card.cost >= 7 ? 2 : 1);
+
                     await resolveDeaths();
 
                     if (card && card.keywords?.battlecry) {
@@ -1463,11 +1478,14 @@ function animateAttack(fromEl, toEl) {
 
             // Trigger Combat Effect (Slash)
             triggerCombatEffect(toEl, 'DAMAGE');
+            spawnDustEffect(toEl, 0.5); // Minor impact dust
 
             // Cleanup Clone
-            clone.remove();
-            resolve();
-        }, 400); // Match CSS duration
+            setTimeout(() => {
+                clone.remove();
+                resolve();
+            }, 100);
+        }, 450); // Slightly longer than CSS to ensure completion
     });
 }
 
@@ -1487,7 +1505,6 @@ function animateCardFromDeck(cardEl) {
     const deckEl = document.getElementById('player-deck');
     if (!deckEl || !cardEl) return;
 
-    // Temporarily hide the real card
     cardEl.style.opacity = '0';
 
     requestAnimationFrame(() => {
@@ -1495,35 +1512,40 @@ function animateCardFromDeck(cardEl) {
         const cardRect = cardEl.getBoundingClientRect();
 
         const clone = cardEl.cloneNode(true);
-        // Ensure clone clean style
         clone.style.position = 'fixed';
-        clone.style.left = `${deckRect.left}px`;
-        clone.style.top = `${deckRect.top}px`;
+        clone.style.left = '0';
+        clone.style.top = '0';
         clone.style.width = `${cardEl.offsetWidth || 100}px`;
         clone.style.height = `${cardEl.offsetHeight || 140}px`;
         clone.style.zIndex = '9999';
         clone.style.margin = '0';
-        clone.style.transform = 'scale(0.5)';
-        clone.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+
+        // Use transform for hardware acceleration
+        const startX = deckRect.left;
+        const startY = deckRect.top;
+        const endX = cardRect.left;
+        const endY = cardRect.top;
+
+        clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
+        clone.style.transition = 'none'; // Initial position without transition
         clone.style.pointerEvents = 'none';
         clone.style.opacity = '1';
-
-        // Remove hover effects/listeners (cloneNode copies attributes, listeners gone)
         clone.className = cardEl.className;
 
         document.body.appendChild(clone);
 
-        // Allow browser to paint initial state
         requestAnimationFrame(() => {
-            clone.style.left = `${cardRect.left}px`;
-            clone.style.top = `${cardRect.top}px`;
-            clone.style.transform = 'scale(1)';
+            requestAnimationFrame(() => {
+                clone.style.transition = 'transform 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.3s ease';
+                clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
+            });
         });
 
-        // Cleanup
-        clone.addEventListener('transitionend', () => {
-            clone.remove();
-            cardEl.style.opacity = '1';
+        clone.addEventListener('transitionend', (e) => {
+            if (e.propertyName === 'transform') {
+                clone.remove();
+                cardEl.style.opacity = '1';
+            }
         });
     });
 }
@@ -1611,8 +1633,8 @@ function spawnDustEffect(targetEl, intensity = 1) {
     const cloud = document.createElement('div');
     cloud.className = 'dust-cloud';
     cloud.style.left = `${rect.left + rect.width / 2}px`;
-    cloud.style.top = `${rect.top + rect.height / 2}px`;
-    cloud.style.zIndex = "60000"; // Higher than overlay if needed
+    cloud.style.top = `${rect.top + rect.height * 0.8}px`; // Bottom of element
+    cloud.style.zIndex = "60000";
     document.body.appendChild(cloud);
 
     const count = Math.floor(15 * intensity);
