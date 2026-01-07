@@ -154,14 +154,15 @@ class GameState {
      * Play a card from hand.
      * @param {number} cardIndex Index in hand
      * @param {Object} target Target info { type: 'HERO'|'MINION', index: number } (Optional)
+     * @param {number} insertionIndex Preferred index on board (Optional)
      */
-    playCard(cardIndex, target = null) {
+    playCard(cardIndex, target = null, insertionIndex = -1) {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
 
         if (!card) throw new Error("Card not found in hand");
         if (player.mana.current < card.cost) throw new Error("Not enough mana");
-        if (player.board.length >= 5 && card.type === 'MINION') throw new Error("Board full (Max 5)");
+        if (player.board.length >= 7 && card.type === 'MINION') throw new Error("Board full (Max 7)");
 
         // Pay Mana
         player.mana.current -= card.cost;
@@ -175,7 +176,14 @@ class GameState {
                 minion.sleeping = false;
                 minion.canAttack = true;
             }
-            player.board.push(minion);
+
+            if (insertionIndex === -1) {
+                player.board.push(minion);
+            } else {
+                // Ensure insertionIndex is within bounds
+                const actualIndex = Math.min(Math.max(0, insertionIndex), player.board.length);
+                player.board.splice(actualIndex, 0, minion);
+            }
 
             // Trigger Battlecry
             if (minion.keywords && minion.keywords.battlecry) {
@@ -600,7 +608,7 @@ class AIEngine {
 
         // 2. Play Card (Prioritize Board & Mana)
         // Check if board not full
-        if (aiPlayer.board.length < 5) {
+        if (aiPlayer.board.length < 7) {
             // Find playable minion with highest cost
             const playableMinions = aiPlayer.hand
                 .map((c, i) => ({ ...c, originalIndex: i }))
