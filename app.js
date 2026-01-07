@@ -1131,6 +1131,8 @@ async function onDragEnd(e) {
 
                 // Show Preview before playing
                 await showCardPlayPreview(card);
+                // Extra delay for targeted cards so player sees the card land
+                if (isTargeted) await new Promise(r => setTimeout(r, 300));
 
                 // Targeted Battlecry check
                 const type = card.keywords?.battlecry?.type;
@@ -1299,8 +1301,8 @@ async function onDragEnd(e) {
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
 
-                    // Small delay for impact feel
-                    await new Promise(r => setTimeout(r, 200));
+                    // Impact Delay (Hsieh's kill needs to be visible)
+                    await new Promise(r => setTimeout(r, 800));
                 }
 
                 // 3. Execute Game Logic (Phase 2)
@@ -1448,6 +1450,12 @@ function animateAttack(fromEl, toEl) {
         // Create Clone
         const clone = fromEl.cloneNode(true);
         clone.classList.add('animating-attack');
+
+        // Remove specific styles that might interfere with attack visual
+        clone.classList.remove('taunt');
+        clone.classList.remove('sleeping');
+        clone.classList.remove('can-attack');
+        clone.style.borderRadius = '12px'; // Standard shape for attack flight
 
         // Initial Position
         clone.style.top = `${rectFrom.top}px`;
