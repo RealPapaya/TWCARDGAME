@@ -1063,6 +1063,11 @@ body {
     white-space: pre-wrap;
 }
 
+.card-desc b {
+    color: var(--neon-yellow);
+    font-weight: 900;
+}
+
 .card-desc::-webkit-scrollbar {
     width: 3px;
 }
