@@ -668,7 +668,11 @@ function render() {
     const handEl = document.getElementById('player-hand');
     handEl.innerHTML = '';
     p1.hand.forEach((card, idx) => {
-        handEl.appendChild(createCardEl(card, idx));
+        const cardEl = createCardEl(card, idx);
+        if (isPlayerTurn && p1.mana.current >= card.cost) {
+            cardEl.classList.add('can-play');
+        }
+        handEl.appendChild(cardEl);
     });
 
     // Detect and animate new cards
