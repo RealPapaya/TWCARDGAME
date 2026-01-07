@@ -4,10 +4,11 @@
 :root {
     --bg-dark: #121214;
     --bg-panel: #1e1e24;
-    --neon-pink: #ff007f;
     --neon-blue: #00f3ff;
-    --neon-yellow: #ffee00;
-    --neon-cyan: #00f3ff;
+    --neon-pink: #ff00de;
+    --neon-yellow: #fff200;
+    --neon-lime: #39FF14;
+    --card-bg: #1a1a1a;
     --text-primary: #ffffff;
     --text-secondary: #b3b3b3;
     --card-frame: #2c2c35;
@@ -882,13 +883,13 @@ body {
 }
 
 .minion.can-attack {
-    border-color: var(--neon-blue);
-    box-shadow: 0 0 15px rgba(0, 243, 255, 0.4);
+    border-color: var(--neon-lime);
+    box-shadow: 0 0 15px var(--neon-lime);
     cursor: crosshair;
 }
 
 .minion.can-attack:hover {
-    box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
+    box-shadow: 0 0 25px var(--neon-lime);
 }
 
 .minion.sleeping {
@@ -1523,6 +1524,10 @@ body {
     z-index: 30000;
     perspective: 1200px;
     pointer-events: none;
+}
+
+.preview-card-3d .card-desc {
+    overflow: hidden !important;
 }
 
 .preview-card-3d {

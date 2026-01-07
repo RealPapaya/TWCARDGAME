@@ -1129,11 +1129,6 @@ async function onDragEnd(e) {
                     return;
                 }
 
-                // Show Preview before playing
-                await showCardPlayPreview(card);
-                // Extra delay for targeted cards so player sees the card land
-                if (isTargeted) await new Promise(r => setTimeout(r, 300));
-
                 // Targeted Battlecry check
                 const type = card.keywords?.battlecry?.type;
                 const isTargeted =
@@ -1143,6 +1138,11 @@ async function onDragEnd(e) {
                     (type === 'BUFF_STAT_TARGET') ||
                     (type === 'GIVE_DIVINE_SHIELD') ||
                     (type === 'DESTROY' && card.keywords.battlecry.target === 'ANY');
+
+                // Show Preview before playing
+                await showCardPlayPreview(card);
+                // Extra delay for targeted cards so player sees the card land
+                if (isTargeted) await new Promise(r => setTimeout(r, 300));
 
                 if (isTargeted) {
                     try {
