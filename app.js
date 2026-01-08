@@ -107,6 +107,7 @@ let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let editingDeckIdx = 0;
 let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
+let currentDifficulty = 'NORMAL';
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
 function init() {
@@ -137,10 +138,18 @@ function init() {
 
     // --- Mode Selection Listeners ---
     document.getElementById('btn-mode-ai').addEventListener('click', () => {
-        pendingViewMode = 'BATTLE';
-        showView('deck-selection');
-        document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
-        renderDeckSelect();
+        showView('difficulty-selection');
+    });
+
+    // --- Difficulty Selection Listeners ---
+    document.querySelectorAll('.diff-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            currentDifficulty = btn.dataset.diff;
+            pendingViewMode = 'BATTLE';
+            showView('deck-selection');
+            document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
+            renderDeckSelect();
+        });
     });
 
     // --- Back Buttons ---
@@ -148,8 +157,10 @@ function init() {
         btn.addEventListener('click', () => {
             if (document.getElementById('mode-selection').style.display === 'flex') {
                 showView('main-menu');
+            } else if (document.getElementById('difficulty-selection').style.display === 'flex') {
+                showView('mode-selection');
             } else if (document.getElementById('deck-selection').style.display === 'flex') {
-                if (pendingViewMode === 'BATTLE') showView('mode-selection');
+                if (pendingViewMode === 'BATTLE') showView('difficulty-selection');
                 else showView('main-menu');
             }
         });
@@ -371,8 +382,13 @@ async function startBattle(deckIds, debugMode = false) {
     const allIds = CARD_DATA.map(c => c.id);
     const oppDeck = [];
     while (oppDeck.length < 30) oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
-
-    gameState = gameEngine.createGame(deckIds, oppDeck, debugMode);
+    try {
+        gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
+        showView('battle-view');
+    } catch (e) {
+        logMessage(e.message);
+        return;
+    }
 
     // Initial Draw Sequence Logic
     const initialHand = [...gameState.players[0].hand];

@@ -60,7 +60,7 @@ class GameEngine {
      * @param {Array<string>} deck2Ids
      * @returns {GameState}
      */
-    createGame(deck1Ids, deck2Ids, debugMode = false) {
+    createGame(deck1Ids, deck2Ids, debugMode = false, difficulty = 'NORMAL') {
         // Validate decks first
         if (!this.validateDeck(deck1Ids).valid || !this.validateDeck(deck2Ids).valid) {
             throw new Error("Invalid decks");
@@ -72,7 +72,7 @@ class GameEngine {
         // Randomly choose starting player
         const startingIndex = Math.random() < 0.5 ? 0 : 1;
 
-        const state = new GameState([p1, p2], startingIndex, debugMode);
+        const state = new GameState([p1, p2], startingIndex, debugMode, difficulty);
 
         // Initial Draw: Both players get 3 cards as per user request
         const p1Draws = 3;
@@ -87,7 +87,7 @@ class GameEngine {
 }
 
 class GameState {
-    constructor(players, startingIndex, debugMode = false) {
+    constructor(players, startingIndex, debugMode = false, difficulty = 'NORMAL') {
         this.gameId = Date.now().toString();
         this.turnCount = 0;
         this.players = players;
@@ -95,6 +95,23 @@ class GameState {
         this.gameOver = false;
         this.winner = null;
         this.debugMode = debugMode;
+        this.difficulty = difficulty;
+
+        // Apply Difficulty Modifiers to Opponent (AI)
+        const opponent = this.players.find(p => p.side === 'OPPONENT');
+        if (opponent) {
+            if (difficulty === 'HARD') {
+                opponent.hero.hp = 40;
+                opponent.hero.maxHp = 40;
+                opponent.mana.max = 2;
+                opponent.mana.current = 2;
+            } else if (difficulty === 'HELL') {
+                opponent.hero.hp = 50;
+                opponent.hero.maxHp = 50;
+                opponent.mana.max = 3;
+                opponent.mana.current = 3;
+            }
+        }
 
         if (this.debugMode) {
             this.players.forEach(p => {
@@ -726,85 +743,138 @@ class AIEngine {
     getNextMove(gameState) {
         const aiPlayer = gameState.currentPlayer;
         const opponent = gameState.opponent;
+        const difficulty = gameState.difficulty;
 
         // 1. Lethal Check (Force Face if possible)
         const totalDamage = this.calculateTotalDamage(aiPlayer);
         if (totalDamage >= opponent.hero.hp) {
-            // Find an attacker that hasn't attacked
             const attackerIdx = aiPlayer.board.findIndex(m => m.canAttack && !m.sleeping);
             if (attackerIdx !== -1) {
                 return { type: 'ATTACK', attackerIndex: attackerIdx, target: { type: 'HERO' } };
             }
-            // If all minions attacked, maybe play damage spell? (TODO)
         }
 
-        // 2. Play Card (Prioritize Board & Mana)
-        // Check if board not full
-        if (aiPlayer.board.length < 7) {
-            // Find playable minion with highest cost
-            const playableMinions = aiPlayer.hand
+        // 2. Play Card Logic (Prioritize Minions then Buffs/Spells)
+        if (difficulty !== 'NORMAL') {
+            const playableCards = aiPlayer.hand
                 .map((c, i) => ({ ...c, originalIndex: i }))
-                .filter(c => c.type === 'MINION' && c.cost <= aiPlayer.mana.current)
-                .sort((a, b) => b.cost - a.cost);
+                .filter(c => c.cost <= aiPlayer.mana.current);
 
-            if (playableMinions.length > 0) {
-                const choice = playableMinions[0];
-                let target = null;
-                if (choice.keywords && choice.keywords.battlecry) {
-                    // Smart Target
-                    target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+            if (playableCards.length > 0) {
+                // Separate into categories
+                const minions = playableCards.filter(c => c.type === 'MINION');
+                const spells = playableCards.filter(c => c.type === 'SPELL');
+
+                // A. Prioritize playing minions if board space available
+                if (minions.length > 0 && aiPlayer.board.length < 7) {
+                    // HS logic: Play minions before buffs.
+                    // If we have a buff in hand, we might want to play it ON a minion, 
+                    // but if we are playing a minion this turn, we play the minion FIRST.
+                    const choice = minions.sort((a, b) => b.cost - a.cost)[0];
+                    let target = null;
+                    if (choice.keywords && choice.keywords.battlecry) {
+                        target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                    }
+                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
                 }
-                return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+
+                // B. Play spells/buffs
+                if (spells.length > 0) {
+                    // Try to find the most value spell
+                    const buffSpells = spells.filter(s => s.keywords?.battlecry?.type?.includes('BUFF') || s.keywords?.battlecry?.type?.includes('GIVE_DIVINE'));
+                    const attackSpells = spells.filter(s => s.keywords?.battlecry?.type?.includes('DAMAGE') || s.keywords?.battlecry?.type?.includes('DESTROY'));
+
+                    if (buffSpells.length > 0 && aiPlayer.board.length > 0) {
+                        const choice = buffSpells[0];
+                        const target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                        if (target) return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                    }
+
+                    if (attackSpells.length > 0) {
+                        const choice = attackSpells[0];
+                        const target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                        if (target) return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                    }
+                }
+            }
+        } else {
+            // NORMAL Difficulty (Old Logic)
+            if (aiPlayer.board.length < 7) {
+                const playableMinions = aiPlayer.hand
+                    .map((c, i) => ({ ...c, originalIndex: i }))
+                    .filter(c => c.type === 'MINION' && c.cost <= aiPlayer.mana.current)
+                    .sort((a, b) => b.cost - a.cost);
+
+                if (playableMinions.length > 0) {
+                    const choice = playableMinions[0];
+                    let target = null;
+                    if (choice.keywords && choice.keywords.battlecry) {
+                        target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                    }
+                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                }
+            }
+
+            const playableSpells = aiPlayer.hand
+                .map((c, i) => ({ ...c, originalIndex: i }))
+                .filter(c => c.type === 'SPELL' && c.cost <= aiPlayer.mana.current);
+
+            if (playableSpells.length > 0) {
+                const choice = playableSpells[0];
+                return { type: 'PLAY_CARD', index: choice.originalIndex, target: { type: 'HERO' } };
             }
         }
 
-        // 3. Play Spell (Simple: High Cost first)
-        const playableSpells = aiPlayer.hand
-            .map((c, i) => ({ ...c, originalIndex: i }))
-            .filter(c => c.type === 'SPELL' && c.cost <= aiPlayer.mana.current)
-            .sort((a, b) => b.cost - a.cost);
-
-        if (playableSpells.length > 0) {
-            const choice = playableSpells[0];
-            // Simple spell targeting? (Mock for now, random or face)
-            let target = null;
-            // Logic for spells can be added here
-            return { type: 'PLAY_CARD', index: choice.originalIndex, target: { type: 'HERO' } };
-        }
-
-        // 4. Trade / Attack
-        // Find attacker
+        // 3. Trade / Attack (Smarter for Hard/Hell)
         const attackers = aiPlayer.board
             .map((m, i) => ({ ...m, index: i }))
             .filter(m => m.canAttack && !m.sleeping);
 
         if (attackers.length > 0) {
             const attacker = attackers[0];
-
-            // A. Check for Free Kill (Value Trade): My Attack >= Enemy HP AND My HP > Enemy Attack
             const validTargets = opponent.board.map((m, i) => ({ ...m, index: i }));
 
             // Taunt filter
             const taunts = validTargets.filter(m => m.keywords && m.keywords.taunt);
             const actualTargets = taunts.length > 0 ? taunts : validTargets;
 
-            for (const t of actualTargets) {
-                // Value trade?
-                if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
-                    return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
+            if (difficulty !== 'NORMAL') {
+                // SMARTER TRADING
+                // A. Prioritize killing high attack minions first if we can kill it efficiently
+                actualTargets.sort((a, b) => b.attack - a.attack);
+
+                for (const t of actualTargets) {
+                    // Value trade: I kill it and I survive
+                    if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
+                        return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
+                    }
+                }
+
+                // B. Efficient Exchange: Low cost minion kills high cost/high attack minion
+                for (const t of actualTargets) {
+                    // If target is dangerous (High Attack) and we can kill it, do it even if we die
+                    if (attacker.attack >= t.currentHealth && (t.attack >= 3 || t.cost > attacker.cost)) {
+                        return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
+                    }
+                }
+            } else {
+                // NORMAL Trading (Value trade only)
+                for (const t of actualTargets) {
+                    if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
+                        return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
+                    }
                 }
             }
 
-            // B. If no value trade, just go Face (or random trade if Taunt blocks)
+            // C. Fallback: Attack Face or Taunt
             if (taunts.length > 0) {
-                // Must attack taunt
                 return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: taunts[0].index } };
             } else {
                 return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'HERO' } };
             }
         }
 
-        return null; // No more moves
+        return null;
     }
 
     calculateTotalDamage(player) {
