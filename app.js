@@ -48,7 +48,8 @@ const CARD_DATA = [
 
     // --- 法術 (Spells) ---
     { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "attack": 0, "health": 0, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
-    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "attack": 0, "health": 0, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" }
+    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
+    { "id": "S003", "name": "大罷免", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall.png" }
 ];
 
 let cardDB = [];
@@ -1371,7 +1372,7 @@ async function onDragEnd(e) {
                             mode = 'HEAL';
                         } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD') {
                             mode = 'BUFF';
-                        } else if (battlecry.type === 'BOUNCE_TARGET') {
+                        } else if (battlecry.type === 'BOUNCE_TARGET' || battlecry.type === 'BOUNCE_CATEGORY') {
                             mode = 'BOUNCE';
                         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
@@ -1575,7 +1576,7 @@ async function onDragEnd(e) {
                     // Determine color based on card/mode
                     if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
-                    else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BUFF'; }
+                    else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BOUNCE'; }
 
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
@@ -1670,7 +1671,13 @@ function isTargetEligible(rule, targetInfo) {
     const categoryToExclude = rule.target_category;
 
     // Category Exclusion check (e.g. Hsieh Chang-ting)
-    if (categoryToExclude && targetInfo.category === categoryToExclude) return false;
+    if (categoryToExclude && rule.type === 'DAMAGE_NON_CATEGORY' && targetInfo.category === categoryToExclude) return false;
+
+    // Category Inclusion check (e.g. S003 Great Recall)
+    // Note: target_category in GIVE_DIVINE_SHIELD_CATEGORY is strict match, handled by engine mostly, but for UI:
+    if (rule.target_category_includes) {
+        if (!targetInfo.category || !targetInfo.category.includes(rule.target_category_includes)) return false;
+    }
 
     // Cost checks (if applicable)
     if (actualRule.min_cost !== undefined && targetInfo.cost < actualRule.min_cost) return false;
@@ -2136,6 +2143,20 @@ function triggerCombatEffect(el, type) {
             p.style.left = `${Math.random() * 60 + 20}%`;
             p.style.top = `${Math.random() * 60 + 20}%`;
             p.style.fontSize = `${18 + Math.random() * 12}px`;
+            p.style.animationDelay = `${Math.random() * 0.4}s`;
+            container.appendChild(p);
+        }
+    } else if (type === 'BOUNCE') {
+        const count = 3;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'buff-particle'; // Re-use class for basic float, but override color/text
+            p.innerText = '↩';
+            p.style.color = '#a335ee';
+            p.style.textShadow = '0 0 5px #a335ee';
+            p.style.left = `${Math.random() * 60 + 20}%`;
+            p.style.top = `${Math.random() * 60 + 20}%`;
+            p.style.fontSize = `${20 + Math.random() * 12}px`;
             p.style.animationDelay = `${Math.random() * 0.4}s`;
             container.appendChild(p);
         }

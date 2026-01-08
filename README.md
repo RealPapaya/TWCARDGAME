@@ -17,7 +17,7 @@
 { 
     "id": "", 
     "name": "", 
-    "category": "", 
+    "category": "COMMON/RARE/EPIC/LEGENDARY", 
     "cost": , 
     "attack": , 
     "health": , 
@@ -38,14 +38,8 @@
     "cost": , 
     "type": "SPELL", 
     "rarity": "COMMON/RARE/EPIC/LEGENDARY", 
-    "keywords": { 
-        "battlecry": { // 法術效果同樣寫在戰吼中
-            "type": "DAMAGE/DRAW/HEAL",
-            "value": 數值,
-            "target": "ANY"
-        }
-    },
-    "description": "法術描述", 
+    "keywords": {}
+    "description": "", 
     "image": "" 
 }
 ```

@@ -1531,7 +1531,7 @@ body {
 
 #drag-line.bounce-line {
     stroke: #a335ee !important;
-    marker-end: url(#arrowhead-damage);
+    marker-end: url(#arrowhead-bounce);
 }
 
 @keyframes dash {

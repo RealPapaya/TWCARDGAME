@@ -534,6 +534,41 @@ class GameState {
                     return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
                 }
             }
+        } else if (battlecry.type === 'BOUNCE_CATEGORY') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                if (battlecry.target_category_includes && (!targetUnit.category || !targetUnit.category.includes(battlecry.target_category_includes))) {
+                    console.warn("Target category mismatch for bounce");
+                    return null;
+                }
+
+                const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                const idx = owner.board.indexOf(targetUnit);
+                if (idx !== -1) {
+                    owner.board.splice(idx, 1);
+                    const collection = this.collection || [];
+                    const originalCard = collection.find(c => c.id === targetUnit.id) || targetUnit;
+                    let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+                    // Clean up board-specific state
+                    // Han Kuo-yu (TW032): Permanent stackable +2/+2 on bounce
+                    if (targetUnit.hanBounceBonus) cardToHand.hanBounceBonus = targetUnit.hanBounceBonus;
+                    if (targetUnit.id === 'TW032') {
+                        cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 2;
+                        cardToHand.attack += cardToHand.hanBounceBonus;
+                        cardToHand.health += cardToHand.hanBounceBonus;
+                    }
+
+                    // Clean up board-specific state
+                    delete cardToHand.currentHealth;
+                    delete cardToHand.sleeping;
+                    delete cardToHand.canAttack;
+                    delete cardToHand.isEnraged;
+
+                    if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                    return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                }
+            }
         }
     }
 
