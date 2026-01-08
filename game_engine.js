@@ -174,6 +174,18 @@ class GameState {
      * End current turn and switch player.
      */
     endTurn() {
+        // Cleanup Temporary Buffs for current player
+        this.currentPlayer.board.forEach(m => {
+            if (m.tempBuffs && m.tempBuffs.length > 0) {
+                m.tempBuffs.forEach(buff => {
+                    m.attack -= buff.attack;
+                    m.health -= buff.health;
+                    if (m.currentHealth > m.health) m.currentHealth = m.health;
+                });
+                m.tempBuffs = [];
+            }
+        });
+
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
         this.startTurn();
     }
@@ -405,6 +417,29 @@ class GameState {
                 }
                 return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: battlecry.stat, value: battlecry.value };
             }
+        } else if (battlecry.type === 'BUFF_STAT_TARGET_TEMP') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                const buff = { attack: 0, health: 0 };
+                if (battlecry.stat === 'ALL' || !battlecry.stat) {
+                    buff.attack = battlecry.value;
+                    buff.health = battlecry.value;
+                } else if (battlecry.stat === 'ATTACK') {
+                    buff.attack = battlecry.value;
+                } else if (battlecry.stat === 'HEALTH') {
+                    buff.health = battlecry.value;
+                }
+
+                targetUnit.attack += buff.attack;
+                targetUnit.health += buff.health;
+                targetUnit.currentHealth += buff.health;
+
+                if (!targetUnit.tempBuffs) targetUnit.tempBuffs = [];
+                targetUnit.tempBuffs.push(buff);
+
+                this.updateEnrage(targetUnit);
+                return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: 'ALL', value: battlecry.value };
+            }
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit && targetUnit.type === 'MINION') {
@@ -600,6 +635,51 @@ class GameState {
                     return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
                 }
             }
+        } else if (battlecry.type === 'BOUNCE_ALL_CATEGORY') {
+            const bounced = [];
+            [this.currentPlayer, this.opponent].forEach(player => {
+                // Must iterate simply since we are modifying the array with splice?
+                // Actually splice changes indices. Safe way: reverse loop or while loop.
+                for (let i = player.board.length - 1; i >= 0; i--) {
+                    const m = player.board[i];
+                    if (m.category && m.category.includes(battlecry.target_category_includes)) {
+                        // Bounce it
+                        player.board.splice(i, 1);
+                        bounced.push(m);
+
+                        const collection = this.collection || [];
+                        const originalCard = collection.find(c => c.id === m.id) || m;
+                        let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+                        // Han Kuo-yu (TW032): Permanent stackable +2/+2 on bounce
+                        if (m.hanBounceBonus) cardToHand.hanBounceBonus = m.hanBounceBonus;
+                        if (m.id === 'TW032') {
+                            cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 2;
+                            cardToHand.attack += cardToHand.hanBounceBonus;
+                            cardToHand.health += cardToHand.hanBounceBonus;
+                        }
+
+                        // Hau Lung-bin (TW033): Permanent stackable +1/+1 on bounce
+                        if (m.id === 'TW033') {
+                            cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 1;
+                            cardToHand.attack += cardToHand.hanBounceBonus;
+                            cardToHand.health += cardToHand.hanBounceBonus;
+                        }
+
+                        // Clean up
+                        delete cardToHand.currentHealth;
+                        delete cardToHand.sleeping;
+                        delete cardToHand.canAttack;
+                        delete cardToHand.isEnraged;
+                        delete cardToHand.tempBuffs;
+
+                        if (player.hand.length < 10) {
+                            player.hand.push(cardToHand);
+                        }
+                    }
+                }
+            });
+            return { type: 'BOUNCE_ALL', bounced };
         }
     }
 
