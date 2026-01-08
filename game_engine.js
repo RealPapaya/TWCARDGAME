@@ -726,10 +726,7 @@ class GameState {
         } else if (battlecry.type === 'DISCARD_DRAW') {
             const player = this.currentPlayer;
             const res = this.resolveBattlecry({ type: 'DISCARD_RANDOM', value: battlecry.discardCount || 1 });
-            for (let i = 0; i < (battlecry.drawCount || 1); i++) {
-                player.drawCard();
-            }
-            return { ...res, type: 'DISCARD_DRAW' };
+            return { ...res, type: 'DISCARD_DRAW', drawCount: battlecry.drawCount || 1 };
         } else if (battlecry.type === 'DISCARD_RANDOM') {
             const player = this.currentPlayer;
             const count = battlecry.value || 1;

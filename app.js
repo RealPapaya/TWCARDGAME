@@ -741,14 +741,23 @@ async function aiTurn() {
                 }
                 render();
 
-                // Visual Delay for S001 Draw 2
-                if (card.id === 'S001') {
+                // Visual Delay for drawing battlecries
+                if (card.keywords?.battlecry?.type === 'DRAW') {
+                    const drawCount = card.keywords.battlecry.value || 1;
+                    for (let i = 0; i < drawCount; i++) {
+                        await new Promise(r => setTimeout(r, 600));
+                        gameState.currentPlayer.drawCard();
+                        render();
+                    }
+                } else if (card.keywords?.battlecry?.type === 'DISCARD_DRAW') {
+                    const drawCount = card.keywords.battlecry.drawCount || 2;
+                    // Ai discard visuals are usually instant render, so we just wait a bit
                     await new Promise(r => setTimeout(r, 600));
-                    gameState.currentPlayer.drawCard();
-                    render();
-                    await new Promise(r => setTimeout(r, 600));
-                    gameState.currentPlayer.drawCard();
-                    render();
+                    for (let i = 0; i < drawCount; i++) {
+                        gameState.currentPlayer.drawCard();
+                        render();
+                        await new Promise(r => setTimeout(r, 600));
+                    }
                 }
 
                 await resolveDeaths();
@@ -1544,9 +1553,14 @@ async function onDragEnd(e) {
                                 if (discardEls.length > 0) {
                                     await Promise.all(discardEls.map(el => animateDiscard(el)));
                                 }
-                                if (result.type === 'DISCARD_DRAW') {
-                                    // Small delay before render shows new cards from draw
-                                    await new Promise(r => setTimeout(r, 400));
+                                if (result.type === 'DISCARD_DRAW' && result.drawCount) {
+                                    // Start drawing after a short pause once discard animation FINISHES
+                                    await new Promise(r => setTimeout(r, 200));
+                                    for (let i = 0; i < result.drawCount; i++) {
+                                        gameState.currentPlayer.drawCard();
+                                        render();
+                                        await new Promise(r => setTimeout(r, 600)); // Standard draw delay
+                                    }
                                 }
                             } else if (result.type === 'BUFF_HAND') {
                                 const handEl = document.getElementById('player-hand');
@@ -1556,13 +1570,14 @@ async function onDragEnd(e) {
                         }
                     }
 
-                    // Visual Delay for S001 Draw 2
-                    if (playedCard.id === 'S001') {
-                        await new Promise(r => setTimeout(r, 600));
-                        gameState.currentPlayer.drawCard();
-                        render();
-                        await new Promise(r => setTimeout(r, 600));
-                        gameState.currentPlayer.drawCard();
+                    // Visual Delay for cards that draw (S001 etc)
+                    if (playedCard.keywords?.battlecry?.type === 'DRAW') {
+                        const drawCount = playedCard.keywords.battlecry.value || 1;
+                        for (let i = 0; i < drawCount; i++) {
+                            await new Promise(r => setTimeout(r, 600));
+                            gameState.currentPlayer.drawCard();
+                            render();
+                        }
                     }
 
                     // Final Render to update all stats
