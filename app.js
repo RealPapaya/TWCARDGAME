@@ -44,7 +44,7 @@ const CARD_DATA = [
     { "id": "TW004", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "五杯大冰拿", "image": "img/tw008.png" },
     { "id": "TW005", "name": "水電徒弟", "category": "勞工", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/tw010.png" },
     { "id": "TW006", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/c013.png" },
-    { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "我是外送師\n衝鋒", "keywords": { "charge": true }, "image": "img/tw007.png" },
+    { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "我是外送師！！\n衝鋒", "keywords": { "charge": true }, "image": "img/tw007.png" },
     { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "戰吼: 回復一個單位2點血量", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw014.png" },
     { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "激怒: 增加3點攻擊 極度耐操", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw015.png" },
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
@@ -58,7 +58,8 @@ const CARD_DATA = [
     { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
-    { "id": "S008", "name": "法院傳票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並降低 3 點消耗。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" }
+    { "id": "S008", "name": "法院傳票", "category": "策略", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
+    { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" }
 ];
 
 let cardDB = [];
@@ -80,7 +81,7 @@ function migrateDecks() {
         'tw009': 'TW013', 'tw019': 'TW014', 'tw020': 'TW015', 'tw002': 'TW016',
         'tw013': 'TW017', 'tw016': 'TW018', 'tw021': 'TW019', 'tw006': 'TW020',
         'tw018': 'TW021', 'tw017': 'TW023', 'tw012': 'TW024',
-        'tw004': 'S001', 'tw005': 'S002'
+        'tw004': 'S001', 'tw005': 'S002', 'v023': 'TW037' // Manual fix for the brief TW023 clash if needed
     };
 
     let needsUpdate = false;
@@ -88,6 +89,9 @@ function migrateDecks() {
         if (!deck.cards) deck.cards = [];
         const originalLength = deck.cards.length;
         deck.cards = deck.cards.map(id => {
+            // Special fix: If someone had TW023 but meant Old Veteran (which clashed briefly)
+            // This is hard to be certain about, but we know tw017 maps to TW023 (Chen).
+            // Let's just focus on the backward map.
             if (map[id]) {
                 needsUpdate = true;
                 return map[id];
@@ -260,6 +264,22 @@ document.getElementById('btn-surrender-cancel').addEventListener('click', () => 
 
 // Update Log Listeners
 document.getElementById('btn-update-log')?.addEventListener('click', () => {
+    const list = document.getElementById('update-log-list');
+    if (list && typeof UPDATE_LOGS !== 'undefined') {
+        list.innerHTML = UPDATE_LOGS.map(log => `
+            <div class="update-version-section">
+                <h3 style="color: var(--neon-cyan); margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
+                <ul style="list-style: none; padding: 0;">
+                    ${log.items.map(item => `
+                        <li style="margin-bottom: 15px;">
+                            <b style="color: var(--neon-yellow);">${item.title}</b><br>
+                            <span style="color: #ccc; font-size: 14px;">${item.desc}</span>
+                        </li>
+                    `).join('')}
+                </ul>
+            </div>
+        `).join('<hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">');
+    }
     document.getElementById('update-log-modal').style.display = 'flex';
 });
 
@@ -709,7 +729,12 @@ async function aiTurn() {
                 const targetSlot = oppBoard.children[oppBoard.children.length]; // Potential new slot
                 await showCardPlayPreview(card, true, targetSlot);
 
-                gameState.playCard(action.index, action.target);
+                try {
+                    gameState.playCard(action.index, action.target);
+                } catch (e) {
+                    console.error("AI failed to play card:", e);
+                    break;
+                }
                 render();
 
                 // Visual Delay for S001 Draw 2

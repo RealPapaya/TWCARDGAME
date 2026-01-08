@@ -10,6 +10,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script src="game_engine.js"></script>
+    <script src="updates.js"></script>
     <script src="app.js" defer></script>
 </head>
 
@@ -218,22 +219,10 @@
     <!-- Update Log Modal -->
     <div id="update-log-modal" class="modal-overlay" style="display: none;">
         <div class="modal-content">
-            <h2 class="sub-title" style="font-size: 28px; margin-bottom: 20px;">更新日誌 v0.1</h2>
-            <div style="text-align: left; margin-bottom: 30px; max-height: 400px; overflow-y: auto;">
-                <ul style="list-style: none; padding: 0;">
-                    <li style="margin-bottom: 15px;">
-                        <b style="color: var(--neon-yellow);">[新卡片] 法院傳票</b><br>
-                        <span style="color: #ccc; font-size: 14px;">抽取一張隨從牌並將其消耗降低 3 點。</span>
-                    </li>
-                    <li style="margin-bottom: 15px;">
-                        <b style="color: var(--neon-yellow);">[新機制] 消耗降低系統</b><br>
-                        <span style="color: #ccc; font-size: 14px;">卡片消耗現在可以降到 0（最低為 0），且降低後的消耗會以綠色文字顯示。</span>
-                    </li>
-                    <li style="margin-bottom: 15px;">
-                        <b style="color: var(--neon-yellow);">[優化] 主介面更新</b><br>
-                        <span style="color: #ccc; font-size: 14px;">新增版本號顯示與更新內容查看功能。</span>
-                    </li>
-                </ul>
+            <h2 class="sub-title" style="font-size: 28px; margin-bottom: 20px;">更新日誌</h2>
+            <div id="update-log-list"
+                style="text-align: left; margin-bottom: 30px; max-height: 400px; overflow-y: auto;">
+                <!-- Content will be injected from updates.js via app.js -->
             </div>
             <button id="btn-update-log-close" class="neon-button">關閉</button>
         </div>

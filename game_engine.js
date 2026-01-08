@@ -196,13 +196,34 @@ class GameState {
      * @param {Object} target Target info { type: 'HERO'|'MINION', index: number } (Optional)
      * @param {number} insertionIndex Preferred index on board (Optional)
      */
+    canPlayCard(cardIndex) {
+        const player = this.currentPlayer;
+        const card = player.hand[cardIndex];
+        if (!card) return false;
+        if (player.mana.current < card.cost) return false;
+        if (player.board.length >= 7 && card.type === 'MINION') return false;
+
+        // Discard Play Restriction
+        if (card.keywords && card.keywords.battlecry && card.keywords.battlecry.type === 'DISCARD_RANDOM') {
+            if (player.hand.length <= 1) return false;
+        }
+
+        return true;
+    }
+
     playCard(cardIndex, target = null, insertionIndex = -1, skipBattlecry = false) {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
 
-        if (!card) throw new Error("Card not found in hand");
-        if (player.mana.current < card.cost) throw new Error("Not enough mana");
-        if (player.board.length >= 7 && card.type === 'MINION') throw new Error("Board full (Max 7)");
+        if (!this.canPlayCard(cardIndex)) {
+            // Re-throw specific errors if needed, or generic
+            if (player.mana.current < card.cost) throw new Error("能量不足！");
+            if (player.board.length >= 7 && card.type === 'MINION') throw new Error("戰場已滿！");
+            if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM' && player.hand.length <= 1) {
+                throw new Error("沒有手牌可以丟棄，無法打出此卡！");
+            }
+            throw new Error("無法打出此卡！");
+        }
 
         // Pay Mana
         player.mana.current -= card.cost;
@@ -865,6 +886,10 @@ class GameState {
             if (player.hand.length < 10) {
                 player.hand.push(cardToHand);
             }
+        } else if (deathrattle.type === 'DRAW') {
+            for (let i = 0; i < (deathrattle.value || 1); i++) {
+                player.drawCard();
+            }
         }
     }
 }
@@ -1040,7 +1065,7 @@ class AIEngine {
         if (difficulty !== 'NORMAL') {
             const playableCards = aiPlayer.hand
                 .map((c, i) => ({ ...c, originalIndex: i }))
-                .filter(c => c.cost <= aiPlayer.mana.current);
+                .filter((c, i) => gameState.canPlayCard(i));
 
             if (playableCards.length > 0) {
                 // Separate into categories
@@ -1084,7 +1109,7 @@ class AIEngine {
             if (aiPlayer.board.length < 7) {
                 const playableMinions = aiPlayer.hand
                     .map((c, i) => ({ ...c, originalIndex: i }))
-                    .filter(c => c.type === 'MINION' && c.cost <= aiPlayer.mana.current)
+                    .filter((c, i) => gameState.canPlayCard(i) && c.type === 'MINION')
                     .sort((a, b) => b.cost - a.cost);
 
                 if (playableMinions.length > 0) {
@@ -1099,7 +1124,7 @@ class AIEngine {
 
             const playableSpells = aiPlayer.hand
                 .map((c, i) => ({ ...c, originalIndex: i }))
-                .filter(c => c.type === 'SPELL' && c.cost <= aiPlayer.mana.current);
+                .filter((c, i) => gameState.canPlayCard(i) && c.type === 'SPELL');
 
             if (playableSpells.length > 0) {
                 const choice = playableSpells[0];
