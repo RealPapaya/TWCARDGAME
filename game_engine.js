@@ -72,7 +72,7 @@ class GameEngine {
         // Randomly choose starting player
         const startingIndex = Math.random() < 0.5 ? 0 : 1;
 
-        const state = new GameState([p1, p2], startingIndex, debugMode, difficulty);
+        const state = new GameState([p1, p2], startingIndex, debugMode, difficulty, this.collection);
 
         // Initial Draw: Both players get 3 cards as per user request
         const p1Draws = 3;
@@ -87,7 +87,7 @@ class GameEngine {
 }
 
 class GameState {
-    constructor(players, startingIndex, debugMode = false, difficulty = 'NORMAL') {
+    constructor(players, startingIndex, debugMode = false, difficulty = 'NORMAL', collection = []) {
         this.gameId = Date.now().toString();
         this.turnCount = 0;
         this.players = players;
@@ -96,6 +96,7 @@ class GameState {
         this.winner = null;
         this.debugMode = debugMode;
         this.difficulty = difficulty;
+        this.collection = collection;
 
         // Apply Difficulty Modifiers to Opponent (AI)
         const opponent = this.players.find(p => p.side === 'OPPONENT');

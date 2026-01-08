@@ -1383,8 +1383,13 @@ async function onDragEnd(e) {
                             const handCardEl = document.getElementById('player-hand').children[attackerIndex];
                             if (handCardEl) handCardEl.style.opacity = '0';
 
+                            // Arrow starts from hero for spells
+                            const heroRect = document.getElementById('player-hero').getBoundingClientRect();
+                            const startX = heroRect.left + heroRect.width / 2;
+                            const startY = heroRect.top + heroRect.height / 2;
+
                             // Pass full battlecry object to support category checks
-                            startBattlecryTargeting(attackerIndex, e.clientX, e.clientY, mode, battlecry, 'SPELL');
+                            startBattlecryTargeting(attackerIndex, startX, startY, mode, battlecry, 'SPELL');
                         } else { // Minion with Battlecry
                             gameState.playCard(attackerIndex, 'PENDING', currentInsertionIndex);
                             render();
@@ -1583,7 +1588,6 @@ async function onDragEnd(e) {
                 if (battlecrySourceType === 'SPELL') {
                     // For Spell: Now we play it
                     const card = gameState.currentPlayer.hand[battlecrySourceIndex];
-                    if (card) showCardPlayPreview(card); // Post-animation preview
                     gameState.playCard(battlecrySourceIndex, target);
                 } else {
                     // For Minion: It's already pending on board, just resolve battlecry
