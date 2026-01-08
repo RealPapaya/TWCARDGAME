@@ -58,8 +58,12 @@ const CARD_DATA = [
     { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
-    { "id": "S008", "name": "法院傳票", "category": "策略", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
-    { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" }
+    { "id": "S008", "name": "法院傳票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
+    { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
+    { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
+    { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
+    { "id": "S009", "name": "政治切割", "category": "法術", "cost": 1, "type": "SPELL", "rarity": "COMMON", "description": "戰吼:丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
+    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" }
 ];
 
 let cardDB = [];
@@ -1525,10 +1529,24 @@ async function onDragEnd(e) {
                                     }
                                     if (el) triggerCombatEffect(el, 'HEAL');
                                 });
-                            } else if (result.type === 'DISCARD') {
+                            } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
                                 const handEl = document.getElementById('player-hand');
-                                if (handEl.children[result.index]) {
-                                    await animateDiscard(handEl.children[result.index]);
+                                let discardEls = [];
+                                if (result.indices) {
+                                    discardEls = result.indices.map(idx => handEl.children[idx]).filter(el => el);
+                                } else if (result.index !== undefined) {
+                                    discardEls = [handEl.children[result.index]].filter(el => el);
+                                } else {
+                                    const count = result.count || 1;
+                                    discardEls = Array.from(handEl.children).slice(-count);
+                                }
+
+                                if (discardEls.length > 0) {
+                                    await Promise.all(discardEls.map(el => animateDiscard(el)));
+                                }
+                                if (result.type === 'DISCARD_DRAW') {
+                                    // Small delay before render shows new cards from draw
+                                    await new Promise(r => setTimeout(r, 400));
                                 }
                             } else if (result.type === 'BUFF_HAND') {
                                 const handEl = document.getElementById('player-hand');

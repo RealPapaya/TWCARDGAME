@@ -205,7 +205,8 @@ class GameState {
 
         // Discard Play Restriction
         if (card.keywords && card.keywords.battlecry && card.keywords.battlecry.type === 'DISCARD_RANDOM') {
-            if (player.hand.length <= 1) return false;
+            const count = card.keywords.battlecry.value || 1;
+            if (player.hand.length <= count) return false;
         }
 
         return true;
@@ -219,8 +220,11 @@ class GameState {
             // Re-throw specific errors if needed, or generic
             if (player.mana.current < card.cost) throw new Error("能量不足！");
             if (player.board.length >= 7 && card.type === 'MINION') throw new Error("戰場已滿！");
-            if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM' && player.hand.length <= 1) {
-                throw new Error("沒有手牌可以丟棄，無法打出此卡！");
+            if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM') {
+                const count = card.keywords.battlecry.value || 1;
+                if (player.hand.length <= count) {
+                    throw new Error(`至少需要 ${count} 張手牌可以丟棄，無法打出此卡！`);
+                }
             }
             throw new Error("無法打出此卡！");
         }
@@ -234,7 +238,7 @@ class GameState {
         let battlecryResult = null;
 
         if (card.type === 'MINION') {
-            const minion = { ...card, sleeping: true, canAttack: false, currentHealth: card.health, side: player.side };
+            const minion = this.createMinion(card, player.side);
             if (minion.keywords && minion.keywords.charge) {
                 minion.sleeping = false;
                 minion.canAttack = true;
@@ -719,14 +723,67 @@ class GameState {
                 player.drawCard(minionIdx, battlecry.value);
             }
             return { type: 'DRAW' };
+        } else if (battlecry.type === 'DISCARD_DRAW') {
+            const player = this.currentPlayer;
+            const res = this.resolveBattlecry({ type: 'DISCARD_RANDOM', value: battlecry.discardCount || 1 });
+            for (let i = 0; i < (battlecry.drawCount || 1); i++) {
+                player.drawCard();
+            }
+            return { ...res, type: 'DISCARD_DRAW' };
         } else if (battlecry.type === 'DISCARD_RANDOM') {
             const player = this.currentPlayer;
-            if (player.hand.length > 0) {
-                const idx = Math.floor(Math.random() * player.hand.length);
-                const discarded = player.hand.splice(idx, 1)[0];
-                return { type: 'DISCARD', index: idx, card: discarded };
+            const count = battlecry.value || 1;
+
+            // Collect original indices to discard
+            const availableIndices = Array.from({ length: player.hand.length }, (_, i) => i);
+            const discardedIndices = [];
+            for (let i = 0; i < count && availableIndices.length > 0; i++) {
+                const randPos = Math.floor(Math.random() * availableIndices.length);
+                discardedIndices.push(availableIndices.splice(randPos, 1)[0]);
+            }
+
+            const discardedCards = [];
+            // Sort descending to splice safely
+            [...discardedIndices].sort((a, b) => b - a).forEach(idx => {
+                const card = player.hand.splice(idx, 1)[0];
+                discardedCards.push(card);
+                this.handleDiscard(player, card);
+            });
+
+            return { type: 'DISCARD', count, indices: discardedIndices, cards: discardedCards };
+        }
+    }
+
+    handleDiscard(player, discardedCard = null) {
+        // Triggered effects on board
+        player.board.forEach(m => {
+            if (m.keywords && m.keywords.triggered && m.keywords.triggered.type === 'ON_DISCARD') {
+                const val = m.keywords.triggered.value || 2;
+                m.attack += val;
+                m.health += val;
+                m.currentHealth += val;
+                this.updateEnrage(m);
+            }
+        });
+
+        // Triggered effects on the card itself (e.g. summon when discarded)
+        if (discardedCard && discardedCard.keywords && discardedCard.keywords.onDiscard === 'SUMMON') {
+            if (player.board.length < 7) {
+                const minion = this.createMinion(discardedCard, player.side);
+                player.board.push(minion);
+                this.updateAuras();
             }
         }
+    }
+
+    createMinion(cardData, side) {
+        return {
+            ...cardData,
+            currentHealth: cardData.health,
+            side: side,
+            sleeping: true,
+            canAttack: false
+        };
     }
 
     getTargetUnit(target) {
