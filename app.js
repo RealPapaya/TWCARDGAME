@@ -16,6 +16,7 @@ const CARD_DATA = [
     { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "image": "img/tw033.png" },
     { "id": "TW034", "name": "趙少康", "category": "國民黨政治人物", "cost": 6, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質", "keywords": { "taunt": true, "battlecry": { "type": "EAT_FRIENDLY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/tw034.png" },
     { "id": "TW035", "name": "江啟臣", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 5, "type": "MINION", "rarity": "RARE", "description": "戰吼：丟棄一張隨機手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM" } }, "image": "img/tw035.png" },
+    { "id": "TW036", "name": "連勝文", "category": "國民黨政治人物", "cost": 4, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "政壇不死鳥\n遺志: 回到手牌", "keywords": { "deathrattle": { "type": "BOUNCE_SELF" } }, "image": "img/tw036.png" },
 
     // --- 民眾黨 (TPP) ---
     { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼：將自己戰場上的隨從血量全部回復", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "image": "img/tw001.png" },
@@ -934,6 +935,9 @@ function formatDesc(text) {
         const reg = new RegExp(k, 'g');
         formatted = formatted.replace(reg, `<b>${k}</b>`);
     });
+
+    // 3. Special highlighting for "遺志" (Deathrattle) in yellow
+    formatted = formatted.replace(/遺志/g, '<b style="color: #ffd700;">遺志</b>');
 
     return formatted;
 }

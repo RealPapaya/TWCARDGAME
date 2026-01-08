@@ -831,7 +831,7 @@ class GameState {
                     p.board.splice(i, 1);
                     // Trigger Deathrattle
                     if (deadMinion.keywords && deadMinion.keywords.deathrattle) {
-                        this.resolveDeathrattle(p, deadMinion.keywords.deathrattle);
+                        this.resolveDeathrattle(p, deadMinion.keywords.deathrattle, deadMinion);
                     }
                 }
             }
@@ -840,12 +840,22 @@ class GameState {
         this.updateAuras();
     }
 
-    resolveDeathrattle(player, deathrattle) {
+    resolveDeathrattle(player, deathrattle, deadMinion) {
         if (deathrattle.type === 'SUMMON') {
-            if (player.board.length < 5) {
-                // Needs access to Card DB to fetch token, for now mock
+            if (player.board.length < 7) {
                 const token = { name: "Ghost", attack: 1, health: 1, currentHealth: 1, sleeping: true, canAttack: false };
                 player.board.push(token);
+            }
+        } else if (deathrattle.type === 'BOUNCE_SELF') {
+            const collection = this.collection || [];
+            const originalCard = collection.find(c => c.id === deadMinion.id) || deadMinion;
+            let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+            // Han / Hau bonuses persist if already on the cardToHand (usually they are applied TO the hand version)
+            // But if it's a deathrattle bounce, we just put it back.
+
+            if (player.hand.length < 10) {
+                player.hand.push(cardToHand);
             }
         }
     }
