@@ -267,79 +267,88 @@ class GameState {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit && targetUnit.type === 'MINION' && targetUnit.category !== battlecry.target_category) {
                 this.applyDamage(targetUnit, battlecry.value);
-                return { type: 'DAMAGE', target: targetUnit, value: battlecry.value };
+                return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: battlecry.value };
             }
         } else if (battlecry.type === 'HEAL') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
-                // Handle both Minion (health/currentHealth) and Hero (hp/maxHp)
                 const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
                 const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
 
                 if (typeof max === 'number' && typeof current === 'number') {
                     const healValue = Math.min(max - current, battlecry.value);
                     const newHp = current + healValue;
-                    if (targetUnit.type === 'HERO') {
-                        targetUnit.hp = newHp;
-                    } else {
+                    if (targetUnit.type === 'HERO') targetUnit.hp = newHp;
+                    else {
                         targetUnit.currentHealth = newHp;
                         this.updateEnrage(targetUnit);
                     }
-                    return { type: 'HEAL', target: targetUnit, value: healValue };
+                    return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
                 }
             }
         } else if (battlecry.type === 'BUFF_STAT_TARGET') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit && targetUnit.type === 'MINION') {
-                if (battlecry.stat === 'ATTACK') {
-                    targetUnit.attack += battlecry.value;
-                } else if (battlecry.stat === 'HEALTH') {
+                if (battlecry.stat === 'ATTACK') targetUnit.attack += battlecry.value;
+                else if (battlecry.stat === 'HEALTH') {
                     targetUnit.health += battlecry.value;
                     targetUnit.currentHealth += battlecry.value;
                     this.updateEnrage(targetUnit);
                 }
-                return { type: 'BUFF', target: targetUnit, stat: battlecry.stat, value: battlecry.value };
+                return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: battlecry.stat, value: battlecry.value };
             }
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit && targetUnit.type === 'MINION') {
                 if (!targetUnit.keywords) targetUnit.keywords = {};
                 targetUnit.keywords.divineShield = true;
+                return { type: 'BUFF', target: { ...targetUnit, index: target.index }, shield: true };
             }
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD_ALL') {
-            this.currentPlayer.board.forEach(m => {
+            const affected = [];
+            this.currentPlayer.board.forEach((m, i) => {
                 if (!m.keywords) m.keywords = {};
                 m.keywords.divineShield = true;
+                affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
             });
-        }
-        else if (battlecry.type === 'DESTROY') {
+            return { type: 'BUFF_ALL', affected };
+        } else if (battlecry.type === 'DESTROY') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
                 this.applyDamage(targetUnit, 999);
+                return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: 999 };
             }
         } else if (battlecry.type === 'BUFF_CATEGORY') {
-            this.currentPlayer.board.forEach(m => {
+            const affected = [];
+            this.currentPlayer.board.forEach((m, i) => {
                 if (m.category === battlecry.target_category) {
                     m.health += battlecry.value;
                     m.currentHealth += battlecry.value;
+                    affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
                 }
             });
+            return { type: 'BUFF_ALL', affected };
         } else if (battlecry.type === 'BUFF_ALL') {
-            this.currentPlayer.board.forEach(m => {
-                if (battlecry.stat === 'ATTACK') {
-                    m.attack += battlecry.value;
-                } else if (battlecry.stat === 'HEALTH') {
+            const affected = [];
+            this.currentPlayer.board.forEach((m, i) => {
+                if (battlecry.stat === 'ATTACK') m.attack += battlecry.value;
+                else if (battlecry.stat === 'HEALTH') {
                     m.health += battlecry.value;
                     m.currentHealth += battlecry.value;
                 }
+                affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
             });
+            return { type: 'BUFF_ALL', affected };
         } else if (battlecry.type === 'DAMAGE_RANDOM_FRIENDLY') {
             const friendlyBoard = this.currentPlayer.board;
             if (friendlyBoard.length > 0) {
                 const randomIdx = Math.floor(Math.random() * friendlyBoard.length);
-                this.applyDamage(friendlyBoard[randomIdx], battlecry.value);
+                const targetUnit = friendlyBoard[randomIdx];
+                this.applyDamage(targetUnit, battlecry.value);
+                return { type: 'DAMAGE', target: { ...targetUnit, index: randomIdx }, value: battlecry.value };
             } else {
                 this.applyDamage(this.currentPlayer.hero, battlecry.value);
+                return { type: 'DAMAGE', target: { ...this.currentPlayer.hero, index: -1 }, value: battlecry.value };
             }
         }
     }

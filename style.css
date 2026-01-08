@@ -660,6 +660,7 @@ body {
     background: url('https://placehold.co/70x70/222/FFF?text=Hero') no-repeat center;
     background-size: cover;
     border: 2px solid rgba(255, 255, 255, 0.1);
+    pointer-events: none;
 }
 
 .stats {
@@ -673,6 +674,7 @@ body {
     font-size: 14px;
     box-shadow: 0 2px 5px rgba(0, 0, 0, 0.5);
     border: 2px solid rgba(255, 255, 255, 0.2);
+    pointer-events: none;
 }
 
 /* Mana Container & Crystals */
@@ -1852,12 +1854,12 @@ body {
 }
 
 .slash-effect {
-    width: 120%;
-    height: 10px;
+    width: 140%;
+    height: 14px;
     background: #ff0000;
-    box-shadow: 0 0 15px #ff0000;
+    box-shadow: 0 0 20px #ff0000, 0 0 40px rgba(255, 0, 0, 0.5);
     transform: rotate(-45deg);
-    animation: slash-fade 0.2s ease-out forwards;
+    animation: slash-fade 0.35s cubic-bezier(0.1, 0.8, 0.3, 1) forwards;
 }
 
 @keyframes slash-fade {
