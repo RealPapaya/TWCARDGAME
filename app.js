@@ -13,6 +13,8 @@ const CARD_DATA = [
     { "id": "TW030", "name": "朱立倫", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "戰吼：對兩側單位 +1/+1", "keywords": { "battlecry": { "type": "BUFF_ADJACENT", "value": 1 } }, "image": "img/tw030.png" },
     { "id": "TW032", "name": "韓國瑜", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "LEGENDARY", "description": "發財外交！！\n(回到手牌時永久獲得 +2/+2)", "image": "img/tw032.png" },
     { "id": "TW031", "name": "蔣萬安", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw031.png" },
+    { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "image": "img/tw033.png" },
+    { "id": "TW034", "name": "趙少康", "category": "國民黨政治人物", "cost": 6, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質", "keywords": { "taunt": true, "battlecry": { "type": "EAT_FRIENDLY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/tw034.png" },
 
     // --- 民眾黨 (TPP) ---
     { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼：將自己戰場上的隨從血量全部回復", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "image": "img/tw001.png" },
@@ -1449,6 +1451,18 @@ async function onDragEnd(e) {
                                     await animateAbility(newMinionEl, targetEl, result.type === 'HEAL' ? '#43e97b' : '#ff0000', true);
                                     triggerCombatEffect(targetEl, result.type === 'HEAL' ? 'HEAL' : 'DAMAGE');
                                 }
+                            } else if (result.type === 'EAT') {
+                                // Find target
+                                const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                const targetEl = document.getElementById(boardId).children[result.target.index];
+
+                                if (targetEl) {
+                                    await animateAbility(newMinionEl, targetEl, '#ff0000', true);
+                                    triggerCombatEffect(targetEl, 'DAMAGE');
+                                    // Visual delay before buffing self
+                                    await new Promise(r => setTimeout(r, 200));
+                                    triggerCombatEffect(newMinionEl, 'BUFF');
+                                }
                             } else if (result.type === 'HEAL_ALL') {
                                 result.affected.forEach(aff => {
                                     let el = null;
@@ -1594,7 +1608,7 @@ async function onDragEnd(e) {
                     // For Minion: It's already pending on board, just resolve battlecry
                     const minionInfo = gameState.currentPlayer.board[battlecrySourceIndex];
                     if (minionInfo && minionInfo.keywords?.battlecry) {
-                        gameState.resolveBattlecry(minionInfo.keywords.battlecry, target);
+                        gameState.resolveBattlecry(minionInfo.keywords.battlecry, target, minionInfo);
                     }
                 }
 

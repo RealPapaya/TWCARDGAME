@@ -521,6 +521,11 @@ class GameState {
                         cardToHand.attack += cardToHand.hanBounceBonus;
                         cardToHand.health += cardToHand.hanBounceBonus;
                     }
+                    if (targetUnit.id === 'TW033') {
+                        cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 1;
+                        cardToHand.attack += cardToHand.hanBounceBonus;
+                        cardToHand.health += cardToHand.hanBounceBonus;
+                    }
 
                     // Clean up board-specific state for hand display
                     delete cardToHand.currentHealth;
@@ -532,6 +537,25 @@ class GameState {
                         owner.hand.push(cardToHand);
                     }
                     return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                }
+            }
+        } else if (battlecry.type === 'EAT_FRIENDLY') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                const eatAtk = targetUnit.attack;
+                const eatHp = targetUnit.health; // Using max health or current? Usually stat "values" imply current attack and current health? But "Body" implies max. Let's use max health for "Stats". Or Hearthstone uses current. Let's use ATTACK and HEALTH (Max).
+
+                // Add to self
+                // But wait, self isn't passed clearly here except in insertion?
+                // `resolveBattlecry` has `sourceMinion`.
+                if (sourceMinion) {
+                    sourceMinion.attack += eatAtk;
+                    sourceMinion.health += eatHp;
+                    sourceMinion.currentHealth += eatHp;
+
+                    // Kill target
+                    this.applyDamage(targetUnit, 999);
+                    return { type: 'EAT', target: target, value: { attack: eatAtk, health: eatHp } };
                 }
             }
         } else if (battlecry.type === 'BOUNCE_CATEGORY') {
@@ -555,6 +579,13 @@ class GameState {
                     if (targetUnit.hanBounceBonus) cardToHand.hanBounceBonus = targetUnit.hanBounceBonus;
                     if (targetUnit.id === 'TW032') {
                         cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 2;
+                        cardToHand.attack += cardToHand.hanBounceBonus;
+                        cardToHand.health += cardToHand.hanBounceBonus;
+                    }
+
+                    // Hau Lung-bin (TW033): Permanent stackable +1/+1 on bounce
+                    if (targetUnit.id === 'TW033') {
+                        cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 1;
                         cardToHand.attack += cardToHand.hanBounceBonus;
                         cardToHand.health += cardToHand.hanBounceBonus;
                     }

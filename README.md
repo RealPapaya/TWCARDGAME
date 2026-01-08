@@ -17,12 +17,12 @@
 { 
     "id": "", 
     "name": "", 
-    "category": "COMMON/RARE/EPIC/LEGENDARY", 
+    "category": "", 
     "cost": , 
     "attack": , 
     "health": , 
     "type": "MINION", 
-    "rarity": "",
+    "rarity": "COMMON/RARE/EPIC/LEGENDARY",
     "keywords": {}, 
     "description": "", 
     "image": "" 
