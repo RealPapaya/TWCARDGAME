@@ -1214,18 +1214,16 @@ function onDragMove(e) {
         dragLine.setAttribute('x2', e.clientX);
         dragLine.setAttribute('y2', e.clientY);
 
-        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('.minion, .hero-container, .hero-stats-pill'); // Improved Hero detection
+        const unitEl = targetEl?.closest('.minion, .hero'); // Corrected Hero selector
 
         if (unitEl) {
-            const actualUnitEl = unitEl.closest('.minion, .hero-container');
             const targetInfo = {};
-            if (actualUnitEl.classList.contains('hero-container')) {
+            if (unitEl.classList.contains('hero')) {
                 targetInfo.type = 'HERO';
-                targetInfo.side = actualUnitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
             } else {
                 targetInfo.type = 'MINION';
-                const board = actualUnitEl.parentElement;
+                const board = unitEl.parentElement;
                 targetInfo.side = board.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
             }
 
@@ -1352,42 +1350,70 @@ async function onDragEnd(e) {
                 }
 
                 try {
-                    // Pre-play preview already shown above.
-                    // Add delay for Battlecry cards to let them land visually
-                    if (card && card.keywords?.battlecry) {
-                        await new Promise(r => setTimeout(r, 600));
-                    }
-                    gameState.playCard(attackerIndex, null, currentInsertionIndex);
+                    // 1. Play Card but SKIP battlecry execution in engine
+                    const { card: playedCard } = gameState.playCard(attackerIndex, null, currentInsertionIndex, true);
+
+                    // 2. Render to show the minion LANDING on the board
                     render();
 
-                    // Visual Delay for S001 Draw 2
-                    if (card.id === 'S001') {
-                        await new Promise(r => setTimeout(r, 600));
-                        gameState.currentPlayer.drawCard();
-                        render();
-                        await new Promise(r => setTimeout(r, 600));
-                        gameState.currentPlayer.drawCard();
-                        render();
-                    }
-
-                    // Trigger Dust at newly played minion
+                    // 3. Trigger Dust at newly played minion
                     const boardEl = document.getElementById('player-board');
                     const newMinionEl = boardEl.children[currentInsertionIndex];
-                    if (newMinionEl) spawnDustEffect(newMinionEl, card.cost >= 7 ? 2 : 1);
+                    if (newMinionEl && playedCard.type === 'MINION') {
+                        spawnDustEffect(newMinionEl, playedCard.cost >= 7 ? 2 : 1);
+                    }
 
+                    // 4. WAIT 0.5s (as requested)
+                    await new Promise(r => setTimeout(r, 500));
+
+                    // 5. Execute Battlecry manually to get the result/target
+                    if (playedCard.keywords && playedCard.keywords.battlecry) {
+                        const result = gameState.resolveBattlecry(playedCard.keywords.battlecry, null);
+
+                        if (result) {
+                            // 6. Show Visual Effects based on result
+                            if (result.type === 'DAMAGE' || result.type === 'HEAL' || result.type === 'BUFF') {
+                                // Find the DOM element for the target
+                                let targetEl = null;
+                                if (result.target.type === 'HERO') {
+                                    targetEl = result.target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
+                                } else {
+                                    const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                    targetEl = document.getElementById(boardId).children[result.target.index];
+                                }
+
+                                if (targetEl) {
+                                    // animateAbility logic is already robust enough to find the middle
+                                    await animateAbility(newMinionEl, targetEl, result.type === 'HEAL' ? '#43e97b' : '#ff0000', true);
+                                    triggerCombatEffect(targetEl, result.type);
+                                }
+                            } else if (result.type === 'HEAL_ALL') {
+                                result.affected.forEach(aff => {
+                                    let el = null;
+                                    if (aff.unit.type === 'HERO') el = aff.unit.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
+                                    else {
+                                        const bId = aff.unit.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                        el = document.getElementById(bId).children[aff.unit.index];
+                                    }
+                                    if (el) triggerCombatEffect(el, 'HEAL');
+                                });
+                            }
+                        }
+                    }
+
+                    // Visual Delay for S001 Draw 2
+                    if (playedCard.id === 'S001') {
+                        await new Promise(r => setTimeout(r, 600));
+                        gameState.currentPlayer.drawCard();
+                        render();
+                        await new Promise(r => setTimeout(r, 600));
+                        gameState.currentPlayer.drawCard();
+                    }
+
+                    // Final Render to update all stats
+                    render();
                     await resolveDeaths();
 
-                    if (card && card.keywords?.battlecry) {
-                        const bcType = card.keywords.battlecry.type;
-                        setTimeout(() => {
-                            if (bcType === 'BUFF_ALL' || bcType === 'BUFF_CATEGORY') {
-                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
-                            } else if (bcType === 'HEAL_ALL_FRIENDLY') {
-                                document.querySelectorAll('#player-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
-                                triggerCombatEffect(document.getElementById('player-hero'), 'HEAL');
-                            }
-                        }, 100);
-                    }
                 } catch (err) {
                     logMessage(err.message);
                     render();
@@ -1427,16 +1453,15 @@ async function onDragEnd(e) {
         console.log("Battlecry Targeting Try Finish. SourceType:", battlecrySourceType);
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('.minion, .hero-container, .hero-stats-pill');
+        const unitEl = targetEl?.closest('.minion, .hero');
         console.log("Target Element Found:", unitEl?.id || unitEl?.className);
 
         let target = null;
         if (unitEl) {
             const targetInfo = {};
-            if (unitEl.classList.contains('hero-container') || unitEl.classList.contains('hero-stats-pill')) {
-                const actualHeroContainer = unitEl.closest('.hero-container');
+            if (unitEl.classList.contains('hero')) {
                 targetInfo.type = 'HERO';
-                targetInfo.side = actualHeroContainer.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
                 targetInfo.index = -1;
             } else {
                 targetInfo.type = 'MINION';
@@ -1555,13 +1580,14 @@ async function onDragEnd(e) {
 function isTargetEligible(rule, targetInfo) {
     if (!rule || !targetInfo) return false;
 
+    // console.log("Checking Eligibility:", rule, targetInfo);
+
     // Side check
     if (rule.side === 'ENEMY' && targetInfo.side !== 'OPPONENT') return false;
     if (rule.side === 'FRIENDLY' && targetInfo.side !== 'PLAYER') return false;
 
     // Type check
     if (!rule.type || rule.type === 'ANY' || rule.type === 'ALL') {
-        // Any unit is fine
         return true;
     }
 

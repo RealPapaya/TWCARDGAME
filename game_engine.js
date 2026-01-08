@@ -66,8 +66,8 @@ class GameEngine {
             throw new Error("Invalid decks");
         }
 
-        const p1 = new Player(deck1Ids, this.collection);
-        const p2 = new Player(deck2Ids, this.collection);
+        const p1 = new Player(deck1Ids, this.collection, 'PLAYER');
+        const p2 = new Player(deck2Ids, this.collection, 'OPPONENT');
 
         // Randomly choose starting player
         const startingIndex = Math.random() < 0.5 ? 0 : 1;
@@ -164,7 +164,7 @@ class GameState {
      * @param {Object} target Target info { type: 'HERO'|'MINION', index: number } (Optional)
      * @param {number} insertionIndex Preferred index on board (Optional)
      */
-    playCard(cardIndex, target = null, insertionIndex = -1) {
+    playCard(cardIndex, target = null, insertionIndex = -1, skipBattlecry = false) {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
 
@@ -178,8 +178,10 @@ class GameState {
         // Remove from hand
         player.hand.splice(cardIndex, 1);
 
+        let battlecryResult = null;
+
         if (card.type === 'MINION') {
-            const minion = { ...card, sleeping: true, canAttack: false, currentHealth: card.health };
+            const minion = { ...card, sleeping: true, canAttack: false, currentHealth: card.health, side: player.side };
             if (minion.keywords && minion.keywords.charge) {
                 minion.sleeping = false;
                 minion.canAttack = true;
@@ -194,22 +196,24 @@ class GameState {
             }
 
             // Trigger Battlecry
-            if (minion.keywords && minion.keywords.battlecry) {
-                this.resolveBattlecry(minion.keywords.battlecry, target);
+            if (minion.keywords && minion.keywords.battlecry && !skipBattlecry) {
+                battlecryResult = this.resolveBattlecry(minion.keywords.battlecry, target);
             }
         } else if (card.type === 'SPELL') {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
             if (card.keywords && card.keywords.battlecry) {
-                this.resolveBattlecry(card.keywords.battlecry, target);
+                battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target);
             } else if (card.id === 'S001') { // Invoice Win: Draw 2 (Handled via app.js for timing)
                 // Logic moved to app.js to allow visual delay
             } else if (card.id === 'S002') { // Impeach: Damage split
                 const damage = player.deck.length === 0 ? 20 : 10;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
+                const hits = [];
 
                 for (let i = 0; i < damage; i++) {
                     const target = enemies[Math.floor(Math.random() * enemies.length)];
                     this.applyDamage(target, 1);
+                    hits.push({ target: JSON.parse(JSON.stringify(target)), value: 1 });
                     // Filter out dead minions after each hit? 
                     // Actually, Hearthstone "Randomly split" usually can hit already dead (at 0 HP) things in some cases, 
                     // but better to filter. 
@@ -219,36 +223,51 @@ class GameState {
                     }
                     if (enemies.length === 0) break;
                 }
+                battlecryResult = { type: 'MULTI_DAMAGE', hits };
             }
         }
+        return { card, battlecryResult };
     }
 
     resolveBattlecry(battlecry, target) {
         console.log("Resolving Battlecry:", battlecry.type, "Target:", target);
-        if (target === 'PENDING') return;
+        if (target === 'PENDING') return null;
 
         if (battlecry.type === 'DAMAGE') {
             const targetUnit = this.getTargetUnit(target) || this.opponent.hero;
             console.log("Applying Damage to:", targetUnit?.name || 'Hero');
             this.applyDamage(targetUnit, battlecry.value);
+            return { type: 'DAMAGE', target: targetUnit, value: battlecry.value };
         } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
+            const affected = [];
             this.currentPlayer.board.forEach(m => {
+                const old = m.currentHealth;
                 m.currentHealth = m.health;
+                affected.push({ unit: m, healed: m.health - old });
                 this.updateEnrage(m);
             });
+            // Hero too
+            const oldHeroHp = this.currentPlayer.hero.hp;
+            this.currentPlayer.hero.hp = this.currentPlayer.hero.maxHp;
+            affected.push({ unit: this.currentPlayer.hero, healed: this.currentPlayer.hero.maxHp - oldHeroHp });
+            return { type: 'HEAL_ALL', affected };
         } else if (battlecry.type === 'BOUNCE_ALL_ENEMY') {
             const opp = this.opponent;
-            const collection = this.players[0].collection || []; // Fallback
+            const collection = this.collection || [];
+            const bounced = [];
             while (opp.board.length > 0) {
                 const m = opp.board.shift();
+                bounced.push(m);
                 // Find original card data to put back in hand
-                const originalCard = (this.collection || []).find(c => c.id === m.id) || m;
+                const originalCard = collection.find(c => c.id === m.id) || m;
                 if (opp.hand.length < 10) opp.hand.push(JSON.parse(JSON.stringify(originalCard)));
             }
+            return { type: 'BOUNCE_ALL', bounced };
         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit && targetUnit.type === 'MINION' && targetUnit.category !== battlecry.target_category) {
                 this.applyDamage(targetUnit, battlecry.value);
+                return { type: 'DAMAGE', target: targetUnit, value: battlecry.value };
             }
         } else if (battlecry.type === 'HEAL') {
             const targetUnit = this.getTargetUnit(target);
@@ -258,13 +277,15 @@ class GameState {
                 const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
 
                 if (typeof max === 'number' && typeof current === 'number') {
-                    const newHp = Math.min(max, current + battlecry.value);
+                    const healValue = Math.min(max - current, battlecry.value);
+                    const newHp = current + healValue;
                     if (targetUnit.type === 'HERO') {
                         targetUnit.hp = newHp;
                     } else {
                         targetUnit.currentHealth = newHp;
                         this.updateEnrage(targetUnit);
                     }
+                    return { type: 'HEAL', target: targetUnit, value: healValue };
                 }
             }
         } else if (battlecry.type === 'BUFF_STAT_TARGET') {
@@ -277,6 +298,7 @@ class GameState {
                     targetUnit.currentHealth += battlecry.value;
                     this.updateEnrage(targetUnit);
                 }
+                return { type: 'BUFF', target: targetUnit, stat: battlecry.stat, value: battlecry.value };
             }
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD') {
             const targetUnit = this.getTargetUnit(target);
@@ -471,8 +493,9 @@ class GameState {
 }
 
 class Player {
-    constructor(deckIds, collection) {
-        this.hero = { type: 'HERO', hp: 30, maxHp: 30 };
+    constructor(deckIds, collection, side) {
+        this.side = side;
+        this.hero = { type: 'HERO', hp: 30, maxHp: 30, side: side };
         this.mana = { current: 0, max: 0 };
         this.deck = this.buildDeck(deckIds, collection);
         this.hand = [];
