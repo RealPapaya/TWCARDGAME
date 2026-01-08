@@ -15,6 +15,7 @@ const CARD_DATA = [
     { "id": "TW031", "name": "蔣萬安", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw031.png" },
     { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "image": "img/tw033.png" },
     { "id": "TW034", "name": "趙少康", "category": "國民黨政治人物", "cost": 6, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質", "keywords": { "taunt": true, "battlecry": { "type": "EAT_FRIENDLY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/tw034.png" },
+    { "id": "TW035", "name": "江啟臣", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 5, "type": "MINION", "rarity": "RARE", "description": "戰吼：丟棄一張隨機手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM" } }, "image": "img/tw035.png" },
 
     // --- 民眾黨 (TPP) ---
     { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼：將自己戰場上的隨從血量全部回復", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "image": "img/tw001.png" },
@@ -33,7 +34,7 @@ const CARD_DATA = [
     // --- 企業與組織 ---
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
     { "id": "TW018", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "image": "img/tw016.png" },
-    { "id": "TW029", "name": "沈慶京", "category": "企業家", "cost": 5, "attack": 2, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予兩側的隨從「嘲諷」", "keywords": { "battlecry": { "type": "GIVE_KEYWORD_ADJACENT", "keyword": "taunt" } }, "image": "img/tw029.png" },
+    { "id": "TW029", "name": "沈慶京", "category": "企業家", "cost": 4, "attack": 2, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予兩側的隨從「嘲諷」", "keywords": { "battlecry": { "type": "GIVE_KEYWORD_ADJACENT", "keyword": "taunt" } }, "image": "img/tw029.png" },
 
     // --- 一般隨從 (學生/勞工) ---
     { "id": "TW001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生", "image": "img/c001.png" },
@@ -53,7 +54,9 @@ const CARD_DATA = [
     { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
     { "id": "S003", "name": "大罷免", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
     { "id": "S004", "name": "造勢晚會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
-    { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" }
+    { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
+    { "id": "S006", "name": "砸雞蛋", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
+    { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" }
 ];
 
 let cardDB = [];
@@ -1061,8 +1064,12 @@ function createCardEl(card, index) {
         `<div class="card-art-box" style="width: 100%; height: 55px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;"></div>` :
         `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
 
+    const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
+    const isReduced = card.cost < baseCard.cost;
+    const costClass = isReduced ? 'cost-reduced' : '';
+
     el.innerHTML = `
-        <div class="card-cost"><span>${card.cost}</span></div>
+        <div class="card-cost ${costClass}"><span>${card.cost}</span></div>
         
         <!-- Header spacer for Cost bubble -->
         <div style="width: 100%; height: 10px;"></div>
@@ -1475,6 +1482,15 @@ async function onDragEnd(e) {
                                     }
                                     if (el) triggerCombatEffect(el, 'HEAL');
                                 });
+                            } else if (result.type === 'DISCARD') {
+                                const handEl = document.getElementById('player-hand');
+                                if (handEl.children[result.index]) {
+                                    await animateDiscard(handEl.children[result.index]);
+                                }
+                            } else if (result.type === 'BUFF_HAND') {
+                                const handEl = document.getElementById('player-hand');
+                                handEl.classList.add('hand-flash');
+                                setTimeout(() => handEl.classList.remove('hand-flash'), 500);
                             }
                         }
                     }
@@ -1822,7 +1838,43 @@ function animateAbility(fromEl, toEl, color, shouldShake = true) {
 
             projectile.remove();
             resolve();
-        }, 510);
+        }, 550);
+    });
+}
+
+/**
+ * Animates a card being discarded (fly out and fade).
+ */
+async function animateDiscard(cardEl) {
+    return new Promise(resolve => {
+        const rect = cardEl.getBoundingClientRect();
+        const clone = cardEl.cloneNode(true);
+        clone.style.position = 'fixed';
+        clone.style.top = rect.top + 'px';
+        clone.style.left = rect.left + 'px';
+        clone.style.width = rect.width + 'px';
+        clone.style.height = rect.height + 'px';
+        clone.style.zIndex = '10000';
+        clone.style.margin = '0';
+        clone.style.transition = 'all 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19)';
+        clone.style.pointerEvents = 'none';
+        document.body.appendChild(clone);
+
+        // Hide original card element
+        cardEl.style.visibility = 'hidden';
+
+        // Force reflow
+        clone.offsetHeight;
+
+        // Animation: Fly up, rotate, and fade
+        clone.style.transform = 'translateY(-300px) rotate(45deg) scale(0.5)';
+        clone.style.opacity = '0';
+
+        setTimeout(() => {
+            spawnDustEffect(clone, 1.5);
+            clone.remove();
+            resolve();
+        }, 600);
     });
 }
 

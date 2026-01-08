@@ -233,7 +233,7 @@ class GameState {
             }
         } else if (card.type === 'SPELL') {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
-            if (card.keywords && card.keywords.battlecry) {
+            if (card.keywords && card.keywords.battlecry && !skipBattlecry) {
                 battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target);
             } else if (card.id === 'S001') { // Invoice Win: Draw 2 (Handled via app.js for timing)
                 // Logic moved to app.js to allow visual delay
@@ -680,6 +680,23 @@ class GameState {
                 }
             });
             return { type: 'BOUNCE_ALL', bounced };
+        } else if (battlecry.type === 'REDUCE_COST_ALL_HAND') {
+            const affected = [];
+            this.currentPlayer.hand.forEach(card => {
+                if (card.cost > 0) {
+                    const reduce = Math.min(card.cost, battlecry.value);
+                    card.cost -= reduce;
+                    affected.push(card);
+                }
+            });
+            return { type: 'BUFF_HAND', affected };
+        } else if (battlecry.type === 'DISCARD_RANDOM') {
+            const player = this.currentPlayer;
+            if (player.hand.length > 0) {
+                const idx = Math.floor(Math.random() * player.hand.length);
+                const discarded = player.hand.splice(idx, 1)[0];
+                return { type: 'DISCARD', index: idx, card: discarded };
+            }
         }
     }
 

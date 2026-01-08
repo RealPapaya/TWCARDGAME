@@ -1450,6 +1450,27 @@ body {
     /* Maintain solid appearance */
 }
 
+.hand-flash {
+    animation: handFlash 0.5s ease-out;
+}
+
+@keyframes handFlash {
+    0% {
+        filter: brightness(1);
+        box-shadow: inset 0 0 0px var(--neon-blue);
+    }
+
+    50% {
+        filter: brightness(1.5);
+        box-shadow: inset 0 0 50px var(--neon-blue);
+    }
+
+    100% {
+        filter: brightness(1);
+        box-shadow: inset 0 0 0px var(--neon-blue);
+    }
+}
+
 /* Card Preview */
 #card-preview {
     position: fixed;
@@ -1650,6 +1671,11 @@ body {
     animation: preview-float 1.5s ease-in-out infinite alternate, preview-entrance 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 20px rgba(0, 243, 255, 0.2);
     transform-style: preserve-3d;
+}
+
+.card-cost.cost-reduced span {
+    color: #00ff00 !important;
+    text-shadow: 0 0 5px #000, 0 0 10px rgba(0, 255, 0, 0.5) !important;
 }
 
 @keyframes preview-float {
