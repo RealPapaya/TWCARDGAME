@@ -148,6 +148,8 @@ class GameState {
         // Actually, logic is: Minions summoned LAST turn can attack THIS turn.
         // So we set sleeping = false for all.
         player.board.forEach(m => m.sleeping = false);
+
+        this.updateAuras();
     }
 
     /**
@@ -226,7 +228,76 @@ class GameState {
                 battlecryResult = { type: 'MULTI_DAMAGE', hits };
             }
         }
+
+        this.updateAuras();
         return { card, battlecryResult };
+    }
+
+    updateAuras() {
+        this.players.forEach(player => {
+            // 1. Calculate Desired Buffs for all minions
+            const desiredBuffs = new Map(); // minion -> { attack: 0, health: 0 }
+
+            // Iterate sources
+            player.board.forEach((m, i) => {
+                // Initialize entry for every minion to ensure we check everyone
+                if (!desiredBuffs.has(m)) desiredBuffs.set(m, { attack: 0, health: 0 });
+
+                if (m.keywords && m.keywords.ongoing) {
+                    const aura = m.keywords.ongoing;
+                    if (aura.type === 'ADJACENT_BUFF_STATS') {
+                        const val = aura.value || 1;
+                        // Neighbors
+                        [i - 1, i + 1].forEach(nid => {
+                            if (nid >= 0 && nid < player.board.length) {
+                                const neighbor = player.board[nid];
+                                if (!desiredBuffs.has(neighbor)) desiredBuffs.set(neighbor, { attack: 0, health: 0 });
+                                const buffs = desiredBuffs.get(neighbor);
+                                buffs.attack += val;
+                                buffs.health += val;
+                            }
+                        });
+                    }
+                }
+            });
+
+            // 2. Apply Diffs
+            player.board.forEach(m => {
+                const current = m.ongoingStats || { attack: 0, health: 0 };
+                const target = desiredBuffs.get(m) || { attack: 0, health: 0 };
+
+                const atkDiff = target.attack - current.attack;
+                const hpDiff = target.health - current.health;
+
+                if (atkDiff !== 0 || hpDiff !== 0) {
+                    m.attack += atkDiff;
+                    m.health += hpDiff;
+
+                    if (hpDiff > 0) {
+                        // Gaining buff: Heal current HP
+                        m.currentHealth += hpDiff;
+                    } else if (hpDiff < 0) {
+                        // Losing buff: Cap current HP
+                        if (m.currentHealth > m.health) {
+                            m.currentHealth = m.health;
+                        }
+                    }
+
+                    // Update state
+                    if (target.attack === 0 && target.health === 0) {
+                        m.ongoingStats = null;
+                    } else {
+                        m.ongoingStats = { ...target };
+                    }
+                }
+
+                // Legacy Divine Shield cleanup (if any left over)
+                if (m.ongoingDivineShield) {
+                    m.keywords.divineShield = false;
+                    m.ongoingDivineShield = false;
+                }
+            });
+        });
     }
 
     resolveBattlecry(battlecry, target) {
@@ -381,7 +452,6 @@ class GameState {
         if (!unit) return;
         const oldHealth = unit.currentHealth !== undefined ? unit.currentHealth : unit.hp;
 
-        // Divine Shield (光盾) Check
         if (unit.type === 'MINION' && unit.keywords && unit.keywords.divineShield) {
             if (amount > 0) {
                 unit.keywords.divineShield = false; // Pop shield
@@ -488,6 +558,8 @@ class GameState {
                 }
             }
         });
+
+        this.updateAuras();
     }
 
     resolveDeathrattle(player, deathrattle) {

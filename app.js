@@ -4,46 +4,47 @@ let gameState;
 const CARD_DATA = [
     // --- 民進黨 (DPP) ---
     { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": { "side": "ALL", "type": "MINION" }, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
-    { "id": "TW020", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "description": "戰吼:將對手場上卡牌全部放回手牌", "image": "img/tw006.png" },
+    { "id": "TW020", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼:將對手場上卡牌全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "image": "img/tw006.png" },
 
     // --- 國民黨 (KMT) ---
-    { "id": "TW016", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 1, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力", "image": "img/tw002.png" },
-    { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true }, "description": "嘲諷。金門坦克", "image": "img/tw017.png" },
-    { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "image": "img/tw012.png" },
+    { "id": "TW016", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 1, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "image": "img/tw002.png" },
+    { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "description": "嘲諷。金門坦克", "keywords": { "taunt": true }, "image": "img/tw017.png" },
+    { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw012.png" },
 
     // --- 民眾黨 (TPP) ---
-    { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "description": "戰吼：將自己戰場上的隨從血量全部回復", "image": "img/tw001.png" },
-    { "id": "TW014", "name": "黃瀞瑩", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "HEAL", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "description": "戰吼：回復一個隨從3點血量", "image": "img/tw019.png" },
-    { "id": "TW015", "name": "高虹安", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD", "target": { "side": "ALL", "type": "MINION" } } }, "description": "戰吼：賦予一個隨從「光盾」", "image": "img/tw020.png" },
-    { "id": "TW019", "name": "陳珮琪", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "keywords": { "divineShield": true }, "description": "司法不公！！！\n光盾", "image": "img/tw021.png" },
-    { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "image": "img/tw018.png" },
-    { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "divineShield": true, "taunt": true }, "description": "珊言良語\n光盾+嘲諷", "image": "img/TW026.png" },
-    { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_ALL" } }, "description": "戰吼：賦予所有友方角色「光盾」", "image": "img/TW025.png" },
+    { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼：將自己戰場上的隨從血量全部回復", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "image": "img/tw001.png" },
+    { "id": "TW014", "name": "黃瀞瑩", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "戰吼：回復一個隨從3點血量", "keywords": { "battlecry": { "type": "HEAL", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw019.png" },
+    { "id": "TW015", "name": "高虹安", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予一個隨從「光盾」", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw020.png" },
+    { "id": "TW019", "name": "陳珮琪", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公！！！\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
+    { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw018.png" },
+    { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "珊言良語\n光盾+嘲諷", "keywords": { "divineShield": true, "taunt": true }, "image": "img/TW026.png" },
+    { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方角色「光盾」", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_ALL" } }, "image": "img/TW025.png" },
+    { "id": "TW028", "name": "京華城", "category": "建築", "cost": 6, "attack": 0, "health": 6, "type": "MINION", "rarity": "RARE", "description": "肖恩柯的救贖\n持續效果: 賦予左右兩側的隨從 +1/+1", "keywords": { "ongoing": { "type": "ADJACENT_BUFF_STATS", "value": 1 } }, "image": "img/tw028.png" },
 
     // --- 公眾人物 / 媒體 ---
-    { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "description": "戰吼：賦予所有友方隨從 +1 生命值", "image": "img/tw003.jpg" },
-    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "description": "要頭腦有肌肉\n激怒：+5攻擊", "image": "img/TW027.png" },
+    { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "戰吼：賦予所有友方隨從 +1 生命值", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "image": "img/tw003.jpg" },
+    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+5攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "攻擊", "value": 5 } }, "image": "img/TW027.png" },
 
     // --- 企業與組織 ---
-    { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "image": "img/tw013.png" },
-    { "id": "TW018", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "image": "img/tw016.png" },
+    { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
+    { "id": "TW018", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "image": "img/tw016.png" },
 
     // --- 一般隨從 (學生/勞工) ---
     { "id": "TW001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生", "image": "img/c001.png" },
-    { "id": "TW002", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": { "side": "ALL", "type": "ALL" } } }, "description": "戰吼：對一個單位造成 1 點傷害", "image": "img/c004.png" },
-    { "id": "TW003", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷", "image": "img/c002.png" },
+    { "id": "TW002", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "戰吼：對一個單位造成 1 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/c004.png" },
+    { "id": "TW003", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/c002.png" },
     { "id": "TW004", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "五杯大冰拿", "image": "img/tw008.png" },
     { "id": "TW005", "name": "水電徒弟", "category": "勞工", "cost": 2, "attack": 2, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/tw010.png" },
     { "id": "TW006", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/c013.png" },
-    { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "keywords": { "charge": true }, "description": "我是外送師\n衝鋒", "image": "img/tw007.png" },
-    { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": { "side": "ALL", "type": "ALL" } } }, "description": "戰吼: 回復一個單位2點血量", "image": "img/tw014.png" },
-    { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "description": "激怒: 增加3點攻擊 極度耐操", "image": "img/tw015.png" },
-    { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "keywords": { "taunt": true }, "description": "嘲諷", "image": "img/tw009.png" },
-    { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "keywords": { "divineShield": true }, "description": "光盾", "image": "img/TW022.png" },
+    { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "我是外送師\n衝鋒", "keywords": { "charge": true }, "image": "img/tw007.png" },
+    { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "戰吼: 回復一個單位2點血量", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw014.png" },
+    { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "激怒: 增加3點攻擊 極度耐操", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw015.png" },
+    { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
+    { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
     // --- 法術 (Spells) ---
-    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
-    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" }
+    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "attack": 0, "health": 0, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
+    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "attack": 0, "health": 0, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" }
 ];
 
 let cardDB = [];
@@ -900,7 +901,7 @@ function formatDesc(text) {
     let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
     // 2. Auto-bold common keywords
-    const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒"];
+    const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒", "持續效果"];
     keywords.forEach(k => {
         const reg = new RegExp(k, 'g');
         formatted = formatted.replace(reg, `<b>${k}</b>`);
@@ -983,6 +984,12 @@ function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
     el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}`;
+    el.dataset.id = card.id;
+    el.dataset.type = card.type;
+    el.dataset.category = card.category || '';
+    el.dataset.cost = card.cost;
+    el.dataset.attack = card.attack || 0;
+    el.dataset.health = card.health || 0;
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
@@ -1121,6 +1128,9 @@ function createMinionEl(minion, index, isPlayer) {
     el.dataset.type = 'MINION';
     el.dataset.index = index;
     el.dataset.category = minion.category; // Added for category-based targeting rules
+    el.dataset.cost = minion.cost;
+    el.dataset.attack = minion.attack;
+    el.dataset.health = minion.health;
 
     return el;
 }
@@ -1233,20 +1243,19 @@ function onDragMove(e) {
         const unitEl = targetEl?.closest('[data-type]'); // Look for units (minions or heroes)
 
         if (unitEl) {
-            const targetInfo = {
-                type: unitEl.dataset.type,
-                side: unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT',
-                index: unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1,
-                category: unitEl.dataset.category // Extract category for logic
-            };
+            const side = unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
+            const type = unitEl.dataset.type;
+            const idx = unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1;
 
-            // Double check for heroes
-            if (unitEl.classList.contains('hero')) {
-                targetInfo.type = 'HERO';
-                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
-                targetInfo.index = -1;
-                targetInfo.category = '英雄';
-            }
+            const targetInfo = {
+                type: type,
+                side: side,
+                index: idx,
+                category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
+                cost: parseInt(unitEl.dataset.cost) || 0,
+                attack: parseInt(unitEl.dataset.attack) || 0,
+                health: parseInt(unitEl.dataset.health) || 0
+            };
 
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
                 // Lock-in visual (snap)
@@ -1480,20 +1489,19 @@ async function onDragEnd(e) {
 
         let target = null;
         if (unitEl) {
-            const targetInfo = {
-                type: unitEl.dataset.type,
-                side: unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT',
-                index: unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1,
-                category: unitEl.dataset.category // Extract category for logic
-            };
+            const side = unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
+            const type = unitEl.dataset.type;
+            const idx = unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1;
 
-            // Double check for heroes
-            if (unitEl.classList.contains('hero')) {
-                targetInfo.type = 'HERO';
-                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
-                targetInfo.index = -1;
-                targetInfo.category = '英雄';
-            }
+            const targetInfo = {
+                type: type,
+                side: side,
+                index: idx,
+                category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
+                cost: parseInt(unitEl.dataset.cost) || 0,
+                attack: parseInt(unitEl.dataset.attack) || 0,
+                health: parseInt(unitEl.dataset.health) || 0
+            };
 
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
                 target = targetInfo;
@@ -1610,9 +1618,11 @@ function isTargetEligible(rule, targetInfo) {
     const categoryToExclude = rule.target_category;
 
     // Category Exclusion check (e.g. Hsieh Chang-ting)
-    if (categoryToExclude && targetInfo.category === categoryToExclude) {
-        return false;
-    }
+    if (categoryToExclude && targetInfo.category === categoryToExclude) return false;
+
+    // Cost checks (if applicable)
+    if (actualRule.min_cost !== undefined && targetInfo.cost < actualRule.min_cost) return false;
+    if (actualRule.max_cost !== undefined && targetInfo.cost > actualRule.max_cost) return false;
 
     // Side check
     if (actualRule.side === 'ENEMY' && targetInfo.side !== 'OPPONENT') return false;
@@ -1633,21 +1643,33 @@ function getValidTargets(rule) {
     if (!rule) return [];
     const targets = [];
 
+    // Helper to format consistent target info for comparison
+    const createTargetInfo = (unit, side, type, index) => ({
+        type: type,
+        side: side,
+        index: index,
+        category: unit.category || (type === 'HERO' ? '英雄' : ''),
+        cost: unit.cost || 0,
+        attack: unit.attack || 0,
+        health: unit.health || 0
+    });
+
     // Check Players
-    const p1Hero = { type: 'HERO', side: 'PLAYER', index: -1 };
-    const p2Hero = { type: 'HERO', side: 'OPPONENT', index: -1 };
+    const p1Hero = createTargetInfo(gameState.players[0].hero, 'PLAYER', 'HERO', -1);
+    const p2Hero = createTargetInfo(gameState.players[1].hero, 'OPPONENT', 'HERO', -1);
+
     if (isTargetEligible(rule, p1Hero)) targets.push(p1Hero);
     if (isTargetEligible(rule, p2Hero)) targets.push(p2Hero);
 
     // Check Player Board
     gameState.players[0].board.forEach((m, i) => {
-        const info = { type: 'MINION', side: 'PLAYER', index: i, category: m.category };
+        const info = createTargetInfo(m, 'PLAYER', 'MINION', i);
         if (isTargetEligible(rule, info)) targets.push(info);
     });
 
     // Check Opponent Board
     gameState.players[1].board.forEach((m, i) => {
-        const info = { type: 'MINION', side: 'OPPONENT', index: i, category: m.category };
+        const info = createTargetInfo(m, 'OPPONENT', 'MINION', i);
         if (isTargetEligible(rule, info)) targets.push(info);
     });
 

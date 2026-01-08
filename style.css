@@ -563,6 +563,26 @@ body {
     padding-bottom: 20px;
 }
 
+.card-desc {
+    font-size: 10px;
+    line-height: 1.2;
+    overflow: hidden;
+    padding: 0 5px;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100%;
+    white-space: pre-wrap;
+}
+
+.card-desc b {
+    color: var(--neon-yellow);
+    font-weight: bold;
+    text-shadow: 0 0 5px rgba(255, 238, 0, 0.5);
+}
+
 /* Board Area */
 .board {
     width: 95%;
