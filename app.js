@@ -1843,7 +1843,7 @@ function animateAbility(fromEl, toEl, color, shouldShake = true) {
 }
 
 /**
- * Animates a card being discarded (fly out and fade).
+ * Animates a card being discarded (Thanos-style disintegration).
  */
 async function animateDiscard(cardEl) {
     return new Promise(resolve => {
@@ -1856,7 +1856,7 @@ async function animateDiscard(cardEl) {
         clone.style.height = rect.height + 'px';
         clone.style.zIndex = '10000';
         clone.style.margin = '0';
-        clone.style.transition = 'all 0.6s cubic-bezier(0.55, 0.055, 0.675, 0.19)';
+        clone.style.transition = 'opacity 0.8s ease-in';
         clone.style.pointerEvents = 'none';
         document.body.appendChild(clone);
 
@@ -1866,15 +1866,58 @@ async function animateDiscard(cardEl) {
         // Force reflow
         clone.offsetHeight;
 
-        // Animation: Fly up, rotate, and fade
-        clone.style.transform = 'translateY(-300px) rotate(45deg) scale(0.5)';
-        clone.style.opacity = '0';
+        // Generate Particles
+        const particleCount = 80; // Increased
+        const colors = ['#a335ee', '#444444', '#888888', '#ffffff'];
+
+        for (let i = 0; i < particleCount; i++) {
+            const p = document.createElement('div');
+            p.className = 'disintegrate-particle';
+
+            // Random color from set
+            p.style.background = colors[Math.floor(Math.random() * colors.length)];
+
+            // Random start pos within card
+            const startX = rect.left + Math.random() * rect.width;
+            const startY = rect.top + Math.random() * rect.height;
+
+            p.style.left = startX + 'px';
+            p.style.top = startY + 'px';
+
+            // Random size (some tiny, some larger)
+            const size = 1 + Math.random() * 5;
+            p.style.width = size + 'px';
+            p.style.height = size + 'px';
+
+            // Random trajectory (Expanding sphere + Floating UP)
+            const angle = Math.random() * Math.PI * 2;
+            const dist = 50 + Math.random() * 100;
+            const dx = Math.cos(angle) * dist + (Math.random() - 0.5) * 100;
+            const dy = Math.sin(angle) * dist - (200 + Math.random() * 300); // Heavy UP bias
+            const dr = (Math.random() - 0.5) * 720;
+
+            p.style.setProperty('--dx', dx + 'px');
+            p.style.setProperty('--dy', dy + 'px');
+            p.style.setProperty('--dr', dr + 'deg');
+
+            // Staggered delay for "crumbling" look
+            p.style.animationDelay = (Math.random() * 0.6) + 's';
+
+            document.body.appendChild(p);
+
+            // Remove after animation
+            setTimeout(() => p.remove(), 2100);
+        }
+
+        // Fade out the main card body slightly slower than animation start
+        setTimeout(() => {
+            clone.style.opacity = '0';
+        }, 100);
 
         setTimeout(() => {
-            spawnDustEffect(clone, 1.5);
             clone.remove();
             resolve();
-        }, 600);
+        }, 1500);
     });
 }
 

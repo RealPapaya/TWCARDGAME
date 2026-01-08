@@ -1819,6 +1819,35 @@ body {
     }
 }
 
+.disintegrate-particle {
+    position: fixed;
+    pointer-events: none;
+    z-index: 10001;
+    background: #a335ee;
+    /* Base on legendary/purple theme or dust */
+    box-shadow: 0 0 5px rgba(163, 53, 238, 0.8), 0 0 10px rgba(0, 0, 0, 0.5);
+    border-radius: 2px;
+    filter: blur(1px);
+    animation: disintegrate-fly 1.5s cubic-bezier(0.1, 0.5, 0.1, 1) forwards;
+}
+
+@keyframes disintegrate-fly {
+    0% {
+        transform: translate(0, 0) scale(1) rotate(0deg);
+        opacity: 1;
+    }
+
+    15% {
+        opacity: 1;
+        transform: translate(calc(var(--dx) * 0.1), calc(var(--dy) * 0.1)) scale(1.2) rotate(45deg);
+    }
+
+    100% {
+        transform: translate(var(--dx), var(--dy)) rotate(var(--dr)) scale(0);
+        opacity: 0;
+    }
+}
+
 .board-slam {
     animation: board-shake 0.3s cubic-bezier(.36, .07, .19, .97) both;
 }
