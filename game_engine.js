@@ -412,6 +412,16 @@ class GameState {
                 targetUnit.keywords.divineShield = true;
                 return { type: 'BUFF', target: { ...targetUnit, index: target.index }, shield: true };
             }
+        } else if (battlecry.type === 'GIVE_DIVINE_SHIELD_CATEGORY') {
+            const affected = [];
+            this.currentPlayer.board.forEach((m, i) => {
+                if (m.category === battlecry.target_category) {
+                    if (!m.keywords) m.keywords = {};
+                    m.keywords.divineShield = true;
+                    affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
+                }
+            });
+            return { type: 'BUFF_ALL', affected };
         } else if (battlecry.type === 'GIVE_DIVINE_SHIELD_ALL') {
             const affected = [];
             this.currentPlayer.board.forEach((m, i) => {

@@ -33,9 +33,9 @@
 ```javascript
 { 
     "id": "twXXX", 
-    "name": "法術名稱", 
+    "name": "", 
     "category": "法術", 
-    "cost": 費用, 
+    "cost": , 
     "type": "SPELL", 
     "rarity": "COMMON/RARE/EPIC/LEGENDARY", 
     "keywords": { 
@@ -46,7 +46,7 @@
         }
     },
     "description": "法術描述", 
-    "image": "img/twXXX.png" 
+    "image": "" 
 }
 ```
 

@@ -21,7 +21,7 @@ const CARD_DATA = [
     { "id": "TW019", "name": "陳珮琪", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公！！！\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
     { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw018.png" },
     { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "珊言良語\n光盾+嘲諷", "keywords": { "divineShield": true, "taunt": true }, "image": "img/TW026.png" },
-    { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方角色「光盾」", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_ALL" } }, "image": "img/TW025.png" },
+    { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方「民眾黨政治人物」光盾", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_CATEGORY", "target_category": "民眾黨政治人物" } }, "image": "img/TW025.png" },
     { "id": "TW028", "name": "京華城", "category": "建築", "cost": 6, "attack": 0, "health": 6, "type": "MINION", "rarity": "RARE", "description": "肖恩柯的救贖\n持續效果: 賦予左右兩側的隨從 +1/+1", "keywords": { "ongoing": { "type": "ADJACENT_BUFF_STATS", "value": 1 } }, "image": "img/tw028.png" },
 
     // --- 公眾人物 / 媒體 ---
@@ -960,7 +960,7 @@ function showPreview(card) {
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
-    if (card.attack !== undefined && card.health !== undefined) {
+    if (card.attack !== undefined && card.health !== undefined && card.type !== 'SPELL') {
         const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
