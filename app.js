@@ -1412,9 +1412,7 @@ async function onDragEnd(e) {
             }
         }
     } else if (isBattlecryTargeting) {
-        console.log("Battlecry Targeting Finished. SourceType:", battlecrySourceType);
-        isBattlecryTargeting = false;
-        dragLine.style.display = 'none'; // Critical: Hide line
+        console.log("Battlecry Targeting Try Finish. SourceType:", battlecrySourceType);
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
         const unitEl = targetEl?.closest('.minion, .hero-container');
@@ -1426,7 +1424,7 @@ async function onDragEnd(e) {
             if (unitEl.classList.contains('hero-container')) {
                 targetInfo.type = 'HERO';
                 targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
-                targetInfo.index = unitEl.id === 'player-hero' ? -1 : -1; // Heroes don't have an index in board array
+                targetInfo.index = -1;
             } else {
                 targetInfo.type = 'MINION';
                 const board = unitEl.parentElement;
@@ -1438,10 +1436,19 @@ async function onDragEnd(e) {
                 target = targetInfo;
             } else {
                 logMessage("Invalid target!");
-                render(); // Reset UI
+                // DO NOT clear targeting state, let user try again
                 return;
             }
+        } else {
+            // Clicked background or non-unit
+            // DO NOT clear targeting state
+            return;
         }
+
+        // ONLY clear state if we have a valid target
+        isBattlecryTargeting = false;
+        dragLine.style.display = 'none'; // Critical: Hide line
+
 
         try {
             if (target) {
