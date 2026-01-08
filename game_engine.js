@@ -472,7 +472,7 @@ class GameState {
 
 class Player {
     constructor(deckIds, collection) {
-        this.hero = { hp: 30, maxHp: 30 };
+        this.hero = { type: 'HERO', hp: 30, maxHp: 30 };
         this.mana = { current: 0, max: 0 };
         this.deck = this.buildDeck(deckIds, collection);
         this.hand = [];

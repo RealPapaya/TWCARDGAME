@@ -1857,7 +1857,7 @@ body {
     background: #ff0000;
     box-shadow: 0 0 15px #ff0000;
     transform: rotate(-45deg);
-    animation: slash-fade 0.4s ease-out forwards;
+    animation: slash-fade 0.2s ease-out forwards;
 }
 
 @keyframes slash-fade {
@@ -1883,7 +1883,7 @@ body {
     font-size: 32px;
     /* Larger */
     font-weight: 900;
-    animation: float-up 1.2s ease-out forwards;
+    animation: float-up 0.5s ease-out forwards;
     pointer-events: none;
     z-index: 10001;
 }

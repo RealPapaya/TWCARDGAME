@@ -1215,22 +1215,23 @@ function onDragMove(e) {
         dragLine.setAttribute('y2', e.clientY);
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('.minion, .hero-container'); // Changed from .minion-card to .minion
+        const unitEl = targetEl?.closest('.minion, .hero-container, .hero-stats-pill'); // Improved Hero detection
 
         if (unitEl) {
+            const actualUnitEl = unitEl.closest('.minion, .hero-container');
             const targetInfo = {};
-            if (unitEl.classList.contains('hero-container')) {
+            if (actualUnitEl.classList.contains('hero-container')) {
                 targetInfo.type = 'HERO';
-                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.side = actualUnitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
             } else {
                 targetInfo.type = 'MINION';
-                const board = unitEl.parentElement;
+                const board = actualUnitEl.parentElement;
                 targetInfo.side = board.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
             }
 
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
                 // Lock-in visual (snap)
-                const rect = unitEl.getBoundingClientRect();
+                const rect = actualUnitEl.getBoundingClientRect();
                 dragLine.setAttribute('x2', rect.left + rect.width / 2);
                 dragLine.setAttribute('y2', rect.top + rect.height / 2);
                 return;
@@ -1307,6 +1308,13 @@ async function onDragEnd(e) {
                 if (isTargeted) await new Promise(r => setTimeout(r, 300));
 
                 if (isTargeted) {
+                    const validTargets = getValidTargets(battlecry.target);
+                    if (validTargets.length === 0) {
+                        logMessage("無合法目標！");
+                        render();
+                        return;
+                    }
+
                     try {
                         let mode = 'DAMAGE';
                         if (battlecry.type === 'HEAL') {
@@ -1345,6 +1353,10 @@ async function onDragEnd(e) {
 
                 try {
                     // Pre-play preview already shown above.
+                    // Add delay for Battlecry cards to let them land visually
+                    if (card && card.keywords?.battlecry) {
+                        await new Promise(r => setTimeout(r, 600));
+                    }
                     gameState.playCard(attackerIndex, null, currentInsertionIndex);
                     render();
 
@@ -1415,15 +1427,16 @@ async function onDragEnd(e) {
         console.log("Battlecry Targeting Try Finish. SourceType:", battlecrySourceType);
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('.minion, .hero-container');
+        const unitEl = targetEl?.closest('.minion, .hero-container, .hero-stats-pill');
         console.log("Target Element Found:", unitEl?.id || unitEl?.className);
 
         let target = null;
         if (unitEl) {
             const targetInfo = {};
-            if (unitEl.classList.contains('hero-container')) {
+            if (unitEl.classList.contains('hero-container') || unitEl.classList.contains('hero-stats-pill')) {
+                const actualHeroContainer = unitEl.closest('.hero-container');
                 targetInfo.type = 'HERO';
-                targetInfo.side = unitEl.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
+                targetInfo.side = actualHeroContainer.id === 'player-hero' ? 'PLAYER' : 'OPPONENT';
                 targetInfo.index = -1;
             } else {
                 targetInfo.type = 'MINION';
@@ -1547,10 +1560,40 @@ function isTargetEligible(rule, targetInfo) {
     if (rule.side === 'FRIENDLY' && targetInfo.side !== 'PLAYER') return false;
 
     // Type check
+    if (!rule.type || rule.type === 'ANY' || rule.type === 'ALL') {
+        // Any unit is fine
+        return true;
+    }
+
     if (rule.type === 'MINION' && targetInfo.type !== 'MINION') return false;
     if (rule.type === 'HERO' && targetInfo.type !== 'HERO') return false;
 
     return true;
+}
+
+function getValidTargets(rule) {
+    if (!rule) return [];
+    const targets = [];
+
+    // Check Players
+    const p1Hero = { type: 'HERO', side: 'PLAYER', index: -1 };
+    const p2Hero = { type: 'HERO', side: 'OPPONENT', index: -1 };
+    if (isTargetEligible(rule, p1Hero)) targets.push(p1Hero);
+    if (isTargetEligible(rule, p2Hero)) targets.push(p2Hero);
+
+    // Check Player Board
+    gameState.players[0].board.forEach((m, i) => {
+        const info = { type: 'MINION', side: 'PLAYER', index: i };
+        if (isTargetEligible(rule, info)) targets.push(info);
+    });
+
+    // Check Opponent Board
+    gameState.players[1].board.forEach((m, i) => {
+        const info = { type: 'MINION', side: 'OPPONENT', index: i };
+        if (isTargetEligible(rule, info)) targets.push(info);
+    });
+
+    return targets;
 }
 
 function startBattlecryTargeting(sourceIndex, x, y, mode = 'DAMAGE', targetRule = null, sourceType = 'MINION') {
@@ -1970,7 +2013,7 @@ function triggerCombatEffect(el, type) {
     container.style.display = 'flex';
     setTimeout(() => {
         container.remove();
-    }, 1500);
+    }, 1000);
 }
 
 // Start
