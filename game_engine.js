@@ -260,8 +260,7 @@ class GameState {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
             if (card.keywords && card.keywords.battlecry && !skipBattlecry) {
                 battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target);
-            } else if (card.id === 'S001') { // Invoice Win: Draw 2 (Handled via app.js for timing)
-                // Logic moved to app.js to allow visual delay
+
             } else if (card.id === 'S002') { // Impeach: Damage split
                 const damage = player.deck.length === 0 ? 20 : 10;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
@@ -716,6 +715,11 @@ class GameState {
                 }
             });
             return { type: 'BUFF_HAND', affected };
+        } else if (battlecry.type === 'DRAW') {
+            for (let i = 0; i < (battlecry.value || 1); i++) {
+                this.currentPlayer.drawCard();
+            }
+            return { type: 'DRAW', value: battlecry.value };
         } else if (battlecry.type === 'DRAW_MINION_REDUCE_COST') {
             const player = this.currentPlayer;
             const minionIdx = player.deck.findIndex(c => c.type === 'MINION');

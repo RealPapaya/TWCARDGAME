@@ -51,7 +51,7 @@ const CARD_DATA = [
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
     // --- 法術 (Spells) ---
-    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "attack": 0, "health": 0, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
+    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
     { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
     { "id": "S003", "name": "大罷免", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
     { "id": "S004", "name": "造勢晚會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
