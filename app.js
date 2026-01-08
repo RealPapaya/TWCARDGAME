@@ -57,7 +57,8 @@ const CARD_DATA = [
     { "id": "S004", "name": "造勢晚會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
     { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
-    { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" }
+    { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
+    { "id": "S008", "name": "法院傳票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並降低 3 點消耗。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" }
 ];
 
 let cardDB = [];
@@ -255,6 +256,15 @@ document.getElementById('btn-surrender-confirm').addEventListener('click', () =>
 
 document.getElementById('btn-surrender-cancel').addEventListener('click', () => {
     document.getElementById('surrender-modal').style.display = 'none';
+});
+
+// Update Log Listeners
+document.getElementById('btn-update-log')?.addEventListener('click', () => {
+    document.getElementById('update-log-modal').style.display = 'flex';
+});
+
+document.getElementById('btn-update-log-close')?.addEventListener('click', () => {
+    document.getElementById('update-log-modal').style.display = 'none';
 });
 
 // --- Result View Listeners ---
@@ -989,10 +999,14 @@ function showPreview(card) {
         `<div class="card-art" style="width: 100%; height: 140px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
         `<div class="card-art" style="width: 100%; height: 140px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
 
+    const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
+    const isReduced = card.cost < baseCard.cost || card.isReduced;
+    const costClass = isReduced ? 'cost-reduced' : '';
+
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-                <div class="card-cost" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
+                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
                 <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
             </div>
             
@@ -1069,7 +1083,7 @@ function createCardEl(card, index) {
         `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
 
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
-    const isReduced = card.cost < baseCard.cost;
+    const isReduced = card.cost < baseCard.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
 
     el.innerHTML = `
@@ -2119,7 +2133,7 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
 
                 // Intensify dust for high cost cards - spawn at PREVIEW CARD or TARGET SLOT
                 const intensity = card.cost >= 7 ? 2.5 : 1;
-                const smokeAnchor = targetEl || cardEl;
+                const smokeAnchor = targetEl || boardEl || cardEl;
                 spawnDustEffect(smokeAnchor, intensity);
                 setTimeout(() => boardEl.classList.remove('board-slam'), 500);
             }, 300); // Wait for card to hit the board

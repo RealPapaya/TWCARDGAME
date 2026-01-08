@@ -686,10 +686,18 @@ class GameState {
                 if (card.cost > 0) {
                     const reduce = Math.min(card.cost, battlecry.value);
                     card.cost -= reduce;
+                    card.isReduced = true;
                     affected.push(card);
                 }
             });
             return { type: 'BUFF_HAND', affected };
+        } else if (battlecry.type === 'DRAW_MINION_REDUCE_COST') {
+            const player = this.currentPlayer;
+            const minionIdx = player.deck.findIndex(c => c.type === 'MINION');
+            if (minionIdx !== -1) {
+                player.drawCard(minionIdx, battlecry.value);
+            }
+            return { type: 'DRAW' };
         } else if (battlecry.type === 'DISCARD_RANDOM') {
             const player = this.currentPlayer;
             if (player.hand.length > 0) {
@@ -890,16 +898,24 @@ class Player {
         return deck;
     }
 
-    drawCard() {
+    /**
+     * Draw a card from deck.
+     * @param {number} index Specific index in deck (Optional)
+     * @param {number} reduction Cost reduction amount (Optional)
+     */
+    drawCard(index = -1, reduction = 0) {
         if (this.deck.length > 0) {
-            const card = this.deck.shift();
+            const card = (index === -1) ? this.deck.shift() : this.deck.splice(index, 1)[0];
             if (this.hand.length < 10) { // Max hand size 10
+                if (reduction > 0) {
+                    card.cost = Math.max(0, card.cost - reduction);
+                    card.isReduced = true;
+                }
                 this.hand.push(card);
             } else {
                 console.log("Hand full! Burned:", card.name);
             }
         } else {
-            // Fatigue damage? Simplified: do nothing
             console.log("Out of cards!");
         }
     }
