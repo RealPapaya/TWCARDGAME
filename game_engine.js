@@ -283,6 +283,9 @@ class GameState {
                         }
                     }
 
+                    // Check enrage state since health threshold might have shifted OR max HP changed
+                    this.updateEnrage(m);
+
                     // Update state
                     if (target.attack === 0 && target.health === 0) {
                         m.ongoingStats = null;
@@ -478,14 +481,16 @@ class GameState {
         if (isDamaged && !unit.isEnraged) {
             unit.isEnraged = true;
             if (unit.keywords.enrage.type === 'BUFF_STAT') {
-                if (unit.keywords.enrage.stat === 'ATTACK') {
+                const stat = unit.keywords.enrage.stat;
+                if (stat === 'ATTACK' || stat === '攻擊') {
                     unit.attack += unit.keywords.enrage.value;
                 }
             }
         } else if (!isDamaged && unit.isEnraged) {
             unit.isEnraged = false;
             if (unit.keywords.enrage.type === 'BUFF_STAT') {
-                if (unit.keywords.enrage.stat === 'ATTACK') {
+                const stat = unit.keywords.enrage.stat;
+                if (stat === 'ATTACK' || stat === '攻擊') {
                     unit.attack -= unit.keywords.enrage.value;
                 }
             }

@@ -23,7 +23,7 @@ const CARD_DATA = [
 
     // --- 公眾人物 / 媒體 ---
     { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "戰吼：賦予所有友方隨從 +1 生命值", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "image": "img/tw003.jpg" },
-    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+5攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "攻擊", "value": 5 } }, "image": "img/TW027.png" },
+    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+5攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "image": "img/TW027.png" },
 
     // --- 企業與組織 ---
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
