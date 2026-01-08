@@ -216,7 +216,7 @@ class GameState {
 
             // Trigger Battlecry
             if (minion.keywords && minion.keywords.battlecry && !skipBattlecry) {
-                battlecryResult = this.resolveBattlecry(minion.keywords.battlecry, target);
+                battlecryResult = this.resolveBattlecry(minion.keywords.battlecry, target, minion);
             }
         } else if (card.type === 'SPELL') {
             // Trigger Spell Effect (Battlecry logic reused for simplicity)
@@ -320,7 +320,7 @@ class GameState {
         });
     }
 
-    resolveBattlecry(battlecry, target) {
+    resolveBattlecry(battlecry, target, sourceMinion = null) {
         console.log("Resolving Battlecry:", battlecry.type, "Target:", target);
         if (target === 'PENDING') return null;
 
@@ -351,7 +351,23 @@ class GameState {
                 bounced.push(m);
                 // Find original card data to put back in hand
                 const originalCard = collection.find(c => c.id === m.id) || m;
-                if (opp.hand.length < 10) opp.hand.push(JSON.parse(JSON.stringify(originalCard)));
+                let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+                // Han Kuo-yu (TW032): Permanent stackable +2/+2 on bounce
+                if (m.hanBounceBonus) cardToHand.hanBounceBonus = m.hanBounceBonus;
+                if (m.id === 'TW032') {
+                    cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 2;
+                    cardToHand.attack += cardToHand.hanBounceBonus;
+                    cardToHand.health += cardToHand.hanBounceBonus;
+                }
+
+                // Clean up board-specific state for hand display
+                delete cardToHand.currentHealth;
+                delete cardToHand.sleeping;
+                delete cardToHand.canAttack;
+                delete cardToHand.isEnraged;
+
+                if (opp.hand.length < 10) opp.hand.push(cardToHand);
             }
             return { type: 'BOUNCE_ALL', bounced };
         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
@@ -440,6 +456,72 @@ class GameState {
             } else {
                 this.applyDamage(this.currentPlayer.hero, battlecry.value);
                 return { type: 'DAMAGE', target: { ...this.currentPlayer.hero, index: -1 }, value: battlecry.value };
+            }
+        } else if (battlecry.type === 'BUFF_ADJACENT') {
+            const affected = [];
+            if (sourceMinion) {
+                const idx = this.currentPlayer.board.indexOf(sourceMinion);
+                if (idx !== -1) {
+                    [idx - 1, idx + 1].forEach(nid => {
+                        if (nid >= 0 && nid < this.currentPlayer.board.length) {
+                            const neighbor = this.currentPlayer.board[nid];
+                            const val = battlecry.value || 1;
+                            neighbor.attack += val;
+                            neighbor.health += val;
+                            neighbor.currentHealth += val;
+                            this.updateEnrage(neighbor);
+                            affected.push({ unit: { ...neighbor, index: nid }, type: 'BUFF' });
+                        }
+                    });
+                }
+            }
+            return { type: 'BUFF_ALL', affected };
+        } else if (battlecry.type === 'GIVE_KEYWORD_ADJACENT') {
+            const affected = [];
+            if (sourceMinion) {
+                const idx = this.currentPlayer.board.indexOf(sourceMinion);
+                if (idx !== -1) {
+                    [idx - 1, idx + 1].forEach(nid => {
+                        if (nid >= 0 && nid < this.currentPlayer.board.length) {
+                            const neighbor = this.currentPlayer.board[nid];
+                            if (!neighbor.keywords) neighbor.keywords = {};
+                            neighbor.keywords[battlecry.keyword] = true;
+                            affected.push({ unit: { ...neighbor, index: nid }, type: 'BUFF' });
+                        }
+                    });
+                }
+            }
+            return { type: 'BUFF_ALL', affected };
+        } else if (battlecry.type === 'BOUNCE_TARGET') {
+            const targetUnit = this.getTargetUnit(target);
+            if (targetUnit && targetUnit.type === 'MINION') {
+                const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                const idx = owner.board.indexOf(targetUnit);
+                if (idx !== -1) {
+                    owner.board.splice(idx, 1);
+                    const collection = this.collection || [];
+                    const originalCard = collection.find(c => c.id === targetUnit.id) || targetUnit;
+                    let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+                    // Han Kuo-yu (TW032): Permanent stackable +2/+2 on bounce
+                    if (targetUnit.hanBounceBonus) cardToHand.hanBounceBonus = targetUnit.hanBounceBonus;
+                    if (targetUnit.id === 'TW032') {
+                        cardToHand.hanBounceBonus = (cardToHand.hanBounceBonus || 0) + 2;
+                        cardToHand.attack += cardToHand.hanBounceBonus;
+                        cardToHand.health += cardToHand.hanBounceBonus;
+                    }
+
+                    // Clean up board-specific state for hand display
+                    delete cardToHand.currentHealth;
+                    delete cardToHand.sleeping;
+                    delete cardToHand.canAttack;
+                    delete cardToHand.isEnraged;
+
+                    if (owner.hand.length < 10) {
+                        owner.hand.push(cardToHand);
+                    }
+                    return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                }
             }
         }
     }

@@ -1529,6 +1529,11 @@ body {
     marker-end: url(#arrowhead-buff);
 }
 
+#drag-line.bounce-line {
+    stroke: #a335ee !important;
+    marker-end: url(#arrowhead-damage);
+}
+
 @keyframes dash {
     to {
         stroke-dashoffset: -20;

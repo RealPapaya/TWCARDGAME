@@ -10,6 +10,9 @@ const CARD_DATA = [
     { "id": "TW016", "name": "吳敦義", "category": "國民黨政治人物", "cost": 5, "attack": 1, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ATTACK" } }, "image": "img/tw002.png" },
     { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "description": "嘲諷。金門坦克", "keywords": { "taunt": true }, "image": "img/tw017.png" },
     { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw012.png" },
+    { "id": "TW030", "name": "朱立倫", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "戰吼：對兩側單位 +1/+1", "keywords": { "battlecry": { "type": "BUFF_ADJACENT", "value": 1 } }, "image": "img/tw030.png" },
+    { "id": "TW032", "name": "韓國瑜", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "LEGENDARY", "description": "發財外交！！\n(回到手牌時永久獲得 +2/+2)", "image": "img/tw032.png" },
+    { "id": "TW031", "name": "蔣萬安", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw031.png" },
 
     // --- 民眾黨 (TPP) ---
     { "id": "TW011", "name": "柯文哲", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼：將自己戰場上的隨從血量全部回復", "keywords": { "battlecry": { "type": "HEAL_ALL_FRIENDLY" } }, "image": "img/tw001.png" },
@@ -28,6 +31,7 @@ const CARD_DATA = [
     // --- 企業與組織 ---
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
     { "id": "TW018", "name": "台積電", "category": "企業", "cost": 5, "attack": 0, "health": 10, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害", "keywords": { "taunt": true, "battlecry": { "type": "DAMAGE_RANDOM_FRIENDLY", "value": 2 } }, "image": "img/tw016.png" },
+    { "id": "TW029", "name": "沈慶京", "category": "企業家", "cost": 5, "attack": 2, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予兩側的隨從「嘲諷」", "keywords": { "battlecry": { "type": "GIVE_KEYWORD_ADJACENT", "keyword": "taunt" } }, "image": "img/tw029.png" },
 
     // --- 一般隨從 (學生/勞工) ---
     { "id": "TW001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生", "image": "img/c001.png" },
@@ -44,7 +48,7 @@ const CARD_DATA = [
 
     // --- 法術 (Spells) ---
     { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "attack": 0, "health": 0, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "image": "img/tw004.png" },
-    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "attack": 0, "health": 0, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "image": "img/tw005.png" }
+    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "attack": 0, "health": 0, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" }
 ];
 
 let cardDB = [];
@@ -1178,7 +1182,7 @@ function onDragStart(e, index, fromHand = false) {
     draggingFromHand = fromHand;
     draggingMode = 'DAMAGE'; // Reset to default
 
-    dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line');
+    dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line', 'bounce-line');
     dragLine.setAttribute('x1', e.clientX);
     dragLine.setAttribute('y1', e.clientY);
     dragLine.setAttribute('x2', e.clientX);
@@ -1353,7 +1357,9 @@ async function onDragEnd(e) {
 
                 if (isTargeted) {
                     const validTargets = getValidTargets(battlecry.target);
-                    if (validTargets.length === 0) {
+                    // Special rule: For spells, even if no minions exist, allow hero-targeting UI to trigger
+                    // to avoid "dead" drag experience (user can still cancel or try to hit hero if rule allows)
+                    if (validTargets.length === 0 && card.type !== 'SPELL') {
                         logMessage("無合法目標！");
                         render();
                         return;
@@ -1365,6 +1371,8 @@ async function onDragEnd(e) {
                             mode = 'HEAL';
                         } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD') {
                             mode = 'BUFF';
+                        } else if (battlecry.type === 'BOUNCE_TARGET') {
+                            mode = 'BOUNCE';
                         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
                         }
@@ -1415,7 +1423,8 @@ async function onDragEnd(e) {
 
                     // 5. Execute Battlecry manually to get the result/target
                     if (playedCard.keywords && playedCard.keywords.battlecry) {
-                        const result = gameState.resolveBattlecry(playedCard.keywords.battlecry, null);
+                        const minionOnBoard = gameState.currentPlayer.board[currentInsertionIndex];
+                        const result = gameState.resolveBattlecry(playedCard.keywords.battlecry, null, minionOnBoard);
 
                         if (result) {
                             // 6. Show Visual Effects based on result
@@ -1527,8 +1536,8 @@ async function onDragEnd(e) {
                 return;
             }
         } else {
-            // Clicked background or non-unit
-            // DO NOT clear targeting state
+            // Clicked background or non-unit -> Cancel
+            cancelBattlecryTargeting();
             return;
         }
 
@@ -1561,6 +1570,7 @@ async function onDragEnd(e) {
                     // Determine color based on card/mode
                     if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
+                    else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BUFF'; }
 
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
@@ -1626,6 +1636,28 @@ async function onDragEnd(e) {
 }
 
 // --- Targeting Helpers ---
+function cancelBattlecryTargeting() {
+    if (!isBattlecryTargeting) return;
+    isBattlecryTargeting = false;
+    dragLine.style.display = 'none';
+
+    if (battlecrySourceType === 'MINION') {
+        // Refund Minion: Remove from board, put back in hand
+        const minion = gameState.currentPlayer.board.splice(battlecrySourceIndex, 1)[0];
+        if (minion) {
+            // Restore mana
+            gameState.currentPlayer.mana.current += minion.cost;
+            gameState.currentPlayer.hand.push(minion);
+            logMessage("取消出牌 (隨從已退回)");
+        }
+    } else {
+        // Spell: Mana wasn't spent yet, just show card again
+        const handCardEl = document.getElementById('player-hand').children[battlecrySourceIndex];
+        if (handCardEl) handCardEl.style.opacity = '1';
+        logMessage("取消出牌");
+    }
+    render();
+}
 function isTargetEligible(rule, targetInfo) {
     if (!rule || !targetInfo) return false;
 
@@ -1702,6 +1734,7 @@ function startBattlecryTargeting(sourceIndex, x, y, mode = 'DAMAGE', targetRule 
     dragLine.classList.add('battlecry-line');
     if (mode === 'HEAL') dragLine.classList.add('heal-line');
     if (mode === 'BUFF') dragLine.classList.add('buff-line');
+    if (mode === 'BOUNCE') dragLine.classList.add('bounce-line');
 
     dragLine.setAttribute('x1', x);
     dragLine.setAttribute('y1', y);
@@ -2111,6 +2144,14 @@ function triggerCombatEffect(el, type) {
         container.remove();
     }, 1000);
 }
+
+// Global listeners
+window.addEventListener('contextmenu', (e) => {
+    if (isBattlecryTargeting) {
+        e.preventDefault();
+        cancelBattlecryTargeting();
+    }
+});
 
 // Start
 init();
