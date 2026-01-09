@@ -271,6 +271,7 @@ document.getElementById('btn-surrender-cancel').addEventListener('click', () => 
 document.getElementById('btn-update-log')?.addEventListener('click', () => {
     const list = document.getElementById('update-log-list');
     if (list && typeof UPDATE_LOGS !== 'undefined') {
+        // 渲染日誌內容
         list.innerHTML = UPDATE_LOGS.map(log => `
             <div class="update-version-section">
                 <h3 style="color: var(--neon-cyan); margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
@@ -284,6 +285,75 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
                 </ul>
             </div>
         `).join('<hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">');
+
+        // 自動掃描並包裝卡牌名稱以實現懸停預覽
+        const allCardNames = CARD_DATA.map(c => c.name);
+        allCardNames.sort((a, b) => b.length - a.length);
+
+        const sections = list.querySelectorAll('.update-version-section li span, .update-version-section li b');
+        sections.forEach(el => {
+            let text = el.innerText;
+            // 避免在 innerHTML 中直接取代，改用一個暫存標記來處理
+            let segments = [{ text: text, isLink: false }];
+
+            allCardNames.forEach(name => {
+                const card = CARD_DATA.find(c => c.name === name);
+                let newSegments = [];
+                segments.forEach(seg => {
+                    if (seg.isLink) {
+                        newSegments.push(seg);
+                    } else {
+                        const parts = seg.text.split(name);
+                        for (let i = 0; i < parts.length; i++) {
+                            if (parts[i]) newSegments.push({ text: parts[i], isLink: false });
+                            if (i < parts.length - 1) {
+                                newSegments.push({ text: name, isLink: true, cardId: card.id });
+                            }
+                        }
+                    }
+                });
+                segments = newSegments;
+            });
+
+            // 重新組裝 HTML
+            el.innerHTML = segments.map(seg => {
+                if (seg.isLink) {
+                    return `<span class="log-card-link" data-card-id="${seg.cardId}">${seg.text}</span>`;
+                }
+                return seg.text;
+            }).join('');
+        });
+
+        // 為所有連結綁定事件
+        list.querySelectorAll('.log-card-link').forEach(link => {
+            const cardId = link.dataset.cardId;
+            const card = CARD_DATA.find(c => c.id === cardId);
+            if (!card) return;
+
+            link.addEventListener('mouseenter', (e) => {
+                const preview = document.getElementById('card-preview');
+                if (!preview || !card) return;
+
+                // 修正置中邏輯：使用 fixed 並重置所有位移
+                preview.style.position = 'fixed';
+                preview.style.top = '50%';
+                preview.style.left = '50%';
+                preview.style.bottom = 'auto';
+                preview.style.right = 'auto';
+                // 必須移除內部可能干擾的 transform: none
+                preview.style.transform = 'translate(-50%, -50%)';
+                preview.style.display = 'block';
+                preview.style.zIndex = '10001';
+
+                showPreview(card);
+
+                // 再次確保 transform 有生效 (有些時候 showPreview 會覆寫 innerHTML 導致重繪)
+                setTimeout(() => {
+                    preview.style.transform = 'translate(-50%, -50%)';
+                }, 0);
+            });
+            link.addEventListener('mouseleave', hidePreview);
+        });
     }
     document.getElementById('update-log-modal').style.display = 'flex';
 });
@@ -1051,15 +1121,15 @@ function showPreview(card) {
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
-                <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
+                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost ?? 0}</span></div>
+                <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
             </div>
             
             ${artHtml}
             
             <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description)}</div>
+            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "")}</div>
             
             ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
         </div>

@@ -48,6 +48,30 @@ body {
     letter-spacing: 10px;
 }
 
+.game-version {
+    font-size: 1.2rem;
+    color: var(--neon-cyan);
+    margin-bottom: 25px;
+    letter-spacing: 2px;
+    text-shadow: 0 0 10px rgba(0, 242, 254, 0.5);
+    opacity: 0.8;
+}
+
+.log-card-link {
+    color: #ff8c00;
+    /* Orange */
+    text-decoration: underline dotted;
+    cursor: help;
+    transition: all 0.2s;
+    display: inline-block;
+    padding: 0 2px;
+}
+
+.log-card-link:hover {
+    color: #ffaa00;
+    text-shadow: 0 0 10px #ff8c00;
+}
+
 .menu-buttons {
     display: flex;
     flex-direction: column;
