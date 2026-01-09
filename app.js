@@ -78,6 +78,21 @@ let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
 ];
 let tempDeck = null; // Temporary deck for editing
 
+// AI Theme Decks
+function generateDefaultDeck() {
+    const allIds = CARD_DATA.map(c => c.id);
+    const deck = [];
+    while (deck.length < 30) deck.push(allIds[Math.floor(Math.random() * allIds.length)]);
+    return deck;
+}
+
+let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
+    { id: 'dpp', name: '民進黨牌組', image: 'img/theme_dpp.png', cards: generateDefaultDeck() },
+    { id: 'kmt', name: '國民黨牌組', image: 'img/theme_kmt.png', cards: generateDefaultDeck() },
+    { id: 'tpp', name: '民眾黨牌組', image: 'img/theme_tpp.png', cards: generateDefaultDeck() }
+];
+let editingThemeIdx = -1; // -1 means not editing theme
+
 function migrateDecks() {
     // Migration Map to translate old IDs to new ones
     const map = {
@@ -128,6 +143,7 @@ if (userDecks[1].cards.length === 0) {
     userDecks[1].cards = defaultDeck;
 }
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
+let selectedThemeId = 'dpp'; // Default theme
 let editingDeckIdx = 0;
 let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
@@ -155,9 +171,7 @@ function init() {
     document.getElementById('btn-main-test').addEventListener('click', () => {
         isDebugMode = true;
         pendingViewMode = 'DEBUG';
-        showView('deck-selection');
-        document.getElementById('deck-select-title').innerText = '測試模式：選擇牌組';
-        renderDeckSelect();
+        showView('test-mode-selection');
     });
 
     // --- Mode Selection Listeners ---
@@ -170,10 +184,22 @@ function init() {
         btn.addEventListener('click', () => {
             currentDifficulty = btn.dataset.diff;
             pendingViewMode = 'BATTLE';
-            showView('deck-selection');
-            document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
-            renderDeckSelect();
+            showView('theme-selection');
+            renderThemeSelection();
         });
+    });
+
+    // --- Test Mode Selection Listeners ---
+    document.getElementById('btn-test-player-decks').addEventListener('click', () => {
+        showView('deck-selection');
+        document.getElementById('deck-select-title').innerText = '測試模式：選擇玩家牌組';
+        renderDeckSelect();
+    });
+
+    document.getElementById('btn-test-ai-themes').addEventListener('click', () => {
+        showView('theme-selection');
+        document.getElementById('theme-selection').querySelector('.sub-title').innerText = '選擇要編輯的主題牌組';
+        renderThemeSelection(true); // Pass true for edit mode
     });
 
     // --- Back Buttons ---
@@ -183,46 +209,82 @@ function init() {
                 showView('main-menu');
             } else if (document.getElementById('difficulty-selection').style.display === 'flex') {
                 showView('mode-selection');
+            } else if (document.getElementById('test-mode-selection').style.display === 'flex') {
+                showView('main-menu');
+            } else if (document.getElementById('theme-selection').style.display === 'flex') {
+                // Check if we're in edit mode or battle mode
+                const title = document.getElementById('theme-selection').querySelector('.sub-title').innerText;
+                if (title.includes('編輯')) {
+                    showView('test-mode-selection');
+                } else {
+                    showView('difficulty-selection');
+                }
             } else if (document.getElementById('deck-selection').style.display === 'flex') {
-                if (pendingViewMode === 'BATTLE') showView('difficulty-selection');
-                else showView('main-menu');
+                // Check if we're in test mode
+                const title = document.getElementById('deck-select-title').innerText;
+                if (title.includes('測試')) {
+                    showView('test-mode-selection');
+                } else {
+                    showView('theme-selection');
+                }
             }
         });
     });
 
     document.getElementById('btn-builder-back').addEventListener('click', async () => {
         if (tempDeck) {
-            // Check if name or cards have changed
-            const original = userDecks[editingDeckIdx];
-            // Sort cards for comparison to avoid false positives if order shouldn't matter? 
-            // Actually order matters in deck list usually? 
-            // The deck builder adds cards to end. 
-            // Let's stick to strict comparison including order.
+            if (tempDeck.isTheme) {
+                // Editing theme deck
+                const original = aiThemeDecks[editingThemeIdx];
+                const tempStr = JSON.stringify({ name: tempDeck.name, cards: tempDeck.cards });
+                const origStr = JSON.stringify({ name: original.name, cards: original.cards });
 
-            // Note: We need to compare specific fields to avoid issues if other properties exist
-            const tempStr = JSON.stringify({ name: tempDeck.name, cards: tempDeck.cards });
-            const origStr = JSON.stringify({ name: original.name, cards: original.cards });
+                if (tempStr !== origStr) {
+                    const confirmed = await showCustomConfirm("您有未保存的修改，確定要放棄並離開嗎？");
+                    if (!confirmed) return;
+                }
+                tempDeck = null;
+                editingThemeIdx = -1;
+                showView('test-mode-selection');
+            } else {
+                // Editing player deck
+                const original = userDecks[editingDeckIdx];
+                const tempStr = JSON.stringify({ name: tempDeck.name, cards: tempDeck.cards });
+                const origStr = JSON.stringify({ name: original.name, cards: original.cards });
 
-            if (tempStr !== origStr) {
-                const confirmed = await showCustomConfirm("您有未保存的修改，確定要放棄並離開嗎？");
-                if (!confirmed) return;
+                if (tempStr !== origStr) {
+                    const confirmed = await showCustomConfirm("您有未保存的修改，確定要放棄並離開嗎？");
+                    if (!confirmed) return;
+                }
+                tempDeck = null;
+                showView('deck-selection');
+                renderDeckSelect();
             }
+        } else {
+            showView('deck-selection');
+            renderDeckSelect();
         }
-        tempDeck = null;
-        showView('deck-selection');
-        renderDeckSelect();
     });
 
     // --- Deck Builder Listeners ---
     document.getElementById('btn-save-deck').addEventListener('click', () => {
         if (!tempDeck) return;
         const nameInput = document.getElementById('deck-name-input');
-        tempDeck.name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
 
-        // Save back to main array
-        userDecks[editingDeckIdx] = JSON.parse(JSON.stringify(tempDeck));
-        localStorage.setItem('userDecks', JSON.stringify(userDecks));
-        showToast("保存成功！");
+        if (tempDeck.isTheme) {
+            // Saving theme deck
+            tempDeck.name = nameInput.value || aiThemeDecks[editingThemeIdx].name;
+            aiThemeDecks[editingThemeIdx].cards = JSON.parse(JSON.stringify(tempDeck.cards));
+            aiThemeDecks[editingThemeIdx].name = tempDeck.name;
+            localStorage.setItem('aiThemeDecks', JSON.stringify(aiThemeDecks));
+            showToast("主題牌組保存成功！");
+        } else {
+            // Saving player deck
+            tempDeck.name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
+            userDecks[editingDeckIdx] = JSON.parse(JSON.stringify(tempDeck));
+            localStorage.setItem('userDecks', JSON.stringify(userDecks));
+            showToast("保存成功！");
+        }
         renderDeckBuilder();
     });
 
@@ -398,12 +460,74 @@ document.addEventListener('mouseup', onDragEnd);
 showView('main-menu');
 
 
+function renderThemeSelection(isEditMode = false) {
+    const container = document.getElementById('theme-cards-container');
+    container.innerHTML = '';
+
+    aiThemeDecks.forEach((theme, idx) => {
+        const card = document.createElement('div');
+        card.className = 'theme-card';
+
+        const imageDiv = document.createElement('div');
+        imageDiv.className = 'theme-card-image';
+
+        // Try to load image, fallback to emoji
+        const img = new Image();
+        img.src = theme.image;
+        img.onload = () => {
+            imageDiv.style.backgroundImage = `url('${theme.image}')`;
+            imageDiv.style.backgroundSize = 'cover';
+            imageDiv.style.backgroundPosition = 'center';
+            imageDiv.innerHTML = '';
+        };
+        img.onerror = () => {
+            // Fallback emoji based on theme
+            const emojis = { 'dpp': '🟢', 'kmt': '🔵', 'tpp': '🟡' };
+            imageDiv.innerHTML = emojis[theme.id] || '🎴';
+        };
+
+        const content = document.createElement('div');
+        content.className = 'theme-card-content';
+        content.innerHTML = `
+            <h3>${theme.name}</h3>
+            <p>${theme.cards.length} / 30 張卡</p>
+        `;
+
+        card.appendChild(imageDiv);
+        card.appendChild(content);
+
+        card.addEventListener('click', () => {
+            if (isEditMode) {
+                // Edit mode: open deck builder
+                editingThemeIdx = idx;
+                tempDeck = JSON.parse(JSON.stringify(theme));
+                tempDeck.isTheme = true; // Mark as theme deck
+                showView('deck-builder');
+                renderDeckBuilder();
+            } else {
+                // Battle mode: select theme
+                selectedThemeId = theme.id;
+                showView('deck-selection');
+                document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
+                renderDeckSelect();
+            }
+        });
+
+        container.appendChild(card);
+    });
+}
+
+
 function renderDeckSelect() {
     const container = document.getElementById('deck-select-slots');
     container.innerHTML = '';
 
     const startBtn = document.getElementById('btn-start-battle');
     const editBtn = document.getElementById('btn-edit-deck');
+    const titleEl = document.getElementById('deck-select-title');
+
+    // Title is already set by the caller, no need to override here
+    // Just keep the existing title
 
     // Reset Buttons
     if (startBtn) startBtn.style.display = 'none';
@@ -417,7 +541,10 @@ function renderDeckSelect() {
                 const deck = userDecks[selectedDeckIdx];
                 const isTest = deck.isTest || isDebugMode;
                 if (deck.cards.length === 30 || (isTest && deck.cards.length > 0)) {
-                    startBattle(deck.cards, isDebugMode);
+                    // Get selected theme deck
+                    const themeDeck = aiThemeDecks.find(t => t.id === selectedThemeId);
+                    const oppDeck = themeDeck ? themeDeck.cards : null;
+                    startBattle(deck.cards, isDebugMode, oppDeck);
                 } else {
                     await showCustomAlert(`「${deck.name}」目前有 ${deck.cards.length} 張卡，需要剛好 30 張才能戰鬥！${isTest ? '(測試模式需至少 1 張)' : ''}`);
                 }
@@ -520,11 +647,17 @@ function showView(viewId) {
 
 let previousPlayerHandSize = 0;
 
-async function startBattle(deckIds, debugMode = false) {
-    // Fill opponent deck with random cards
-    const allIds = CARD_DATA.map(c => c.id);
-    const oppDeck = [];
-    while (oppDeck.length < 30) oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
+async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
+    // Use provided opponent deck or generate random one
+    let oppDeck;
+    if (oppDeckIds && oppDeckIds.length > 0) {
+        oppDeck = oppDeckIds;
+    } else {
+        const allIds = CARD_DATA.map(c => c.id);
+        oppDeck = [];
+        while (oppDeck.length < 30) oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
+    }
+
     try {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
         showView('battle-view');
@@ -888,18 +1021,20 @@ async function aiTurn() {
                     }
                 } else if (card.keywords?.battlecry) {
                     const type = card.keywords.battlecry.type;
-                    setTimeout(() => {
-                        if (type === 'BUFF_ALL' || type === 'BUFF_CATEGORY') {
-                            document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
-                        } else if (type === 'HEAL_ALL_FRIENDLY') {
-                            document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
-                            triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
-                        } else if (type === 'BOUNCE_ALL_ENEMY') {
-                            triggerFullBoardBounceAnimation(true); // Player board vs Opponent Tsai
-                        } else if (type === 'DESTROY_ALL_MINIONS') {
-                            triggerEarthquakeAnimation();
-                        }
-                    }, 100);
+                    if (type === 'DESTROY_ALL_MINIONS') {
+                        await triggerEarthquakeAnimation();
+                    } else {
+                        setTimeout(() => {
+                            if (type === 'BUFF_ALL' || type === 'BUFF_CATEGORY') {
+                                document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'BUFF'));
+                            } else if (type === 'HEAL_ALL_FRIENDLY') {
+                                document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
+                                triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
+                            } else if (type === 'BOUNCE_ALL_ENEMY') {
+                                triggerFullBoardBounceAnimation(true);
+                            }
+                        }, 100);
+                    }
                 }
 
                 await new Promise(r => setTimeout(r, 1000));
@@ -1052,12 +1187,16 @@ async function resolveDeaths() {
 
     if (dead.length > 0) {
         const boards = [document.getElementById('player-board'), document.getElementById('opp-board')];
+        const animations = [];
+
         for (const death of dead) {
             const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
             if (board && board.children[death.index]) {
-                await animateShatter(board.children[death.index]);
+                animations.push(animateShatter(board.children[death.index]));
             }
         }
+
+        await Promise.all(animations);
         gameState.resolveDeaths();
         render();
     }
