@@ -1,4 +1,4 @@
-# 寶島保護戰 (Treasure Island Duel) - 開發指南
+# 寶島保護戰 (Treasure Island Duel) - 開發指南 v0.2.1
 
 ## 如何新增卡牌
 
@@ -51,7 +51,9 @@
     - `battlecry`: 戰吼（下場立即執行的效果）
 - **Effect Types (`battlecry.type`)**:
     - `DAMAGE`: 造成傷害
+    - `DAMAGE_SELF`: 對自己造成傷害
     - `HEAL`: 回復生命
+    - `FULL_HEAL`: 生命回復全滿
     - `BUFF_ALL`: 強化全場我方單位
     - `DRAW`: 抽牌
     - `DESTROY`: 直接摧毀單位
