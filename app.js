@@ -795,6 +795,8 @@ async function aiTurn() {
                         } else if (type === 'HEAL_ALL_FRIENDLY') {
                             document.querySelectorAll('#opp-board .minion').forEach(m => triggerCombatEffect(m, 'HEAL'));
                             triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
+                        } else if (type === 'BOUNCE_ALL_ENEMY') {
+                            triggerFullBoardBounceAnimation(true); // Player board vs Opponent Tsai
                         }
                     }, 100);
                 }
@@ -1532,6 +1534,14 @@ async function onDragEnd(e) {
                                 // Trigger Full Board Visual Effect instead of granular ones
                                 const isPlayer = result.affected[0]?.unit.side === 'PLAYER';
                                 triggerFullBoardHealAnimation(isPlayer);
+                            } else if (result.type === 'BOUNCE_ALL') {
+                                // Tsai Ing-wen or Cabinet Resignation
+                                if (result.bounced && result.bounced.length > 0) {
+                                    const isOpponentBoard = result.bounced[0].side === 'OPPONENT';
+                                    triggerFullBoardBounceAnimation(!isOpponentBoard);
+                                } else {
+                                    triggerFullBoardBounceAnimation(false);
+                                }
                             } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
                                 const handEl = document.getElementById('player-hand');
                                 let discardEls = [];
@@ -2476,6 +2486,46 @@ async function triggerFullBoardHealAnimation(isPlayer) {
         // Random size and delay
         p.style.fontSize = `${20 + Math.random() * 20}px`;
         p.style.animationDelay = `${Math.random() * 0.5}s`;
+
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2500);
+    }
+}
+
+/**
+ * Triggers a full-board bounce animation (Return to hand).
+ * @param {boolean} isPlayer Whether to bounce player board or opponent board
+ */
+async function triggerFullBoardBounceAnimation(isPlayer) {
+    const boardId = isPlayer ? 'player-board' : 'opp-board';
+    const boardEl = document.getElementById(boardId);
+    if (!boardEl) return;
+
+    // 1. Board Flash (Purple Neon)
+    boardEl.classList.remove('board-purple-flash');
+    void boardEl.offsetWidth; // Force reflow
+    boardEl.classList.add('board-purple-flash');
+    setTimeout(() => boardEl.classList.remove('board-purple-flash'), 1500);
+
+    // 2. Background Particles (Rotation Arrows)
+    const rect = boardEl.getBoundingClientRect();
+    const particleCount = 20;
+    const arrowChars = ['↻', '↺', '↩'];
+    for (let i = 0; i < particleCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'bg-bounce-particle';
+        p.innerText = arrowChars[Math.floor(Math.random() * arrowChars.length)];
+
+        // Random position within the board area
+        const x = rect.left + Math.random() * rect.width;
+        const y = rect.top + Math.random() * rect.height;
+
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+
+        // Random size and delay
+        p.style.fontSize = `${24 + Math.random() * 24}px`;
+        p.style.animationDelay = `${Math.random() * 0.6}s`;
 
         document.body.appendChild(p);
         setTimeout(() => p.remove(), 2500);

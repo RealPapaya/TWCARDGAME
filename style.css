@@ -2331,3 +2331,53 @@ body {
         opacity: 0;
     }
 }
+
+/* Full Board Bounce Animation (Tsai Ing-wen) */
+.board-purple-flash {
+    animation: purple-flash-animation 1.5s ease-out;
+}
+
+@keyframes purple-flash-animation {
+    0% {
+        border-color: rgba(163, 53, 238, 0.3);
+        box-shadow: inset 0 0 20px rgba(163, 53, 238, 0);
+    }
+
+    30% {
+        border-color: #a335ee;
+        box-shadow: inset 0 0 50px rgba(163, 53, 238, 0.6), 0 0 30px #a335ee;
+    }
+
+    100% {
+        border-color: rgba(163, 53, 238, 0.3);
+        box-shadow: inset 0 0 20px rgba(163, 53, 238, 0);
+    }
+}
+
+.bg-bounce-particle {
+    position: fixed;
+    color: #a335ee;
+    font-weight: bold;
+    font-size: 32px;
+    pointer-events: none;
+    z-index: 50;
+    text-shadow: 0 0 15px #a335ee;
+    animation: arrow-swirl-rise 2s ease-in-out forwards;
+}
+
+@keyframes arrow-swirl-rise {
+    0% {
+        transform: translate(0, 0) rotate(0deg) scale(0.5);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+        transform: translate(0, -20px) rotate(180deg) scale(1.5);
+    }
+
+    100% {
+        transform: translate(0, -100px) rotate(720deg) scale(1);
+        opacity: 0;
+    }
+}
