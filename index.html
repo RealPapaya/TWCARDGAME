@@ -45,16 +45,39 @@
         </div>
     </div>
 
-    <!-- Difficulty Selection View -->
     <div id="difficulty-selection" class="view" style="display: none;">
-        <div class="menu-content">
+        <div class="menu-content" style="max-width: 1200px;">
             <h2 class="sub-title">選擇難度</h2>
-            <div class="menu-buttons">
-                <button class="neon-button diff-btn" data-diff="NORMAL">普通 (Normal)</button>
-                <button class="neon-button diff-btn" data-diff="HARD"
-                    style="border-color: #ff9d00; box-shadow: 0 0 10px #ff9d00;">困難 (Hard)</button>
-                <button class="neon-button diff-btn" data-diff="HELL"
-                    style="border-color: #ff0000; box-shadow: 0 0 15px #ff0000; color: #ff0000;">地獄 (Hell)</button>
+            <div class="difficulty-squares-container">
+                <div class="diff-square diff-btn" data-diff="NORMAL" style="background-image: url('img/diff_normal.png');">
+                    <div class="diff-overlay">
+                        <div class="diff-desc">
+                            <h3>普通 (Normal)</h3>
+                            <p>適合初學者的標準難度，敵人出牌較為溫和。</p>
+                        </div>
+                    </div>
+                    <div class="diff-title-bottom">普通</div>
+                </div>
+                <div class="diff-square diff-btn" data-diff="HARD" style="background-image: url('img/diff_hard.png');">
+                    <div class="diff-overlay">
+                        <div class="diff-desc">
+                            <h3>困難 (Hard)</h3>
+                            <p>挑戰你的策略極限，敵人將會展現更強的進攻性。</p>
+                        </div>
+                    </div>
+                    <div class="diff-title-bottom">困難</div>
+                </div>
+                <div class="diff-square diff-btn" data-diff="HELL" style="background-image: url('img/diff_hell.png');">
+                    <div class="diff-overlay">
+                        <div class="diff-desc">
+                            <h3>地獄 (Hell)</h3>
+                            <p>只有真正的寶島遊戲王能生存！敵人擁有致命的牌組與智慧。</p>
+                        </div>
+                    </div>
+                    <div class="diff-title-bottom">地獄</div>
+                </div>
+            </div>
+            <div class="menu-buttons" style="margin-top: 40px;">
                 <button class="neon-button secondary btn-back">返回</button>
             </div>
         </div>

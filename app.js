@@ -71,7 +71,9 @@ const CARD_DATA = [
     { "id": "TW042", "name": "蔡璧如", "category": "民眾黨政治人物", "cost": 3, "attack": 2, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "戰吼: 對自己造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 2 } }, "image": "img/tsai_pi_ru.png" },
     { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公！！！\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
     { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" },
-    { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物，改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" }
+    { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物，改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" },
+    { "id": "S012", "name": "抗中保台", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +4 攻擊力。如果是民進黨政治人物，改為獲得 +5 攻擊力。", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_CATEGORY_BONUS", "value": 4, "bonus_value": 5, "stat": "ATTACK", "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/s_anti_china.png" },
+    { "id": "S013", "name": "芒果乾", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷", "keywords": { "battlecry": { "type": "BUFF_HEALTH_AND_TAUNT_TARGET", "value": 1, "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/s_dried_mango.png" }
 ];
 
 let cardDB = [];
@@ -227,10 +229,12 @@ function init() {
                     showView('difficulty-selection');
                 }
             } else if (document.getElementById('deck-selection').style.display === 'flex') {
-                // Check if we're in test mode
+                // Check if we're in test mode or builder mode
                 const title = document.getElementById('deck-select-title').innerText;
                 if (title.includes('測試')) {
                     showView('test-mode-selection');
+                } else if (pendingViewMode === 'BUILDER') {
+                    showView('main-menu');
                 } else {
                     showView('theme-selection');
                 }
@@ -1769,7 +1773,7 @@ async function onDragEnd(e) {
                         let mode = 'DAMAGE';
                         if (battlecry.type === 'HEAL' || battlecry.type === 'FULL_HEAL' || battlecry.type === 'HEAL_CATEGORY_BONUS') {
                             mode = 'HEAL';
-                        } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD' || battlecry.type === 'BUFF_STAT_TARGET_TEMP') {
+                        } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD' || battlecry.type === 'BUFF_STAT_TARGET_TEMP' || battlecry.type === 'BUFF_STAT_TARGET_CATEGORY_BONUS' || battlecry.type === 'BUFF_HEALTH_AND_TAUNT_TARGET') {
                             mode = 'BUFF';
                         } else if (battlecry.type === 'BOUNCE_TARGET' || battlecry.type === 'BOUNCE_CATEGORY') {
                             mode = 'BOUNCE';

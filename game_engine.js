@@ -239,6 +239,24 @@ class GameState {
                 }
                 return null;
             },
+            'BUFF_STAT_TARGET_CATEGORY_BONUS': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    let buffValue = bc.value;
+                    if (targetUnit.category && targetUnit.category.includes(bc.target_category_includes)) {
+                        buffValue = bc.bonus_value;
+                    }
+
+                    if (bc.stat === 'ATTACK') targetUnit.attack += buffValue;
+                    else if (bc.stat === 'HEALTH') {
+                        targetUnit.health += buffValue;
+                        targetUnit.currentHealth += buffValue;
+                        this.updateEnrage(targetUnit);
+                    }
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: bc.stat, value: buffValue };
+                }
+                return null;
+            },
             'BUFF_STAT_TARGET_TEMP': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {
@@ -255,6 +273,22 @@ class GameState {
                     targetUnit.tempBuffs.push(buff);
                     this.updateEnrage(targetUnit);
                     return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: 'ALL', value: bc.value };
+                }
+                return null;
+            },
+            'BUFF_HEALTH_AND_TAUNT_TARGET': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    // Increase Health (Max and Current)
+                    targetUnit.health += bc.value;
+                    targetUnit.currentHealth += bc.value;
+                    this.updateEnrage(targetUnit);
+
+                    // Grant Taunt
+                    if (!targetUnit.keywords) targetUnit.keywords = {};
+                    targetUnit.keywords.taunt = true;
+
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: 'HEALTH', value: bc.value, taunt: true };
                 }
                 return null;
             },

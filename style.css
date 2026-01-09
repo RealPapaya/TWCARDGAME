@@ -425,6 +425,141 @@ body {
     color: var(--neon-blue);
     text-shadow: 0 0 15px var(--neon-blue);
     letter-spacing: 5px;
+    text-align: center;
+    width: 100%;
+}
+
+/* Difficulty Selection Redesign */
+#difficulty-selection .menu-content {
+    align-items: center;
+    justify-content: center;
+    margin: auto;
+}
+
+.difficulty-squares-container {
+    display: flex;
+    justify-content: center;
+    gap: 40px;
+    width: 100%;
+    padding: 20px 0;
+}
+
+.diff-square {
+    width: 280px;
+    height: 400px;
+    background-color: #1a1a2e;
+    background-size: cover;
+    background-position: center;
+    border: 3px solid var(--neon-blue);
+    border-radius: 20px;
+    position: relative;
+    overflow: hidden;
+    cursor: pointer;
+    transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+}
+
+.diff-square:hover {
+    transform: scale(1.08) translateY(-10px);
+    box-shadow: 0 15px 40px rgba(0, 243, 255, 0.5);
+}
+
+.diff-title-bottom {
+    position: absolute;
+    bottom: 0;
+    width: 100%;
+    height: 120px;
+    background: #1a1a2e;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: var(--neon-blue);
+    font-size: 1.8rem;
+    font-weight: bold;
+    letter-spacing: 4px;
+    transition: all 0.3s;
+    border-top: 2px solid rgba(0, 243, 255, 0.3);
+    text-shadow: 0 0 10px var(--neon-blue);
+}
+
+/* Specific colors for borders */
+.diff-square[data-diff="NORMAL"] {
+    border-color: var(--neon-blue);
+}
+
+.diff-square[data-diff="HARD"] {
+    border-color: #ff9d00;
+}
+
+.diff-square[data-diff="HELL"] {
+    border-color: #ff0000;
+}
+
+.diff-square[data-diff="NORMAL"] .diff-title-bottom {
+    color: var(--neon-blue);
+    border-top-color: var(--neon-blue);
+}
+
+.diff-square[data-diff="HARD"] .diff-title-bottom {
+    color: #ff9d00;
+    border-top-color: #ff9d00;
+}
+
+.diff-square[data-diff="HELL"] .diff-title-bottom {
+    color: #ff0000;
+    border-top-color: #ff0000;
+}
+
+.diff-square:hover .diff-title-bottom {
+    opacity: 0;
+}
+
+.diff-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(8px);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    transition: height 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    padding: 0 30px;
+    box-sizing: border-box;
+    text-align: center;
+    z-index: 10;
+}
+
+.diff-square:hover .diff-overlay {
+    height: 100%;
+}
+
+.diff-desc {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.4s 0.1s;
+    text-align: center;
+}
+
+.diff-square:hover .diff-desc {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.diff-desc h3 {
+    margin-bottom: 20px;
+    font-size: 28px;
+}
+
+.diff-desc p {
+    color: #ccc;
+    font-size: 16px;
+    line-height: 1.6;
 }
 
 /* Modal Overlay */
