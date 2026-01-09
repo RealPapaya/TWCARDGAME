@@ -59,9 +59,12 @@ const CARD_DATA = [
     { "id": "S003", "name": "大罷免", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
     { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
     { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
+    { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
+    { "id": "S014", "name": "側翼出動", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "召喚三個只能存在一回合的網軍", "keywords": { "battlecry": { "type": "SUMMON_MULTIPLE", "cardId": "TW048", "count": 3, "isTemporary": true } }, "image": "img/s_wingman_sortie.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
     { "id": "S008", "name": "法院傳票", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
+    { "id": "TW047", "name": "連戰", "category": "國民黨政治人物", "cost": 4, "attack": 6, "health": 6, "type": "MINION", "rarity": "RARE", "description": "連戰都站不穩\n戰吼: 擊殺一名我方隨從", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/lien_chan.png" },
     { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
@@ -1219,9 +1222,11 @@ async function resolveDeaths() {
         }
 
         await Promise.all(animations);
-        gameState.resolveDeaths();
-        render();
     }
+
+    // Always resolve game state logic (Hero death, minion cleanup) and render
+    gameState.resolveDeaths();
+    render();
 }
 
 function endGame(result) {
@@ -1876,6 +1881,19 @@ async function onDragEnd(e) {
                                 } else {
                                     triggerFullBoardBounceAnimation(false);
                                 }
+                            } else if (result.type === 'SUMMON_MULTIPLE') {
+                                render();
+                                // Animate the new minions (assumed to be at the end of the board)
+                                setTimeout(() => {
+                                    const boardEl = document.getElementById('player-board');
+                                    const total = boardEl.children.length;
+                                    for (let i = 0; i < result.count; i++) {
+                                        const token = boardEl.children[total - 1 - i];
+                                        if (token) {
+                                            token.classList.add('pop-in');
+                                        }
+                                    }
+                                }, 50);
                             } else if (result.type === 'DESTROY_ALL') {
                                 // 921 Earthquake
                                 triggerEarthquakeAnimation();

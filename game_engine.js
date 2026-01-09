@@ -301,6 +301,39 @@ class GameState {
                 }
                 return null;
             },
+            'SUMMON_MULTIPLE': (bc, target, source) => {
+                const collection = this.collection || [];
+                const cardDef = collection.find(c => c.id === bc.cardId);
+                const count = bc.count || 1;
+                const summoned = [];
+
+                if (cardDef) {
+                    for (let i = 0; i < count; i++) {
+                        if (this.currentPlayer.board.length < 7) {
+                            const minion = this.createMinion(cardDef, this.currentPlayer.side);
+
+                            // Apply specific properties if needed
+                            if (bc.isTemporary) {
+                                minion.isTemporary = true;
+                            }
+
+                            // Redundant Charge Check
+                            if (minion.keywords && minion.keywords.charge) {
+                                minion.sleeping = false;
+                                minion.canAttack = true;
+                            }
+
+                            this.currentPlayer.board.push(minion);
+                            summoned.push(minion);
+                        }
+                    }
+                    if (summoned.length > 0) {
+                        this.updateAuras();
+                        return { type: 'SUMMON_MULTIPLE', count: summoned.length, cardId: bc.cardId };
+                    }
+                }
+                return null;
+            },
             'GIVE_DIVINE_SHIELD_CATEGORY': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
@@ -618,6 +651,13 @@ class GameState {
             }
         });
 
+        // Kill Temporary Minions (e.g. from '側翼出動')
+        this.currentPlayer.board.forEach(m => {
+            if (m.isTemporary) {
+                m.currentHealth = 0; // Mark as dead
+            }
+        });
+
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
         this.startTurn();
     }
@@ -789,7 +829,7 @@ class GameState {
             const isExcluded = battlecry.type.includes('DRAW') || battlecry.type.includes('COST') || battlecry.type.includes('REDUCE');
 
             if ((isDamage || isHeal) && !isExcluded) {
-                const bonusSide = sourceMinion.side || sourceMinion.ownerSide || 'PLAYER';
+                const bonusSide = sourceMinion.side || sourceMinion.ownerSide;
                 const bonus = this.getNewsPower(bonusSide);
                 if (bonus > 0) {
                     effectiveBattlecry = { ...battlecry, value: battlecry.value + bonus };
@@ -832,13 +872,22 @@ class GameState {
     }
 
     createMinion(cardData, side) {
-        return {
+        const minion = {
             ...cardData,
             currentHealth: cardData.health,
             side: side,
             sleeping: true,
             canAttack: false
         };
+
+        if (minion.keywords && minion.keywords.charge) {
+            minion.sleeping = false;
+            minion.canAttack = true;
+        }
+
+        // Apply '網軍' (TW048) or other specific checks if keywords are missing but required context implies execution (Unlikely if data is correct)
+
+        return minion;
     }
 
     getTargetUnit(target) {
