@@ -716,9 +716,6 @@ class GameState {
             });
             return { type: 'BUFF_HAND', affected };
         } else if (battlecry.type === 'DRAW') {
-            for (let i = 0; i < (battlecry.value || 1); i++) {
-                this.currentPlayer.drawCard();
-            }
             return { type: 'DRAW', value: battlecry.value };
         } else if (battlecry.type === 'DRAW_MINION_REDUCE_COST') {
             const player = this.currentPlayer;

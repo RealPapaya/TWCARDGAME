@@ -1550,16 +1550,18 @@ async function onDragEnd(e) {
                                     discardEls = Array.from(handEl.children).slice(-count);
                                 }
 
+                                // --- PERFECT: DO NOT TOUCH DISCARD_DRAW ANIMATION LOGIC ---
+                                // Sequence: Discard -> Render Hand Gap -> Small Wait -> Draw Loop (Render after each)
                                 if (discardEls.length > 0) {
                                     await Promise.all(discardEls.map(el => animateDiscard(el)));
+                                    render(); // Close the gap in hand immediately
+                                    await new Promise(r => setTimeout(r, 300));
                                 }
                                 if (result.type === 'DISCARD_DRAW' && result.drawCount) {
-                                    // Start drawing after a short pause once discard animation FINISHES
-                                    await new Promise(r => setTimeout(r, 200));
                                     for (let i = 0; i < result.drawCount; i++) {
                                         gameState.currentPlayer.drawCard();
                                         render();
-                                        await new Promise(r => setTimeout(r, 600)); // Standard draw delay
+                                        await new Promise(r => setTimeout(r, 600));
                                     }
                                 }
                             } else if (result.type === 'BUFF_HAND') {
@@ -1570,13 +1572,13 @@ async function onDragEnd(e) {
                         }
                     }
 
-                    // Visual Delay for cards that draw (S001 etc)
+                    // --- PERFECT: DO NOT TOUCH S001 ANIMATION LOGIC ---
                     if (playedCard.keywords?.battlecry?.type === 'DRAW') {
                         const drawCount = playedCard.keywords.battlecry.value || 1;
                         for (let i = 0; i < drawCount; i++) {
-                            await new Promise(r => setTimeout(r, 600));
                             gameState.currentPlayer.drawCard();
                             render();
+                            await new Promise(r => setTimeout(r, 600));
                         }
                     }
 
@@ -2067,7 +2069,10 @@ function logMessage(msg) {
 }
 
 /**
- * Animation for drawing a card from deck to hand.
+ * --- GOLD STANDARD DRAW ANIMATION ---
+ * This function handles the "fly from deck to hand" visuals.
+ * DO NOT change the timing or bezier curve without explicit request.
+ * Reference for S001 (Perfect Animation).
  * @param {HTMLElement} cardEl The final destination element in hand
  */
 function animateCardFromDeck(cardEl) {
