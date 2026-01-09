@@ -61,6 +61,7 @@ const CARD_DATA = [
     { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
     { "id": "S014", "name": "側翼出動", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "召喚三個只能存在一回合的網軍", "keywords": { "battlecry": { "type": "SUMMON_MULTIPLE", "cardId": "TW048", "count": 3, "isTemporary": true } }, "image": "img/s_wingman_sortie.png" },
+    { "id": "TW049", "name": "陳時中", "category": "民進黨政治人物", "cost": 7, "attack": 5, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "校正回歸\n戰吼: 手牌增加三張\"高端疫苗\"", "keywords": { "battlecry": { "type": "ADD_CARD_TO_HAND", "cardId": "S011", "value": 3 } }, "image": "img/chen_shih_chung.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
     { "id": "S008", "name": "法院傳票", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
@@ -1880,6 +1881,30 @@ async function onDragEnd(e) {
                                     triggerFullBoardBounceAnimation(!isOpponentBoard);
                                 } else {
                                     triggerFullBoardBounceAnimation(false);
+                                }
+                                // Suppress deck animation for bounced cards
+                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
+                            } else if (result.type === 'BOUNCE') {
+                                // Single bounce - suppress deck animation
+                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
+                            } else if (result.type === 'ADD_CARD') {
+                                // Cards added to hand (e.g., 高端疫苗 from 陳時中)
+                                // Suppress deck animation and use pop-in effect
+                                const oldHandSize = previousPlayerHandSize;
+                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
+
+                                // Render to create the card elements
+                                render();
+
+                                // Apply pop-in animation to newly added cards
+                                await new Promise(r => setTimeout(r, 50));
+                                const handEl = document.getElementById('player-hand');
+                                const newCount = result.count || 1;
+                                for (let i = 0; i < newCount; i++) {
+                                    const cardIdx = handEl.children.length - newCount + i;
+                                    if (handEl.children[cardIdx]) {
+                                        handEl.children[cardIdx].classList.add('pop-in');
+                                    }
                                 }
                             } else if (result.type === 'SUMMON_MULTIPLE') {
                                 render();

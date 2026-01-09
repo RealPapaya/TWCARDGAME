@@ -334,6 +334,24 @@ class GameState {
                 }
                 return null;
             },
+            'ADD_CARD_TO_HAND': (bc) => {
+                const collection = this.collection || [];
+                const cardDef = collection.find(c => c.id === bc.cardId);
+                const count = bc.value || 1;
+                const added = [];
+
+                if (cardDef) {
+                    for (let i = 0; i < count; i++) {
+                        if (this.currentPlayer.hand.length < 10) {
+                            const card = JSON.parse(JSON.stringify(cardDef));
+                            this.currentPlayer.hand.push(card);
+                            added.push(card);
+                        }
+                    }
+                    return { type: 'ADD_CARD', count: added.length, cardId: bc.cardId };
+                }
+                return null;
+            },
             'GIVE_DIVINE_SHIELD_CATEGORY': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
