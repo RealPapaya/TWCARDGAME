@@ -2100,8 +2100,8 @@ body {
 }
 
 .buff-particle {
-    color: #ffa500;
-    text-shadow: 0 0 10px #ffa500;
+    color: #43e97b;
+    text-shadow: 0 0 10px #43e97b, 0 0 20px rgba(67, 233, 123, 0.4);
 }
 
 @keyframes float-up {

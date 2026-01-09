@@ -31,7 +31,7 @@ const CARD_DATA = [
 
     // --- 公眾人物 / 媒體 ---
     { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "戰吼：賦予所有友方隨從 +1 生命值", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "image": "img/tw003.jpg" },
-    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+5攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "image": "img/TW027.png" },
+    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 11, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+4攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "image": "img/TW027.png" },
 
     // --- 企業與組織 ---
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
@@ -68,7 +68,8 @@ const CARD_DATA = [
     { "id": "TW041", "name": "柯文哲(獄中)", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 對自己造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 3 } }, "image": "img/ko_jail.png" },
     { "id": "TW042", "name": "蔡璧如", "category": "民眾黨政治人物", "cost": 3, "attack": 2, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "戰吼: 對自己造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 2 } }, "image": "img/tsai_pi_ru.png" },
     { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公！！！\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
-    { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" }
+    { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" },
+    { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物，改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" }
 ];
 
 let cardDB = [];
@@ -1764,14 +1765,14 @@ async function onDragEnd(e) {
 
                     try {
                         let mode = 'DAMAGE';
-                        if (battlecry.type === 'HEAL' || battlecry.type === 'FULL_HEAL') {
+                        if (battlecry.type === 'HEAL' || battlecry.type === 'FULL_HEAL' || battlecry.type === 'HEAL_CATEGORY_BONUS') {
                             mode = 'HEAL';
                         } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD' || battlecry.type === 'BUFF_STAT_TARGET_TEMP') {
                             mode = 'BUFF';
                         } else if (battlecry.type === 'BOUNCE_TARGET' || battlecry.type === 'BOUNCE_CATEGORY') {
                             mode = 'BOUNCE';
                         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
-                            mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
+                            mode = 'DAMAGE';
                         }
 
                         if (card.type === 'NEWS') {
@@ -2018,7 +2019,10 @@ async function onDragEnd(e) {
                     let effectType = 'DAMAGE';
 
                     // Determine color based on card/mode
-                    if (draggingMode === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
+                    if (draggingMode === 'HEAL') {
+                        color = '#43e97b';
+                        effectType = (battlecryTargetRule?.type === 'HEAL_CATEGORY_BONUS') ? 'HEAL_ARROW' : 'HEAL';
+                    }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
                     else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BOUNCE'; }
 
@@ -2118,9 +2122,8 @@ function isTargetEligible(rule, targetInfo) {
     if (categoryToExclude && rule.type === 'DAMAGE_NON_CATEGORY' && targetInfo.category === categoryToExclude) return false;
 
     // Category Inclusion check (e.g. S003 Great Recall)
-    // Note: target_category in GIVE_DIVINE_SHIELD_CATEGORY is strict match, handled by engine mostly, but for UI:
-    if (rule.target_category_includes) {
-        if (!targetInfo.category || !targetInfo.category.includes(rule.target_category_includes)) return false;
+    if (actualRule.target_category_includes) {
+        if (!targetInfo.category || !targetInfo.category.includes(actualRule.target_category_includes)) return false;
     }
 
     // Cost checks (if applicable)
@@ -2676,6 +2679,22 @@ function triggerCombatEffect(el, type) {
             p.style.top = `${Math.random() * 60 + 20}%`;
             p.style.fontSize = `${18 + Math.random() * 12}px`;
             p.style.animationDelay = `${Math.random() * 0.4}s`;
+            container.appendChild(p);
+        }
+    } else if (type === 'HEAL_ARROW') {
+        // Mix of arrows and pluses, colored green
+        const count = 8;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            const isArrow = i % 2 === 0;
+            p.className = isArrow ? 'buff-particle' : 'heal-particle';
+            p.innerText = isArrow ? '↑' : '+';
+            p.style.color = '#00ff00';
+            p.style.textShadow = '0 0 10px #00ff00';
+            p.style.left = `${Math.random() * 60 + 20}%`;
+            p.style.top = `${Math.random() * 60 + 20}%`;
+            p.style.fontSize = `${18 + Math.random() * 12}px`;
+            p.style.animationDelay = `${Math.random() * 0.3}s`;
             container.appendChild(p);
         }
     } else if (type === 'BOUNCE') {

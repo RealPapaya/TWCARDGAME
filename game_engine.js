@@ -186,6 +186,29 @@ class GameState {
                 }
                 return null;
             },
+            'HEAL_CATEGORY_BONUS': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit) {
+                    let healAmount = bc.value;
+                    if (targetUnit.category && targetUnit.category.includes(bc.target_category_includes)) {
+                        healAmount = bc.bonus_value;
+                    }
+
+                    const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                    const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
+                    if (typeof max === 'number' && typeof current === 'number') {
+                        const healValue = Math.min(max - current, healAmount);
+                        const newHp = current + healValue;
+                        if (targetUnit.type === 'HERO') targetUnit.hp = newHp;
+                        else {
+                            targetUnit.currentHealth = newHp;
+                            this.updateEnrage(targetUnit);
+                        }
+                        return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
+                    }
+                }
+                return null;
+            },
             'FULL_HEAL': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit) {
@@ -736,6 +759,9 @@ class GameState {
                 const bonus = this.getNewsPower(bonusSide);
                 if (bonus > 0) {
                     effectiveBattlecry = { ...battlecry, value: battlecry.value + bonus };
+                    if (typeof effectiveBattlecry.bonus_value === 'number') {
+                        effectiveBattlecry.bonus_value += bonus;
+                    }
                 }
             }
         }
