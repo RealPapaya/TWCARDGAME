@@ -1708,7 +1708,7 @@ async function onDragEnd(e) {
 
                     try {
                         let mode = 'DAMAGE';
-                        if (battlecry.type === 'HEAL') {
+                        if (battlecry.type === 'HEAL' || battlecry.type === 'FULL_HEAL') {
                             mode = 'HEAL';
                         } else if (battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD' || battlecry.type === 'BUFF_STAT_TARGET_TEMP') {
                             mode = 'BUFF';
