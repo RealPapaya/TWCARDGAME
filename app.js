@@ -1305,27 +1305,51 @@ function onDragMove(e) {
             if (isPlayerArea) {
                 board.classList.add('drop-highlight');
 
-                // Calculate insertion index
-                const minions = Array.from(board.children);
+                let indicator = board.querySelector('.placement-indicator');
+                if (!indicator) {
+                    indicator = document.createElement('div');
+                    indicator.className = 'placement-indicator';
+                    board.appendChild(indicator);
+                }
+
+                // Calculate insertion index based on proximity to cousins (minion elements)
+                const minions = Array.from(board.children).filter(m => m.classList.contains('minion'));
+
                 if (minions.length === 0) {
                     currentInsertionIndex = 0;
+                    if (indicator.parentElement !== board) board.appendChild(indicator);
                 } else {
                     let found = false;
                     for (let i = 0; i < minions.length; i++) {
                         const rect = minions[i].getBoundingClientRect();
                         const centerX = rect.left + rect.width / 2;
+
                         if (e.clientX < centerX) {
                             currentInsertionIndex = i;
+                            // Insert indicator BEFORE this minion to push it right
+                            if (board.children[i] !== indicator) {
+                                board.insertBefore(indicator, minions[i]);
+                            }
                             found = true;
                             break;
                         }
                     }
                     if (!found) {
                         currentInsertionIndex = minions.length;
+                        // Insert at the end
+                        if (board.lastElementChild !== indicator) {
+                            board.appendChild(indicator);
+                        }
                     }
                 }
+                indicator.classList.add('active');
             } else {
                 board.classList.remove('drop-highlight');
+                const indicator = board.querySelector('.placement-indicator');
+                if (indicator) {
+                    indicator.classList.remove('active');
+                    // Removed immediate indicator.remove() to allow smooth collapse animation
+                }
                 currentInsertionIndex = -1;
             }
         }
@@ -1374,6 +1398,10 @@ async function onDragEnd(e) {
         dragLine.style.display = 'none'; // Ensure hide when dragging ends
         dragLine.setAttribute('x1', 0); // Reset coords
         dragLine.setAttribute('y1', 0);
+
+        const indicator = board.querySelector('.placement-indicator');
+        if (indicator) indicator.classList.remove('active');
+        // Let it collapse naturally via CSS transition
 
         if (draggingFromHand) {
             // Cleanup visual ghost
