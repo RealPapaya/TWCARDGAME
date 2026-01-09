@@ -368,16 +368,12 @@ class GameState {
             return { type: 'DAMAGE', target: targetUnit, value: battlecry.value };
         } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
             const affected = [];
-            this.currentPlayer.board.forEach(m => {
+            this.currentPlayer.board.forEach((m, i) => {
                 const old = m.currentHealth;
                 m.currentHealth = m.health;
-                affected.push({ unit: m, healed: m.health - old });
+                affected.push({ unit: { ...m, index: i }, healed: m.health - old });
                 this.updateEnrage(m);
             });
-            // Hero too
-            const oldHeroHp = this.currentPlayer.hero.hp;
-            this.currentPlayer.hero.hp = this.currentPlayer.hero.maxHp;
-            affected.push({ unit: this.currentPlayer.hero, healed: this.currentPlayer.hero.maxHp - oldHeroHp });
             return { type: 'HEAL_ALL', affected };
         } else if (battlecry.type === 'BOUNCE_ALL_ENEMY') {
             const opp = this.opponent;

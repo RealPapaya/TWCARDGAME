@@ -1529,15 +1529,9 @@ async function onDragEnd(e) {
                                     triggerCombatEffect(newMinionEl, 'BUFF');
                                 }
                             } else if (result.type === 'HEAL_ALL') {
-                                result.affected.forEach(aff => {
-                                    let el = null;
-                                    if (aff.unit.type === 'HERO') el = aff.unit.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
-                                    else {
-                                        const bId = aff.unit.side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                        el = document.getElementById(bId).children[aff.unit.index];
-                                    }
-                                    if (el) triggerCombatEffect(el, 'HEAL');
-                                });
+                                // Trigger Full Board Visual Effect instead of granular ones
+                                const isPlayer = result.affected[0]?.unit.side === 'PLAYER';
+                                triggerFullBoardHealAnimation(isPlayer);
                             } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
                                 const handEl = document.getElementById('player-hand');
                                 let discardEls = [];
@@ -2448,3 +2442,43 @@ function showCustomConfirm(message) {
         };
     });
 }
+
+/**
+ * Triggers a full-board healing animation.
+ * @param {boolean} isPlayer Whether to heal player board or opponent board
+ */
+async function triggerFullBoardHealAnimation(isPlayer) {
+    const boardId = isPlayer ? 'player-board' : 'opp-board';
+    const boardEl = document.getElementById(boardId);
+    if (!boardEl) return;
+
+    // 1. Board Flash
+    boardEl.classList.remove('board-heal-flash');
+    void boardEl.offsetWidth; // Force reflow
+    boardEl.classList.add('board-heal-flash');
+    setTimeout(() => boardEl.classList.remove('board-heal-flash'), 1500);
+
+    // 2. Background Particles爆炸
+    const rect = boardEl.getBoundingClientRect();
+    const particleCount = 20;
+    for (let i = 0; i < particleCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'bg-heal-particle';
+        p.innerText = '+';
+
+        // Random position within the board area
+        const x = rect.left + Math.random() * rect.width;
+        const y = rect.top + Math.random() * rect.height;
+
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+
+        // Random size and delay
+        p.style.fontSize = `${20 + Math.random() * 20}px`;
+        p.style.animationDelay = `${Math.random() * 0.5}s`;
+
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2500);
+    }
+}
+
