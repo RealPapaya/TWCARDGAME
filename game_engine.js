@@ -488,7 +488,8 @@ class GameState {
         } else if (battlecry.type === 'DESTROY') {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
-                this.applyDamage(targetUnit, 999);
+                targetUnit.currentHealth = 0; // Direct kill, ignore Divine Shield
+                this.resolveDeaths();
                 return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: 999 };
             }
         } else if (battlecry.type === 'BUFF_CATEGORY') {
@@ -609,7 +610,8 @@ class GameState {
                     sourceMinion.currentHealth += eatHp;
 
                     // Kill target
-                    this.applyDamage(targetUnit, 999);
+                    targetUnit.currentHealth = 0;
+                    this.resolveDeaths();
                     return { type: 'EAT', target: target, value: { attack: eatAtk, health: eatHp } };
                 }
             }
@@ -745,6 +747,18 @@ class GameState {
             });
 
             return { type: 'DISCARD', count, indices: discardedIndices, cards: discardedCards };
+        } else if (battlecry.type === 'DESTROY_ALL_MINIONS') {
+            const affected = [];
+            [this.players[0], this.players[1]].forEach(p => {
+                const board = p.board;
+                for (let i = board.length - 1; i >= 0; i--) {
+                    const m = board[i];
+                    affected.push({ unit: { ...m, index: i, side: p.side } });
+                    m.currentHealth = 0; // Bypass Divine Shield
+                }
+            });
+            this.resolveDeaths();
+            return { type: 'DESTROY_ALL', affected };
         }
     }
 
@@ -1112,78 +1126,72 @@ class AIEngine {
             }
         }
 
-        // 2. Play Card Logic (Prioritize Minions then Buffs/Spells)
-        if (difficulty !== 'NORMAL') {
-            const playableCards = aiPlayer.hand
-                .map((c, i) => ({ ...c, originalIndex: i }))
-                .filter((c, i) => gameState.canPlayCard(i));
+        // 2. Play Card Logic
+        const playableCards = aiPlayer.hand
+            .map((c, i) => ({ ...c, originalIndex: i }))
+            .filter((c, i) => gameState.canPlayCard(i));
 
-            if (playableCards.length > 0) {
-                // Separate into categories
-                const minions = playableCards.filter(c => c.type === 'MINION');
-                const spells = playableCards.filter(c => c.type === 'SPELL');
+        if (playableCards.length > 0) {
+            // Categorize and prioritize
+            // Sequence Priority: 
+            // 1. Standard Minions (no board-wide buff or target required if no targets)
+            // 2. Buff/Heal Minions (triggered after minions are on board)
+            // 3. Spells (only if targets exist or beneficial)
 
-                // A. Prioritize playing minions if board space available
-                if (minions.length > 0 && aiPlayer.board.length < 7) {
-                    // HS logic: Play minions before buffs.
-                    // If we have a buff in hand, we might want to play it ON a minion, 
-                    // but if we are playing a minion this turn, we play the minion FIRST.
-                    const choice = minions.sort((a, b) => b.cost - a.cost)[0];
+            const minions = playableCards.filter(c => c.type === 'MINION');
+            const spells = playableCards.filter(c => c.type === 'SPELL');
+
+            // Find valid minions to play
+            if (minions.length > 0 && aiPlayer.board.length < 7) {
+                // Determine category of minion
+                const isBuffAll = (c) => c.keywords?.battlecry?.type?.includes('_ALL') || c.keywords?.battlecry?.type?.includes('CATEGORY');
+                const isBuffAdjacent = (c) => c.keywords?.battlecry?.type?.includes('ADJACENT') || c.keywords?.ongoing?.type?.includes('ADJACENT');
+
+                const standardMinions = minions.filter(m => !isBuffAll(m) && !isBuffAdjacent(m));
+                const buffMinions = minions.filter(m => isBuffAll(m) || isBuffAdjacent(m));
+
+                // Sort minions by cost (descending)
+                standardMinions.sort((a, b) => b.cost - a.cost);
+                buffMinions.sort((a, b) => b.cost - a.cost);
+
+                const finalMinionList = [...standardMinions, ...buffMinions];
+
+                for (const choice of finalMinionList) {
                     let target = null;
-                    if (choice.keywords && choice.keywords.battlecry) {
+                    if (choice.keywords?.battlecry?.target) {
                         target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
-                    }
-                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
-                }
-
-                // B. Play spells/buffs
-                if (spells.length > 0) {
-                    // Try to find the most value spell
-                    const buffSpells = spells.filter(s => s.keywords?.battlecry?.type?.includes('BUFF') || s.keywords?.battlecry?.type?.includes('GIVE_DIVINE'));
-                    const attackSpells = spells.filter(s => s.keywords?.battlecry?.type?.includes('DAMAGE') || s.keywords?.battlecry?.type?.includes('DESTROY'));
-
-                    if (buffSpells.length > 0 && aiPlayer.board.length > 0) {
-                        const choice = buffSpells[0];
-                        const target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
-                        if (target) return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                        // User requirement: If target is required but missing, don't play (or skip if optional? Usually cards in this game need target)
+                        // If card is a direct "Destroy" or high damage, let's skip playing if no target.
+                        const type = choice.keywords.battlecry.type;
+                        const isHardTarget = ['DESTROY', 'DAMAGE', 'HEAL', 'BUFF_STAT_TARGET', 'GIVE_DIVINE_SHIELD'].includes(type);
+                        if (isHardTarget && !target) continue;
                     }
 
-                    if (attackSpells.length > 0) {
-                        const choice = attackSpells[0];
-                        const target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
-                        if (target) return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                    // Best placement for adjacent buffs
+                    let insertionIndex = -1;
+                    if (isBuffAdjacent(choice) && aiPlayer.board.length >= 2) {
+                        // Find a spot between two minions
+                        insertionIndex = 1; // Default to first available gap
                     }
-                }
-            }
-        } else {
-            // NORMAL Difficulty (Old Logic)
-            if (aiPlayer.board.length < 7) {
-                const playableMinions = aiPlayer.hand
-                    .map((c, i) => ({ ...c, originalIndex: i }))
-                    .filter((c, i) => gameState.canPlayCard(i) && c.type === 'MINION')
-                    .sort((a, b) => b.cost - a.cost);
 
-                if (playableMinions.length > 0) {
-                    const choice = playableMinions[0];
-                    let target = null;
-                    if (choice.keywords && choice.keywords.battlecry) {
-                        target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
-                    }
-                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target, insertionIndex: insertionIndex };
                 }
             }
 
-            const playableSpells = aiPlayer.hand
-                .map((c, i) => ({ ...c, originalIndex: i }))
-                .filter((c, i) => gameState.canPlayCard(i) && c.type === 'SPELL');
-
-            if (playableSpells.length > 0) {
-                const choice = playableSpells[0];
-                return { type: 'PLAY_CARD', index: choice.originalIndex, target: { type: 'HERO' } };
+            // Play spells
+            if (spells.length > 0) {
+                for (const choice of spells) {
+                    let target = null;
+                    if (choice.keywords?.battlecry?.target) {
+                        target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
+                        if (!target) continue; // Spells MUST have targets if they have a target rule
+                    }
+                    return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
+                }
             }
         }
 
-        // 3. Trade / Attack (Smarter for Hard/Hell)
+        // 3. Trade / Attack
         const attackers = aiPlayer.board
             .map((m, i) => ({ ...m, index: i }))
             .filter(m => m.canAttack && !m.sleeping);
@@ -1197,26 +1205,18 @@ class AIEngine {
             const actualTargets = taunts.length > 0 ? taunts : validTargets;
 
             if (difficulty !== 'NORMAL') {
-                // SMARTER TRADING
-                // A. Prioritize killing high attack minions first if we can kill it efficiently
                 actualTargets.sort((a, b) => b.attack - a.attack);
-
                 for (const t of actualTargets) {
-                    // Value trade: I kill it and I survive
                     if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
                         return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
                     }
                 }
-
-                // B. Efficient Exchange: Low cost minion kills high cost/high attack minion
                 for (const t of actualTargets) {
-                    // If target is dangerous (High Attack) and we can kill it, do it even if we die
                     if (attacker.attack >= t.currentHealth && (t.attack >= 3 || t.cost > attacker.cost)) {
                         return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
                     }
                 }
             } else {
-                // NORMAL Trading (Value trade only)
                 for (const t of actualTargets) {
                     if (attacker.attack >= t.currentHealth && attacker.currentHealth > t.attack) {
                         return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: t.index } };
@@ -1224,7 +1224,6 @@ class AIEngine {
                 }
             }
 
-            // C. Fallback: Attack Face or Taunt
             if (taunts.length > 0) {
                 return { type: 'ATTACK', attackerIndex: attacker.index, target: { type: 'MINION', index: taunts[0].index } };
             } else {
@@ -1245,29 +1244,50 @@ class AIEngine {
         const rule = battlecry.target;
         if (!rule || typeof rule !== 'object') return null;
 
-        // Simple Heuristic for Battlecries
-        if (battlecry.type === 'DAMAGE' || battlecry.type === 'DAMAGE_NON_CATEGORY' || battlecry.type === 'DESTROY') {
-            // Target: Enemies preferred
-            if (rule.side !== 'FRIENDLY') {
-                if (rule.type !== 'HERO' && opponent.board.length > 0) {
-                    return { type: 'MINION', index: 0, side: 'OPPONENT' };
-                }
-                if (rule.type !== 'MINION') {
-                    return { type: 'HERO', side: 'OPPONENT' };
-                }
-            }
+        const results = [];
+
+        // Collect all possible targets
+        const potentialMinions = [];
+        if (rule.side === 'ALL' || rule.side === 'FRIENDLY') {
+            ai.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: 'PLAYER' }));
         }
-        else if (battlecry.type === 'HEAL' || battlecry.type === 'BUFF_STAT_TARGET' || battlecry.type === 'GIVE_DIVINE_SHIELD') {
-            // Target: Friendly preferred
-            if (rule.side !== 'ENEMY') {
-                if (rule.type !== 'HERO' && ai.board.length > 0) {
-                    return { type: 'MINION', index: 0, side: 'PLAYER' };
-                }
-                if (rule.type !== 'MINION') {
-                    return { type: 'HERO', side: 'PLAYER' };
-                }
-            }
+        if (rule.side === 'ALL' || rule.side === 'ENEMY' || rule.side === 'OPPONENT') {
+            opponent.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: 'OPPONENT' }));
         }
+
+        const potentialHeroes = [];
+        if (rule.type !== 'MINION') {
+            if (rule.side === 'ALL' || rule.side === 'FRIENDLY') potentialHeroes.push({ type: 'HERO', side: 'PLAYER' });
+            if (rule.side === 'ALL' || rule.side === 'ENEMY' || rule.side === 'OPPONENT') potentialHeroes.push({ type: 'HERO', side: 'OPPONENT' });
+        }
+
+        // Filtering
+        let filteredMinions = potentialMinions;
+        if (rule.type === 'MINION') filteredMinions = potentialMinions.filter(p => p.unit.type === 'MINION');
+        if (battlecry.target_category) filteredMinions = filteredMinions.filter(p => p.unit.category === battlecry.target_category);
+
+        // Preference Logic
+        if (battlecry.type === 'HEAL' || battlecry.type?.includes('BUFF') || battlecry.type === 'GIVE_DIVINE_SHIELD') {
+            // Prefer friends, then injured, then high attack
+            const friendly = filteredMinions.filter(p => p.side === 'PLAYER');
+            if (friendly.length > 0) {
+                if (battlecry.type === 'HEAL') {
+                    friendly.sort((a, b) => (a.unit.health - a.unit.currentHealth) - (b.unit.health - b.unit.currentHealth));
+                    if (friendly[0].unit.currentHealth < friendly[0].unit.health) return { type: 'MINION', index: friendly[0].index, side: 'PLAYER' };
+                }
+                return { type: 'MINION', index: friendly[0].index, side: 'PLAYER' };
+            }
+            if (potentialHeroes.some(h => h.side === 'PLAYER')) return { type: 'HERO', side: 'PLAYER' };
+        } else if (battlecry.type === 'DAMAGE' || battlecry.type === 'DESTROY' || battlecry.type === 'BOUNCE_TARGET') {
+            // Prefer enemies, then high threat
+            const enemies = filteredMinions.filter(p => p.side === 'OPPONENT');
+            if (enemies.length > 0) {
+                enemies.sort((a, b) => b.unit.attack - a.unit.attack);
+                return { type: 'MINION', index: enemies[0].index, side: 'OPPONENT' };
+            }
+            if (potentialHeroes.some(h => h.side === 'OPPONENT')) return { type: 'HERO', side: 'OPPONENT' };
+        }
+
         return null;
     }
 }

@@ -63,7 +63,8 @@ const CARD_DATA = [
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
     { "id": "S009", "name": "政治切割", "category": "法術", "cost": 1, "type": "SPELL", "rarity": "COMMON", "description": "戰吼:丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
-    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" }
+    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
+    { "id": "S010", "name": "921大地震", "category": "法術", "cost": 7, "type": "SPELL", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" }
 ];
 
 let cardDB = [];
@@ -730,11 +731,13 @@ async function aiTurn() {
                 logMessage(`Opponent plays ${card.name}`);
 
                 const oppBoard = document.getElementById('opp-board');
-                const targetSlot = oppBoard.children[oppBoard.children.length]; // Potential new slot
+                const insertionIndex = action.insertionIndex !== undefined ? action.insertionIndex : -1;
+                const targetSlot = insertionIndex === -1 ? null : oppBoard.children[insertionIndex];
+
                 await showCardPlayPreview(card, true, targetSlot);
 
                 try {
-                    gameState.playCard(action.index, action.target);
+                    gameState.playCard(action.index, action.target, insertionIndex);
                 } catch (e) {
                     console.error("AI failed to play card:", e);
                     break;
@@ -797,6 +800,8 @@ async function aiTurn() {
                             triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
                         } else if (type === 'BOUNCE_ALL_ENEMY') {
                             triggerFullBoardBounceAnimation(true); // Player board vs Opponent Tsai
+                        } else if (type === 'DESTROY_ALL_MINIONS') {
+                            triggerEarthquakeAnimation();
                         }
                     }, 100);
                 }
@@ -1542,6 +1547,9 @@ async function onDragEnd(e) {
                                 } else {
                                     triggerFullBoardBounceAnimation(false);
                                 }
+                            } else if (result.type === 'DESTROY_ALL') {
+                                // 921 Earthquake
+                                triggerEarthquakeAnimation();
                             } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
                                 const handEl = document.getElementById('player-hand');
                                 let discardEls = [];
@@ -2531,4 +2539,62 @@ async function triggerFullBoardBounceAnimation(isPlayer) {
         setTimeout(() => p.remove(), 2500);
     }
 }
+
+/**
+ * Triggers the 921 Earthquake animation.
+ */
+async function triggerEarthquakeAnimation() {
+    const playerBoard = document.getElementById('player-board');
+    const oppBoard = document.getElementById('opp-board');
+    const boards = [playerBoard, oppBoard].filter(b => b);
+    const gameContainer = document.getElementById('game-container');
+
+    // 1. Screen Shake
+    gameContainer.classList.add('screen-quake');
+    setTimeout(() => gameContainer.classList.remove('screen-quake'), 2000);
+
+    // 2. Board Flash & Fracture
+    boards.forEach(boardEl => {
+        boardEl.classList.remove('board-red-flash');
+        void boardEl.offsetWidth; // Force reflow
+        boardEl.classList.add('board-red-flash');
+        setTimeout(() => boardEl.classList.remove('board-red-flash'), 1500);
+
+        // Fracture Overlay
+        let fracture = boardEl.querySelector('.fracture-overlay');
+        if (!fracture) {
+            fracture = document.createElement('div');
+            fracture.className = 'fracture-overlay';
+            boardEl.appendChild(fracture);
+        }
+
+        void fracture.offsetWidth;
+        fracture.classList.add('active');
+        setTimeout(() => fracture.classList.remove('active'), 2500);
+    });
+
+    // 3. Dust Particles
+    const rect = gameContainer.getBoundingClientRect();
+    const particleCount = 30;
+    for (let i = 0; i < particleCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'bg-bounce-particle'; // Reuse particle style
+        p.innerText = '•'; // Dust/Debris
+        p.style.color = '#555';
+        p.style.textShadow = 'none';
+
+        const x = rect.left + Math.random() * rect.width;
+        const y = rect.top + Math.random() * rect.height;
+
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+        p.style.fontSize = `${10 + Math.random() * 20}px`;
+        p.style.animation = `arrow-swirl-rise ${1 + Math.random()}s ease-in forwards`;
+        p.style.animationDelay = `${Math.random() * 0.5}s`;
+
+        document.body.appendChild(p);
+        setTimeout(() => p.remove(), 2000);
+    }
+}
+
 
