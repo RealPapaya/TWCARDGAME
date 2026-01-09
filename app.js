@@ -11,9 +11,9 @@ const CARD_DATA = [
     { "id": "TW023", "name": "陳玉珍", "category": "國民黨政治人物", "cost": 7, "attack": 3, "health": 8, "type": "MINION", "rarity": "EPIC", "description": "嘲諷。金門坦克", "keywords": { "taunt": true }, "image": "img/tw017.png" },
     { "id": "TW024", "name": "馬英九", "category": "國民黨政治人物", "cost": 9, "attack": 3, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "死亡之握\n戰吼: 直接擊殺一個隨從", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw012.png" },
     { "id": "TW030", "name": "朱立倫", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "戰吼：對兩側單位 +1/+1", "keywords": { "battlecry": { "type": "BUFF_ADJACENT", "value": 1 } }, "image": "img/tw030.png" },
-    { "id": "TW032", "name": "韓國瑜", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "LEGENDARY", "description": "發財外交！！\n(回到手牌時永久獲得 +2/+2)", "image": "img/tw032.png" },
+    { "id": "TW032", "name": "韓國瑜", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "LEGENDARY", "description": "發財外交！！\n(回到手牌時永久獲得 +2/+2)", "bounce_bonus": 2, "image": "img/tw032.png" },
     { "id": "TW031", "name": "蔣萬安", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw031.png" },
-    { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "image": "img/tw033.png" },
+    { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "bounce_bonus": 1, "image": "img/tw033.png" },
     { "id": "TW034", "name": "趙少康", "category": "國民黨政治人物", "cost": 6, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質", "keywords": { "taunt": true, "battlecry": { "type": "EAT_FRIENDLY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/tw034.png" },
     { "id": "TW035", "name": "江啟臣", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 5, "type": "MINION", "rarity": "RARE", "description": "戰吼：丟棄一張隨機手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM" } }, "image": "img/tw035.png" },
     { "id": "TW036", "name": "連勝文", "category": "國民黨政治人物", "cost": 4, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "政壇不死鳥\n遺志: 回到手牌", "keywords": { "deathrattle": { "type": "BOUNCE_SELF" } }, "image": "img/tw036.png" },
@@ -62,7 +62,7 @@ const CARD_DATA = [
     { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
-    { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "戰吼:丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
+    { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
     { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
     { "id": "TW041", "name": "柯文哲(獄中)", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 對自己造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 3 } }, "image": "img/ko_jail.png" },
     { "id": "TW042", "name": "蔡璧如", "category": "民眾黨政治人物", "cost": 3, "attack": 2, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "戰吼: 對自己造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 2 } }, "image": "img/tsai_pi_ru.png" },
@@ -1076,7 +1076,10 @@ async function aiTurn() {
     }
 }
 
-function render() {
+/**
+ * Render basic UI elements like turn indicator, mana, HP, and deck sizes.
+ */
+function renderGameUI(p1, p2) {
     document.getElementById('turn-indicator').innerText = `TURN: ${gameState.turnCount}`;
 
     // Toggle Turn Lights
@@ -1097,85 +1100,14 @@ function render() {
         }
     }
 
-    const p1 = gameState.players[0];
-    const p2 = gameState.players[1];
-
     renderMana('player-mana-container', p1.mana);
     renderMana('opp-mana-container', p2.mana);
 
     document.getElementById('player-hp').innerText = p1.hero.hp;
     document.getElementById('opp-hp').innerText = p2.hero.hp;
 
-    const handEl = document.getElementById('player-hand');
-    handEl.innerHTML = '';
-    p1.hand.forEach((card, idx) => {
-        const cardEl = createCardEl(card, idx);
-        handEl.appendChild(cardEl);
-    });
-
-    // Detect and animate new cards
-    if (p1.hand.length > previousPlayerHandSize) {
-        const newCount = p1.hand.length - previousPlayerHandSize;
-        const children = handEl.children;
-        // Only animate if it looks like a draw event (not a full reload from 0 to 30)
-        // Ensure we don't crash if children count mismatch
-        if (newCount > 0 && newCount < 15) {
-            for (let i = Math.max(0, children.length - newCount); i < children.length; i++) {
-                if (children[i]) animateCardFromDeck(children[i]);
-            }
-        }
-    }
-    previousPlayerHandSize = p1.hand.length;
-
-    const oppHandEl = document.getElementById('opp-hand');
-    oppHandEl.innerHTML = '';
-    p2.hand.forEach(() => {
-        const back = document.createElement('div');
-        back.className = 'card';
-        oppHandEl.appendChild(back);
-    });
-
-    // Apply Hearthstone-like Arc Logic
-    [handEl, oppHandEl].forEach((container, cIdx) => {
-        const cards = Array.from(container.children);
-        const total = cards.length;
-        const center = (total - 1) / 2;
-
-        // Curvature parameters
-        const degPerCard = 6;
-        const yPerCard = 12; // Stronger curve
-
-        cards.forEach((card, i) => {
-            const delta = i - center;
-            const rot = delta * degPerCard;
-            // Parabolic Curve: y = x^2 * factor roughly
-            const y = Math.abs(delta) * Math.abs(delta) * 2 + Math.abs(delta) * 5;
-
-            card.style.setProperty('--rot', `${rot}deg`);
-            card.style.setProperty('--y', `${y}px`);
-        });
-    });
-
-    const boardEl = document.getElementById('player-board');
-    boardEl.innerHTML = '';
-    p1.board.forEach((minion, idx) => {
-        boardEl.appendChild(createMinionEl(minion, idx, true));
-    });
-
-    const oppBoardEl = document.getElementById('opp-board');
-    oppBoardEl.innerHTML = '';
-    p2.board.forEach((minion, idx) => {
-        oppBoardEl.appendChild(createMinionEl(minion, idx, false));
-    });
-
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
-    // document.querySelector('#player-discard .count-badge').innerText = p1.graveyard?.length || 0;
     document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
-    // document.querySelector('#opp-discard .count-badge').innerText = p2.graveyard?.length || 0;
-
-    if (gameState.lastAction === 'attack') {
-        // Implement visual shake if hit
-    }
 
     // Check for Win/Loss
     if (gameState.winner !== null) {
@@ -1184,6 +1116,85 @@ function render() {
         }, 1000);
     }
 }
+
+/**
+ * Render player and opponent hands with arc effect.
+ */
+function renderHands(p1, p2) {
+    const handEl = document.getElementById('player-hand');
+    const oppHandEl = document.getElementById('opp-hand');
+
+    // Player Hand
+    handEl.innerHTML = '';
+    p1.hand.forEach((card, idx) => {
+        handEl.appendChild(createCardEl(card, idx));
+    });
+
+    // Detect and animate new cards
+    if (p1.hand.length > previousPlayerHandSize) {
+        const newCount = p1.hand.length - previousPlayerHandSize;
+        const children = handEl.children;
+        if (newCount > 0 && newCount < 15) {
+            for (let i = Math.max(0, children.length - newCount); i < children.length; i++) {
+                if (children[i]) animateCardFromDeck(children[i]);
+            }
+        }
+    }
+    previousPlayerHandSize = p1.hand.length;
+
+    // Opponent Hand
+    oppHandEl.innerHTML = '';
+    p2.hand.forEach(() => {
+        const back = document.createElement('div');
+        back.className = 'card';
+        oppHandEl.appendChild(back);
+    });
+
+    // Apply Hearthstone-like Arc Logic
+    [handEl, oppHandEl].forEach((container) => {
+        const cards = Array.from(container.children);
+        const total = cards.length;
+        const center = (total - 1) / 2;
+
+        const degPerCard = 6;
+        cards.forEach((card, i) => {
+            const delta = i - center;
+            const rot = delta * degPerCard;
+            const y = Math.abs(delta) * Math.abs(delta) * 2 + Math.abs(delta) * 5;
+
+            card.style.setProperty('--rot', `${rot}deg`);
+            card.style.setProperty('--y', `${y}px`);
+        });
+    });
+}
+
+/**
+ * Render player and opponent board minions.
+ */
+function renderBoards(p1, p2) {
+    const boardEl = document.getElementById('player-board');
+    const oppBoardEl = document.getElementById('opp-board');
+
+    boardEl.innerHTML = '';
+    p1.board.forEach((minion, idx) => {
+        boardEl.appendChild(createMinionEl(minion, idx, true));
+    });
+
+    oppBoardEl.innerHTML = '';
+    p2.board.forEach((minion, idx) => {
+        oppBoardEl.appendChild(createMinionEl(minion, idx, false));
+    });
+}
+
+function render() {
+    const p1 = gameState.players[0];
+    const p2 = gameState.players[1];
+
+    renderGameUI(p1, p2);
+    renderHands(p1, p2);
+    renderBoards(p1, p2);
+}
+
 
 async function resolveDeaths() {
     const dead = gameState.checkDeaths ? gameState.checkDeaths() : [];
@@ -1900,11 +1911,11 @@ async function onDragEnd(e) {
             }
         }
     } else if (isBattlecryTargeting) {
-        console.log("Battlecry Targeting Try Finish. SourceType:", battlecrySourceType);
+
 
         const targetEl = document.elementFromPoint(e.clientX, e.clientY);
         const unitEl = targetEl?.closest('[data-type]');
-        console.log("Target Candidate Found:", unitEl?.id || unitEl?.className, unitEl?.dataset?.type);
+
 
         let target = null;
         if (unitEl) {
