@@ -366,6 +366,12 @@ class GameState {
             console.log("Applying Damage to:", targetUnit?.name || 'Hero');
             this.applyDamage(targetUnit, battlecry.value);
             return { type: 'DAMAGE', target: targetUnit, value: battlecry.value };
+        } else if (battlecry.type === 'DAMAGE_SELF') {
+            if (sourceMinion) {
+                console.log("Applying Self Damage to:", sourceMinion.name);
+                this.applyDamage(sourceMinion, battlecry.value);
+                return { type: 'DAMAGE', target: sourceMinion, value: battlecry.value };
+            }
         } else if (battlecry.type === 'HEAL_ALL_FRIENDLY') {
             const affected = [];
             this.currentPlayer.board.forEach((m, i) => {
@@ -424,6 +430,26 @@ class GameState {
                         this.updateEnrage(targetUnit);
                     }
                     return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
+                }
+            }
+        } else if (battlecry.type === 'FULL_HEAL') {
+            const targetUnit = this.getTargetUnit(target);
+            // Limit to MINIONS only based on user request "將一個隨從生命回復全滿"
+            // But usually healers can heal heroes too. Let's allowing targeting to decide.
+            if (targetUnit) {
+                const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
+
+                if (typeof max === 'number' && typeof current === 'number') {
+                    const healValue = max - current;
+                    const newHp = max;
+
+                    if (targetUnit.type === 'HERO') targetUnit.hp = newHp;
+                    else {
+                        targetUnit.currentHealth = newHp;
+                        this.updateEnrage(targetUnit);
+                    }
+                    return { type: 'HEAL', target: targetUnit, value: healValue };
                 }
             }
         } else if (battlecry.type === 'BUFF_STAT_TARGET') {
