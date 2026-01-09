@@ -4,6 +4,7 @@ let gameState;
 const CARD_DATA = [
     // --- 民進黨 (DPP) ---
     { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": { "side": "ALL", "type": "MINION" }, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
+    { "id": "TW044", "name": "黃捷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "RARE", "description": "新聞數值+1", "keywords": { "newsPower": 1 }, "image": "img/huang_jie.png" },
     { "id": "TW020", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼:將對手場上卡牌全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "image": "img/tw006.png" },
 
     // --- 國民黨 (KMT) ---
@@ -51,8 +52,8 @@ const CARD_DATA = [
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
     // --- 新聞 (News) ---
-    { "id": "S001", "name": "發票中獎", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽 2 張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
-    { "id": "S002", "name": "彈劾賴皇", "category": "新聞", "cost": 10, "type": "NEWS", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
+    { "id": "S001", "name": "發票中獎", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽兩張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
+    { "id": "S002", "name": "彈劾賴皇", "category": "新聞", "cost": 10, "type": "NEWS", "rarity": "EPIC", "description": "隨機分配 10 點傷害。", "keywords": { "battlecry": { "type": "MULTI_DAMAGE", "value": 10 } }, "image": "img/tw005.png" },
     { "id": "S003", "name": "大罷免", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
     { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
     { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
@@ -1227,10 +1228,12 @@ function endGame(result) {
     document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex
 }
 
-function formatDesc(text) {
+function formatDesc(text, newsBonus = 0, isNews = false) {
     if (!text) return "";
+    let formatted = text;
+
     // 1. Process explicit bolding: **text** -> <b>text</b>
-    let formatted = text.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
+    formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
     // 2. Auto-bold common keywords
     const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒", "持續效果"];
@@ -1241,6 +1244,28 @@ function formatDesc(text) {
 
     // 3. Special highlighting for "遺志" (Deathrattle) in yellow
     formatted = formatted.replace(/遺志/g, '<b style="color: #ffd700;">遺志</b>');
+
+    // 4. News Power Keywords Formatting
+    // Bold {新聞數值+n} or 新聞數值+n with green color
+    formatted = formatted.replace(/\{新聞數值\+(\d+)\}/g, '<b style="color: #00ff00;">新聞數值+$1</b>');
+    formatted = formatted.replace(/(?<!\{)新聞數值\+(\d+)(?!\})/g, '<b style="color: #00ff00;">新聞數值+$1</b>');
+
+    // 5. Dynamic News Power Bonus highlighting
+    if (isNews && newsBonus > 0) {
+        // Find numbers and replace with (val + bonus) while adding green color
+        // Skip numbers that are preceded by "+" or inside a tag
+        formatted = formatted.replace(/(\d+)(?!>)(?![^<]*<\/)/g, (match, p1, offset) => {
+            // Check context: skip if it's "張牌" or part of News Power keyword
+            const post = formatted.substring(offset + match.length, offset + match.length + 5);
+            if (post.includes('張牌')) return match;
+
+            const pre = formatted.substring(offset - 1, offset);
+            if (pre === '+') return match;
+
+            const val = parseInt(match);
+            return `<b class="stat-buffed">${val + newsBonus}</b>`;
+        });
+    }
 
     return formatted;
 }
@@ -1296,6 +1321,16 @@ function showPreview(card) {
     const isReduced = card.cost < baseCard.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
 
+    const bonus = (gameState && card.id) ? (gameState.getNewsPower(card.side || 'PLAYER') || 0) : 0;
+    const isNews = card.type === 'NEWS';
+    const bcType = card.keywords?.battlecry?.type || '';
+
+    // Strict rules: Only DAMAGE and HEAL related effects get bonus
+    const isDamage = bcType.includes('DAMAGE');
+    const isHeal = bcType.includes('HEAL') || bcType.includes('RECOVER');
+    const isExcluded = bcType.includes('DRAW') || bcType.includes('COST') || bcType.includes('REDUCE');
+    const effectiveBonus = (isNews && (isDamage || isHeal) && !isExcluded) ? bonus : 0;
+
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
@@ -1307,7 +1342,7 @@ function showPreview(card) {
             
             <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
             
-            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "")}</div>
+            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
             
             ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
         </div>
@@ -1379,6 +1414,16 @@ function createCardEl(card, index) {
     const isReduced = card.cost < baseCard.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
 
+    const bonus = (gameState && card.id) ? (gameState.getNewsPower(card.side || 'PLAYER') || 0) : 0;
+    const isNews = card.type === 'NEWS';
+    const bcType = card.keywords?.battlecry?.type || '';
+
+    // Strict rules: Only DAMAGE and HEAL related effects get bonus
+    const isDamage = bcType.includes('DAMAGE');
+    const isHeal = bcType.includes('HEAL') || bcType.includes('RECOVER');
+    const isExcluded = bcType.includes('DRAW') || bcType.includes('COST') || bcType.includes('REDUCE');
+    const effectiveBonus = (isNews && (isDamage || isHeal) && !isExcluded) ? bonus : 0;
+
     el.innerHTML = `
         <div class="card-cost ${costClass}"><span>${card.cost}</span></div>
         
@@ -1391,7 +1436,7 @@ function createCardEl(card, index) {
         
         <div class="card-category" style="margin: 2px 0; font-size: 7px;">${card.category || ""}</div>
         
-        <div class="card-desc" style="font-size: 8px; line-height: 1.1; overflow: hidden; padding: 2px; flex-grow: 1; text-align: center; white-space: pre-wrap;">${formatDesc(card.description)}</div>
+        <div class="card-desc" style="font-size: 8px; line-height: 1.1; overflow: hidden; padding: 2px; flex-grow: 1; text-align: center; white-space: pre-wrap;">${formatDesc(card.description, effectiveBonus, isNews)}</div>
         
         <!-- Stats are absolute positioned in CSS usually, but let's check -->
         ${statsHtml}
@@ -2454,6 +2499,13 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
         `<div class="card-art" style="width: 100%; height: 150px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
         `<div class="card-art" style="width: 100%; height: 100px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
 
+    const bonusPreview = (gameState && (card.side || 'PLAYER')) ? gameState.getNewsPower(card.side || 'PLAYER') : 0;
+    const bcTypePreview = card.keywords?.battlecry?.type || '';
+    const isDamagePreview = bcTypePreview.includes('DAMAGE');
+    const isHealPreview = bcTypePreview.includes('HEAL') || bcTypePreview.includes('RECOVER');
+    const isExcludedPreview = bcTypePreview.includes('DRAW') || bcTypePreview.includes('COST') || bcTypePreview.includes('REDUCE');
+    const effectiveBonusPreview = (card.type === 'NEWS' && (isDamagePreview || isHealPreview) && !isExcludedPreview) ? bonusPreview : 0;
+
     cardEl.innerHTML = `
         <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
             <div class="card-cost" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
@@ -2461,7 +2513,7 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
         </div>
         ${customArtHtml}
         <div class="card-category" style="font-size:16px; padding: 2px 10px; margin-bottom: 5px; flex-shrink: 0; text-align: center; color: #aaa;">${card.category || ""}</div>
-        <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description)}</div>
+        <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description, effectiveBonusPreview, card.type === 'NEWS')}</div>
         ${statsHtml}
     `;
 

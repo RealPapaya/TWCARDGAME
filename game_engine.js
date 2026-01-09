@@ -444,6 +444,24 @@ class GameState {
                     }
                 });
                 return { type: 'DESTROY_ALL', affected };
+            },
+            'MULTI_DAMAGE': (bc, target) => {
+                const damage = bc.value;
+                const enemies = [this.opponent.hero, ...this.opponent.board];
+                const hits = [];
+
+                for (let i = 0; i < damage; i++) {
+                    if (enemies.length === 0) break;
+                    const randTarget = enemies[Math.floor(Math.random() * enemies.length)];
+                    this.applyDamage(randTarget, 1);
+                    hits.push({ target: JSON.parse(JSON.stringify(randTarget)), value: 1 });
+
+                    if (randTarget.type === 'MINION' && randTarget.currentHealth <= 0) {
+                        const idx = enemies.indexOf(randTarget);
+                        if (idx > -1) enemies.splice(idx, 1);
+                    }
+                }
+                return { type: 'MULTI_DAMAGE', hits };
             }
         };
     }
@@ -479,6 +497,14 @@ class GameState {
 
     get opponent() {
         return this.players[this.currentPlayerIdx === 0 ? 1 : 0];
+    }
+
+    getNewsPower(side) {
+        const player = this.players.find(p => p.side === side);
+        if (!player) return 0;
+        return player.board.reduce((total, m) => {
+            return total + (m.keywords?.newsPower || 0);
+        }, 0);
     }
 
     /**
@@ -607,28 +633,16 @@ class GameState {
             }
         } else if (card.type === 'NEWS') {
             // Trigger News Effect (Battlecry logic reused for simplicity)
+            // Special Case for S002: Dynamic base damage based on deck
+            if (card.id === 'S002' && card.keywords?.battlecry) {
+                const baseDamage = player.deck.length === 0 ? 20 : 10;
+                card.keywords.battlecry.value = baseDamage;
+            }
+
             if (card.keywords && card.keywords.battlecry && !skipBattlecry) {
-                battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target);
-
-            } else if (card.id === 'S002') { // Impeach: Damage split
-                const damage = player.deck.length === 0 ? 20 : 10;
-                const enemies = [this.opponent.hero, ...this.opponent.board];
-                const hits = [];
-
-                for (let i = 0; i < damage; i++) {
-                    const target = enemies[Math.floor(Math.random() * enemies.length)];
-                    this.applyDamage(target, 1);
-                    hits.push({ target: JSON.parse(JSON.stringify(target)), value: 1 });
-                    // Filter out dead minions after each hit? 
-                    // Actually, Hearthstone "Randomly split" usually can hit already dead (at 0 HP) things in some cases, 
-                    // but better to filter. 
-                    if (target.type === 'MINION' && target.currentHealth <= 0) {
-                        const idx = enemies.indexOf(target);
-                        if (idx > -1) enemies.splice(idx, 1);
-                    }
-                    if (enemies.length === 0) break;
-                }
-                battlecryResult = { type: 'MULTI_DAMAGE', hits };
+                // Ensure card.side is available for News Power calculation
+                card.side = player.side;
+                battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target, card);
             }
         }
 
@@ -709,12 +723,29 @@ class GameState {
     resolveBattlecry(battlecry, target, sourceMinion = null) {
         if (!battlecry || target === 'PENDING') return null;
 
-        const handler = this.battlecryHandlers[battlecry.type];
-        if (handler) {
-            return handler(battlecry, target, sourceMinion);
+        // Apply News Power bonus if source is a News card
+        // Strictly only for DAMAGE and HEAL types. Exclude DRAW, COST and REDUCE variants.
+        let effectiveBattlecry = battlecry;
+        if (sourceMinion && sourceMinion.type === 'NEWS' && typeof battlecry.value === 'number') {
+            const isDamage = battlecry.type.includes('DAMAGE');
+            const isHeal = battlecry.type.includes('HEAL') || battlecry.type.includes('RECOVER');
+            const isExcluded = battlecry.type.includes('DRAW') || battlecry.type.includes('COST') || battlecry.type.includes('REDUCE');
+
+            if ((isDamage || isHeal) && !isExcluded) {
+                const bonusSide = sourceMinion.side || sourceMinion.ownerSide || 'PLAYER';
+                const bonus = this.getNewsPower(bonusSide);
+                if (bonus > 0) {
+                    effectiveBattlecry = { ...battlecry, value: battlecry.value + bonus };
+                }
+            }
         }
 
-        console.warn("Unhandled Battlecry Type:", battlecry.type);
+        const handler = this.battlecryHandlers[effectiveBattlecry.type];
+        if (handler) {
+            return handler(effectiveBattlecry, target, sourceMinion);
+        }
+
+        console.warn("Unhandled Battlecry Type:", effectiveBattlecry.type);
         return null;
     }
 
