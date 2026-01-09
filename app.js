@@ -1392,60 +1392,61 @@ function onDragMove(e) {
         if (draggingFromHand) {
             updateDraggedElPosition(e.clientX, e.clientY);
 
-            // Highlight board and calculate insertion index if hovering
-            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-            const board = document.getElementById('player-board');
-            const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board';
+            // Get the card being dragged
+            const card = gameState.currentPlayer.hand[attackerIndex];
 
-            if (isPlayerArea) {
-                board.classList.add('drop-highlight');
+            // Only show placement indicator for minions, not spells
+            if (card && card.type === 'MINION') {
+                const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+                const board = document.getElementById('player-board');
+                const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board';
 
-                let indicator = board.querySelector('.placement-indicator');
-                if (!indicator) {
-                    indicator = document.createElement('div');
-                    indicator.className = 'placement-indicator';
-                    board.appendChild(indicator);
-                }
+                if (isPlayerArea) {
+                    board.classList.add('drop-highlight');
 
-                // Calculate insertion index based on proximity to cousins (minion elements)
-                const minions = Array.from(board.children).filter(m => m.classList.contains('minion'));
+                    let indicator = board.querySelector('.placement-indicator');
+                    if (!indicator) {
+                        indicator = document.createElement('div');
+                        indicator.className = 'placement-indicator';
+                        board.appendChild(indicator);
+                    }
 
-                if (minions.length === 0) {
-                    currentInsertionIndex = 0;
-                    if (indicator.parentElement !== board) board.appendChild(indicator);
-                } else {
-                    let found = false;
-                    for (let i = 0; i < minions.length; i++) {
-                        const rect = minions[i].getBoundingClientRect();
-                        const centerX = rect.left + rect.width / 2;
+                    const minions = Array.from(board.children).filter(m => m.classList.contains('minion'));
 
-                        if (e.clientX < centerX) {
-                            currentInsertionIndex = i;
-                            // Insert indicator BEFORE this minion to push it right
-                            if (board.children[i] !== indicator) {
-                                board.insertBefore(indicator, minions[i]);
+                    if (minions.length === 0) {
+                        currentInsertionIndex = 0;
+                        if (indicator.parentElement !== board) board.appendChild(indicator);
+                    } else {
+                        let found = false;
+                        for (let i = 0; i < minions.length; i++) {
+                            const rect = minions[i].getBoundingClientRect();
+                            const centerX = rect.left + rect.width / 2;
+
+                            if (e.clientX < centerX) {
+                                currentInsertionIndex = i;
+                                if (board.children[i] !== indicator) {
+                                    board.insertBefore(indicator, minions[i]);
+                                }
+                                found = true;
+                                break;
                             }
-                            found = true;
-                            break;
+                        }
+                        if (!found) {
+                            currentInsertionIndex = minions.length;
+                            if (board.lastElementChild !== indicator) {
+                                board.appendChild(indicator);
+                            }
                         }
                     }
-                    if (!found) {
-                        currentInsertionIndex = minions.length;
-                        // Insert at the end
-                        if (board.lastElementChild !== indicator) {
-                            board.appendChild(indicator);
-                        }
+                    indicator.classList.add('active');
+                } else {
+                    board.classList.remove('drop-highlight');
+                    const indicator = board.querySelector('.placement-indicator');
+                    if (indicator) {
+                        indicator.classList.remove('active');
                     }
+                    currentInsertionIndex = -1;
                 }
-                indicator.classList.add('active');
-            } else {
-                board.classList.remove('drop-highlight');
-                const indicator = board.querySelector('.placement-indicator');
-                if (indicator) {
-                    indicator.classList.remove('active');
-                    // Removed immediate indicator.remove() to allow smooth collapse animation
-                }
-                currentInsertionIndex = -1;
             }
         }
     } else if (isBattlecryTargeting) {
