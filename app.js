@@ -76,6 +76,7 @@ let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
     { name: "預設牌組 2", cards: [] },
     { name: "預設牌組 3", cards: [] }
 ];
+let tempDeck = null; // Temporary deck for editing
 
 function migrateDecks() {
     // Migration Map to translate old IDs to new ones
@@ -189,15 +190,37 @@ function init() {
         });
     });
 
-    document.getElementById('btn-builder-back').addEventListener('click', () => {
+    document.getElementById('btn-builder-back').addEventListener('click', async () => {
+        if (tempDeck) {
+            // Check if name or cards have changed
+            const original = userDecks[editingDeckIdx];
+            // Sort cards for comparison to avoid false positives if order shouldn't matter? 
+            // Actually order matters in deck list usually? 
+            // The deck builder adds cards to end. 
+            // Let's stick to strict comparison including order.
+
+            // Note: We need to compare specific fields to avoid issues if other properties exist
+            const tempStr = JSON.stringify({ name: tempDeck.name, cards: tempDeck.cards });
+            const origStr = JSON.stringify({ name: original.name, cards: original.cards });
+
+            if (tempStr !== origStr) {
+                const confirmed = await showCustomConfirm("您有未保存的修改，確定要放棄並離開嗎？");
+                if (!confirmed) return;
+            }
+        }
+        tempDeck = null;
         showView('deck-selection');
         renderDeckSelect();
     });
 
     // --- Deck Builder Listeners ---
     document.getElementById('btn-save-deck').addEventListener('click', () => {
+        if (!tempDeck) return;
         const nameInput = document.getElementById('deck-name-input');
-        userDecks[editingDeckIdx].name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
+        tempDeck.name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
+
+        // Save back to main array
+        userDecks[editingDeckIdx] = JSON.parse(JSON.stringify(tempDeck));
         localStorage.setItem('userDecks', JSON.stringify(userDecks));
         showToast("保存成功！");
         renderDeckBuilder();
@@ -408,6 +431,8 @@ function renderDeckSelect() {
             editBtn.onclick = () => {
                 if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
                 editingDeckIdx = selectedDeckIdx;
+                // Deep copy for editing
+                tempDeck = JSON.parse(JSON.stringify(userDecks[editingDeckIdx]));
                 showView('deck-builder');
                 renderDeckBuilder();
             };
@@ -549,7 +574,8 @@ function initManaContainers(id) {
 }
 
 function renderDeckBuilder() {
-    const deck = userDecks[editingDeckIdx];
+    // Use tempDeck for rendering during edit
+    const deck = tempDeck || userDecks[editingDeckIdx];
     document.getElementById('deck-name-input').value = deck.name;
 
     const gridEl = document.getElementById('all-cards-grid');
