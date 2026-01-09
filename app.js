@@ -5,6 +5,8 @@ const CARD_DATA = [
     // --- 民進黨 (DPP) ---
     { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": { "side": "ALL", "type": "MINION" }, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },
     { "id": "TW044", "name": "黃捷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "RARE", "description": "新聞數值+1", "keywords": { "newsPower": 1 }, "image": "img/huang_jie.png" },
+    { "id": "TW045", "name": "蘇巧慧", "category": "民進黨政治人物", "cost": 5, "attack": 4, "health": 5, "type": "MINION", "rarity": "COMMON", "description": "新聞數值+2", "keywords": { "newsPower": 2 }, "image": "img/su_chiao_hui.png" },
+    { "id": "TW046", "name": "賴清德", "category": "民進黨政治人物", "cost": 7, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "由我來領導！！\n新聞數值+5", "keywords": { "newsPower": 5 }, "image": "img/lai_ching_te.png" },
     { "id": "TW020", "name": "蔡英文", "category": "民進黨政治人物", "cost": 6, "attack": 4, "health": 4, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼:將對手場上卡牌全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_ENEMY" } }, "image": "img/tw006.png" },
 
     // --- 國民黨 (KMT) ---
