@@ -489,7 +489,7 @@ class GameState {
             const targetUnit = this.getTargetUnit(target);
             if (targetUnit) {
                 targetUnit.currentHealth = 0; // Direct kill, ignore Divine Shield
-                this.resolveDeaths();
+                // this.resolveDeaths(); // Let app.js handle with animation
                 return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: 999 };
             }
         } else if (battlecry.type === 'BUFF_CATEGORY') {
@@ -611,7 +611,7 @@ class GameState {
 
                     // Kill target
                     targetUnit.currentHealth = 0;
-                    this.resolveDeaths();
+                    // this.resolveDeaths(); // Let app.js handle with animation
                     return { type: 'EAT', target: target, value: { attack: eatAtk, health: eatHp } };
                 }
             }
@@ -757,7 +757,7 @@ class GameState {
                     m.currentHealth = 0; // Bypass Divine Shield
                 }
             });
-            this.resolveDeaths();
+            // this.resolveDeaths(); // Let app.js handle with animation
             return { type: 'DESTROY_ALL', affected };
         }
     }
@@ -837,7 +837,8 @@ class GameState {
         if (unit.hp !== undefined) unit.hp = newHealth;
 
         this.updateEnrage(unit);
-        this.resolveDeaths();
+        // Don't resolve deaths here - let app.js handle it with animation
+        // this.resolveDeaths();
     }
 
     updateEnrage(unit) {
@@ -906,8 +907,24 @@ class GameState {
         attacker.canAttack = false;
         attacker.allowAttackCount = (attacker.allowAttackCount || 1) - 1;
 
-        // check deaths
-        this.resolveDeaths();
+        // Don't resolve deaths here - let app.js handle it with animation
+        // this.resolveDeaths();
+    }
+
+    /**
+     * Check for dead minions without removing them.
+     * Returns array of { side: 'PLAYER'|'OPPONENT', index: number }
+     */
+    checkDeaths() {
+        const dead = [];
+        [this.players[0], this.players[1]].forEach(p => {
+            for (let i = 0; i < p.board.length; i++) {
+                if (p.board[i].currentHealth <= 0) {
+                    dead.push({ side: p.side, index: i });
+                }
+            }
+        });
+        return dead;
     }
 
     resolveDeaths() {

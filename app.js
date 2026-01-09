@@ -1049,14 +1049,13 @@ function render() {
 
 async function resolveDeaths() {
     const dead = gameState.checkDeaths ? gameState.checkDeaths() : [];
+
     if (dead.length > 0) {
-        // Animate deaths
         const boards = [document.getElementById('player-board'), document.getElementById('opp-board')];
         for (const death of dead) {
             const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
             if (board && board.children[death.index]) {
-                const el = board.children[death.index];
-                await animateShatter(el);
+                await animateShatter(board.children[death.index]);
             }
         }
         gameState.resolveDeaths();
@@ -2377,7 +2376,10 @@ function spawnDustEffect(targetEl, intensity = 1) {
  * Shatters a minion element into fragments.
  */
 function animateShatter(el) {
-    return new Promise(resolve => {
+    return new Promise(async resolve => {
+        el.classList.add('dying');
+        await new Promise(r => setTimeout(r, 400));
+
         const rect = el.getBoundingClientRect();
         const container = document.createElement('div');
         container.style.position = 'fixed';
@@ -2389,15 +2391,11 @@ function animateShatter(el) {
         container.style.zIndex = '2000';
         document.body.appendChild(container);
 
-        // Hide original
         el.style.visibility = 'hidden';
 
-        const cols = 4; // More fragments
-        const rows = 5;
+        const cols = 4, rows = 5;
         const fragW = rect.width / cols;
         const fragH = rect.height / rows;
-
-        // Get original image if any
         const artEl = el.querySelector('.minion-art');
         const bgImg = artEl ? artEl.style.backgroundImage : null;
 

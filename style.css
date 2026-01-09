@@ -811,6 +811,21 @@ body {
     }
 }
 
+/* Death Animation - Grayscale Transition */
+@keyframes grayscale-death {
+    0% {
+        filter: grayscale(0) brightness(1);
+    }
+
+    100% {
+        filter: grayscale(1) brightness(0.7);
+    }
+}
+
+.minion.dying {
+    animation: grayscale-death 0.4s ease-out forwards;
+}
+
 /* Shatter Effect */
 .shatter-fragment {
     position: absolute;
@@ -826,11 +841,13 @@ body {
     0% {
         transform: translate(0, 0) rotate(0deg) scale(1);
         opacity: 1;
+        filter: grayscale(1) brightness(0.7);
     }
 
     100% {
         transform: translate(var(--dx), var(--dy)) rotate(var(--dr)) scale(0);
         opacity: 0;
+        filter: grayscale(1) brightness(0.7);
     }
 }
 
