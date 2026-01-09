@@ -256,8 +256,8 @@ class GameState {
             if (minion.keywords && minion.keywords.battlecry && !skipBattlecry) {
                 battlecryResult = this.resolveBattlecry(minion.keywords.battlecry, target, minion);
             }
-        } else if (card.type === 'SPELL') {
-            // Trigger Spell Effect (Battlecry logic reused for simplicity)
+        } else if (card.type === 'NEWS') {
+            // Trigger News Effect (Battlecry logic reused for simplicity)
             if (card.keywords && card.keywords.battlecry && !skipBattlecry) {
                 battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target);
 
@@ -1044,13 +1044,13 @@ class AIEngine {
                     actions.push({ type: 'ATTACK', attackerIndex: index, target: { type: 'HERO' } });
                 }
             });
-            // Queue damage spells from hand? (Simplified: Hand logic separate)
+            // Queue damage newss from hand? (Simplified: Hand logic separate)
             // For now, if board lethal, just attack.
             // If hand lethal needed, that logic is more complex.
         } else {
             // 2. Play Cycle (Board Control & Mana Efficiency)
 
-            // A. Play Minions/Spells
+            // A. Play Minions/News
             // Sort hand by cost high->low to use mana efficiently, or check keywords?
             // Simple heuristic: Try to spend max mana.
 
@@ -1153,10 +1153,10 @@ class AIEngine {
             // Sequence Priority: 
             // 1. Standard Minions (no board-wide buff or target required if no targets)
             // 2. Buff/Heal Minions (triggered after minions are on board)
-            // 3. Spells (only if targets exist or beneficial)
+            // 3. News (only if targets exist or beneficial)
 
             const minions = playableCards.filter(c => c.type === 'MINION');
-            const spells = playableCards.filter(c => c.type === 'SPELL');
+            const newss = playableCards.filter(c => c.type === 'NEWS');
 
             // Find valid minions to play
             if (minions.length > 0 && aiPlayer.board.length < 7) {
@@ -1195,13 +1195,13 @@ class AIEngine {
                 }
             }
 
-            // Play spells
-            if (spells.length > 0) {
-                for (const choice of spells) {
+            // Play newss
+            if (newss.length > 0) {
+                for (const choice of newss) {
                     let target = null;
                     if (choice.keywords?.battlecry?.target) {
                         target = this.getBattlecryTarget(choice.keywords.battlecry, gameState, aiPlayer, opponent);
-                        if (!target) continue; // Spells MUST have targets if they have a target rule
+                        if (!target) continue; // News MUST have targets if they have a target rule
                     }
                     return { type: 'PLAY_CARD', index: choice.originalIndex, target: target };
                 }

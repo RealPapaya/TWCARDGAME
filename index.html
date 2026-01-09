@@ -77,7 +77,9 @@
         <div class="menu-content">
             <h2 class="sub-title">選擇挑戰主題</h2>
             <div id="theme-cards-container"></div>
-            <button class="neon-button secondary btn-back">返回</button>
+            <div class="menu-buttons" style="margin-top: 20px;">
+                <button class="neon-button secondary btn-back">返回</button>
+            </div>
         </div>
     </div>
 
@@ -88,9 +90,11 @@
             <div class="deck-slots-container" id="deck-select-slots">
                 <!-- Slots will be rendered by JS -->
             </div>
-            <div class="menu-buttons" style="margin-top: 40px; flex-direction: row; justify-content: center;">
-                <button id="btn-edit-deck" class="neon-button" style="display: none;">編輯牌組</button>
-                <button id="btn-start-battle" class="neon-button" style="display: none;">開始戰鬥</button>
+            <div class="menu-buttons" style="margin-top: 40px;">
+                <div style="display: flex; gap: 20px;justify-content: center; width: 100%;">
+                    <button id="btn-edit-deck" class="neon-button" style="display: none;">編輯牌組</button>
+                    <button id="btn-start-battle" class="neon-button" style="display: none;">開始戰鬥</button>
+                </div>
                 <button class="neon-button secondary btn-back">返回</button>
             </div>
         </div>

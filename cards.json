@@ -79,7 +79,7 @@
     "name": "發財支票",
     "title": "發財支票",
     "cost": 2,
-    "type": "SPELL",
+    "type": "NEWS",
     "rarity": "COMMON",
     "description": "選舉支票 (Electoral Promise): 下回合開始時，抽 2 張牌。"
   },
@@ -88,7 +88,7 @@
     "name": "用愛發電",
     "title": "用愛發電",
     "cost": 10,
-    "type": "SPELL",
+    "type": "NEWS",
     "rarity": "EPIC",
     "description": "造成 10 點傷害，隨機分配給所有敵人。如果你的牌堆沒有牌，改為造成 20 點。"
   },

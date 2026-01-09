@@ -50,21 +50,21 @@ const CARD_DATA = [
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
-    // --- 法術 (Spells) ---
-    { "id": "S001", "name": "發票中獎", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽 2 張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
-    { "id": "S002", "name": "彈劾賴皇", "category": "法術", "cost": 10, "type": "SPELL", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
-    { "id": "S003", "name": "大罷免", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
-    { "id": "S004", "name": "造勢晚會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
-    { "id": "S005", "name": "倒閣", "category": "法術", "cost": 4, "type": "SPELL", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
-    { "id": "S006", "name": "砸雞蛋", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
-    { "id": "S007", "name": "召開記者會", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
-    { "id": "S008", "name": "法院傳票", "category": "法術", "cost": 2, "type": "SPELL", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
+    // --- 新聞 (News) ---
+    { "id": "S001", "name": "發票中獎", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽 2 張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
+    { "id": "S002", "name": "彈劾賴皇", "category": "新聞", "cost": 10, "type": "NEWS", "rarity": "EPIC", "description": "造成 10 點傷害。", "keywords": { "battlecry": { "type": "DAMAGE", "value": 10, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw005.png" },
+    { "id": "S003", "name": "大罷免", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
+    { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
+    { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
+    { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
+    { "id": "S007", "name": "召開記者會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
+    { "id": "S008", "name": "法院傳票", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
     { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
-    { "id": "S009", "name": "政治切割", "category": "法術", "cost": 1, "type": "SPELL", "rarity": "COMMON", "description": "戰吼:丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
+    { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "戰吼:丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
     { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
-    { "id": "S010", "name": "921大地震", "category": "法術", "cost": 7, "type": "SPELL", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" }
+    { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" }
 ];
 
 let cardDB = [];
@@ -905,14 +905,14 @@ function renderDeckBuilder() {
     // Calculate Stats
     let totalCost = 0;
     let minionCount = 0;
-    let spellCount = 0;
+    let newsCount = 0;
 
     deck.cards.forEach(id => {
         const card = CARD_DATA.find(c => c.id === id);
         if (card) {
             totalCost += card.cost;
             if (card.type === 'MINION') minionCount++;
-            else if (card.type === 'SPELL') spellCount++;
+            else if (card.type === 'NEWS') newsCount++;
         }
     });
 
@@ -923,7 +923,7 @@ function renderDeckBuilder() {
         statsEl.innerHTML = `
             <div class="stat-row">平均花費: <span style="color:var(--neon-cyan)">${avgCost}</span></div>
             <div class="stat-row">單位卡: <span style="color:var(--neon-yellow)">${minionCount}</span></div>
-            <div class="stat-row">技能卡: <span style="color:#ff4b2b">${spellCount}</span></div>
+            <div class="stat-row">技能卡: <span style="color:#ff4b2b">${newsCount}</span></div>
         `;
     }
 }
@@ -1261,7 +1261,7 @@ function showPreview(card) {
 
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
-    if (card.attack !== undefined && card.health !== undefined && card.type !== 'SPELL') {
+    if (card.attack !== undefined && card.health !== undefined && card.type !== 'NEWS') {
         const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
@@ -1283,7 +1283,7 @@ function showPreview(card) {
     const costClass = isReduced ? 'cost-reduced' : '';
 
     preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
+        <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
                 <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost ?? 0}</span></div>
                 <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
@@ -1308,7 +1308,7 @@ function hidePreview() {
 function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
-    el.className = `card rarity-${rarityClass} ${card.type === 'SPELL' ? 'spell-card' : ''}`;
+    el.className = `card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}`;
     el.dataset.id = card.id;
     el.dataset.type = card.type;
     el.dataset.category = card.category || '';
@@ -1470,7 +1470,7 @@ let draggingFromHand = false;
 let draggedEl = null;
 let isBattlecryTargeting = false;
 let battlecrySourceIndex = -1;
-let battlecrySourceType = 'MINION'; // 'MINION' or 'SPELL'
+let battlecrySourceType = 'MINION'; // 'MINION' or 'NEWS'
 let battlecryTargetRule = null;
 let draggingMode = 'DAMAGE'; // 'DAMAGE', 'HEAL', 'BUFF'
 let currentInsertionIndex = -1;
@@ -1534,7 +1534,7 @@ function onDragMove(e) {
             // Get the card being dragged
             const card = gameState.currentPlayer.hand[attackerIndex];
 
-            // Only show placement indicator for minions, not spells
+            // Only show placement indicator for minions, not newss
             if (card && card.type === 'MINION') {
                 const targetEl = document.elementFromPoint(e.clientX, e.clientY);
                 const board = document.getElementById('player-board');
@@ -1695,9 +1695,9 @@ async function onDragEnd(e) {
 
                 if (isTargeted) {
                     const validTargets = getValidTargets(battlecry.target);
-                    // Special rule: For spells, even if no minions exist, allow hero-targeting UI to trigger
+                    // Special rule: For newss, even if no minions exist, allow hero-targeting UI to trigger
                     // to avoid "dead" drag experience (user can still cancel or try to hit hero if rule allows)
-                    if (validTargets.length === 0 && card.type !== 'SPELL') {
+                    if (validTargets.length === 0 && card.type !== 'NEWS') {
                         logMessage("無合法目標！");
                         render();
                         return;
@@ -1715,19 +1715,19 @@ async function onDragEnd(e) {
                             mode = 'DAMAGE'; // Explicitly set DAMAGE for Hsieh
                         }
 
-                        if (card.type === 'SPELL') {
-                            battlecrySourceType = 'SPELL';
+                        if (card.type === 'NEWS') {
+                            battlecrySourceType = 'NEWS';
                             // Hide the card in hand to simulate it "becoming" the arrow
                             const handCardEl = document.getElementById('player-hand').children[attackerIndex];
                             if (handCardEl) handCardEl.style.opacity = '0';
 
-                            // Arrow starts from hero for spells
+                            // Arrow starts from hero for newss
                             const heroRect = document.getElementById('player-hero').getBoundingClientRect();
                             const startX = heroRect.left + heroRect.width / 2;
                             const startY = heroRect.top + heroRect.height / 2;
 
                             // Pass full battlecry object to support category checks
-                            startBattlecryTargeting(attackerIndex, startX, startY, mode, battlecry, 'SPELL');
+                            startBattlecryTargeting(attackerIndex, startX, startY, mode, battlecry, 'NEWS');
                         } else { // Minion with Battlecry
                             gameState.playCard(attackerIndex, 'PENDING', currentInsertionIndex);
                             render();
@@ -1941,7 +1941,7 @@ async function onDragEnd(e) {
             if (target) {
                 // 1. Identify Source & Dest for Animation
                 let sourceEl;
-                if (battlecrySourceType === 'SPELL') {
+                if (battlecrySourceType === 'NEWS') {
                     // Source is Hand Card (it's hidden but element exists until render)
                     sourceEl = document.getElementById('player-hand').children[battlecrySourceIndex];
                 } else {
@@ -1971,8 +1971,8 @@ async function onDragEnd(e) {
                 }
 
                 // 3. Execute Game Logic (Phase 2)
-                if (battlecrySourceType === 'SPELL') {
-                    // For Spell: Now we play it
+                if (battlecrySourceType === 'NEWS') {
+                    // For News: Now we play it
                     const card = gameState.currentPlayer.hand[battlecrySourceIndex];
                     gameState.playCard(battlecrySourceIndex, target);
                 } else {
@@ -1988,7 +1988,7 @@ async function onDragEnd(e) {
 
             } else {
                 // Non-targeted logic (Fallback for Minions played without target if flow allows, or AOE)
-                // Note: If battlecrySourceType is SPELL and target is null, we cancelled (handled in 'else' of outer block if exists, but here structure is try/catch)
+                // Note: If battlecrySourceType is NEWS and target is null, we cancelled (handled in 'else' of outer block if exists, but here structure is try/catch)
                 // Actually, earlier we checked 'if (target)'. If not target...
                 // If it's a MINION with non-targeted battlecry (e.g. AOE), we should trigger it.
 
@@ -2015,7 +2015,7 @@ async function onDragEnd(e) {
                         }, 100);
                     }
                 }
-                // If Spell and no target, we do nothing (cancel).
+                // If News and no target, we do nothing (cancel).
             }
         } catch (err) {
             logMessage(err.message);
@@ -2041,7 +2041,7 @@ function cancelBattlecryTargeting() {
             logMessage("取消出牌 (隨從已退回)");
         }
     } else {
-        // Spell: Mana wasn't spent yet, just show card again
+        // News: Mana wasn't spent yet, just show card again
         const handCardEl = document.getElementById('player-hand').children[battlecrySourceIndex];
         if (handCardEl) handCardEl.style.opacity = '1';
         logMessage("取消出牌");
@@ -2410,7 +2410,7 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
     // Create a big version of the card manually to ensure perfect scaling
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
     const cardEl = document.createElement('div');
-    cardEl.className = `card rarity-${rarityClass} preview-card-3d ${card.type === 'SPELL' ? 'spell-card' : ''}`;
+    cardEl.className = `card rarity-${rarityClass} preview-card-3d ${card.type === 'NEWS' ? 'news-card' : ''}`;
 
     // We override styles for the 3D preview
     cardEl.style.width = '280px';

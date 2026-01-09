@@ -1538,14 +1538,14 @@ body {
     color: #ff8000;
 }
 
-/* Spell Cards */
-.spell-card {
+/* News Cards */
+.news-card {
     border-radius: 20px;
-    /* Rounder shape for spells */
+    /* Rounder shape for newss */
     background: radial-gradient(circle at center, #2c2c35, #1a1a1d);
 }
 
-.spell-card .card-cost {
+.news-card .card-cost {
     background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
     border-color: #38f9d7;
     color: #000;

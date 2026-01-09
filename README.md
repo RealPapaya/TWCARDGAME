@@ -29,14 +29,14 @@
 }
 ```
 
-#### 法術卡 (Spell) 模板
+#### 新聞卡 (News) 模板
 ```javascript
 { 
     "id": "twXXX", 
     "name": "", 
-    "category": "法術", 
+    "category": "新聞", 
     "cost": , 
-    "type": "SPELL", 
+    "type": "NEWS", 
     "rarity": "COMMON/RARE/EPIC/LEGENDARY", 
     "keywords": {}
     "description": "", 

@@ -5,7 +5,7 @@ const MOCK_DB = [
     { id: 'c1', name: 'Student', cost: 1, attack: 2, health: 1, type: 'MINION' },
     { id: 'c2', name: 'Guard', cost: 2, attack: 2, health: 3, type: 'MINION', keywords: { taunt: true } },
     { id: 'c5', name: 'BigGuy', cost: 5, attack: 5, health: 5, type: 'MINION' },
-    { id: 's1', name: 'Burn', cost: 2, type: 'SPELL', keywords: { battlecry: { type: 'DAMAGE', value: 3, target: 'ANY' } } }
+    { id: 's1', name: 'Burn', cost: 2, type: 'NEWS', keywords: { battlecry: { type: 'DAMAGE', value: 3, target: 'ANY' } } }
 ];
 
 function runTests() {
