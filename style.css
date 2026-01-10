@@ -1339,6 +1339,12 @@ body {
     margin: 0 10px;
 }
 
+/* Playable card (enough mana) */
+.card.can-play {
+    border-color: var(--neon-lime) !important;
+    box-shadow: 0 0 20px var(--neon-lime), 0 5px 15px rgba(0, 0, 0, 0.4) !important;
+}
+
 .hand .card:active {
     cursor: grabbing;
 }

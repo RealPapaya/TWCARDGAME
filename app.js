@@ -1524,7 +1524,18 @@ function positionPreviewNearElement(element) {
 function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
-    el.className = `card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}`;
+
+    // Check if card is playable (enough mana)
+    let canPlayClass = '';
+    if (gameState && gameState.currentPlayerIdx === 0 && index !== -1) {
+        const player = gameState.players[0];
+        const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
+        if (player.mana.current >= actualCost) {
+            canPlayClass = ' can-play';
+        }
+    }
+
+    el.className = `card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}${canPlayClass}`;
     el.dataset.id = card.id;
     el.dataset.type = card.type;
     el.dataset.category = card.category || '';
