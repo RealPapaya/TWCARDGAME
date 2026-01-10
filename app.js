@@ -50,7 +50,7 @@ const CARD_DATA = [
     { "id": "TW006", "name": "廟口管委", "category": "勞工", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "", "image": "img/c013.png" },
     { "id": "TW007", "name": "外送師", "category": "勞工", "cost": 3, "attack": 3, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "我是外送師！！\n衝鋒", "keywords": { "charge": true }, "image": "img/tw007.png" },
     { "id": "TW008", "name": "手搖員工", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "戰吼: 回復一個單位2點血量", "keywords": { "battlecry": { "type": "HEAL", "value": 2, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/tw014.png" },
-    { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "激怒: 增加3點攻擊 極度耐操", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw015.png" },
+    { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 1, "health": 4, "type": "MINION", "rarity": "RARE", "description": "激怒: 增加3點攻擊 極度耐操", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw015.png" },
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
@@ -61,7 +61,7 @@ const CARD_DATA = [
     { "id": "S003", "name": "大罷免", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
     { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜!!\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
     { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
-    { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
+    { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對一個敵方單位造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ENEMY", "type": "ALL" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
     { "id": "S008", "name": "法院傳票", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
     { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "丟棄一張手牌,抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
@@ -75,7 +75,7 @@ const CARD_DATA = [
     { "id": "S017", "name": "緋聞", "category": "新聞", "cost": 6, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力5點以上的敵方隨從", "keywords": { "battlecry": { "type": "DESTROY_HIGH_ATTACK", "value": 5, "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/scandal.png" },
     { "id": "S018", "name": "炎上", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "RARE", "description": "擊殺一名受傷的隨從", "keywords": { "battlecry": { "type": "DESTROY_DAMAGED", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/burn.png" },
     { "id": "S019", "name": "查水表", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "對敵方所有隨從造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_ENEMY_MINIONS", "value": 2 } }, "image": "img/check_water_meter.png" },
-    { "id": "S020", "name": "政治清算", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對一個敵方隨從造成7點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 7, "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/political_purge.png" },
+    { "id": "S020", "name": "政治清算", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對一個敵方單位造成7點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 7, "target": { "side": "ENEMY", "type": "ALL" } } }, "image": "img/political_purge.png" },
 
     // --- 隨從 (Minions) - 網軍 ---
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
@@ -312,6 +312,17 @@ function init() {
             showToast("保存成功！");
         }
         renderDeckBuilder();
+    });
+
+    // Clear Deck Listener
+    document.getElementById('btn-clear-deck')?.addEventListener('click', async () => {
+        if (!tempDeck || tempDeck.cards.length === 0) return;
+        const confirmed = await showCustomConfirm("確定要清空目前牌組嗎？");
+        if (confirmed) {
+            tempDeck.cards = [];
+            renderDeckBuilder();
+            showToast("牌組已清空");
+        }
     });
 
     // Search Listener
@@ -1382,20 +1393,94 @@ function showPreview(card) {
     const isExcluded = bcType.includes('DRAW') || bcType.includes('COST') || bcType.includes('REDUCE');
     const effectiveBonus = (isNews && (isDamage || isHeal) && !isExcluded) ? bonus : 0;
 
-    preview.innerHTML = `
-        <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
-            <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${actualCost ?? 0}</span></div>
-                <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
+    // Generate Keyword Tooltips
+    let keywordHtml = '';
+    const keywordsList = [];
+
+    // Check for Charge
+    if (card.keywords?.charge) {
+        keywordsList.push({ title: "衝鋒", desc: "上場即可馬上攻擊" });
+    }
+    // Check for Taunt
+    if (card.keywords?.taunt) {
+        keywordsList.push({ title: "嘲諷", desc: "敵人必須優先攻擊此隨從" });
+    }
+    // Check for Divine Shield
+    if (card.keywords?.divineShield) {
+        keywordsList.push({ title: "光盾", desc: "抵擋一次受到的傷害" });
+    }
+    // Check for Battlecry (Exclude NEWS cards)
+    if (card.keywords?.battlecry && card.type !== 'NEWS') {
+        keywordsList.push({ title: "戰吼", desc: "從手牌打出時觸發的效果" });
+    }
+    // Check for Deathrattle
+    if (card.keywords?.deathrattle) {
+        keywordsList.push({ title: "遺志", desc: "死亡時觸發的效果" });
+    }
+    // Check for News Power
+    if (card.keywords?.newsPower) {
+        keywordsList.push({ title: "新聞數值", desc: "強化新聞卡牌的攻擊力/回復量數值" });
+    }
+    // Check for Ongoing
+    if (card.keywords?.ongoing) {
+        keywordsList.push({ title: "持續效果", desc: "只要此卡在場上就會持續生效" });
+    }
+    // Check for Enrage
+    if (card.keywords?.enrage) {
+        keywordsList.push({ title: "激怒", desc: "受傷時獲得的效果" });
+    }
+
+    if (keywordsList.length > 0) {
+        keywordHtml = `
+            <div class="keyword-tooltip-container" style="
+                margin-left: 20px;
+                margin-right: 20px;
+                display: flex;
+                flex-direction: column;
+                gap: 6px;
+                z-index: 10002;
+            ">
+                ${keywordsList.map(k => `
+                    <div class="keyword-box" style="
+                        background: rgba(42, 42, 48, 0.95);
+                        border: 1px solid #555;
+                        border-radius: 6px;
+                        padding: 6px 10px;
+                        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+                        min-width: 140px;
+                        max-width: 180px;
+                        white-space: nowrap;
+                    ">
+                        <div style="color: var(--neon-cyan); font-weight: bold; font-size: 13px; margin-bottom: 3px;">${k.title}</div>
+                        <div style="color: #bbb; font-size: 11px; line-height: 1.3; white-space: normal;">${k.desc}</div>
+                    </div>
+                `).join('')}
             </div>
-            
-            ${artHtml}
-            
-            <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
-            
-            <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
-            
-            ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
+        `;
+    }
+
+    // Check if preview is on the right side (deck builder right panel)
+    const previewStyle = window.getComputedStyle(preview);
+    const isPreviewOnRight = preview.style.right === '40px' || preview.style.left === 'auto';
+    const flexDirection = isPreviewOnRight ? 'row-reverse' : 'row';
+
+    preview.innerHTML = `
+        <div style="display: flex; flex-direction: ${flexDirection}; align-items: flex-start; pointer-events: none;">
+            <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px; flex-shrink: 0;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
+                    <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${actualCost ?? 0}</span></div>
+                    <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
+                </div>
+                
+                ${artHtml}
+                
+                <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
+                
+                <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
+                
+                ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
+            </div>
+            ${keywordHtml}
         </div>
     `;
     preview.style.display = 'block';
