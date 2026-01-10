@@ -769,32 +769,43 @@ class GameState {
         // Check for REDUCE_NEWS_COST ongoing effects
         if (card.type === 'NEWS') {
             player.board.forEach(minion => {
+                // Modular check: any minion with this keyword reduces cost
                 if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
-                    cost -= minion.keywords.ongoing.value;
+                    const val = minion.keywords.ongoing.value || 0;
+                    cost -= val;
                 }
             });
         }
 
-        return Math.max(0, cost); // Cost cannot go below 0
+        const finalCost = Math.max(0, cost);
+        // console.log(`[DEBUG] Cost calc for ${card.name}: Base=${card.cost}, Final=${finalCost}`);
+        return finalCost;
     }
 
     /**
      * Play a card from hand.
      * @param {number} cardIndex Index in hand
-     * @param {Object} target Target info { type: 'HERO'|'MINION', index: number } (Optional)
+     * @param {Object} target Target info { type: 'HERO'|'MINION'|'PLAYER', index: number } (Optional)
      * @param {number} insertionIndex Preferred index on board (Optional)
      */
     canPlayCard(cardIndex) {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
         if (!card) return false;
+
+        // Critical Fix: Use getCardActualCost for validation logic too
         const actualCost = this.getCardActualCost(card);
+
         if (player.mana.current < actualCost) return false;
         if (player.board.length >= 7 && card.type === 'MINION') return false;
 
         // Discard Play Restriction
         if (card.keywords && card.keywords.battlecry && card.keywords.battlecry.type === 'DISCARD_RANDOM') {
             const count = card.keywords.battlecry.value || 1;
+            // The card itself is in hand, so we have hand.length cards.
+            // If we have 1 card (this one) and need to discard 1, we can't discard "another" card.
+            // Logic: play card -> remove from hand -> trigger battlecry -> discard from REMAINING hand.
+            // So if hand.length (including self) <= count, we have < count remaining.
             if (player.hand.length <= count) return false;
         }
 

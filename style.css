@@ -1039,6 +1039,160 @@ body {
     animation: grayscale-death 0.4s ease-out forwards;
 }
 
+/* Poison Gas Effect */
+.poison-gas-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: radial-gradient(circle, rgba(0, 255, 0, 0.4) 0%, rgba(0, 100, 0, 0.1) 70%, transparent 100%);
+    pointer-events: none;
+    z-index: 5000;
+    opacity: 0;
+    filter: blur(20px);
+    mix-blend-mode: screen;
+}
+
+.gas-active {
+    animation: poison-gas-spread 3s ease-in-out forwards;
+}
+
+@keyframes poison-gas-spread {
+    0% {
+        transform: scale(0.5);
+        opacity: 0;
+        filter: blur(40px);
+    }
+
+    20% {
+        transform: scale(1.1);
+        opacity: 0.8;
+        filter: blur(20px);
+    }
+
+    80% {
+        transform: scale(1.2);
+        opacity: 0.6;
+        filter: blur(30px);
+    }
+
+    100% {
+        transform: scale(1.5);
+        opacity: 0;
+        filter: blur(50px);
+    }
+}
+
+.gas-cloud {
+    position: absolute;
+    background: rgba(100, 255, 100, 0.3);
+    border-radius: 50%;
+    filter: blur(30px);
+    pointer-events: none;
+}
+
+/* Ripple Diffusion Effect */
+.ripple-wave {
+    position: absolute;
+    border: 3px solid rgba(0, 242, 254, 0.6);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 5000;
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.4), inset 0 0 20px rgba(0, 242, 254, 0.4);
+    transform: translate(-50%, -50%) scale(0);
+    opacity: 0;
+}
+
+.ripple-active {
+    animation: ripple-spread 1.5s ease-out forwards;
+}
+
+@keyframes ripple-spread {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, -300%) scale(10);
+        opacity: 0;
+    }
+}
+
+
+@keyframes ripple-spread-opp {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0;
+    }
+
+    20% {
+        opacity: 1;
+    }
+
+    100% {
+        transform: translate(-50%, 200%) scale(10);
+        opacity: 0;
+    }
+}
+
+/* Purge Mark Effect */
+.purge-mark {
+    position: absolute;
+    width: 100px;
+    height: 100px;
+    border: 5px solid #ff0000;
+    border-radius: 50%;
+    box-shadow: 0 0 20px #ff0000, inset 0 0 20px #ff0000;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 5000;
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.purge-mark::before {
+    content: 'X';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: #ff0000;
+    font-size: 80px;
+    font-weight: bold;
+    text-shadow: 0 0 10px #000;
+}
+
+.purge-active {
+    animation: purge-slam 0.6s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes purge-slam {
+    0% {
+        transform: scale(3) rotate(45deg);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1) rotate(0deg);
+        opacity: 1;
+    }
+
+    70% {
+        transform: scale(1.1) rotate(0deg);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0;
+    }
+}
+
 /* Shatter Effect */
 .shatter-fragment {
     position: absolute;

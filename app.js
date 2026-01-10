@@ -75,6 +75,7 @@ const CARD_DATA = [
     { "id": "S017", "name": "緋聞", "category": "新聞", "cost": 6, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力5點以上的敵方隨從", "keywords": { "battlecry": { "type": "DESTROY_HIGH_ATTACK", "value": 5, "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/scandal.png" },
     { "id": "S018", "name": "炎上", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "RARE", "description": "擊殺一名受傷的隨從", "keywords": { "battlecry": { "type": "DESTROY_DAMAGED", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/burn.png" },
     { "id": "S019", "name": "查水表", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "對敵方所有隨從造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_ENEMY_MINIONS", "value": 2 } }, "image": "img/check_water_meter.png" },
+    { "id": "S020", "name": "政治清算", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對一個敵方隨從造成7點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 7, "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/political_purge.png" },
 
     // --- 隨從 (Minions) - 網軍 ---
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
@@ -1609,7 +1610,9 @@ function onDragStart(e, index, fromHand = false) {
     if (isBattlecryTargeting) return; // Finish targeting first
 
     const card = gameState.currentPlayer.hand[index];
-    if (fromHand && card && gameState.currentPlayer.mana.current < card.cost) {
+    // Use actual cost for drag start check
+    const actualCost = gameState.getCardActualCost(card);
+    if (fromHand && card && gameState.currentPlayer.mana.current < actualCost) {
         shakeManaContainer(true);
     }
 
@@ -1802,31 +1805,38 @@ async function onDragEnd(e) {
             }
 
             if (isPlayValidated) {
-                if (gameState.currentPlayer.mana.current < gameState.getCardActualCost(card)) {
-                    shakeManaContainer(true);
+                // Use centralized validation from game engine to ensure consistency (e.g. cost reduction)
+                if (!gameState.canPlayCard(attackerIndex)) {
+                    // Start: Diagnostics for UX
+                    const actualCost = gameState.getCardActualCost(card);
+                    if (gameState.currentPlayer.mana.current < actualCost) {
+                        shakeManaContainer(true);
+                    } else if (card.type === 'MINION' && gameState.currentPlayer.board.length >= 7) {
+                        logMessage("戰場已滿!");
+                    } else if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM') {
+                        logMessage("手牌不足以發動棄牌效果!");
+                    } else {
+                        logMessage("無法打出此卡!");
+                    }
+                    // End: Diagnostics
+
                     const originalEl = document.getElementById('player-hand').children[attackerIndex];
                     if (originalEl) originalEl.style.opacity = '1';
                     render();
                     return;
                 }
 
-                // Call preview with insertion target for smoke positioning
                 const targetSlot = document.getElementById('player-board').children[currentInsertionIndex];
-                showCardPlayPreview(card, false, targetSlot);
-
-                if (card.type === 'MINION' && gameState.currentPlayer.board.length >= 7) {
-                    logMessage("Board full!");
-                    return;
-                }
 
                 // Targeted Battlecry check
                 const battlecry = card.keywords?.battlecry;
                 const isTargeted = battlecry && battlecry.target && typeof battlecry.target === 'object';
 
                 // Show Preview before playing
-                await showCardPlayPreview(card);
+                await showCardPlayPreview(card, false, targetSlot);
+
                 // Extra delay for targeted cards so player sees the card land
-                if (isTargeted) await new Promise(r => setTimeout(r, 300));
+                if (isTargeted) await new Promise(r => setTimeout(r, 200));
 
                 if (isTargeted) {
                     const validTargets = getValidTargets(battlecry.target);
@@ -1909,11 +1919,19 @@ async function onDragEnd(e) {
                             if (result.type === 'DAMAGE' || result.type === 'HEAL' || result.type === 'BUFF') {
                                 // Find the DOM element for the target
                                 let targetEl = null;
-                                if (result.target.type === 'HERO') {
-                                    targetEl = result.target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
-                                } else {
-                                    const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                    targetEl = document.getElementById(boardId).children[result.target.index];
+
+                                if (result.target) {
+                                    if (result.target.type === 'HERO') {
+                                        targetEl = result.target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
+                                    } else {
+                                        const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                        const board = document.getElementById(boardId);
+                                        if (board) targetEl = board.children[result.target.index];
+                                    }
+                                }
+
+                                if (playedCard.id === 'S020' && targetEl) {
+                                    triggerPurgeAnimation(targetEl);
                                 }
 
                                 if (targetEl) {
@@ -1937,6 +1955,21 @@ async function onDragEnd(e) {
                                 // Trigger Full Board Visual Effect instead of granular ones
                                 const isPlayer = result.affected[0]?.unit.side === 'PLAYER';
                                 triggerFullBoardHealAnimation(isPlayer);
+                            } else if (result.type === 'DAMAGE_ALL') {
+                                if (playedCard.id === 'S015') { // 武漢肺炎
+                                    triggerPoisonGasAnimation();
+                                } else if (playedCard.id === 'S019') { // 查水表
+                                    triggerRippleDiffusionAnimation(true);
+                                }
+
+                                // Apply individual damage numbers/shake
+                                result.affected.forEach(aff => {
+                                    const boardId = aff.unit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                                    const targetEl = document.getElementById(boardId).children[aff.unit.index];
+                                    if (targetEl) {
+                                        triggerCombatEffect(targetEl, 'DAMAGE');
+                                    }
+                                });
                             } else if (result.type === 'BOUNCE_ALL') {
                                 // Tsai Ing-wen or Cabinet Resignation
                                 if (result.bounced && result.bounced.length > 0) {
@@ -2138,6 +2171,7 @@ async function onDragEnd(e) {
                     }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
                     else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BOUNCE'; }
+                    else if (battlecryTargetRule?.type.startsWith('DESTROY')) { color = '#333333'; effectType = 'DAMAGE'; }
 
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
@@ -3076,6 +3110,64 @@ async function triggerEarthquakeAnimation() {
         document.body.appendChild(p);
         setTimeout(() => p.remove(), 2000);
     }
+}
+
+/**
+ * 武漢肺炎：毒氣動畫
+ */
+async function triggerPoisonGasAnimation() {
+    const overlay = document.createElement('div');
+    overlay.className = 'poison-gas-overlay gas-active';
+    document.body.appendChild(overlay);
+
+    // Add some random gas clouds for depth
+    for (let i = 0; i < 15; i++) {
+        const cloud = document.createElement('div');
+        cloud.className = 'gas-cloud';
+        const size = 100 + Math.random() * 200;
+        cloud.style.width = `${size}px`;
+        cloud.style.height = `${size}px`;
+        cloud.style.left = `${Math.random() * 100}%`;
+        cloud.style.top = `${Math.random() * 100}%`;
+        cloud.style.animation = `poison-gas-spread ${2 + Math.random()}s ease-in-out forwards`;
+        overlay.appendChild(cloud);
+    }
+
+    setTimeout(() => overlay.remove(), 3000);
+}
+
+/**
+ * 查水表：波紋擴散動畫
+ */
+async function triggerRippleDiffusionAnimation() {
+    const playerHero = document.getElementById('player-hero');
+    const oppBoard = document.getElementById('opp-board');
+    if (!playerHero || !oppBoard) return;
+
+    const pRect = playerHero.getBoundingClientRect();
+    const centerX = pRect.left + pRect.width / 2;
+    const centerY = pRect.top + pRect.height / 2;
+
+    for (let i = 0; i < 3; i++) {
+        setTimeout(() => {
+            const ripple = document.createElement('div');
+            ripple.className = 'ripple-wave ripple-active';
+            ripple.style.left = `${centerX}px`;
+            ripple.style.top = `${centerY}px`;
+            ripple.style.width = '120px';
+            ripple.style.height = '120px';
+            document.body.appendChild(ripple);
+            setTimeout(() => ripple.remove(), 1500);
+        }, i * 250);
+    }
+
+    // Board slam animation after a short delay
+    setTimeout(() => {
+        oppBoard.classList.remove('board-slam');
+        void oppBoard.offsetWidth;
+        oppBoard.classList.add('board-slam');
+        setTimeout(() => oppBoard.classList.remove('board-slam'), 500);
+    }, 400);
 }
 
 
