@@ -1466,19 +1466,19 @@ function showPreview(card) {
 
     preview.innerHTML = `
         <div style="display: flex; flex-direction: ${flexDirection}; align-items: flex-start; pointer-events: none;">
-            <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px; flex-shrink: 0;">
-                <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-                    <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${actualCost ?? 0}</span></div>
-                    <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
+            <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:220px; height:320px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 8px; flex-shrink: 0;">
+                <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 4px; height: 30px;">
+                    <div class="card-cost ${costClass}" style="position: relative; width:24px; height:24px; font-size:13px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 4px;"><span>${actualCost ?? 0}</span></div>
+                    <div class="card-title" style="font-size:20px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
                 </div>
                 
                 ${artHtml}
                 
-                <div class="card-category" style="font-size:16px; padding: 2px 5px; margin-bottom: 5px; text-align:center; color:#aaa;">${card.category || ""}</div>
+                <div class="card-category" style="font-size:12px; padding: 1px 4px; margin-bottom: 4px; text-align:center; color:#aaa;">${card.category || ""}</div>
                 
-                <div class="card-desc" style="font-size:18px; padding: 0 10px; line-height: 1.35; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
+                <div class="card-desc" style="font-size:13px; padding: 0 8px; line-height: 1.3; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
                 
-                ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;') : ''}
+                ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;').replace(/width: 70px; height: 70px; font-size: 32px;/g, 'width: 50px; height: 50px; font-size: 24px;') : ''}
             </div>
             ${keywordHtml}
         </div>
@@ -1488,6 +1488,37 @@ function showPreview(card) {
 
 function hidePreview() {
     document.getElementById('card-preview').style.display = 'none';
+}
+
+function positionPreviewNearElement(element) {
+    const preview = document.getElementById('card-preview');
+    if (!preview || preview.style.display !== 'block') return;
+
+    const rect = element.getBoundingClientRect();
+    const previewWidth = 220 + 200; // Smaller card width + keyword box width
+    const previewHeight = 320; // Smaller height
+    const offset = 25;
+
+    let left = rect.right + offset;
+    let top = rect.top + (rect.height / 2) - (previewHeight / 2);
+
+    // If overflow on right, show on left side
+    if (left + previewWidth > window.innerWidth) {
+        left = rect.left - previewWidth - offset;
+    }
+
+    // Prevent overflow on top/bottom edges
+    if (top < 10) top = 10;
+    if (top + previewHeight > window.innerHeight - 10) {
+        top = window.innerHeight - previewHeight - 10;
+    }
+
+    preview.style.position = 'fixed';
+    preview.style.left = `${left}px`;
+    preview.style.top = `${top}px`;
+    preview.style.right = 'auto';
+    preview.style.bottom = 'auto';
+    preview.style.transform = 'none';
 }
 
 function createCardEl(card, index) {
@@ -1598,6 +1629,7 @@ function createCardEl(card, index) {
         const preview = document.getElementById('card-preview');
         const builderView = document.getElementById('deck-builder');
 
+        // Only show preview in deck builder, not in battle mode for hand cards
         if (builderView && builderView.style.display === 'flex') {
             // Builder Mode: Avoid overlap
             const screenWidth = window.innerWidth;
@@ -1615,15 +1647,9 @@ function createCardEl(card, index) {
                 preview.style.right = 'auto';
                 preview.style.left = '40px';
             }
-        } else {
-            // Battle Mode (Hand): Fixed Left Top
-            preview.style.top = '20%';
-            preview.style.left = '20px';
-            preview.style.right = 'auto';
-            preview.style.bottom = 'auto';
-            preview.style.transform = 'none';
+            showPreview(card);
         }
-        showPreview(card);
+        // Battle Mode (Hand): No preview, rely on CSS hover zoom effect
     });
     el.addEventListener('mouseleave', hidePreview);
 
@@ -1640,7 +1666,8 @@ function createMinionEl(minion, index, isPlayer) {
     let dsClass = (minion.keywords && minion.keywords.divineShield) ? ' divine-shield' : '';
     let enrageClass = minion.isEnraged ? ' enraged' : '';
     const canActuallyAttack = minion.canAttack && minion.attack > 0;
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${canActuallyAttack && isPlayer ? 'can-attack' : ''}${dsClass}${enrageClass}`;
+    const showCanAttack = canActuallyAttack && isPlayer && gameState.currentPlayerIdx === 0;
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
@@ -1655,9 +1682,23 @@ function createMinionEl(minion, index, isPlayer) {
         </div>
     `;
 
-    // Preview Interaction
-    el.addEventListener('mouseenter', () => showPreview(minion));
-    el.addEventListener('mouseleave', hidePreview);
+    // Preview Interaction - Fixed position near minion
+    let previewTimeout = null;
+
+    el.addEventListener('mouseenter', () => {
+        previewTimeout = setTimeout(() => {
+            showPreview(minion);
+            positionPreviewNearElement(el);
+        }, 100); // Short delay to avoid flicker
+    });
+
+    el.addEventListener('mouseleave', () => {
+        if (previewTimeout) {
+            clearTimeout(previewTimeout);
+            previewTimeout = null;
+        }
+        hidePreview();
+    });
 
     // Attack Drag Start
     if (isPlayer && canActuallyAttack && gameState.currentPlayerIdx === 0) {

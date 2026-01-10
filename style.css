@@ -1332,7 +1332,7 @@ body {
 
 /* Hover effect for PLAYER cards only */
 .player .hand .card:hover {
-    transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 80px)) scale(1.3) !important;
+    transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 60px)) scale(1.9) !important;
     z-index: 1000;
     box-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
     border-color: var(--neon-blue);
