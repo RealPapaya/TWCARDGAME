@@ -595,6 +595,22 @@ class GameState {
                 });
                 return { type: 'DESTROY_ALL', affected };
             },
+            'DESTROY_LOW_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.attack <= bc.value) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
+            'DESTROY_HIGH_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.attack >= bc.value) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
             'MULTI_DAMAGE': (bc, target) => {
                 const damage = bc.value;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
@@ -718,8 +734,30 @@ class GameState {
             }
         });
 
+
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
         this.startTurn();
+    }
+
+    /**
+     * Calculate the actual cost of a card considering ongoing effects
+     * @param {Object} card The card to calculate cost for
+     * @returns {number} The actual cost after reductions
+     */
+    getCardActualCost(card) {
+        let cost = card.cost;
+        const player = this.currentPlayer;
+
+        // Check for REDUCE_NEWS_COST ongoing effects
+        if (card.type === 'NEWS') {
+            player.board.forEach(minion => {
+                if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
+                    cost -= minion.keywords.ongoing.value;
+                }
+            });
+        }
+
+        return Math.max(0, cost); // Cost cannot go below 0
     }
 
     /**
@@ -732,7 +770,8 @@ class GameState {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
         if (!card) return false;
-        if (player.mana.current < card.cost) return false;
+        const actualCost = this.getCardActualCost(card);
+        if (player.mana.current < actualCost) return false;
         if (player.board.length >= 7 && card.type === 'MINION') return false;
 
         // Discard Play Restriction
@@ -747,22 +786,23 @@ class GameState {
     playCard(cardIndex, target = null, insertionIndex = -1, skipBattlecry = false) {
         const player = this.currentPlayer;
         const card = player.hand[cardIndex];
+        const actualCost = this.getCardActualCost(card); // Calculate actual cost once
 
         if (!this.canPlayCard(cardIndex)) {
             // Re-throw specific errors if needed, or generic
-            if (player.mana.current < card.cost) throw new Error("能量不足！");
-            if (player.board.length >= 7 && card.type === 'MINION') throw new Error("戰場已滿！");
+            if (player.mana.current < actualCost) throw new Error("能量不足!");
+            if (player.board.length >= 7 && card.type === 'MINION') throw new Error("戰場已滿!");
             if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM') {
                 const count = card.keywords.battlecry.value || 1;
                 if (player.hand.length <= count) {
-                    throw new Error(`至少需要 ${count} 張手牌可以丟棄，無法打出此卡！`);
+                    throw new Error(`至少需要 ${count} 張手牌可以丟棄,無法打出此卡!`);
                 }
             }
-            throw new Error("無法打出此卡！");
+            throw new Error("無法打出此卡!");
         }
 
-        // Pay Mana
-        player.mana.current -= card.cost;
+        // Pay Mana (use actual cost considering ongoing effects)
+        player.mana.current -= actualCost;
 
         // Remove from hand
         player.hand.splice(cardIndex, 1);
