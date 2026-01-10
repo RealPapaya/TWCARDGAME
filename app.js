@@ -1527,10 +1527,14 @@ function createCardEl(card, index) {
 
     // Check if card is playable (enough mana)
     let canPlayClass = '';
-    if (gameState && gameState.currentPlayerIdx === 0 && index !== -1) {
-        const player = gameState.players[0];
-        const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
-        if (player.mana.current >= actualCost) {
+    if (gameState && index !== -1) {
+        // Always calculate based on current player (usually player 0 during their turn)
+        const p = gameState.players[0];
+        const actualCost = (typeof gameState.getCardActualCost === 'function')
+            ? gameState.getCardActualCost(card)
+            : card.cost;
+
+        if (gameState.currentPlayerIdx === 0 && p.mana.current >= actualCost) {
             canPlayClass = ' can-play';
         }
     }
@@ -1591,17 +1595,7 @@ function createCardEl(card, index) {
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
 
     // Calculate actual cost considering ongoing effects
-    // Only apply cost reduction for player 1's hand (the human player)
-    let actualCost = card.cost;
-    if (gameState && card.type === 'NEWS' && gameState.players && gameState.players[0]) {
-        const player = gameState.players[0]; // Always use player 1 for hand card display
-        player.board.forEach(minion => {
-            if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
-                actualCost -= minion.keywords.ongoing.value;
-            }
-        });
-        actualCost = Math.max(0, actualCost);
-    }
+    const actualCost = gameState ? gameState.getCardActualCost(card) : card.cost;
 
     const isReduced = actualCost < card.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
@@ -1766,6 +1760,9 @@ function onDragStart(e, index, fromHand = false) {
     dragLine.style.display = 'block';
 
     if (fromHand) {
+        // Add dragging class to body to disable hover effects
+        document.body.classList.add('dragging-active');
+
         hidePreview();
         // Visual feedback: clone the card to follow mouse
         const originalEl = document.getElementById('player-hand').children[index];
@@ -1779,6 +1776,7 @@ function onDragStart(e, index, fromHand = false) {
         updateDraggedElPosition(e.clientX, e.clientY);
 
         originalEl.style.opacity = '0.2';
+        originalEl.style.pointerEvents = 'none'; // Prevent hover blocking
     }
 }
 
@@ -1802,14 +1800,17 @@ function onDragMove(e) {
             const card = gameState.currentPlayer.hand[attackerIndex];
 
             // Only show placement indicator for minions, not newss
-            if (card && card.type === 'MINION') {
-                const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-                const board = document.getElementById('player-board');
-                const isPlayerArea = targetEl?.closest('.player-area.player') || targetEl?.id === 'player-board';
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            const board = document.getElementById('player-board');
 
-                if (isPlayerArea) {
-                    board.classList.add('drop-highlight');
+            // Strict board detection: mouse must be OVER the board or inside its container
+            const isBoardHover = targetEl?.closest('#player-board') || targetEl?.id === 'player-board';
 
+            if (isBoardHover) {
+                board.classList.add('drop-highlight');
+
+                // Only show placement indicator for minions
+                if (card.type === 'MINION') {
                     let indicator = board.querySelector('.placement-indicator');
                     if (!indicator) {
                         indicator = document.createElement('div');
@@ -1846,13 +1847,19 @@ function onDragMove(e) {
                     }
                     indicator.classList.add('active');
                 } else {
-                    board.classList.remove('drop-highlight');
+                    // For news cards, hide any active indicator
                     const indicator = board.querySelector('.placement-indicator');
                     if (indicator) {
                         indicator.classList.remove('active');
                     }
-                    currentInsertionIndex = -1;
                 }
+            } else {
+                board.classList.remove('drop-highlight');
+                const indicator = board.querySelector('.placement-indicator');
+                if (indicator) {
+                    indicator.classList.remove('active');
+                }
+                currentInsertionIndex = -1;
             }
         }
     } else if (isBattlecryTargeting) {
@@ -1894,6 +1901,10 @@ async function onDragEnd(e) {
     if (!dragging && !isBattlecryTargeting) return;
 
     const board = document.getElementById('player-board');
+
+    // Capture highlight state BEFORE removing it
+    const isBoardHighlighted = board.classList.contains('drop-highlight');
+
     board.classList.remove('drop-highlight');
 
     if (dragging) {
@@ -1907,32 +1918,52 @@ async function onDragEnd(e) {
         // Let it collapse naturally via CSS transition
 
         if (draggingFromHand) {
-            // Cleanup visual ghost
+            // Remove dragging class from body
+            document.body.classList.remove('dragging-active');
+
+            // Cleanup visual ghost - but don't null it yet so we can check visibility
+            if (draggedEl) {
+                draggedEl.style.display = 'none';
+            }
+            const originalEl = document.getElementById('player-hand').children[attackerIndex];
+            if (originalEl) {
+                originalEl.style.opacity = '1';
+                originalEl.style.pointerEvents = ''; // Restore pointer events
+            }
+
+            // Temporarily hide ghosts and effects to see what's underneath
+            const dustClouds = document.querySelectorAll('.dust-cloud');
+            dustClouds.forEach(d => d.style.pointerEvents = 'none');
+
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+
+            // Fallback: Check if coordinates are inside player board rect
+            const boardRect = board.getBoundingClientRect();
+            const isInBoardRect = (
+                e.clientX >= boardRect.left &&
+                e.clientX <= boardRect.right &&
+                e.clientY >= boardRect.top &&
+                e.clientY <= boardRect.bottom
+            );
+
+            // Cleanup ghost for real now
             if (draggedEl) {
                 draggedEl.remove();
                 draggedEl = null;
             }
-            const originalEl = document.getElementById('player-hand').children[attackerIndex];
-            if (originalEl) originalEl.style.opacity = '1';
 
-            // Temporarily hide ghost to see what's underneath
-            if (draggedEl) draggedEl.style.display = 'none';
-            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-            if (draggedEl) draggedEl.style.display = 'block';
-
-            const isHandArea = targetEl?.closest('#player-hand');
-            const isBoardArea = targetEl?.closest('#player-board') || targetEl?.id === 'player-board';
-            const isOpponentArea = targetEl?.closest('.player-area.opponent');
-            const isCenterArea = targetEl?.closest('.center-line');
-            const isHeroArea = targetEl?.closest('.hero');
-
-            // Permissive play for News: anywhere excluding hand area
-            // Strict play for Minions: must be on player's board
+            // Play condition: Board must be highlighted (user sees the visual cue) 
+            // OR the mouse is physically within the board area (calculated via Rect)
             const card = gameState.currentPlayer.hand[attackerIndex];
-            const isPlayValidated = (card.type === 'MINION' && isBoardArea) ||
-                (card.type === 'NEWS' && !isHandArea && targetEl);
+            const isPlayValidated = isBoardHighlighted || isInBoardRect;
 
-            if (isHandArea || !isPlayValidated) {
+            // [DEBUG] Detail log for investigation
+            console.log(`[DRAG_END] Card: ${card.name}, type: ${card.type}`);
+            console.log(`[DRAG_END] x: ${e.clientX}, y: ${e.clientY}, targetEl:`, targetEl);
+            console.log(`[DRAG_END] Flags - Highlight: ${isBoardHighlighted}, isInRect: ${isInBoardRect}`);
+            console.log(`[DRAG_END] isPlayValidated: ${isPlayValidated}`);
+
+            if (!isPlayValidated) {
                 // Return to hand visuals
                 logMessage("Play cancelled");
                 const originalEl = document.getElementById('player-hand').children[attackerIndex];

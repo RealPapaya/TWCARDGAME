@@ -16,6 +16,28 @@
     --card-border-radius: 12px;
 }
 
+#drag-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+#play-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 4000;
+}
+
 body {
     margin: 0;
     padding: 0;
@@ -998,8 +1020,10 @@ body {
 /* Dust Effect */
 .dust-cloud {
     position: absolute;
-    pointer-events: none;
-    z-index: 1000;
+    pointer-events: none !important;
+    z-index: 5;
+    width: 0;
+    height: 0;
 }
 
 .dust-particle {
@@ -1337,6 +1361,14 @@ body {
     box-shadow: 0 0 30px rgba(0, 243, 255, 0.8);
     border-color: var(--neon-blue);
     margin: 0 10px;
+}
+
+/* Disable hover effect when dragging to prevent ghost shadow blocking */
+body.dragging-active .player .hand .card:hover {
+    transform: rotate(var(--rot, 0deg)) translateY(var(--y, 0px)) scale(1) !important;
+    z-index: auto;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.4);
+    margin: 0 -15px;
 }
 
 /* Playable card (enough mana) */
@@ -2185,12 +2217,7 @@ body {
     }
 }
 
-/* Dust Effect */
-.dust-cloud {
-    position: absolute;
-    pointer-events: none;
-    z-index: 1000;
-}
+
 
 .dust-particle {
     position: absolute;
