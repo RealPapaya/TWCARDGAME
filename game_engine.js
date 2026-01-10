@@ -170,12 +170,14 @@ class GameState {
             },
             'DAMAGE_ALL_NON_CATEGORIES': (bc) => {
                 const excludedCategories = bc.excluded_categories || [];
+                const newsPower = this.getNewsPower(this.currentPlayer.side);
+                const totalDamage = bc.value + newsPower;
                 const affected = [];
                 [this.currentPlayer, this.opponent].forEach(player => {
                     player.board.forEach((m, i) => {
                         if (!excludedCategories.includes(m.category)) {
-                            this.applyDamage(m, bc.value);
-                            affected.push({ unit: { ...m, index: i, side: player.side }, value: bc.value });
+                            this.applyDamage(m, totalDamage);
+                            affected.push({ unit: { ...m, index: i, side: player.side }, value: totalDamage });
                         }
                     });
                 });
@@ -194,6 +196,33 @@ class GameState {
                             targetUnit.currentHealth = newHp;
                             this.updateEnrage(targetUnit);
                         }
+
+                        // Trigger heal number animation
+                        if (typeof window !== 'undefined' && window.showDamageNumber && healValue > 0) {
+                            setTimeout(() => {
+                                let targetEl = null;
+                                if (targetUnit.type === 'HERO') {
+                                    targetEl = targetUnit.side === 'PLAYER' ?
+                                        document.getElementById('player-hero') :
+                                        document.getElementById('opp-hero');
+                                } else if (targetUnit.type === 'MINION') {
+                                    const boardId = targetUnit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                                    const board = document.getElementById(boardId);
+                                    if (board) {
+                                        const cards = board.querySelectorAll('.card');
+                                        const player = targetUnit.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                                        const index = player.board.indexOf(targetUnit);
+                                        if (index >= 0 && cards[index]) {
+                                            targetEl = cards[index];
+                                        }
+                                    }
+                                }
+                                if (targetEl) {
+                                    window.showDamageNumber(targetEl, healValue, 'heal');
+                                }
+                            }, 50);
+                        }
+
                         return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
                     }
                 }
@@ -905,6 +934,7 @@ class GameState {
     createMinion(cardData, side) {
         const minion = {
             ...cardData,
+            instanceId: `minion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique instance ID
             currentHealth: cardData.health,
             side: side,
             sleeping: true,
@@ -952,6 +982,13 @@ class GameState {
         if (unit.type === 'MINION' && unit.keywords && unit.keywords.divineShield) {
             if (amount > 0) {
                 unit.keywords.divineShield = false; // Pop shield
+                // Trigger shield break animation if available
+                if (typeof window !== 'undefined' && window.showDamageNumber) {
+                    setTimeout(() => {
+                        const el = document.querySelector(`[data-minion-id="${unit.instanceId}"]`);
+                        if (el) window.showDamageNumber(el, 0, 'shield');
+                    }, 50);
+                }
                 return; // No damage taken
             }
         }
@@ -962,6 +999,41 @@ class GameState {
         if (unit.currentHealth !== undefined) unit.currentHealth = newHealth;
         // Update hp (heroes)
         if (unit.hp !== undefined) unit.hp = newHealth;
+
+        // Trigger damage number animation in browser
+        if (typeof window !== 'undefined' && window.showDamageNumber && amount > 0) {
+            setTimeout(() => {
+                let targetEl = null;
+                if (unit.type === 'HERO') {
+                    targetEl = unit.side === 'PLAYER' ?
+                        document.getElementById('player-hero') :
+                        document.getElementById('opp-hero');
+                } else if (unit.type === 'MINION') {
+                    // Find minion element by its unique instance ID
+                    if (unit.instanceId) {
+                        targetEl = document.querySelector(`[data-minion-id="${unit.instanceId}"]`);
+                    }
+                    // Fallback: try to find by index if instanceId doesn't work
+                    if (!targetEl) {
+                        const boardId = unit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                        const board = document.getElementById(boardId);
+                        if (board) {
+                            const cards = board.querySelectorAll('.card');
+                            const player = unit.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                            const index = player.board.indexOf(unit);
+                            if (index >= 0 && cards[index]) {
+                                targetEl = cards[index];
+                            }
+                        }
+                    }
+                }
+                if (targetEl) {
+                    window.showDamageNumber(targetEl, amount, 'damage');
+                } else {
+                    console.log('Could not find target element for damage animation:', unit);
+                }
+            }, 50);
+        }
 
         this.updateEnrage(unit);
         // Don't resolve deaths here - let app.js handle it with animation
