@@ -183,6 +183,16 @@ class GameState {
                 });
                 return { type: 'DAMAGE_ALL', affected };
             },
+            'DAMAGE_ALL_ENEMY_MINIONS': (bc) => {
+                const newsPower = this.getNewsPower(this.currentPlayer.side);
+                const totalDamage = bc.value + newsPower;
+                const affected = [];
+                this.opponent.board.forEach((m, i) => {
+                    this.applyDamage(m, totalDamage);
+                    affected.push({ unit: { ...m, index: i, side: this.opponent.side }, value: totalDamage });
+                });
+                return { type: 'DAMAGE_ALL', affected };
+            },
             'HEAL': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit) {
@@ -611,6 +621,14 @@ class GameState {
                 }
                 return null;
             },
+            'DESTROY_DAMAGED': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.currentHealth < targetUnit.health) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
             'MULTI_DAMAGE': (bc, target) => {
                 const damage = bc.value;
                 const enemies = [this.opponent.hero, ...this.opponent.board];
@@ -841,6 +859,8 @@ class GameState {
                 card.side = player.side;
                 battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target, card);
             }
+            // Trigger effects that listen for News being played
+            this.handlePlayNews(player);
         }
 
         this.updateAuras();
@@ -969,6 +989,17 @@ class GameState {
                 this.updateAuras();
             }
         }
+    }
+
+    handlePlayNews(player) {
+        // Triggered effects on board whenever a News card is played
+        player.board.forEach(m => {
+            if (m.keywords && m.keywords.triggered && m.keywords.triggered.type === 'ON_PLAY_NEWS') {
+                const val = m.keywords.triggered.value || 1;
+                m.attack += val;
+                // Attack increase should be reflected immediately in UI during render
+            }
+        });
     }
 
     createMinion(cardData, side) {
@@ -1113,6 +1144,7 @@ class GameState {
         const attacker = this.currentPlayer.board[minionIndex];
         if (!attacker) throw new Error("Attacker not found");
         if (attacker.sleeping || !attacker.canAttack) throw new Error("Minion cannot attack");
+        if (attacker.attack <= 0) throw new Error("Minion with 0 attack cannot attack");
         if (attacker.allowAttackCount <= 0 && attacker.keywords?.windfury !== true) {
             // Basic check, refined later
         }

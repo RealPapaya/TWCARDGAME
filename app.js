@@ -54,34 +54,40 @@ const CARD_DATA = [
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
 
+
     // --- 新聞 (News) ---
     { "id": "S001", "name": "發票中獎", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽兩張牌", "keywords": { "battlecry": { "type": "DRAW", "value": 2 } }, "image": "img/tw004.png" },
     { "id": "S002", "name": "彈劾賴皇", "category": "新聞", "cost": 10, "type": "NEWS", "rarity": "EPIC", "description": "隨機分配 10 點傷害。", "keywords": { "battlecry": { "type": "MULTI_DAMAGE", "value": 10 } }, "image": "img/tw005.png" },
     { "id": "S003", "name": "大罷免", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "將一個政治人物放回手牌中", "keywords": { "battlecry": { "type": "BOUNCE_CATEGORY", "target_category_includes": "政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_recall_v2.png" },
-    { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜！！\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
+    { "id": "S004", "name": "造勢晚會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "凍蒜!!\n(本回合獲得 +2/+2)", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_TEMP", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_rally.png" },
     { "id": "S005", "name": "倒閣", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "RARE", "description": "將場上的政治人物全部放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_ALL_CATEGORY", "target_category_includes": "政治人物" } }, "image": "img/tw_cabinet_resignation.png" },
-    { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
-    { "id": "S014", "name": "側翼出動", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "召喚三個只能存在一回合的網軍", "keywords": { "battlecry": { "type": "SUMMON_MULTIPLE", "cardId": "TW048", "count": 3, "isTemporary": true } }, "image": "img/s_wingman_sortie.png" },
-    { "id": "TW049", "name": "陳時中", "category": "民進黨政治人物", "cost": 7, "attack": 5, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "校正回歸\n戰吼: 手牌增加三張\"高端疫苗\"", "keywords": { "battlecry": { "type": "ADD_CARD_TO_HAND", "cardId": "S011", "value": 3 } }, "image": "img/chen_shih_chung.png" },
     { "id": "S006", "name": "砸雞蛋", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "對隨從造成 3 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw_eggs.png" },
     { "id": "S007", "name": "召開記者會", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "降低我方全部手牌 1 點消耗", "keywords": { "battlecry": { "type": "REDUCE_COST_ALL_HAND", "value": 1 } }, "image": "img/tw_press_conference.png" },
     { "id": "S008", "name": "法院傳票", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "抽取一張隨從牌並將其消耗降低 3 點。", "keywords": { "battlecry": { "type": "DRAW_MINION_REDUCE_COST", "value": 3 } }, "image": "img/s003.png" },
+    { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "丟棄一張手牌,抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
+    { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" },
+    { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物,改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" },
+    { "id": "S012", "name": "抗中保台", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +4 攻擊力。如果是民進黨政治人物,改為獲得 +5 攻擊力。", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_CATEGORY_BONUS", "value": 4, "bonus_value": 5, "stat": "ATTACK", "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/s_anti_china.png" },
+    { "id": "S013", "name": "芒果乾", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷", "keywords": { "battlecry": { "type": "BUFF_HEALTH_AND_TAUNT_TARGET", "value": 1, "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/s_dried_mango.png" },
+    { "id": "S014", "name": "側翼出動", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "召喚三個只能存在一回合的網軍", "keywords": { "battlecry": { "type": "SUMMON_MULTIPLE", "cardId": "TW048", "count": 3, "isTemporary": true } }, "image": "img/s_wingman_sortie.png" },
+    { "id": "S015", "name": "武漢肺炎", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對所有非建築且非政府機關的單位造成5點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_NON_CATEGORIES", "value": 5, "excluded_categories": ["建築", "政府機關"] } }, "image": "img/covid19.png" },
+    { "id": "S016", "name": "八卦", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力3點以下的隨從", "keywords": { "battlecry": { "type": "DESTROY_LOW_ATTACK", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/gossip.png" },
+    { "id": "S017", "name": "緋聞", "category": "新聞", "cost": 6, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力5點以上的敵方隨從", "keywords": { "battlecry": { "type": "DESTROY_HIGH_ATTACK", "value": 5, "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/scandal.png" },
+    { "id": "S018", "name": "炎上", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "RARE", "description": "擊殺一名受傷的隨從", "keywords": { "battlecry": { "type": "DESTROY_DAMAGED", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/burn.png" },
+    { "id": "S019", "name": "查水表", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "對敵方所有隨從造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_ENEMY_MINIONS", "value": 2 } }, "image": "img/check_water_meter.png" },
+
+    // --- 隨從 (Minions) - 網軍 ---
+    { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
+    { "id": "TW049", "name": "陳時中", "category": "民進黨政治人物", "cost": 7, "attack": 5, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "校正回歸\n戰吼: 手牌增加三張\"高端疫苗\"", "keywords": { "battlecry": { "type": "ADD_CARD_TO_HAND", "cardId": "S011", "value": 3 } }, "image": "img/chen_shih_chung.png" },
     { "id": "TW047", "name": "連戰", "category": "國民黨政治人物", "cost": 4, "attack": 6, "health": 6, "type": "MINION", "rarity": "RARE", "description": "連戰都站不穩\n戰吼: 擊殺一名我方隨從", "keywords": { "battlecry": { "type": "DESTROY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/lien_chan.png" },
-    { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志：抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
+    { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志:抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
-    { "id": "S009", "name": "政治切割", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "丟棄一張手牌，抽兩張牌", "keywords": { "battlecry": { "type": "DISCARD_DRAW", "discardCount": 1, "drawCount": 2 } }, "image": "img/cutting.png" },
-    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時，則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
+    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時,則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
     { "id": "TW041", "name": "柯文哲(獄中)", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 對自己造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 3 } }, "image": "img/ko_jail.png" },
     { "id": "TW042", "name": "蔡璧如", "category": "民眾黨政治人物", "cost": 3, "attack": 2, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "戰吼: 對自己造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 2 } }, "image": "img/tsai_pi_ru.png" },
-    { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公！！！\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
-    { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" },
-    { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物，改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" },
-    { "id": "S012", "name": "抗中保台", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +4 攻擊力。如果是民進黨政治人物，改為獲得 +5 攻擊力。", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_CATEGORY_BONUS", "value": 4, "bonus_value": 5, "stat": "ATTACK", "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/s_anti_china.png" },
-    { "id": "S013", "name": "芒果乾", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷", "keywords": { "battlecry": { "type": "BUFF_HEALTH_AND_TAUNT_TARGET", "value": 1, "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/s_dried_mango.png" },
-    { "id": "S015", "name": "武漢肺炎", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對所有非建築且非政府機關的單位造成5點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_NON_CATEGORIES", "value": 5, "excluded_categories": ["建築", "政府機關"] } }, "image": "img/covid19.png" },
-    { "id": "S016", "name": "查水表", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力3點以下的隨從", "keywords": { "battlecry": { "type": "DESTROY_LOW_ATTACK", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/check_water_meter.png" },
-    { "id": "S017", "name": "緋聞", "category": "新聞", "cost": 6, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一名攻擊力5點以上的隨從", "keywords": { "battlecry": { "type": "DESTROY_HIGH_ATTACK", "value": 5, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/scandal.png" }
+    { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公!!!\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
+    { "id": "TW051", "name": "蕭美琴", "category": "民進黨政治人物", "cost": 3, "attack": 1, "health": 5, "type": "MINION", "rarity": "RARE", "description": "每當有新聞牌打出後 攻擊力+1", "keywords": { "triggered": { "type": "ON_PLAY_NEWS", "value": 1 } }, "image": "img/hsiao_bi_khim.png" }
 ];
 
 let cardDB = [];
@@ -1119,6 +1125,17 @@ function renderGameUI(p1, p2) {
     renderMana('player-mana-container', p1.mana);
     renderMana('opp-mana-container', p2.mana);
 
+    const p1HeroEl = document.getElementById('player-hero');
+    const p2HeroEl = document.getElementById('opp-hero');
+    if (p1HeroEl) {
+        p1HeroEl.dataset.health = p1.hero.maxHp || 30;
+        p1HeroEl.dataset.currentHealth = p1.hero.hp;
+    }
+    if (p2HeroEl) {
+        p2HeroEl.dataset.health = p2.hero.maxHp || 30;
+        p2HeroEl.dataset.currentHealth = p2.hero.hp;
+    }
+
     document.getElementById('player-hp').innerText = p1.hero.hp;
     document.getElementById('opp-hp').innerText = p2.hero.hp;
 
@@ -1335,7 +1352,23 @@ function showPreview(card) {
         `<div class="card-art" style="width: 100%; height: 140px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
 
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
-    const isReduced = card.cost < baseCard.cost || card.isReduced;
+
+    // Calculate actual cost for preview
+    let actualCost = card.cost;
+    if (gameState && card.type === 'NEWS' && gameState.players && gameState.players[0]) {
+        // Use the same logic as createCardEl for consistency
+        const player = gameState.players[0];
+        player.board.forEach(minion => {
+            if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
+                actualCost -= minion.keywords.ongoing.value;
+            }
+        });
+        actualCost = Math.max(0, actualCost);
+    } else if (gameState && typeof gameState.getCardActualCost === 'function') {
+        actualCost = gameState.getCardActualCost(card);
+    }
+
+    const isReduced = actualCost < baseCard.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
 
     const bonus = (gameState && card.id) ? (gameState.getNewsPower(card.side || 'PLAYER') || 0) : 0;
@@ -1351,7 +1384,7 @@ function showPreview(card) {
     preview.innerHTML = `
         <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:280px; height:410px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 10px;">
             <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost ?? 0}</span></div>
+                <div class="card-cost ${costClass}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${actualCost ?? 0}</span></div>
                 <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
             </div>
             
@@ -1430,17 +1463,16 @@ function createCardEl(card, index) {
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
 
     // Calculate actual cost considering ongoing effects
+    // Only apply cost reduction for player 1's hand (the human player)
     let actualCost = card.cost;
-    if (gameState && card.type === 'NEWS') {
-        const player = gameState.currentPlayer;
-        if (player) {
-            player.board.forEach(minion => {
-                if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
-                    actualCost -= minion.keywords.ongoing.value;
-                }
-            });
-            actualCost = Math.max(0, actualCost);
-        }
+    if (gameState && card.type === 'NEWS' && gameState.players && gameState.players[0]) {
+        const player = gameState.players[0]; // Always use player 1 for hand card display
+        player.board.forEach(minion => {
+            if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
+                actualCost -= minion.keywords.ongoing.value;
+            }
+        });
+        actualCost = Math.max(0, actualCost);
     }
 
     const isReduced = actualCost < card.cost || card.isReduced;
@@ -1521,7 +1553,8 @@ function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
     let dsClass = (minion.keywords && minion.keywords.divineShield) ? ' divine-shield' : '';
     let enrageClass = minion.isEnraged ? ' enraged' : '';
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${minion.canAttack && isPlayer ? 'can-attack' : ''}${dsClass}${enrageClass}`;
+    const canActuallyAttack = minion.canAttack && minion.attack > 0;
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${canActuallyAttack && isPlayer ? 'can-attack' : ''}${dsClass}${enrageClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
@@ -1541,7 +1574,7 @@ function createMinionEl(minion, index, isPlayer) {
     el.addEventListener('mouseleave', hidePreview);
 
     // Attack Drag Start
-    if (isPlayer && minion.canAttack && gameState.currentPlayerIdx === 0) {
+    if (isPlayer && canActuallyAttack && gameState.currentPlayerIdx === 0) {
         el.addEventListener('mousedown', (e) => onDragStart(e, index));
     }
 
@@ -1552,6 +1585,7 @@ function createMinionEl(minion, index, isPlayer) {
     el.dataset.cost = minion.cost;
     el.dataset.attack = minion.attack;
     el.dataset.health = minion.health;
+    el.dataset.currentHealth = minion.currentHealth;
     el.dataset.minionId = minion.instanceId; // Added for damage animation targeting
 
     return el;
@@ -1701,12 +1735,13 @@ function onDragMove(e) {
                 category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
                 cost: parseInt(unitEl.dataset.cost) || 0,
                 attack: parseInt(unitEl.dataset.attack) || 0,
-                health: parseInt(unitEl.dataset.health) || 0
+                health: parseInt(unitEl.dataset.health) || 0,
+                currentHealth: (unitEl.dataset.currentHealth !== undefined) ? parseInt(unitEl.dataset.currentHealth) : (parseInt(unitEl.dataset.health) || 0)
             };
 
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
                 // Lock-in visual (snap)
-                const rect = actualUnitEl.getBoundingClientRect();
+                const rect = unitEl.getBoundingClientRect();
                 dragLine.setAttribute('x2', rect.left + rect.width / 2);
                 dragLine.setAttribute('y2', rect.top + rect.height / 2);
                 return;
@@ -1747,8 +1782,17 @@ async function onDragEnd(e) {
 
             const isHandArea = targetEl?.closest('#player-hand');
             const isBoardArea = targetEl?.closest('#player-board') || targetEl?.id === 'player-board';
+            const isOpponentArea = targetEl?.closest('.player-area.opponent');
+            const isCenterArea = targetEl?.closest('.center-line');
+            const isHeroArea = targetEl?.closest('.hero');
 
-            if (isHandArea || !isBoardArea) {
+            // Permissive play for News: anywhere excluding hand area
+            // Strict play for Minions: must be on player's board
+            const card = gameState.currentPlayer.hand[attackerIndex];
+            const isPlayValidated = (card.type === 'MINION' && isBoardArea) ||
+                (card.type === 'NEWS' && !isHandArea && targetEl);
+
+            if (isHandArea || !isPlayValidated) {
                 // Return to hand visuals
                 logMessage("Play cancelled");
                 const originalEl = document.getElementById('player-hand').children[attackerIndex];
@@ -1757,10 +1801,8 @@ async function onDragEnd(e) {
                 return;
             }
 
-            if (isBoardArea) { // Validated landing on board
-                const card = gameState.currentPlayer.hand[attackerIndex];
-
-                if (gameState.currentPlayer.mana.current < card.cost) {
+            if (isPlayValidated) {
+                if (gameState.currentPlayer.mana.current < gameState.getCardActualCost(card)) {
                     shakeManaContainer(true);
                     const originalEl = document.getElementById('player-hand').children[attackerIndex];
                     if (originalEl) originalEl.style.opacity = '1';
@@ -2046,7 +2088,8 @@ async function onDragEnd(e) {
                 category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
                 cost: parseInt(unitEl.dataset.cost) || 0,
                 attack: parseInt(unitEl.dataset.attack) || 0,
-                health: parseInt(unitEl.dataset.health) || 0
+                health: parseInt(unitEl.dataset.health) || 0,
+                currentHealth: (unitEl.dataset.currentHealth !== undefined) ? parseInt(unitEl.dataset.currentHealth) : (parseInt(unitEl.dataset.health) || 0)
             };
 
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
@@ -2208,9 +2251,17 @@ function isTargetEligible(rule, targetInfo) {
         if (targetInfo.attack === undefined || targetInfo.attack < rule.value) return false;
     }
 
+    // Damaged check for DESTROY_DAMAGED
+    if (rule.type === 'DESTROY_DAMAGED') {
+        if (targetInfo.currentHealth === undefined || targetInfo.health === undefined) return false;
+        if (targetInfo.currentHealth >= targetInfo.health) return false; // Not damaged
+    }
+
+
     // Side check
     if (actualRule.side === 'ENEMY' && targetInfo.side !== 'OPPONENT') return false;
     if (actualRule.side === 'FRIENDLY' && targetInfo.side !== 'PLAYER') return false;
+    // If side is 'ALL' or undefined, allow both sides
 
     // Type check
     if (!actualRule.type || actualRule.type === 'ANY' || actualRule.type === 'ALL') {
@@ -2235,7 +2286,8 @@ function getValidTargets(rule) {
         category: unit.category || (type === 'HERO' ? '英雄' : ''),
         cost: unit.cost || 0,
         attack: unit.attack || 0,
-        health: unit.health || 0
+        health: unit.health || unit.maxHp || 0,
+        currentHealth: unit.currentHealth !== undefined ? unit.currentHealth : (unit.hp !== undefined ? unit.hp : unit.health)
     });
 
     // Check Players
@@ -2587,9 +2639,13 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
     const isExcludedPreview = bcTypePreview.includes('DRAW') || bcTypePreview.includes('COST') || bcTypePreview.includes('REDUCE');
     const effectiveBonusPreview = (card.type === 'NEWS' && (isDamagePreview || isHealPreview) && !isExcludedPreview) ? bonusPreview : 0;
 
+    const actualCostPreview = (gameState && typeof gameState.getCardActualCost === 'function') ? gameState.getCardActualCost(card) : card.cost;
+    const isReducedPreview = actualCostPreview < base.cost || card.isReduced;
+    const costClassPreview = isReducedPreview ? 'cost-reduced' : '';
+
     cardEl.innerHTML = `
         <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 5px; height: 40px;">
-            <div class="card-cost" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${card.cost}</span></div>
+            <div class="card-cost ${costClassPreview}" style="position: relative; width:30px; height:30px; font-size:16px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 5px;"><span>${actualCostPreview}</span></div>
             <div class="card-title" style="font-size:28px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name}</div>
         </div>
         ${customArtHtml}
