@@ -59,4 +59,5 @@
     - `DESTROY`: 直接摧毀單位
     - `BOUNCE_ALL_ENEMY`: 將對手全場單位回傳手牌
     - `DAMAGE_NON_CATEGORY`: 對非指定類別的單位造成傷害
+    - `DAMAGE_ALL_NON_CATEGORIES`: 對所有非指定類別列表的單位造成傷害
     - `BUFF_CATEGORY`: 強化指定類別的單位

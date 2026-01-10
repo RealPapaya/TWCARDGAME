@@ -28,7 +28,7 @@ const CARD_DATA = [
     { "id": "TW019", "name": "陳珮琪", "category": "民眾黨政治人物", "cost": 4, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "戰吼：將一個隨從生命回復全滿", "keywords": { "battlecry": { "type": "FULL_HEAL", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/peggy_chen.png" },
     { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw018.png" },
     { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "珊言良語\n光盾+嘲諷", "keywords": { "divineShield": true, "taunt": true }, "image": "img/TW026.png" },
-    { "id": "TW025", "name": "民眾黨黨部", "category": "民眾黨機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方「民眾黨政治人物」光盾", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_CATEGORY", "target_category": "民眾黨政治人物" } }, "image": "img/TW025.png" },
+    { "id": "TW025", "name": "民眾黨黨部", "category": "政府機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方「民眾黨政治人物」光盾", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_CATEGORY", "target_category": "民眾黨政治人物" } }, "image": "img/TW025.png" },
     { "id": "TW028", "name": "京華城", "category": "建築", "cost": 6, "attack": 0, "health": 6, "type": "MINION", "rarity": "RARE", "description": "肖恩柯的救贖\n持續效果: 賦予左右兩側的隨從 +1/+1", "keywords": { "ongoing": { "type": "ADJACENT_BUFF_STATS", "value": 1 } }, "image": "img/tw028.png" },
 
     // --- 公眾人物 / 媒體 ---
@@ -77,7 +77,8 @@ const CARD_DATA = [
     { "id": "S010", "name": "921大地震", "category": "新聞", "cost": 7, "type": "NEWS", "rarity": "EPIC", "description": "摧毀雙方場上所有隨從", "keywords": { "battlecry": { "type": "DESTROY_ALL_MINIONS" } }, "image": "img/e921.png" },
     { "id": "S011", "name": "高端疫苗", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "回復隨從 1 點生命。如果是民進黨政治人物，改為回復 2 點。", "keywords": { "battlecry": { "type": "HEAL_CATEGORY_BONUS", "value": 1, "bonus_value": 2, "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/mvc_vaccine.png" },
     { "id": "S012", "name": "抗中保台", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +4 攻擊力。如果是民進黨政治人物，改為獲得 +5 攻擊力。", "keywords": { "battlecry": { "type": "BUFF_STAT_TARGET_CATEGORY_BONUS", "value": 4, "bonus_value": 5, "stat": "ATTACK", "target_category_includes": "民進黨政治人物", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/s_anti_china.png" },
-    { "id": "S013", "name": "芒果乾", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷", "keywords": { "battlecry": { "type": "BUFF_HEALTH_AND_TAUNT_TARGET", "value": 1, "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/s_dried_mango.png" }
+    { "id": "S013", "name": "芒果乾", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷", "keywords": { "battlecry": { "type": "BUFF_HEALTH_AND_TAUNT_TARGET", "value": 1, "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/s_dried_mango.png" },
+    { "id": "S015", "name": "武漢肺炎", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對所有非建築且非政府機關的單位造成5點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_NON_CATEGORIES", "value": 5, "excluded_categories": ["建築", "政府機關"] } }, "image": "img/covid19.png" }
 ];
 
 let cardDB = [];

@@ -168,6 +168,19 @@ class GameState {
                 }
                 return null;
             },
+            'DAMAGE_ALL_NON_CATEGORIES': (bc) => {
+                const excludedCategories = bc.excluded_categories || [];
+                const affected = [];
+                [this.currentPlayer, this.opponent].forEach(player => {
+                    player.board.forEach((m, i) => {
+                        if (!excludedCategories.includes(m.category)) {
+                            this.applyDamage(m, bc.value);
+                            affected.push({ unit: { ...m, index: i, side: player.side }, value: bc.value });
+                        }
+                    });
+                });
+                return { type: 'DAMAGE_ALL', affected };
+            },
             'HEAL': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit) {
