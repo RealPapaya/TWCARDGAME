@@ -1808,14 +1808,8 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .minion.taunt::before {
-    content: "???";
-    position: absolute;
-    top: -15px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 24px;
-    text-shadow: 0 0 10px #C0C0C0;
-    z-index: 10;
+    content: '';
+    animation: taunt-shield-appear 0.8s ease-out 0.3s forwards;
 }
 
 /* Toast Notification */
@@ -1966,7 +1960,8 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .ability-projectile::after {
-    content: "??";
+    content: "\27A4";
+    /* Right arrow âž¤ using Unicode escape */
     font-size: 30px;
     display: block;
     color: var(--projectile-color, #43e97b);
@@ -2039,7 +2034,7 @@ body.dragging-active .player .hand .card:hover {
     border-color: #ffffff !important;
 }
 
-/* Divine Shield (¥ú¬Þ) Visual effect */
+/* Divine Shield (ï¿½ï¿½ï¿½ï¿½) Visual effect */
 .divine-shield {
     /* Base minion styles maintained, inner border removed as per user request */
     position: relative;
@@ -3032,7 +3027,7 @@ body.dragging-active .player .hand .card:hover {
 
 /* Taunt Shield Glow Animation */
 .minion::before {
-    content: '???';
+    content: '';
     position: absolute;
     top: -10px;
     right: -10px;
@@ -3046,6 +3041,7 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .minion.taunt::before {
+    content: '';
     animation: taunt-shield-appear 0.8s ease-out 0.3s forwards;
 }
 
@@ -3093,7 +3089,7 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .minion.locked::after {
-    content: '??';
+    content: 'ðŸ”’';
     position: absolute;
     top: 50%;
     left: 50%;
@@ -3118,7 +3114,7 @@ body.dragging-active .player .hand .card:hover {
 
 /* Unlock Animation */
 .minion.unlocking::after {
-    content: '??';
+    content: 'ðŸ”“';
     animation: unlock-shatter 0.8s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -3212,16 +3208,19 @@ body.dragging-active .player .hand .card:hover {
 .minion .countdown-badge+.countdown-badge {
     top: 35px;
 }
+
 /* Nuclear Explosion Animation */
 @keyframes nuclear-explosion {
     0% {
         box-shadow: 0 0 0 0 rgba(255, 0, 0, 0.8);
         transform: scale(1);
     }
+
     50% {
         box-shadow: 0 0 100px 50px rgba(255, 0, 0, 0.4);
         transform: scale(1.1);
     }
+
     100% {
         box-shadow: 0 0 200px 100px rgba(255, 0, 0, 0);
         transform: scale(1);
@@ -3233,6 +3232,30 @@ body.dragging-active .player .hand .card:hover {
     z-index: 100;
 }
 
+.damage-number {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 32px;
+    font-weight: bold;
+    color: #ff0000;
+    text-shadow: 0 0 10px #ff0000, 0 0 20px #ff0000;
+    animation: damage-float 1s ease-out forwards;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+@keyframes damage-float {
+    0% {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(0.5);
+    }
+
+    50% {
+        opacity: 1;
+        transform: translate(-50%, -100%) scale(1.2);
+    }
 
     100% {
         opacity: 0;
@@ -3245,9 +3268,11 @@ body.dragging-active .player .hand .card:hover {
     0% {
         opacity: 0;
     }
+
     10% {
         opacity: 1;
     }
+
     100% {
         opacity: 0;
     }
@@ -3255,14 +3280,45 @@ body.dragging-active .player .hand .card:hover {
 
 /* Screen Shake Animation for Nuclear Explosion */
 @keyframes screen-shake {
-    0%, 100% { transform: translate(0, 0); }
-    10% { transform: translate(-5px, 2px); }
-    20% { transform: translate(5px, -2px); }
-    30% { transform: translate(-3px, -3px); }
-    40% { transform: translate(3px, 3px); }
-    50% { transform: translate(-4px, 1px); }
-    60% { transform: translate(4px, -1px); }
-    70% { transform: translate(-2px, -2px); }
-    80% { transform: translate(2px, 2px); }
-    90% { transform: translate(-1px, 1px); }
+
+    0%,
+    100% {
+        transform: translate(0, 0);
+    }
+
+    10% {
+        transform: translate(-5px, 2px);
+    }
+
+    20% {
+        transform: translate(5px, -2px);
+    }
+
+    30% {
+        transform: translate(-3px, -3px);
+    }
+
+    40% {
+        transform: translate(3px, 3px);
+    }
+
+    50% {
+        transform: translate(-4px, 1px);
+    }
+
+    60% {
+        transform: translate(4px, -1px);
+    }
+
+    70% {
+        transform: translate(-2px, -2px);
+    }
+
+    80% {
+        transform: translate(2px, 2px);
+    }
+
+    90% {
+        transform: translate(-1px, 1px);
+    }
 }
