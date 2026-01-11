@@ -19,7 +19,7 @@ const CARD_DATA = [
     { "id": "TW031", "name": "蔣萬安", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌", "keywords": { "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/tw031.png" },
     { "id": "TW033", "name": "郝龍斌", "category": "國民黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)", "bounce_bonus": 1, "image": "img/tw033.png" },
     { "id": "TW034", "name": "趙少康", "category": "國民黨政治人物", "cost": 6, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質", "keywords": { "taunt": true, "battlecry": { "type": "EAT_FRIENDLY", "target": { "side": "FRIENDLY", "type": "MINION" } } }, "image": "img/tw034.png" },
-    { "id": "TW035", "name": "江啟臣", "category": "國民黨政治人物", "cost": 3, "attack": 3, "health": 5, "type": "MINION", "rarity": "RARE", "description": "戰吼：丟棄一張隨機手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM" } }, "image": "img/tw035.png" },
+    { "id": "TW035", "name": "江啟臣", "category": "國民黨政治人物", "cost": 3, "attack": 4, "health": 5, "type": "MINION", "rarity": "RARE", "description": "戰吼：丟棄一張隨機手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM" } }, "image": "img/tw035.png" },
     { "id": "TW036", "name": "連勝文", "category": "國民黨政治人物", "cost": 4, "attack": 2, "health": 2, "type": "MINION", "rarity": "EPIC", "description": "政壇不死鳥\n遺志: 回到手牌", "keywords": { "deathrattle": { "type": "BOUNCE_SELF" } }, "image": "img/tw036.png" },
 
     // --- 民眾黨 (TPP) ---
@@ -29,12 +29,14 @@ const CARD_DATA = [
     { "id": "TW019", "name": "陳珮琪", "category": "民眾黨政治人物", "cost": 4, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "戰吼：將一個隨從生命回復全滿", "keywords": { "battlecry": { "type": "FULL_HEAL", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/peggy_chen.png" },
     { "id": "TW021", "name": "黃國昌", "category": "民眾黨政治人物", "cost": 7, "attack": 4, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！", "keywords": { "charge": true, "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw018.png" },
     { "id": "TW026", "name": "黃珊珊", "category": "民眾黨政治人物", "cost": 2, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "珊言良語\n光盾+嘲諷", "keywords": { "divineShield": true, "taunt": true }, "image": "img/TW026.png" },
-    { "id": "TW025", "name": "民眾黨黨部", "category": "政府機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "戰吼：賦予所有友方「民眾黨政治人物」光盾", "keywords": { "battlecry": { "type": "GIVE_DIVINE_SHIELD_CATEGORY", "target_category": "民眾黨政治人物" } }, "image": "img/TW025.png" },
+    { "id": "TW025", "name": "民眾黨黨部", "category": "政府機關", "cost": 8, "attack": 0, "health": 4, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼：賦予所有我方「民眾黨政治人物」光盾", "keywords": { "taunt": true, "battlecry": { "type": "GIVE_DIVINE_SHIELD_CATEGORY", "target_category": "民眾黨政治人物" } }, "image": "img/TW025.png" },
+    { "id": "TW055", "name": "國民黨黨部", "category": "政府機關", "cost": 8, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "持續效果:賦予我方兩側「國民黨政治人物」嘲諷+1生命值", "keywords": { "ongoing": { "type": "ADJACENT_BUFF_CATEGORY_ATTRS", "target_category": "國民黨政治人物", "value": 1, "keyword": "taunt" } }, "image": "img/kmt_hq.png" },
+    { "id": "TW056", "name": "民進黨黨部", "category": "政府機關", "cost": 8, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "嘲諷+戰吼:賦予我方「民進黨政治人物」+2/+2", "keywords": { "taunt": true, "battlecry": { "type": "BUFF_CATEGORY", "target_category": "民進黨政治人物", "stat": "ALL", "value": 2 } }, "image": "img/dpp_hq.png" },
     { "id": "TW028", "name": "京華城", "category": "建築", "cost": 6, "attack": 0, "health": 6, "type": "MINION", "rarity": "RARE", "description": "肖恩柯的救贖\n持續效果: 賦予左右兩側的隨從 +1/+1", "keywords": { "ongoing": { "type": "ADJACENT_BUFF_STATS", "value": 1 } }, "image": "img/tw028.png" },
 
     // --- 公眾人物 / 媒體 ---
     { "id": "TW012", "name": "四叉貓", "category": "公眾人物", "cost": 4, "attack": 1, "health": 1, "type": "MINION", "rarity": "RARE", "description": "戰吼：賦予所有友方隨從 +1 生命值", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "HEALTH" } }, "image": "img/tw003.jpg" },
-    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 11, "type": "MINION", "rarity": "RARE", "description": "要頭腦有肌肉\n激怒：+4攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "image": "img/TW027.png" },
+    { "id": "TW027", "name": "館長", "category": "公眾人物", "cost": 10, "attack": 3, "health": 11, "type": "MINION", "rarity": "REPIC", "description": "要頭腦有肌肉\n激怒：+4攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 5 } }, "image": "img/TW027.png" },
 
     // --- 企業與組織 ---
     { "id": "TW017", "name": "勞工局", "category": "政府機關", "cost": 5, "attack": 0, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 賦予所有\"勞工\"血量上限+2", "keywords": { "battlecry": { "type": "BUFF_CATEGORY", "value": 2, "stat": "HEALTH", "target_category": "勞工" } }, "image": "img/tw013.png" },
@@ -43,6 +45,7 @@ const CARD_DATA = [
 
     // --- 一般隨從 (學生/勞工) ---
     { "id": "TW001", "name": "窮酸大學生", "category": "學生", "cost": 1, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "一個窮學生", "image": "img/c001.png" },
+    { "id": "TW052", "name": "青鳥大學生", "category": "學生", "cost": 1, "attack": 1, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "持續效果: 新聞牌消耗降低1點", "keywords": { "ongoing": { "type": "REDUCE_NEWS_COST", "value": 1 } }, "image": "img/bluebird_student.png" },
     { "id": "TW002", "name": "小草大學生", "category": "學生", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "戰吼：對一個單位造成 1 點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 1, "target": { "side": "ALL", "type": "ALL" } } }, "image": "img/c004.png" },
     { "id": "TW003", "name": "大樓保全", "category": "勞工", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/c002.png" },
     { "id": "TW004", "name": "條碼師", "category": "勞工", "cost": 2, "attack": 1, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "五杯大冰拿", "image": "img/tw008.png" },
@@ -53,6 +56,7 @@ const CARD_DATA = [
     { "id": "TW009", "name": "台積電工程師", "category": "勞工", "cost": 3, "attack": 1, "health": 4, "type": "MINION", "rarity": "RARE", "description": "激怒: 增加3點攻擊 極度耐操", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 3 } }, "image": "img/tw015.png" },
     { "id": "TW013", "name": "水電師傅", "category": "勞工", "cost": 4, "attack": 3, "health": 4, "type": "MINION", "rarity": "COMMON", "description": "嘲諷", "keywords": { "taunt": true }, "image": "img/tw009.png" },
     { "id": "TW022", "name": "老草中年", "category": "勞工", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/TW022.png" },
+    { "id": "TW053", "name": "老鳥中年", "category": "勞工", "cost": 2, "attack": 1, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "戰吼:抽一張新聞牌", "keywords": { "battlecry": { "type": "DRAW_NEWS" } }, "image": "img/old_bird.png" },
 
 
     // --- 新聞 (News) ---
@@ -84,7 +88,8 @@ const CARD_DATA = [
     { "id": "TW037", "name": "老榮民", "category": "平民", "cost": 3, "attack": 1, "health": 2, "type": "MINION", "rarity": "COMMON", "description": "遺志:抽兩張牌", "keywords": { "deathrattle": { "type": "DRAW", "value": 2 } }, "image": "img/veteran.png" },
     { "id": "TW038", "name": "傅崐萁", "category": "國民黨政治人物", "cost": 5, "attack": 4, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2", "keywords": { "charge": true, "triggered": { "type": "ON_DISCARD", "value": 2 } }, "image": "img/fu.png" },
     { "id": "TW039", "name": "徐巧芯", "category": "國民黨政治人物", "cost": 1, "attack": 4, "health": 4, "type": "MINION", "rarity": "RARE", "description": "戰吼:隨機丟棄三張手牌", "keywords": { "battlecry": { "type": "DISCARD_RANDOM", "value": 3 } }, "image": "img/hsu.png" },
-    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 3, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時,則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
+    { "id": "TW040", "name": "謝龍介", "category": "國民黨政治人物", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "屢敗屢戰\n當這個隨從從手牌被丟棄時,則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/hsieh.png" },
+    { "id": "TW054", "name": "鋼鐵韓粉 ", "category": "平民", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "氣氣氣\n當這個隨從從手牌被丟棄時,則會跳入戰場", "keywords": { "onDiscard": "SUMMON" }, "image": "img/iron_han_fan.png" },
     { "id": "TW041", "name": "柯文哲(獄中)", "category": "民眾黨政治人物", "cost": 4, "attack": 3, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 對自己造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 3 } }, "image": "img/ko_jail.png" },
     { "id": "TW042", "name": "蔡璧如", "category": "民眾黨政治人物", "cost": 3, "attack": 2, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "戰吼: 對自己造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_SELF", "value": 2 } }, "image": "img/tsai_pi_ru.png" },
     { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公!!!\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
@@ -102,7 +107,69 @@ let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
 ];
 let tempDeck = null; // Temporary deck for editing
 
-// AI Theme Decks
+// AI Theme Decks - Do not modify！！！
+const DEFAULT_THEME_DECKS = {
+    dpp: [
+        // 民進黨核心卡牌
+        'TW010', 'TW010', // 謝長廷 x2
+        'TW044', 'TW044', // 黃捷 x2 (新聞數值+1)
+        'TW045', 'TW045', // 蘇巧慧 x2 (新聞數值+2)
+        'TW046', 'TW046', // 賴清德 x2 (新聞數值+5)
+        'TW050', 'TW050', // 陳建仁 x2 (降低新聞牌消耗)
+        'TW049',  // 陳時中 x2
+        'TW051', 'TW051', // 蕭美琴 x2
+        // 新聞卡
+        'S001',  // 發票中獎
+        'S006', 'S006', // 砸雞蛋 (造成3點傷害)
+        'S011',
+        'S019', 'S019', // 查水表 (對敵方所有隨從造成2點傷害)
+        'S020', 'S020', // 政治清算 (造成7點傷害)
+        'S010', 'S016', 'S017', 'S018',
+        // 基礎隨從
+        'TW012', 'TW052', 'TW052', 'TW053', 'TW053'
+    ],
+    kmt: [
+        // 國民黨韓國瑜套牌核心卡牌
+        'TW016', 'TW016', // 吳敦義 x2 (賦予友方+1攻擊)
+        'TW023', 'TW023', // 陳玉珍 x2 (嘲諷坦克)
+        'TW024', 'TW024', // 馬英九 x2 (擊殺隨從)
+        'TW030', 'TW030', // 朱立倫 x2 (兩側+1/+1)
+        'TW032', 'TW032', // 韓國瑜 x2 (彈回獲得buff)
+        'TW031', 'TW031', // 蔣萬安 x2 (彈回隨從)
+        'TW033', 'TW033', // 郝龍斌 x2 (彈回獲得buff)
+        'TW034', 'TW034', // 趙少康 x2 (嘲諷+吃友方)
+        'TW035', 'TW035', // 江啟臣 x2 (丟棄手牌)
+        'TW036', 'TW036', // 連勝文 x2 (遺志回手牌)
+        // 基礎隨從
+        'TW001', 'TW001', // 窮酸大學生 x2
+        'TW003', 'TW003', // 大樓保全 x2
+        'TW005', 'TW005', // 水電徒弟 x2
+        'TW006', 'TW006', // 廟口管委 x2
+        'TW027', 'TW027'  // 館長 x2 (激怒)
+    ],
+    tpp: [
+        // 民眾黨核心卡牌
+        'TW011', 'TW011', // 柯文哲 x2 (回復友方血量)
+        'TW014', 'TW014', // 黃瀞瑩 x2 (回復3點)
+        'TW015', 'TW015', // 高虹安 x2 (賦予光盾)
+        'TW019', 'TW019', // 陳珮琪 x2 (全回復)
+        'TW021', 'TW021', // 黃國昌 x2 (衝鋒+激怒)
+        'TW026', 'TW026', // 黃珊珊 x2 (光盾+嘲諷)
+        'TW025', 'TW025', // 民眾黨黨部 x2 (賦予光盾)
+        'TW028', 'TW028', // 京華城 x2 (兩側+1/+1)
+        // 功能卡
+        'TW017', 'TW017', // 勞工局 x2 (賦予勞工+2血)
+        'TW018', 'TW018', // 台積電 x2 (嘲諷)
+        // 基礎隨從
+        'TW001', 'TW001', // 窮酸大學生 x2
+        'TW002', 'TW002', // 小草大學生 x2
+        'TW003', 'TW003', // 大樓保全 x2
+        'TW004', 'TW004', // 條碼師 x2
+        'TW005', 'TW005', // 水電徒弟 x2
+        'TW012', 'TW012'  // 四叉貓 x2
+    ]
+};
+
 function generateDefaultDeck() {
     const allIds = CARD_DATA.map(c => c.id);
     const deck = [];
@@ -111,51 +178,13 @@ function generateDefaultDeck() {
 }
 
 let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
-    { id: 'dpp', name: '民進黨牌組', image: 'img/theme_dpp.png', cards: generateDefaultDeck() },
-    { id: 'kmt', name: '國民黨牌組', image: 'img/theme_kmt.png', cards: generateDefaultDeck() },
-    { id: 'tpp', name: '民眾黨牌組', image: 'img/theme_tpp.png', cards: generateDefaultDeck() }
+    { id: 'dpp', name: '民進黨牌組', image: 'img/theme_dpp.png', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'kmt', name: '國民黨牌組', image: 'img/theme_kmt.png', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'tpp', name: '民眾黨牌組', image: 'img/theme_tpp.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
 let editingThemeIdx = -1; // -1 means not editing theme
 
-function migrateDecks() {
-    // Migration Map to translate old IDs to new ones
-    const map = {
-        'c001': 'TW001', 'c004': 'TW002', 'c002': 'TW003', 'tw008': 'TW004',
-        'tw010': 'TW005', 'c013': 'TW006', 'tw007': 'TW007', 'tw014': 'TW008',
-        'tw015': 'TW009', 'tw011': 'TW010', 'tw001': 'TW011', 'tw003': 'TW012',
-        'tw009': 'TW013', 'tw019': 'TW014', 'tw020': 'TW015', 'tw002': 'TW016',
-        'tw013': 'TW017', 'tw016': 'TW018', 'tw021': 'TW019', 'tw006': 'TW020',
-        'tw018': 'TW021', 'tw017': 'TW023', 'tw012': 'TW024',
-        'tw004': 'S001', 'tw005': 'S002', 'v023': 'TW037' // Manual fix for the brief TW023 clash if needed
-    };
 
-    let needsUpdate = false;
-    userDecks.forEach(deck => {
-        if (!deck.cards) deck.cards = [];
-        const originalLength = deck.cards.length;
-        deck.cards = deck.cards.map(id => {
-            // Special fix: If someone had TW023 but meant Old Veteran (which clashed briefly)
-            // This is hard to be certain about, but we know tw017 maps to TW023 (Chen).
-            // Let's just focus on the backward map.
-            if (map[id]) {
-                needsUpdate = true;
-                return map[id];
-            }
-            return id;
-        }).filter(id => {
-            const cardExists = CARD_DATA.some(c => c.id === id);
-            if (!cardExists) needsUpdate = true;
-            return cardExists;
-        });
-
-        if (deck.cards.length !== originalLength) needsUpdate = true;
-    });
-
-    if (needsUpdate) {
-        localStorage.setItem('userDecks', JSON.stringify(userDecks));
-        console.log("Decks migrated and cleaned up.");
-    }
-}
 
 // Ensure valid Slot 2 if empty or broken (for testing convenience)
 if (userDecks[1].cards.length === 0) {
@@ -175,7 +204,7 @@ let currentDifficulty = 'NORMAL';
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
 function init() {
-    migrateDecks();
+
     gameEngine = new GameEngine(CARD_DATA);
 
     // --- Main Menu Listeners ---

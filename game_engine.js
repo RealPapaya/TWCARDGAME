@@ -436,8 +436,14 @@ class GameState {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
                     if (m.category === bc.target_category) {
-                        m.health += bc.value;
-                        m.currentHealth += bc.value;
+                        const val = bc.value || 0;
+                        if (bc.stat === 'HEALTH' || bc.stat === 'ALL') {
+                            m.health += val;
+                            m.currentHealth += val;
+                        }
+                        if (bc.stat === 'ATTACK' || bc.stat === 'ALL') {
+                            m.attack += val;
+                        }
                         affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
                     }
                 });
@@ -574,6 +580,11 @@ class GameState {
             'DRAW_MINION_REDUCE_COST': (bc) => {
                 const idx = this.currentPlayer.deck.findIndex(c => c.type === 'MINION');
                 if (idx !== -1) this.currentPlayer.drawCard(idx, bc.value);
+                return { type: 'DRAW' };
+            },
+            'DRAW_NEWS': (bc) => {
+                const idx = this.currentPlayer.deck.findIndex(c => c.type === 'NEWS');
+                if (idx !== -1) this.currentPlayer.drawCard(idx, bc.value || 0);
                 return { type: 'DRAW' };
             },
             'DISCARD_DRAW': (bc) => {
@@ -882,6 +893,7 @@ class GameState {
         this.players.forEach(player => {
             // 1. Calculate Desired Buffs for all minions
             const desiredBuffs = new Map(); // minion -> { attack: 0, health: 0 }
+            const desiredTaunt = new Set(); // Minions that should have taunt from aura
 
             // Iterate sources
             player.board.forEach((m, i) => {
@@ -890,9 +902,10 @@ class GameState {
 
                 if (m.keywords && m.keywords.ongoing) {
                     const aura = m.keywords.ongoing;
+
+                    // Basic Adjacent Stats Buff
                     if (aura.type === 'ADJACENT_BUFF_STATS') {
                         const val = aura.value || 1;
-                        // Neighbors
                         [i - 1, i + 1].forEach(nid => {
                             if (nid >= 0 && nid < player.board.length) {
                                 const neighbor = player.board[nid];
@@ -900,6 +913,29 @@ class GameState {
                                 const buffs = desiredBuffs.get(neighbor);
                                 buffs.attack += val;
                                 buffs.health += val;
+                            }
+                        });
+                    }
+                    // Adjacent Buff with Category Requirement (Stats + Keyword)
+                    else if (aura.type === 'ADJACENT_BUFF_CATEGORY_ATTRS') {
+                        const cat = aura.target_category;
+                        [i - 1, i + 1].forEach(nid => {
+                            if (nid >= 0 && nid < player.board.length) {
+                                const neighbor = player.board[nid];
+                                if (neighbor.category && neighbor.category.includes(cat)) {
+                                    if (!desiredBuffs.has(neighbor)) desiredBuffs.set(neighbor, { attack: 0, health: 0 });
+                                    const buffs = desiredBuffs.get(neighbor);
+
+                                    if (aura.value) { // Health buff
+                                        buffs.health += aura.value;
+                                    }
+                                    if (aura.attack) { // Attack buff
+                                        buffs.attack += aura.attack;
+                                    }
+                                    if (aura.keyword === 'taunt') {
+                                        desiredTaunt.add(neighbor);
+                                    }
+                                }
                             }
                         });
                     }
@@ -919,19 +955,14 @@ class GameState {
                     m.health += hpDiff;
 
                     if (hpDiff > 0) {
-                        // Gaining buff: Heal current HP
                         m.currentHealth += hpDiff;
                     } else if (hpDiff < 0) {
-                        // Losing buff: Cap current HP
                         if (m.currentHealth > m.health) {
                             m.currentHealth = m.health;
                         }
                     }
-
-                    // Check enrage state since health threshold might have shifted OR max HP changed
                     this.updateEnrage(m);
 
-                    // Update state
                     if (target.attack === 0 && target.health === 0) {
                         m.ongoingStats = null;
                     } else {
@@ -939,7 +970,27 @@ class GameState {
                     }
                 }
 
-                // Legacy Divine Shield cleanup (if any left over)
+                // Handle Ongoing Taunt
+                if (desiredTaunt.has(m)) {
+                    if (!m.keywords) m.keywords = {};
+                    if (!m.keywords.taunt) {
+                        m.keywords.taunt = true;
+                        m.ongoingTaunt = true; // Mark as granted by aura
+                    } else if (m.keywords.taunt && !m.ongoingTaunt && !m.keywords.baseTaunt) {
+                        // If it has taunt but not marked as ongoing, maybe it was natural?
+                        // For simplicity, if we desire it, we ensure it's there.
+                        // But we track if we added it via 'ongoingTaunt' to remove it later.
+                        m.ongoingTaunt = true;
+                    }
+                } else {
+                    // If we don't desire it, but currently have it AND it was granted by aura, remove it.
+                    if (m.ongoingTaunt) {
+                        m.keywords.taunt = false; // Remove taunt
+                        m.ongoingTaunt = false;
+                    }
+                }
+
+                // Legacy Divine Shield cleanup
                 if (m.ongoingDivineShield) {
                     m.keywords.divineShield = false;
                     m.ongoingDivineShield = false;
