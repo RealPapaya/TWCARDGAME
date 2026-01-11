@@ -118,6 +118,7 @@ const DEFAULT_THEME_DECKS = {
         'TW050', 'TW050', // 陳建仁 x2 (降低新聞牌消耗)
         'TW049',  // 陳時中 x2
         'TW051', 'TW051', // 蕭美琴 x2
+        'TW056',
         // 新聞卡
         'S001',  // 發票中獎
         'S006', 'S006', // 砸雞蛋 (造成3點傷害)
@@ -126,47 +127,52 @@ const DEFAULT_THEME_DECKS = {
         'S020', 'S020', // 政治清算 (造成7點傷害)
         'S010', 'S016', 'S017', 'S018',
         // 基礎隨從
-        'TW012', 'TW052', 'TW052', 'TW053', 'TW053'
+        'TW052', 'TW052', // 青鳥大學生 x2
+        'TW053', 'TW053' // 老鳥中年 x2
     ],
     kmt: [
         // 國民黨韓國瑜套牌核心卡牌
         'TW016', 'TW016', // 吳敦義 x2 (賦予友方+1攻擊)
         'TW023', 'TW023', // 陳玉珍 x2 (嘲諷坦克)
-        'TW024', 'TW024', // 馬英九 x2 (擊殺隨從)
         'TW030', 'TW030', // 朱立倫 x2 (兩側+1/+1)
         'TW032', 'TW032', // 韓國瑜 x2 (彈回獲得buff)
         'TW031', 'TW031', // 蔣萬安 x2 (彈回隨從)
         'TW033', 'TW033', // 郝龍斌 x2 (彈回獲得buff)
         'TW034', 'TW034', // 趙少康 x2 (嘲諷+吃友方)
-        'TW035', 'TW035', // 江啟臣 x2 (丟棄手牌)
         'TW036', 'TW036', // 連勝文 x2 (遺志回手牌)
+        'TW047', 'TW047', // 連戰 x2 (擊殺隨從)
+        'TW056', 'TW056', // 國民黨黨部 x2
+        // 新聞牌
+        'S005', 'S005', // 倒閣 x2 
+        'S003', 'S003', // 大罷免 x2
+        'S010',
+        'S013',
         // 基礎隨從
-        'TW001', 'TW001', // 窮酸大學生 x2
-        'TW003', 'TW003', // 大樓保全 x2
-        'TW005', 'TW005', // 水電徒弟 x2
-        'TW006', 'TW006', // 廟口管委 x2
-        'TW027', 'TW027'  // 館長 x2 (激怒)
+        'TW054', 'TW054', // 鋼鐵韓粉 x2
+        'TW013', 'TW013' // 水電師傅 x2
+
     ],
     tpp: [
         // 民眾黨核心卡牌
         'TW011', 'TW011', // 柯文哲 x2 (回復友方血量)
+        'TW041', 'TW041', // 柯文哲(獄中) x2 (自損)
+        'TW043', 'TW043', // 陳珮琪(老公獄中) x2 (全回復)
         'TW014', 'TW014', // 黃瀞瑩 x2 (回復3點)
         'TW015', 'TW015', // 高虹安 x2 (賦予光盾)
-        'TW019', 'TW019', // 陳珮琪 x2 (全回復)
+        'TW019', 'TW019', // 陳珮琪 x2 (光盾)
         'TW021', 'TW021', // 黃國昌 x2 (衝鋒+激怒)
         'TW026', 'TW026', // 黃珊珊 x2 (光盾+嘲諷)
         'TW025', 'TW025', // 民眾黨黨部 x2 (賦予光盾)
         'TW028', 'TW028', // 京華城 x2 (兩側+1/+1)
-        // 功能卡
-        'TW017', 'TW017', // 勞工局 x2 (賦予勞工+2血)
-        'TW018', 'TW018', // 台積電 x2 (嘲諷)
+        'TW042', 'TW042', // 蔡璧如 x2 (自損)
+        'TW018',  // 台積電 x2 (嘲諷)
+        'TW027',  // 館長 x2 (激怒)
+        //新聞牌
+        'S013',  // 芒果乾
+        'S014', 'S014', // 側翼出動 x2
         // 基礎隨從
-        'TW001', 'TW001', // 窮酸大學生 x2
-        'TW002', 'TW002', // 小草大學生 x2
-        'TW003', 'TW003', // 大樓保全 x2
-        'TW004', 'TW004', // 條碼師 x2
-        'TW005', 'TW005', // 水電徒弟 x2
-        'TW012', 'TW012'  // 四叉貓 x2
+        'TW002', // 小草大學生 x2
+        'TW022', 'TW022' // 老草中年 x2
     ]
 };
 
@@ -1624,7 +1630,8 @@ function createCardEl(card, index) {
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
 
     // Calculate actual cost considering ongoing effects
-    const actualCost = gameState ? gameState.getCardActualCost(card) : card.cost;
+    // Pass card.side to ensure AI effects don't leak to player UI
+    const actualCost = gameState ? gameState.getCardActualCost(card, card.side) : card.cost;
 
     const isReduced = actualCost < card.cost || card.isReduced;
     const costClass = isReduced ? 'cost-reduced' : '';
@@ -2096,7 +2103,7 @@ async function onDragEnd(e) {
                     // 2. Render to show the minion LANDING on the board
                     render();
 
-                    // 3. Trigger Dust at newly played minion
+                    // 3. Trigger Dust at newly played minion (Capture from fresh DOM)
                     const boardEl = document.getElementById('player-board');
                     const newMinionEl = boardEl.children[currentInsertionIndex];
                     if (newMinionEl && playedCard.type === 'MINION') {
@@ -2182,21 +2189,24 @@ async function onDragEnd(e) {
                                 previousPlayerHandSize = gameState.currentPlayer.hand.length;
                             } else if (result.type === 'ADD_CARD') {
                                 // Cards added to hand (e.g., 高端疫苗 from 陳時中)
-                                // Suppress deck animation and use pop-in effect
-                                const oldHandSize = previousPlayerHandSize;
+                                // Suppress deck animation in renderHands
                                 previousPlayerHandSize = gameState.currentPlayer.hand.length;
 
-                                // Render to create the card elements
+                                // Render to create the card elements (they will be visible but we'll apply pop-in)
                                 render();
 
-                                // Apply pop-in animation to newly added cards
-                                await new Promise(r => setTimeout(r, 50));
+                                // Get hand and apply sequential pop-in
                                 const handEl = document.getElementById('player-hand');
                                 const newCount = result.count || 1;
                                 for (let i = 0; i < newCount; i++) {
                                     const cardIdx = handEl.children.length - newCount + i;
-                                    if (handEl.children[cardIdx]) {
-                                        handEl.children[cardIdx].classList.add('pop-in');
+                                    const el = handEl.children[cardIdx];
+                                    if (el) {
+                                        el.classList.add('pop-in');
+                                        // Auto-cleanup after animation
+                                        setTimeout(() => el.classList.remove('pop-in'), 600);
+                                        // Small delay for sequential appearance
+                                        await new Promise(r => setTimeout(r, 200));
                                     }
                                 }
                             } else if (result.type === 'SUMMON_MULTIPLE') {
@@ -2241,26 +2251,34 @@ async function onDragEnd(e) {
                                         await new Promise(r => setTimeout(r, 600));
                                     }
                                 }
+                            } else if (result.type === 'DRAW') {
+                                // Universal sequential draw handling (Matches S001 logic)
+                                const count = result.value || result.count || 1;
+                                for (let i = 0; i < count; i++) {
+                                    gameState.currentPlayer.drawCard(result.cardIndex || -1, result.reduction || 0);
+                                    render();
+                                    await new Promise(r => setTimeout(r, 600));
+                                }
                             } else if (result.type === 'BUFF_HAND') {
                                 const handEl = document.getElementById('player-hand');
                                 handEl.classList.add('hand-flash');
                                 setTimeout(() => handEl.classList.remove('hand-flash'), 500);
+                            } else if (result.type === 'BUFF_ALL') {
+                                if (result.affected) {
+                                    result.affected.forEach(aff => {
+                                        const side = aff.unit.side || 'PLAYER'; // Default to player if side missing
+                                        const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                        const targetEl = document.getElementById(boardId).children[aff.unit.index];
+                                        if (targetEl) {
+                                            triggerCombatEffect(targetEl, 'BUFF');
+                                        }
+                                    });
+                                }
                             }
                         }
                     }
 
-                    // --- PERFECT: DO NOT TOUCH S001 ANIMATION LOGIC ---
-                    if (playedCard.keywords?.battlecry?.type === 'DRAW') {
-                        const drawCount = playedCard.keywords.battlecry.value || 1;
-                        for (let i = 0; i < drawCount; i++) {
-                            gameState.currentPlayer.drawCard();
-                            render();
-                            await new Promise(r => setTimeout(r, 600));
-                        }
-                    }
 
-                    // Final Render to update all stats
-                    render();
                     await resolveDeaths();
 
                 } catch (err) {

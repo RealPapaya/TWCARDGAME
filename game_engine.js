@@ -396,6 +396,7 @@ class GameState {
                     for (let i = 0; i < count; i++) {
                         if (this.currentPlayer.hand.length < 10) {
                             const card = JSON.parse(JSON.stringify(cardDef));
+                            card.side = this.currentPlayer.side; // Ensure side is set for tokens
                             this.currentPlayer.hand.push(card);
                             added.push(card);
                         }
@@ -576,16 +577,34 @@ class GameState {
                 });
                 return { type: 'BUFF_HAND', affected };
             },
-            'DRAW': (bc) => ({ type: 'DRAW', value: bc.value }),
+            'DRAW': (bc) => {
+                const count = bc.value || 1;
+                if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                    for (let i = 0; i < count; i++) this.currentPlayer.drawCard();
+                }
+                return { type: 'DRAW', value: count };
+            },
             'DRAW_MINION_REDUCE_COST': (bc) => {
                 const idx = this.currentPlayer.deck.findIndex(c => c.type === 'MINION');
-                if (idx !== -1) this.currentPlayer.drawCard(idx, bc.value);
-                return { type: 'DRAW' };
+                if (idx !== -1) {
+                    if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                        this.currentPlayer.drawCard(idx, bc.value);
+                    }
+                    return { type: 'DRAW', cardIndex: idx, reduction: bc.value, count: 1 };
+                }
+                return null;
             },
             'DRAW_NEWS': (bc) => {
                 const idx = this.currentPlayer.deck.findIndex(c => c.type === 'NEWS');
-                if (idx !== -1) this.currentPlayer.drawCard(idx, bc.value || 0);
-                return { type: 'DRAW' };
+                if (idx !== -1) {
+                    if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                        this.currentPlayer.drawCard(idx, bc.value || 0);
+                    }
+                    return { type: 'DRAW', cardIndex: idx, count: 1 };
+                } else {
+                    if (typeof logMessage === 'function') logMessage("牌庫中沒有新聞牌了!");
+                    return null;
+                }
             },
             'DISCARD_DRAW': (bc) => {
                 const res = this.resolveBattlecry({ type: 'DISCARD_RANDOM', value: bc.discardCount || 1 });
@@ -676,6 +695,9 @@ class GameState {
             card.attack += card.hanBounceBonus;
             card.health += card.hanBounceBonus;
         }
+
+        // Carry over side
+        card.side = minion.side;
 
         delete card.currentHealth;
         delete card.sleeping;
@@ -771,11 +793,16 @@ class GameState {
     /**
      * Calculate the actual cost of a card considering ongoing effects
      * @param {Object} card The card to calculate cost for
+     * @param {string} side Optional: Force calculation for a specific side (PLAYER/OPPONENT)
      * @returns {number} The actual cost after reductions
      */
-    getCardActualCost(card) {
+    getCardActualCost(card, side = null) {
         let cost = card.cost;
-        const player = this.currentPlayer;
+        // Use provided side, or the card's own side, or fallback to current player
+        const targetSide = side || card.side || (this.currentPlayer ? this.currentPlayer.side : 'PLAYER');
+        const player = this.players.find(p => p.side === targetSide);
+
+        if (!player) return Math.max(0, cost);
 
         // Check for REDUCE_NEWS_COST ongoing effects
         if (card.type === 'NEWS') {
@@ -789,7 +816,6 @@ class GameState {
         }
 
         const finalCost = Math.max(0, cost);
-        // console.log(`[DEBUG] Cost calc for ${card.name}: Base=${card.cost}, Final=${finalCost}`);
         return finalCost;
     }
 
@@ -1327,7 +1353,9 @@ class Player {
             const cardDef = collection.find(c => c.id === id);
             if (cardDef) {
                 // Deep copy to ensure independence
-                deck.push(JSON.parse(JSON.stringify(cardDef)));
+                const card = JSON.parse(JSON.stringify(cardDef));
+                card.side = this.side;
+                deck.push(card);
             }
         }
         // Shuffle

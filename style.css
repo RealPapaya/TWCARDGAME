@@ -2422,8 +2422,8 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .buff-particle {
-    color: #43e97b;
-    text-shadow: 0 0 10px #43e97b, 0 0 20px rgba(67, 233, 123, 0.4);
+    color: #ffa500;
+    text-shadow: 0 0 10px #ffa500, 0 0 20px rgba(255, 165, 0, 0.4);
 }
 
 @keyframes float-up {
@@ -2950,16 +2950,16 @@ body.dragging-active .player .hand .card:hover {
 @keyframes popIn {
     0% {
         opacity: 0;
-        transform: scale(0.5);
+        transform: rotate(var(--rot, 0deg)) translateY(var(--y, 0px)) scale(0.5);
     }
 
     70% {
-        transform: scale(1.1);
+        transform: rotate(var(--rot, 0deg)) translateY(var(--y, 0px)) scale(1.1);
     }
 
     100% {
         opacity: 1;
-        transform: scale(1);
+        transform: rotate(var(--rot, 0deg)) translateY(var(--y, 0px)) scale(1);
     }
 }
 
