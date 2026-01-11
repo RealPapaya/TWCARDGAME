@@ -899,7 +899,8 @@ body {
 }
 
 .opponent-hero {
-    margin-bottom: -20px;
+    margin-top: -10px;
+    margin-bottom: 20px;
 }
 
 .player-hero {

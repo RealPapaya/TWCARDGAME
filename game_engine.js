@@ -833,17 +833,18 @@ class GameState {
         // Draw a card (Always draw at start of turn)
         player.drawCard();
 
-        // Decrease Lock Turns & Handle Survival
-        player.board.forEach(m => {
-            if (m.lockedTurns > 0) {
-                m.lockedTurns--;
-                if (m.lockedTurns === 0) {
-                    m.justUnlocked = true;
+        // Decrease Lock Turns for ALL players' minions
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(m => {
+                if (m.lockedTurns > 0) {
+                    m.lockedTurns--;
+                    if (m.lockedTurns === 0) {
+                        m.justUnlocked = true;
+                    }
+                } else {
+                    delete m.justUnlocked;
                 }
-            } else {
-                delete m.justUnlocked;
-            }
-
+            });
         });
 
         // Wake up minions (summoning sickness wears off)
