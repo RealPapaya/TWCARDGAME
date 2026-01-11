@@ -150,15 +150,42 @@ class GameState {
                 });
                 return { type: 'HEAL_ALL', affected };
             },
-            'BOUNCE_ALL_ENEMY': () => {
+            'BOUNCE_ALL_ENEMY': (bc, target, source) => {
                 const bounced = [];
+                // 1. Bounce opponents
                 while (this.opponent.board.length > 0) {
                     const m = this.opponent.board.shift();
                     const cardToHand = this._createBounceCard(m);
                     bounced.push(m);
                     if (this.opponent.hand.length < 10) this.opponent.hand.push(cardToHand);
                 }
-                return { type: 'BOUNCE_ALL', bounced };
+
+                // 2. Summon Pets (Lele and Xiangxiang) around source
+                let summonedCount = 0;
+                if (bc.summon && source) {
+                    const idx = this.currentPlayer.board.indexOf(source);
+                    if (idx !== -1) {
+                        // Summon Lele (Left)
+                        const leleDef = (this.collection || []).find(c => c.id === bc.summon[0]);
+                        if (leleDef && this.currentPlayer.board.length < 7) {
+                            const lele = this.createMinion(leleDef, this.currentPlayer.side);
+                            this.currentPlayer.board.splice(idx, 0, lele);
+                            summonedCount++;
+                        }
+
+                        // Re-find source index because it might have shifted
+                        const newIdx = this.currentPlayer.board.indexOf(source);
+                        // Summon Xiangxiang (Right)
+                        const xiangDef = (this.collection || []).find(c => c.id === bc.summon[1]);
+                        if (xiangDef && this.currentPlayer.board.length < 7) {
+                            const xiang = this.createMinion(xiangDef, this.currentPlayer.side);
+                            this.currentPlayer.board.splice(newIdx + 1, 0, xiang);
+                            summonedCount++;
+                        }
+                    }
+                }
+
+                return { type: 'BOUNCE_ALL', bounced, summonedCount };
             },
             'DAMAGE_NON_CATEGORY': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);

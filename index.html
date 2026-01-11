@@ -9,6 +9,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
+    <script src="card_data.js"></script>
+    <script src="default_decks.js"></script>
     <script src="game_engine.js"></script>
     <script src="updates.js"></script>
     <script src="app.js" defer></script>
@@ -174,7 +176,11 @@
                 <div id="all-cards-grid" class="cards-grid"></div>
             </div>
             <div class="my-deck-section">
-                <h3>目前牌組</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h3 style="margin: 0;">目前牌組</h3>
+                    <button id="btn-clear-deck" class="neon-button danger"
+                        style="padding: 5px 15px; font-size: 14px;">清空牌組</button>
+                </div>
                 <div id="my-deck-list" class="deck-list"></div>
                 <div id="deck-stats" class="deck-stats"></div>
             </div>
