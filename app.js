@@ -3315,3 +3315,59 @@ function showDamageNumber(targetElement, value, type = 'damage') {
 
 // Make function globally accessible for game_engine.js
 window.showDamageNumber = showDamageNumber;
+
+// Nuclear Power Plant Explosion Animation
+function triggerNuclearExplosion(sourceMinion, damageValue) {
+    // Find the nuclear power plant element on the board
+    const boards = document.querySelectorAll('.board');
+    let nuclearEl = null;
+
+    boards.forEach(board => {
+        const minions = board.querySelectorAll('.minion');
+        minions.forEach(minionEl => {
+            if (minionEl.dataset.minionId === sourceMinion.instanceId) {
+                nuclearEl = minionEl;
+            }
+        });
+    });
+
+    if (!nuclearEl) return;
+
+    // Add explosion animation to nuclear plant
+    nuclearEl.classList.add('nuclear-exploding');
+    setTimeout(() => nuclearEl.classList.remove('nuclear-exploding'), 1000);
+
+    // Show damage numbers on all minions
+    setTimeout(() => {
+        boards.forEach(board => {
+            const minions = board.querySelectorAll('.minion');
+            minions.forEach(minionEl => {
+                showDamageNumber(minionEl, damageValue, 'damage');
+            });
+        });
+    }, 300);
+}
+
+window.triggerNuclearExplosion = triggerNuclearExplosion;
+
+// Check for quest completion events after render
+(function () {
+    const originalRender = window.render;
+    if (originalRender) {
+        window.render = function () {
+            originalRender();
+
+            // Check for quest completion events
+            if (gameState && gameState.questCompletionEvents && gameState.questCompletionEvents.length > 0) {
+                gameState.questCompletionEvents.forEach(event => {
+                    if (event.type === 'NUCLEAR_EXPLOSION') {
+                        setTimeout(() => {
+                            triggerNuclearExplosion(event.sourceMinion, event.effect.value);
+                        }, 100);
+                    }
+                });
+                gameState.questCompletionEvents = [];
+            }
+        };
+    }
+})();

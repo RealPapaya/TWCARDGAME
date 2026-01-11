@@ -98,6 +98,7 @@ class GameState {
         this.debugMode = debugMode;
         this.difficulty = difficulty;
         this.collection = collection;
+        this.questCompletionEvents = [];
         this._initBattlecryHandlers();
 
         // Apply Difficulty Modifiers to Opponent (AI)
@@ -873,13 +874,35 @@ class GameState {
                 if (m.keywords?.quest) {
                     m.questTurns = (m.questTurns || 0) + 1;
                     if (m.questTurns >= m.keywords.quest.turns) {
-                        m.currentHealth = 0; // Trigger death
+                        // Quest completed
                         if (m.keywords.quest.summonCardId) {
-                            // Append specific deathrattle for the summon
+                            // Summon type quest (e.g., Lan Yi-ming)
+                            m.currentHealth = 0; // Trigger death
                             m.keywords.deathrattle = {
                                 type: 'SUMMON',
                                 cardId: m.keywords.quest.summonCardId
                             };
+                        } else if (m.keywords.quest.effect) {
+                            // Effect type quest (e.g., Nuclear Power Plant)
+                            const effect = m.keywords.quest.effect;
+                            if (effect.type === 'DAMAGE_ALL_MINIONS') {
+                                // Add to events for visual trigger
+                                this.questCompletionEvents.push({
+                                    type: 'NUCLEAR_EXPLOSION',
+                                    sourceMinion: { ...m },
+                                    effect: effect
+                                });
+
+                                // Apply damage in engine
+                                [this.players[0], this.players[1]].forEach(p => {
+                                    p.board.forEach(minion => {
+                                        this.applyDamage(minion, effect.value);
+                                    });
+                                });
+                            }
+                            // Remove quest from minion so it doesn't trigger again
+                            delete m.keywords.quest;
+                            delete m.questTurns;
                         }
                     }
                 }
