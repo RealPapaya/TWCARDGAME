@@ -277,7 +277,7 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
                     ${log.items.map(item => `
                         <li style="margin-bottom: 15px;">
                             <b style="color: var(--neon-yellow);">${item.title}</b><br>
-                            <span style="color: #ccc; font-size: 14px;">${item.desc}</span>
+                            <span style="color: #ccc; font-size: 14px; display: block; margin-top: 4px; white-space: pre-wrap;">${item.desc}</span>
                         </li>
                     `).join('')}
                 </ul>
