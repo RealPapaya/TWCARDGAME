@@ -843,18 +843,6 @@ class GameState {
                 delete m.justUnlocked;
             }
 
-            // Quest Logic (e.g., Lan Yi-ming)
-            if (m.keywords?.quest) {
-                m.questTurns = (m.questTurns || 0) + 1;
-                if (m.questTurns >= m.keywords.quest.turns) {
-                    m.currentHealth = 0; // Trigger death
-                    // Append specific deathrattle for the summon
-                    m.keywords.deathrattle = {
-                        type: 'SUMMON',
-                        cardId: m.keywords.quest.summonCardId
-                    };
-                }
-            }
         });
 
         // Wake up minions (summoning sickness wears off)
@@ -879,6 +867,25 @@ class GameState {
      * End current turn and switch player.
      */
     endTurn() {
+        // Quest Logic: Process for ALL minions on BOTH boards at any turn end
+        [this.players[0], this.players[1]].forEach(player => {
+            player.board.forEach(m => {
+                if (m.keywords?.quest) {
+                    m.questTurns = (m.questTurns || 0) + 1;
+                    if (m.questTurns >= m.keywords.quest.turns) {
+                        m.currentHealth = 0; // Trigger death
+                        if (m.keywords.quest.summonCardId) {
+                            // Append specific deathrattle for the summon
+                            m.keywords.deathrattle = {
+                                type: 'SUMMON',
+                                cardId: m.keywords.quest.summonCardId
+                            };
+                        }
+                    }
+                }
+            });
+        });
+
         // Cleanup Temporary Buffs for current player
         this.currentPlayer.board.forEach(m => {
             if (m.tempBuffs && m.tempBuffs.length > 0) {
@@ -898,6 +905,7 @@ class GameState {
             }
         });
 
+        this.resolveDeaths();
 
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
         this.startTurn();
@@ -1220,7 +1228,7 @@ class GameState {
 
         // Initialize quest turns counter
         if (minion.keywords && minion.keywords.quest) {
-            minion.questTurns = 1;
+            minion.questTurns = 0;
         }
 
         // Apply '網軍' (TW048) or other specific checks if keywords are missing but required context implies execution (Unlikely if data is correct)

@@ -945,6 +945,8 @@ async function aiTurn() {
                                 triggerCombatEffect(document.getElementById('opp-hero'), 'HEAL');
                             } else if (type === 'BOUNCE_ALL_ENEMY') {
                                 triggerFullBoardBounceAnimation(true);
+                            } else if (card.id === 'S019') { // 查水表
+                                triggerRippleDiffusionAnimation(false);
                             }
                         }, 100);
                     }
@@ -1586,7 +1588,7 @@ function createMinionEl(minion, index, isPlayer) {
     if (minion.lockedTurns > 0) {
         countdownHtml += `<div class="countdown-badge lock-countdown">🔒 ${minion.lockedTurns}</div>`;
     }
-    if (minion.questTurns && minion.keywords?.quest) {
+    if (minion.keywords?.quest && minion.questTurns !== undefined) {
         const remaining = minion.keywords.quest.turns - minion.questTurns;
         if (remaining >= 0) {
             countdownHtml += `<div class="countdown-badge quest-countdown">⏳ ${remaining}</div>`;
@@ -3253,14 +3255,14 @@ async function triggerPoisonGasAnimation() {
 /**
  * 查水表：波紋擴散動畫
  */
-async function triggerRippleDiffusionAnimation() {
-    const playerHero = document.getElementById('player-hero');
-    const oppBoard = document.getElementById('opp-board');
-    if (!playerHero || !oppBoard) return;
+async function triggerRippleDiffusionAnimation(isPlayer = true) {
+    const sourceHero = isPlayer ? document.getElementById('player-hero') : document.getElementById('opp-hero');
+    const targetBoard = isPlayer ? document.getElementById('opp-board') : document.getElementById('player-board');
+    if (!sourceHero || !targetBoard) return;
 
-    const pRect = playerHero.getBoundingClientRect();
-    const centerX = pRect.left + pRect.width / 2;
-    const centerY = pRect.top + pRect.height / 2;
+    const sRect = sourceHero.getBoundingClientRect();
+    const centerX = sRect.left + sRect.width / 2;
+    const centerY = sRect.top + sRect.height / 2;
 
     for (let i = 0; i < 3; i++) {
         setTimeout(() => {
@@ -3277,10 +3279,10 @@ async function triggerRippleDiffusionAnimation() {
 
     // Board slam animation after a short delay
     setTimeout(() => {
-        oppBoard.classList.remove('board-slam');
-        void oppBoard.offsetWidth;
-        oppBoard.classList.add('board-slam');
-        setTimeout(() => oppBoard.classList.remove('board-slam'), 500);
+        targetBoard.classList.remove('board-slam');
+        void targetBoard.offsetWidth;
+        targetBoard.classList.add('board-slam');
+        setTimeout(() => targetBoard.classList.remove('board-slam'), 500);
     }, 400);
 }
 
