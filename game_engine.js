@@ -452,6 +452,26 @@ class GameState {
                 });
                 return { type: 'BUFF_ALL', affected };
             },
+            'SWAP_ATTACK_HEALTH': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const oldAttack = targetUnit.attack;
+                    const oldHealth = targetUnit.health;
+                    const oldCurrentHealth = targetUnit.currentHealth;
+
+                    // Swap attack and max health
+                    targetUnit.attack = oldHealth;
+                    targetUnit.health = oldAttack;
+
+                    // Adjust current health proportionally, but ensure it's at least 1
+                    const healthRatio = oldCurrentHealth / oldHealth;
+                    targetUnit.currentHealth = Math.max(0, Math.floor(oldAttack * healthRatio));
+
+                    this.updateEnrage(targetUnit);
+                    return { type: 'SWAP', target: { ...targetUnit, index: target.index }, oldAttack, oldHealth };
+                }
+                return null;
+            },
             'DESTROY': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit) {
