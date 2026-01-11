@@ -102,7 +102,7 @@ const CARD_DATA = [
     { "id": "TW060", "name": "蘇貞昌", "category": "民進黨政治人物", "cost": 9, "attack": 8, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "在那叫甚麼?\n衝鋒+戰吼:使一名隨從回到手牌", "keywords": { "charge": true, "battlecry": { "type": "BOUNCE", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/su_tseng_chang.png" },
     { "id": "TW061", "name": "陳其邁", "category": "民進黨政治人物", "cost": 7, "attack": 3, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "戰吼:沈默所有敵方隨從2回合\n遺志:召喚藍亦明", "keywords": { "battlecry": { "type": "LOCK_ALL_ENEMY", "value": 2 }, "deathrattle": { "type": "SUMMON", "cardId": "TW062" } }, "image": "img/chen_chi_mai.png" },
     { "id": "TW062", "name": "藍亦明", "category": "公眾人物", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "任務:如果存活3回合則死亡並召喚陳其邁", "keywords": { "quest": { "turns": 3, "summonCardId": "TW061" } }, "image": "img/lan_yi_ming.png" },
-    { "id": "TW063", "name": "核電廠", "category": "建築", "cost": 3, "attack": 0, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "任務:如果存活5回合 對全部隨從造成25點傷害", "keywords": { "quest": { "turns": 1, "effect": { "type": "DAMAGE_ALL_MINIONS", "value": 25 } } }, "image": "img/nuclear_power_plant.png" }
+    { "id": "TW063", "name": "核電廠", "category": "建築", "cost": 3, "attack": 0, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "任務:如果存活5回合 對全部隨從造成25點傷害", "keywords": { "quest": { "turns": 2, "effect": { "type": "DAMAGE_ALL_MINIONS", "value": 25 } } }, "image": "img/nuclear_power_plant.png" }
 ];
 
 // Export for browser

@@ -751,6 +751,13 @@ function renderDeckBuilder() {
     const sortedCards = [...deck.cards].sort((a, b) => {
         const cardA = CARD_DATA.find(c => c.id === a);
         const cardB = CARD_DATA.find(c => c.id === b);
+
+        // Handle missing cards gracefully
+        if (!cardA || !cardB) {
+            console.warn('[SORT] Missing card data:', { a, cardA, b, cardB });
+            return 0; // Keep original order if either card is missing
+        }
+
         if (cardA.cost !== cardB.cost) return cardA.cost - cardB.cost;
         return cardA.name.localeCompare(cardB.name);
     });
@@ -1631,11 +1638,11 @@ function createMinionEl(minion, index, isPlayer) {
     // Target Drop Data (Needed for both enemy attacks AND friendly buffs)
     el.dataset.type = 'MINION';
     el.dataset.index = index;
-    el.dataset.category = minion.category; // Added for category-based targeting rules
-    el.dataset.cost = minion.cost;
-    el.dataset.attack = minion.attack;
-    el.dataset.health = minion.health;
-    el.dataset.currentHealth = minion.currentHealth;
+    el.dataset.category = minion.category || ''; // Added for category-based targeting rules
+    el.dataset.cost = minion.cost !== undefined ? minion.cost : 0;
+    el.dataset.attack = minion.attack !== undefined ? minion.attack : 0;
+    el.dataset.health = minion.health !== undefined ? minion.health : 0;
+    el.dataset.currentHealth = minion.currentHealth !== undefined ? minion.currentHealth : 0;
     el.dataset.minionId = minion.instanceId; // Added for damage animation targeting
 
     return el;
@@ -1658,11 +1665,19 @@ function onDragStart(e, index, fromHand = false) {
     if (gameState.currentPlayerIdx !== 0) return;
     if (isBattlecryTargeting) return; // Finish targeting first
 
-    const card = gameState.currentPlayer.hand[index];
-    // Use actual cost for drag start check
-    const actualCost = gameState.getCardActualCost(card);
-    if (fromHand && card && gameState.currentPlayer.mana.current < actualCost) {
-        shakeManaContainer(true);
+    // Only check hand card and cost if dragging from hand
+    if (fromHand) {
+        const card = gameState.currentPlayer.hand[index];
+        if (!card) {
+            console.warn('[DRAG] Card not found in hand at index:', index);
+            return;
+        }
+
+        // Use actual cost for drag start check
+        const actualCost = gameState.getCardActualCost(card);
+        if (gameState.currentPlayer.mana.current < actualCost) {
+            shakeManaContainer(true);
+        }
     }
 
     dragging = true;
@@ -3294,7 +3309,12 @@ async function triggerRippleDiffusionAnimation(isPlayer = true) {
  * @param {string} type - 'damage' or 'heal'
  */
 function showDamageNumber(targetElement, value, type = 'damage') {
-    if (!targetElement || value === 0) return;
+    console.log('[DAMAGE_NUMBER] Called with:', { targetElement, value, type });
+
+    if (!targetElement || value === 0) {
+        console.warn('[DAMAGE_NUMBER] Skipped - targetElement:', !!targetElement, 'value:', value);
+        return;
+    }
 
     const rect = targetElement.getBoundingClientRect();
     const numberEl = document.createElement('div');
@@ -3305,11 +3325,19 @@ function showDamageNumber(targetElement, value, type = 'damage') {
     numberEl.style.left = `${rect.left + rect.width / 2}px`;
     numberEl.style.top = `${rect.top + rect.height / 2}px`;
 
+    console.log('[DAMAGE_NUMBER] Created element:', {
+        className: numberEl.className,
+        text: numberEl.textContent,
+        position: { left: numberEl.style.left, top: numberEl.style.top }
+    });
+
     document.body.appendChild(numberEl);
+    console.log('[DAMAGE_NUMBER] Appended to body');
 
     // Remove after animation completes
     setTimeout(() => {
         numberEl.remove();
+        console.log('[DAMAGE_NUMBER] Removed after animation');
     }, 1200);
 }
 
@@ -3317,35 +3345,99 @@ function showDamageNumber(targetElement, value, type = 'damage') {
 window.showDamageNumber = showDamageNumber;
 
 // Nuclear Power Plant Explosion Animation
-function triggerNuclearExplosion(sourceMinion, damageValue) {
-    // Find the nuclear power plant element on the board
-    const boards = document.querySelectorAll('.board');
-    let nuclearEl = null;
+async function triggerNuclearExplosion(event) {
+    console.log('[NUCLEAR] Explosion triggered!', event);
+    console.log('[NUCLEAR] Event details:', {
+        sourceMinion: event.sourceMinion,
+        effect: event.effect,
+        affectedMinionsCount: event.affectedMinions?.length
+    });
 
+    const { sourceMinion, effect, affectedMinions } = event;
+    const damageValue = effect.value;
+
+    // Find nuclear plant element for explosion animation
+    const boards = document.querySelectorAll('.board');
+    console.log('[NUCLEAR] Found', boards.length, 'boards');
+
+    let nuclearEl = null;
     boards.forEach(board => {
         const minions = board.querySelectorAll('.minion');
+        console.log('[NUCLEAR] Board has', minions.length, 'minions');
         minions.forEach(minionEl => {
+            console.log('[NUCLEAR] Checking minion:', minionEl.dataset.minionId, 'vs', sourceMinion.instanceId);
             if (minionEl.dataset.minionId === sourceMinion.instanceId) {
                 nuclearEl = minionEl;
+                console.log('[NUCLEAR] Found nuclear plant element!');
             }
         });
     });
 
-    if (!nuclearEl) return;
+    // Add explosion animation to nuclear plant if found
+    if (nuclearEl) {
+        console.log('[NUCLEAR] Adding explosion animation to nuclear plant');
+        nuclearEl.classList.add('nuclear-exploding');
+        setTimeout(() => nuclearEl.classList.remove('nuclear-exploding'), 1000);
+    } else {
+        console.warn('[NUCLEAR] Nuclear plant element not found - it may have already been destroyed');
+    }
 
-    // Add explosion animation to nuclear plant
-    nuclearEl.classList.add('nuclear-exploding');
-    setTimeout(() => nuclearEl.classList.remove('nuclear-exploding'), 1000);
+    // Step 1: Show damage numbers on all affected minions (before they die)
+    console.log('[NUCLEAR] Step 1: Showing damage numbers on', affectedMinions?.length || 0, 'minions');
 
-    // Show damage numbers on all minions
-    setTimeout(() => {
-        boards.forEach(board => {
-            const minions = board.querySelectorAll('.minion');
-            minions.forEach(minionEl => {
-                showDamageNumber(minionEl, damageValue, 'damage');
-            });
+    if (!affectedMinions || affectedMinions.length === 0) {
+        console.error('[NUCLEAR] No affected minions data! Event:', event);
+        return;
+    }
+
+    affectedMinions.forEach(({ minion, side }, index) => {
+        const boardId = side === 'PLAYER' ? 'player-board' : 'opp-board';
+        const board = document.getElementById(boardId);
+        if (!board) {
+            console.warn('[NUCLEAR] Board not found:', boardId);
+            return;
+        }
+
+        // Find the minion element by instanceId
+        const minionEl = Array.from(board.querySelectorAll('.minion')).find(
+            el => el.dataset.minionId === minion.instanceId
+        );
+
+        if (minionEl) {
+            console.log(`[NUCLEAR] Showing damage ${damageValue} on minion ${index + 1}/${affectedMinions.length}:`, minion.name);
+            showDamageNumber(minionEl, damageValue, 'damage');
+        } else {
+            console.warn('[NUCLEAR] Minion element not found for:', minion.name, minion.instanceId);
+        }
+    });
+
+    // Step 2: Wait for damage numbers to be visible
+    await new Promise(r => setTimeout(r, 600));
+
+    // Step 3: Apply damage directly to game state (without triggering damage numbers again)
+    console.log('[NUCLEAR] Step 2: Applying damage in game state');
+    [gameState.players[0], gameState.players[1]].forEach(p => {
+        p.board.forEach(minion => {
+            // Directly modify health without calling applyDamage to avoid duplicate damage numbers
+            const oldHealth = minion.currentHealth;
+            minion.currentHealth = Math.max(0, oldHealth - damageValue);
+
+            // Update enrage state if needed
+            gameState.updateEnrage(minion);
         });
-    }, 300);
+    });
+
+    // Step 4: Render to update health values
+    render();
+
+    // Step 5: Wait a bit, then resolve deaths with animations
+    await new Promise(r => setTimeout(r, 300));
+    console.log('[NUCLEAR] Step 3: Resolving deaths with animations');
+    await resolveDeaths();
+
+    // Step 6: Final render
+    render();
+    console.log('[NUCLEAR] Explosion complete');
 }
 
 window.triggerNuclearExplosion = triggerNuclearExplosion;
@@ -3359,14 +3451,18 @@ window.triggerNuclearExplosion = triggerNuclearExplosion;
 
             // Check for quest completion events
             if (gameState && gameState.questCompletionEvents && gameState.questCompletionEvents.length > 0) {
-                gameState.questCompletionEvents.forEach(event => {
+                const events = [...gameState.questCompletionEvents];
+                gameState.questCompletionEvents = [];
+
+                // Process events asynchronously to not block rendering
+                events.forEach(event => {
                     if (event.type === 'NUCLEAR_EXPLOSION') {
+                        // Trigger explosion animation asynchronously
                         setTimeout(() => {
-                            triggerNuclearExplosion(event.sourceMinion, event.effect.value);
+                            triggerNuclearExplosion(event);
                         }, 100);
                     }
                 });
-                gameState.questCompletionEvents = [];
             }
         };
     }

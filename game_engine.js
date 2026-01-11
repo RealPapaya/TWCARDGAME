@@ -886,19 +886,30 @@ class GameState {
                             // Effect type quest (e.g., Nuclear Power Plant)
                             const effect = m.keywords.quest.effect;
                             if (effect.type === 'DAMAGE_ALL_MINIONS') {
+                                // Collect all minions that will be affected
+                                const affectedMinions = [];
+                                [this.players[0], this.players[1]].forEach(p => {
+                                    p.board.forEach(minion => {
+                                        affectedMinions.push({
+                                            minion: { ...minion },
+                                            side: p.side
+                                        });
+                                    });
+                                });
+
                                 // Add to events for visual trigger
+                                // Frontend will handle damage application and animations
                                 this.questCompletionEvents.push({
                                     type: 'NUCLEAR_EXPLOSION',
                                     sourceMinion: { ...m },
-                                    effect: effect
+                                    effect: effect,
+                                    affectedMinions: affectedMinions,
+                                    // Flag to indicate backend should apply damage after frontend animations
+                                    needsBackendDamage: true
                                 });
 
-                                // Apply damage in engine
-                                [this.players[0], this.players[1]].forEach(p => {
-                                    p.board.forEach(minion => {
-                                        this.applyDamage(minion, effect.value);
-                                    });
-                                });
+                                // DON'T apply damage here - let frontend handle it with animations
+                                // The damage will be applied after animations complete
                             }
                             // Remove quest from minion so it doesn't trigger again
                             delete m.keywords.quest;
@@ -1021,10 +1032,9 @@ class GameState {
 
         if (card.type === 'MINION') {
             const minion = this.createMinion(card, player.side);
-            if (minion.keywords && minion.keywords.charge) {
-                minion.sleeping = false;
-                minion.canAttack = true;
-            }
+
+            // Debug log to verify minion state after creation
+            console.log(`[PLAY_MINION] ${minion.name} - canAttack: ${minion.canAttack}, sleeping: ${minion.sleeping}, hasCharge: ${!!minion.keywords?.charge}`);
 
             if (insertionIndex === -1) {
                 player.board.push(minion);
@@ -1244,9 +1254,12 @@ class GameState {
             canAttack: false
         };
 
+        // Handle Charge keyword - must be set AFTER the base object is created
+        // to ensure these properties aren't overwritten
         if (minion.keywords && minion.keywords.charge) {
             minion.sleeping = false;
             minion.canAttack = true;
+            console.log(`[CHARGE] Minion ${minion.name} created with charge - canAttack: ${minion.canAttack}, sleeping: ${minion.sleeping}`);
         }
 
         // Initialize quest turns counter
