@@ -99,7 +99,9 @@ const CARD_DATA = [
     { "id": "TW051", "name": "蕭美琴", "category": "民進黨政治人物", "cost": 3, "attack": 1, "health": 5, "type": "MINION", "rarity": "RARE", "description": "每當有新聞牌打出後 攻擊力+1", "keywords": { "triggered": { "type": "ON_PLAY_NEWS", "value": 1 } }, "image": "img/hsiao_bi_khim.png" },
     { "id": "TW057", "name": "蔡樂樂", "category": "動物", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/tsai_lele.png" },
     { "id": "TW058", "name": "蔡想想", "category": "動物", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/tsai_xiangxiang.png" },
-    { "id": "TW060", "name": "蘇貞昌", "category": "民進黨政治人物", "cost": 9, "attack": 8, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "在那叫甚麼?\n衝鋒 戰吼:使一名隨從回到手牌", "keywords": { "charge": true, "battlecry": { "type": "BOUNCE", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/su_tseng_chang.png" }
+    { "id": "TW060", "name": "蘇貞昌", "category": "民進黨政治人物", "cost": 9, "attack": 8, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "在那叫甚麼?\n衝鋒+戰吼:使一名隨從回到手牌", "keywords": { "charge": true, "battlecry": { "type": "BOUNCE", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/su_tseng_chang.png" },
+    { "id": "TW061", "name": "陳其邁", "category": "民進黨政治人物", "cost": 7, "attack": 4, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "戰吼:沈默所有敵方隨從2回合\n遺志:召喚藍亦明", "keywords": { "battlecry": { "type": "LOCK_ALL_ENEMY", "value": 2 }, "deathrattle": { "type": "SUMMON", "cardId": "TW062" } }, "image": "img/chen_chi_mai.png" },
+    { "id": "TW062", "name": "藍亦明", "category": "公眾人物", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "任務:如果存活3回合則死亡並召喚陳其邁", "keywords": { "quest": { "turns": 3, "summonCardId": "TW061" } }, "image": "img/lan_yi_ming.png" }
 ];
 
 // Export for browser

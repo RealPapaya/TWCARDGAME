@@ -149,6 +149,16 @@ class GameState {
                 }
                 return null;
             },
+            'LOCK_ALL_ENEMY': (bc) => {
+                const affected = [];
+                this.opponent.board.forEach((m, i) => {
+                    // Use max to prevent stacking - multiple locks extend duration, not add
+                    m.lockedTurns = Math.max(m.lockedTurns || 0, bc.value || 1);
+                    m.canAttack = false;
+                    affected.push({ ...m, index: i });
+                });
+                return { type: 'LOCK_ALL', affected, value: bc.value };
+            },
             'HEAL_ALL_FRIENDLY': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
@@ -225,26 +235,22 @@ class GameState {
             },
             'DAMAGE_ALL_NON_CATEGORIES': (bc) => {
                 const excludedCategories = bc.excluded_categories || [];
-                const newsPower = this.getNewsPower(this.currentPlayer.side);
-                const totalDamage = bc.value + newsPower;
                 const affected = [];
                 [this.currentPlayer, this.opponent].forEach(player => {
                     player.board.forEach((m, i) => {
                         if (!excludedCategories.includes(m.category)) {
-                            this.applyDamage(m, totalDamage);
-                            affected.push({ unit: { ...m, index: i, side: player.side }, value: totalDamage });
+                            this.applyDamage(m, bc.value);
+                            affected.push({ unit: { ...m, index: i, side: player.side }, value: bc.value });
                         }
                     });
                 });
                 return { type: 'DAMAGE_ALL', affected };
             },
             'DAMAGE_ALL_ENEMY_MINIONS': (bc) => {
-                const newsPower = this.getNewsPower(this.currentPlayer.side);
-                const totalDamage = bc.value + newsPower;
                 const affected = [];
                 this.opponent.board.forEach((m, i) => {
-                    this.applyDamage(m, totalDamage);
-                    affected.push({ unit: { ...m, index: i, side: this.opponent.side }, value: totalDamage });
+                    this.applyDamage(m, bc.value);
+                    affected.push({ unit: { ...m, index: i, side: this.opponent.side }, value: bc.value });
                 });
                 return { type: 'DAMAGE_ALL', affected };
             },
@@ -826,7 +832,7 @@ class GameState {
         // Draw a card (Always draw at start of turn)
         player.drawCard();
 
-        // Decrease Lock Turns
+        // Decrease Lock Turns & Handle Survival
         player.board.forEach(m => {
             if (m.lockedTurns > 0) {
                 m.lockedTurns--;
@@ -835,6 +841,19 @@ class GameState {
                 }
             } else {
                 delete m.justUnlocked;
+            }
+
+            // Quest Logic (e.g., Lan Yi-ming)
+            if (m.keywords?.quest) {
+                m.questTurns = (m.questTurns || 0) + 1;
+                if (m.questTurns >= m.keywords.quest.turns) {
+                    m.currentHealth = 0; // Trigger death
+                    // Append specific deathrattle for the summon
+                    m.keywords.deathrattle = {
+                        type: 'SUMMON',
+                        cardId: m.keywords.quest.summonCardId
+                    };
+                }
             }
         });
 
@@ -851,6 +870,9 @@ class GameState {
         player.board.forEach(m => m.sleeping = false);
 
         this.updateAuras();
+
+        // Resolve deaths for minions that died from survival mechanic
+        this.resolveDeaths();
     }
 
     /**
@@ -1196,6 +1218,11 @@ class GameState {
             minion.canAttack = true;
         }
 
+        // Initialize quest turns counter
+        if (minion.keywords && minion.keywords.quest) {
+            minion.questTurns = 1;
+        }
+
         // Apply '網軍' (TW048) or other specific checks if keywords are missing but required context implies execution (Unlikely if data is correct)
 
         return minion;
@@ -1405,8 +1432,19 @@ class GameState {
     resolveDeathrattle(player, deathrattle, deadMinion) {
         if (deathrattle.type === 'SUMMON') {
             if (player.board.length < 7) {
-                const token = { name: "Ghost", attack: 1, health: 1, currentHealth: 1, sleeping: true, canAttack: false };
-                player.board.push(token);
+                const cardId = deathrattle.cardId;
+                const collection = this.collection || [];
+                const cardData = collection.find(c => c.id === cardId);
+
+                if (cardData) {
+                    const newMinion = this.createMinion(cardData, player.side);
+                    newMinion.justSummoned = true; // Flag for pop-out animation
+                    player.board.push(newMinion);
+                } else {
+                    // Fallback ghost
+                    const token = { name: "Ghost", attack: 1, health: 1, currentHealth: 1, sleeping: true, canAttack: false };
+                    player.board.push(token);
+                }
             }
         } else if (deathrattle.type === 'BOUNCE_SELF') {
             const collection = this.collection || [];

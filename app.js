@@ -1164,8 +1164,11 @@ function formatDesc(text, newsBonus = 0, isNews = false) {
         formatted = formatted.replace(reg, `<b>${k}</b>`);
     });
 
-    // 3. Special highlighting for "遺志" (Deathrattle) in yellow
+    // 3. Special highlighting for "遺志" (Deathrattle), "沉默" (Silence), and "任務" (Quest) in yellow
     formatted = formatted.replace(/遺志/g, '<b style="color: #ffd700;">遺志</b>');
+    formatted = formatted.replace(/沉默/g, '<b style="color: #ffd700;">沉默</b>');
+    formatted = formatted.replace(/沈默/g, '<b style="color: #ffd700;">沈默</b>');
+    formatted = formatted.replace(/任務/g, '<b style="color: #ffd700;">任務</b>');
 
     // 4. News Power Keywords Formatting
     // Bold {新聞數值+n} or 新聞數值+n with green color
@@ -1304,6 +1307,16 @@ function showPreview(card) {
     // Check for Enrage
     if (card.keywords?.enrage) {
         keywordsList.push({ title: "激怒", desc: "受傷時獲得的效果" });
+    }
+    // Check for Silence/Lock (Battlecry-based)
+    const battlecryType = card.keywords?.battlecry?.type;
+    if (battlecryType === 'LOCK_ATTACK' || battlecryType === 'LOCK_ALL_ENEMY') {
+        const turns = card.keywords.battlecry.value || 1;
+        keywordsList.push({ title: "沉默", desc: `使隨從無法攻擊 ${turns} 回合` });
+    }
+    // Check for Quest
+    if (card.keywords?.quest) {
+        keywordsList.push({ title: "任務", desc: "達成特定條件後觸發" });
     }
 
     if (keywordsList.length > 0) {
@@ -1549,20 +1562,40 @@ function createMinionEl(minion, index, isPlayer) {
     let enrageClass = minion.isEnraged ? ' enraged' : '';
     let lockedClass = (minion.lockedTurns > 0) ? ' locked' : '';
     let unlockClass = minion.justUnlocked ? ' unlocking' : '';
+    let summonClass = minion.justSummoned ? ' summoning' : '';
+
     if (minion.justUnlocked) {
         // Clear the flag so it only animates once
         delete minion.justUnlocked;
     }
+    if (minion.justSummoned) {
+        // Clear the flag so it only animates once
+        delete minion.justSummoned;
+    }
+
     const canActuallyAttack = minion.canAttack && minion.attack > 0;
     const showCanAttack = canActuallyAttack && isPlayer && gameState.currentPlayerIdx === 0;
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}`;
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}${summonClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
     const hpClass = minion.currentHealth < minion.health ? 'stat-damaged' : (minion.health > base.health ? 'stat-buffed' : '');
 
+    // Countdown timers
+    let countdownHtml = '';
+    if (minion.lockedTurns > 0) {
+        countdownHtml += `<div class="countdown-badge lock-countdown">🔒 ${minion.lockedTurns}</div>`;
+    }
+    if (minion.questTurns && minion.keywords?.quest) {
+        const remaining = minion.keywords.quest.turns - minion.questTurns;
+        if (remaining >= 0) {
+            countdownHtml += `<div class="countdown-badge quest-countdown">⏳ ${remaining}</div>`;
+        }
+    }
+
     el.innerHTML = `
         <div class="minion-art" style="${imageStyle}"></div>
+        ${countdownHtml}
         <div class="card-title">${minion.name}</div>
         <div class="minion-stats">
             <span class="stat-atk ${atkClass}"><span>${minion.attack}</span></span>

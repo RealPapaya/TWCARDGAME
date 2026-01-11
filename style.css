@@ -3159,3 +3159,56 @@ body.dragging-active .player .hand .card:hover {
         box-shadow: none;
     }
 }
+
+/* Summon Animation */
+.minion.summoning {
+    animation: summon-pop 0.6s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+
+@keyframes summon-pop {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+/* Countdown Badges */
+.countdown-badge {
+    position: absolute;
+    top: -20px;
+    left: 27px;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: bold;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.lock-countdown {
+    border: 2px solid #ff6b6b;
+    background: rgba(255, 107, 107, 0.2);
+}
+
+.quest-countdown {
+    border: 2px solid #ffd700;
+    background: rgba(255, 215, 0, 0.2);
+}
+
+.minion .countdown-badge+.countdown-badge {
+    top: 35px;
+}
