@@ -140,6 +140,15 @@ class GameState {
                 }
                 return null;
             },
+            'LOCK_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    targetUnit.lockedTurns = (targetUnit.lockedTurns || 0) + bc.value;
+                    targetUnit.canAttack = false; // Immediately disable
+                    return { type: 'LOCK', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
             'HEAL_ALL_FRIENDLY': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
@@ -149,6 +158,25 @@ class GameState {
                     this.updateEnrage(m);
                 });
                 return { type: 'HEAL_ALL', affected };
+            },
+            'BOUNCE': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const owner = targetUnit.side === this.currentPlayer.side ? this.currentPlayer : this.opponent;
+                    const index = owner.board.indexOf(targetUnit);
+
+                    if (index > -1) {
+                        owner.board.splice(index, 1);
+                        const cardToHand = this._createBounceCard(targetUnit);
+
+                        if (owner.hand.length < 10) {
+                            owner.hand.push(cardToHand);
+                        }
+                        this.updateAuras();
+                        return { type: 'BOUNCE', target: { ...targetUnit, index: target.index } };
+                    }
+                }
+                return null;
             },
             'BOUNCE_ALL_ENEMY': (bc, target, source) => {
                 const bounced = [];
@@ -798,8 +826,24 @@ class GameState {
         // Draw a card (Always draw at start of turn)
         player.drawCard();
 
+        // Decrease Lock Turns
+        player.board.forEach(m => {
+            if (m.lockedTurns > 0) {
+                m.lockedTurns--;
+                if (m.lockedTurns === 0) {
+                    m.justUnlocked = true;
+                }
+            } else {
+                delete m.justUnlocked;
+            }
+        });
+
         // Wake up minions (summoning sickness wears off)
-        player.board.forEach(minion => minion.canAttack = true);
+        player.board.forEach(minion => {
+            minion.canAttack = true;
+            // Re-apply lock if still locked
+            if (minion.lockedTurns > 0) minion.canAttack = false;
+        });
 
         // Sleeping minions from last turn wake up (simplified: all board minions can attack unless just summoned)
         // Actually, logic is: Minions summoned LAST turn can attack THIS turn.
@@ -1279,6 +1323,7 @@ class GameState {
         const attacker = this.currentPlayer.board[minionIndex];
         if (!attacker) throw new Error("Attacker not found");
         if (attacker.sleeping || !attacker.canAttack) throw new Error("Minion cannot attack");
+        if (attacker.lockedTurns > 0) throw new Error("Minion is Locked and cannot attack");
         if (attacker.attack <= 0) throw new Error("Minion with 0 attack cannot attack");
         if (attacker.allowAttackCount <= 0 && attacker.keywords?.windfury !== true) {
             // Basic check, refined later

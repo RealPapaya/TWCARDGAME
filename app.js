@@ -1547,9 +1547,15 @@ function createMinionEl(minion, index, isPlayer) {
     const el = document.createElement('div');
     let dsClass = (minion.keywords && minion.keywords.divineShield) ? ' divine-shield' : '';
     let enrageClass = minion.isEnraged ? ' enraged' : '';
+    let lockedClass = (minion.lockedTurns > 0) ? ' locked' : '';
+    let unlockClass = minion.justUnlocked ? ' unlocking' : '';
+    if (minion.justUnlocked) {
+        // Clear the flag so it only animates once
+        delete minion.justUnlocked;
+    }
     const canActuallyAttack = minion.canAttack && minion.attack > 0;
     const showCanAttack = canActuallyAttack && isPlayer && gameState.currentPlayerIdx === 0;
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}`;
+    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');

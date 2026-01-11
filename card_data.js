@@ -81,6 +81,7 @@ const CARD_DATA = [
     { "id": "S019", "name": "查水表", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "對敵方所有隨從造成2點傷害", "keywords": { "battlecry": { "type": "DAMAGE_ALL_ENEMY_MINIONS", "value": 2 } }, "image": "img/check_water_meter.png" },
     { "id": "S020", "name": "政治清算", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對一個敵方單位造成7點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 7, "target": { "side": "ENEMY", "type": "ALL" } } }, "image": "img/political_purge.png" },
     { "id": "S021", "name": "哈們", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "交換一名隨從的攻擊力和生命值", "keywords": { "battlecry": { "type": "SWAP_ATTACK_HEALTH", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/hamen.png" },
+    { "id": "S022", "name": "電子腳鐐", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "沈默一名隨從2回合", "keywords": { "battlecry": { "type": "LOCK_ATTACK", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/electronic_monitoring.png" },
 
     // --- 隨從 (Minions) - 網軍 ---
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
@@ -97,7 +98,8 @@ const CARD_DATA = [
     { "id": "TW043", "name": "陳珮琪(老公獄中)", "category": "民眾黨政治人物", "cost": 5, "attack": 4, "health": 3, "type": "MINION", "rarity": "RARE", "description": "司法不公!!!\n光盾", "keywords": { "divineShield": true }, "image": "img/tw021.png" },
     { "id": "TW051", "name": "蕭美琴", "category": "民進黨政治人物", "cost": 3, "attack": 1, "health": 5, "type": "MINION", "rarity": "RARE", "description": "每當有新聞牌打出後 攻擊力+1", "keywords": { "triggered": { "type": "ON_PLAY_NEWS", "value": 1 } }, "image": "img/hsiao_bi_khim.png" },
     { "id": "TW057", "name": "蔡樂樂", "category": "動物", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/tsai_lele.png" },
-    { "id": "TW058", "name": "蔡想想", "category": "動物", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/tsai_xiangxiang.png" }
+    { "id": "TW058", "name": "蔡想想", "category": "動物", "cost": 1, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "光盾", "keywords": { "divineShield": true }, "image": "img/tsai_xiangxiang.png" },
+    { "id": "TW060", "name": "蘇貞昌", "category": "民進黨政治人物", "cost": 9, "attack": 8, "health": 6, "type": "MINION", "rarity": "EPIC", "description": "在那叫甚麼?\n衝鋒 戰吼:使一名隨從回到手牌", "keywords": { "charge": true, "battlecry": { "type": "BOUNCE", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/su_tseng_chang.png" }
 ];
 
 // Export for browser

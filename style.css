@@ -3085,3 +3085,77 @@ body.dragging-active .player .hand .card:hover {
         box-shadow: 0 0 15px rgba(192, 192, 192, 0.5), 0 0 30px rgba(192, 192, 192, 0.3);
     }
 }
+
+/* Locked Minion Effect */
+.minion.locked {
+    filter: grayscale(100%);
+    transition: filter 0.5s ease-out;
+}
+
+.minion.locked::after {
+    content: '🔒';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    z-index: 10;
+    text-shadow: 0 0 10px black;
+    animation: lock-wobble 2s infinite ease-in-out;
+}
+
+@keyframes lock-wobble {
+
+    0%,
+    100% {
+        transform: translate(-50%, -50%) rotate(-5deg);
+    }
+
+    50% {
+        transform: translate(-50%, -50%) rotate(5deg);
+    }
+}
+
+/* Unlock Animation */
+.minion.unlocking::after {
+    content: '🔓';
+    animation: unlock-shatter 0.8s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.minion.unlocking {
+    animation: unlock-flash 0.8s forwards;
+}
+
+@keyframes unlock-shatter {
+    0% {
+        transform: translate(-50%, -50%) scale(1);
+        opacity: 1;
+    }
+
+    50% {
+        transform: translate(-50%, -50%) scale(1.5);
+        opacity: 0.8;
+    }
+
+    100% {
+        transform: translate(-50%, -50%) scale(2.5);
+        opacity: 0;
+    }
+}
+
+@keyframes unlock-flash {
+    0% {
+        filter: grayscale(100%);
+        box-shadow: 0 0 0px var(--neon-cyan);
+    }
+
+    30% {
+        filter: grayscale(0%);
+        box-shadow: 0 0 30px var(--neon-cyan);
+    }
+
+    100% {
+        filter: grayscale(0%);
+        box-shadow: none;
+    }
+}
