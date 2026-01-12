@@ -66,7 +66,25 @@ body {
 #main-menu {
     justify-content: center;
     align-items: center;
-    background: radial-gradient(circle, #1a1a1a 0%, #000 100%);
+    background: url('img/main_menu_bg.jpg') no-repeat center center;
+    background-size: cover;
+    position: relative;
+}
+
+#main-menu::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: 1;
+}
+
+#main-menu .menu-content {
+    position: relative;
+    z-index: 2;
 }
 
 .game-title {
@@ -390,61 +408,99 @@ body {
 }
 
 .neon-button {
-    background: transparent;
-    border: 2px solid var(--neon-blue);
-    color: var(--neon-blue);
+    background: linear-gradient(to bottom, #4a3728, #2d1e16);
+    /* 木紋深褐色底 */
+    border: 3px solid #6d5b4b;
+    border-radius: 8px;
+    color: #f1e4d1;
+    /* 羊皮紙色文字 */
     padding: 15px 40px;
-    font-size: 20px;
+    font-size: 22px;
+    font-weight: 700;
     cursor: pointer;
     text-transform: uppercase;
     letter-spacing: 2px;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 0 10px rgba(0, 243, 255, 0.3);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.1),
+        0 4px 0 #1a120c,
+        0 6px 12px rgba(0, 0, 0, 0.6);
     position: relative;
     overflow: hidden;
+    text-shadow: 2px 2px 2px rgba(0, 0, 0, 0.8);
+    font-family: 'Noto Sans TC', serif;
+}
+
+.neon-button::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(90deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.05) 2px,
+            rgba(0, 0, 0, 0.05) 4px);
+    pointer-events: none;
 }
 
 .neon-button:hover {
-    background: var(--neon-blue);
-    color: #000;
-    box-shadow: 0 0 25px var(--neon-blue);
+    background: linear-gradient(to bottom, #5d4633, #3d2a1e);
+    color: #fff;
     transform: translateY(-2px);
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.15),
+        0 6px 0 #1a120c,
+        0 8px 15px rgba(0, 0, 0, 0.7);
+    border-color: #8b7355;
 }
 
 .neon-button:active {
-    transform: translateY(1px);
+    transform: translateY(2px);
+    box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.5),
+        0 2px 0 #1a120c,
+        0 3px 6px rgba(0, 0, 0, 0.5);
 }
 
 .neon-button.secondary {
-    border-color: var(--neon-pink);
-    color: var(--neon-pink);
-    box-shadow: 0 0 10px rgba(255, 0, 127, 0.3);
+    background: linear-gradient(to bottom, #4a4a4a, #2a2a2a);
+    /* 石頭灰 */
+    border-color: #666;
+    color: #e0e0e0;
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.1),
+        0 4px 0 #1a1a1a,
+        0 6px 12px rgba(0, 0, 0, 0.6);
 }
 
 .neon-button.secondary:hover {
-    background: var(--neon-pink);
-    color: #fff;
-    box-shadow: 0 0 25px var(--neon-pink);
+    background: linear-gradient(to bottom, #5a5a5a, #3a3a3a);
+    border-color: #888;
 }
 
 .neon-button.danger {
-    border-color: #ff4b2b;
-    color: #ff4b2b;
+    background: linear-gradient(to bottom, #7d2a1e, #4a1510);
+    /* 暗紅木/血石 */
+    border-color: #9b3a2a;
+    color: #ffcccc;
 }
 
 .neon-button.danger:hover {
-    background: #ff4b2b;
-    color: #fff;
-    box-shadow: 0 0 25px #ff4b2b;
+    background: linear-gradient(to bottom, #9b3a2a, #621d15);
+    border-color: #c04a35;
 }
 
 .neon-button:disabled,
 .neon-button.disabled-mode {
-    border-color: #444;
-    color: #444;
-    box-shadow: none;
+    background: #333 !important;
+    border-color: #222 !important;
+    color: #555 !important;
+    box-shadow: none !important;
     cursor: not-allowed;
-    background: transparent !important;
+    text-shadow: none !important;
     transform: none !important;
 }
 
@@ -797,12 +853,9 @@ body {
     display: flex;
     flex-direction: column;
     height: 100vh;
-    background:
-        linear-gradient(rgba(18, 18, 20, 0.9), rgba(18, 18, 20, 0.9)),
-        repeating-linear-gradient(0deg, transparent, transparent 19px, #2a2a30 20px),
-        repeating-linear-gradient(90deg, transparent, transparent 19px, #2a2a30 20px);
-    background-size: 100% 100%, 40px 40px, 40px 40px;
-    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.8);
+    background: url('img/arena_bg.jpg') no-repeat center center;
+    background-size: cover;
+    box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
 }
 
 .player-area {
@@ -2530,6 +2583,11 @@ body.dragging-active .player .hand .card:hover {
     text-shadow: 0 0 5px rgba(0, 243, 255, 0.8);
 }
 
+.status-cluster.opponent-cluster .mana-text {
+    color: #ff3333;
+    text-shadow: 0 0 10px rgba(255, 51, 51, 0.8);
+}
+
 /* Opponent Cluster Positioning */
 .status-cluster.opponent-cluster {
     top: 20px;
@@ -2541,18 +2599,18 @@ body.dragging-active .player .hand .card:hover {
 
 /* Ensure Opponent Frame has correct styling */
 .player-area.opponent .mana-container.frame-style {
-    border-color: #ff007f;
-    /* Pinkish for opponent */
-    box-shadow: 0 0 15px rgba(255, 0, 127, 0.2);
+    border-color: #ff3333;
+    /* Red for opponent */
+    box-shadow: 0 0 15px rgba(255, 51, 51, 0.3);
 }
 
 .player-area.opponent .mana-crystal.active {
-    background: #ff007f;
-    box-shadow: 0 0 15px #ff007f, inset 0 0 10px rgba(255, 255, 255, 0.5);
+    background: #ff3333;
+    box-shadow: 0 0 15px #ff3333, inset 0 0 10px rgba(255, 255, 255, 0.5);
 }
 
 .player-area.opponent .mana-crystal.spent {
-    background: rgba(255, 0, 127, 0.15);
+    background: rgba(255, 51, 51, 0.15);
 }
 
 /* Filter Selects */
@@ -3322,4 +3380,61 @@ body.dragging-active .player .hand .card:hover {
     90% {
         transform: translate(-1px, 1px);
     }
+}
+
+/* Update Log Button and Footer */
+.home-footer {
+    position: relative;
+    /* Ensure z-index works */
+    z-index: 100;
+    /* Higher than main-menu::before (1) */
+    margin-top: 30px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+    width: 100%;
+}
+
+.version-info {
+    font-size: 0.9rem;
+    color: rgba(255, 255, 255, 0.5);
+    text-shadow: 0 0 5px rgba(0, 0, 0, 0.8);
+}
+
+.update-log-btn {
+    background: rgba(0, 243, 255, 0.1);
+    border: 2px solid var(--neon-blue);
+    color: var(--neon-blue);
+    padding: 10px 25px;
+    border-radius: 30px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.update-log-btn:hover {
+    background: var(--neon-blue);
+    color: #000;
+    box-shadow: 0 0 25px var(--neon-blue), 0 0 50px rgba(0, 243, 255, 0.4);
+    transform: translateY(-2px);
+}
+
+.update-log-btn:active {
+    transform: translateY(0);
+    box-shadow: 0 0 10px var(--neon-blue);
+}
+
+/* Ensure modal is on top */
+#update-log-modal {
+    z-index: 20000;
 }

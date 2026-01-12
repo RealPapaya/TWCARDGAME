@@ -341,7 +341,7 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
                 // 必須移除內部可能干擾的 transform: none
                 preview.style.transform = 'translate(-50%, -50%)';
                 preview.style.display = 'block';
-                preview.style.zIndex = '10001';
+                preview.style.zIndex = '20002';
 
                 showPreview(card);
 
@@ -1080,13 +1080,27 @@ function renderHands(p1, p2) {
         oppHandEl.appendChild(back);
     });
 
-    // Apply Hearthstone-like Arc Logic
+    // Apply Hearthstone-like Arc Logic with Overlap Clamp
     [handEl, oppHandEl].forEach((container) => {
         const cards = Array.from(container.children);
         const total = cards.length;
         const center = (total - 1) / 2;
 
-        const degPerCard = 6;
+        let degPerCard = 6;
+        let denseMargin = '';
+
+        // Denser packing for larger hands
+        if (total > 5) {
+            degPerCard = Math.max(2, 6 - (total - 6) * 0.5); // Reduce fanning for dense hands
+
+            // Constant width calculation:
+            // Max width approx equivalent to 6 cards (6 * 110px = 660px)
+            // Per-card width = 660 / total
+            // marginLeft = width - 125 (140px width - 15px right margin)
+            const widthPerCard = 550 / total;
+            denseMargin = (widthPerCard - 125).toFixed(1) + 'px';
+        }
+
         cards.forEach((card, i) => {
             const delta = i - center;
             const rot = delta * degPerCard;
@@ -1094,6 +1108,10 @@ function renderHands(p1, p2) {
 
             card.style.setProperty('--rot', `${rot}deg`);
             card.style.setProperty('--y', `${y}px`);
+
+            // Verify if we need to override CSS
+            // Note: CSS default is margin: 0 -15px (-15px left)
+            card.style.marginLeft = denseMargin;
         });
     });
 }
