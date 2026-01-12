@@ -871,15 +871,17 @@ body {
 .opponent {
     background: linear-gradient(180deg, rgba(255, 0, 127, 0.05) 0%, transparent 100%);
     align-items: center;
-    justify-content: flex-start;
-    padding-top: 5px;
+    justify-content: flex-end;
+    /* Moved to center */
+    padding-top: 0;
 }
 
 .player {
     background: linear-gradient(0deg, rgba(0, 243, 255, 0.05) 0%, transparent 100%);
     align-items: center;
-    justify-content: flex-end;
-    padding-bottom: 20px;
+    justify-content: flex-start;
+    /* Moved to center */
+    padding-bottom: 0;
 }
 
 .card-desc {
@@ -907,26 +909,30 @@ body {
     width: 95%;
     max-width: 1000px;
     height: 170px;
-    border: 2px solid rgba(255, 255, 255, 0.1);
-    border-radius: 12px;
+    border: none;
+    /* Remove border */
     display: flex;
     justify-content: center;
     align-items: center;
     gap: 10px;
-    margin: 10px 0;
+    margin: 0;
+    /* Minimal margin */
     position: relative;
-    /* Added for absolute positioning of indicators */
-    background: rgba(0, 0, 0, 0.2);
-    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
-    transition: border-color 0.3s;
+    background: none;
+    /* Remove background */
+    box-shadow: none;
+    /* Remove shadow */
+    transition: all 0.3s;
 }
 
 .player .board {
-    border-color: rgba(0, 243, 255, 0.3);
+    border-color: transparent;
+    /* Ensure transparent */
 }
 
 .opponent .board {
-    border-color: rgba(255, 0, 127, 0.3);
+    border-color: transparent;
+    /* Ensure transparent */
 }
 
 .board.drop-highlight {
@@ -957,7 +963,8 @@ body {
 }
 
 .player-hero {
-    margin-top: -20px;
+    margin-top: 10px;
+    /* Adjusted to move down */
 }
 
 .hero:hover {
@@ -1613,7 +1620,7 @@ body.dragging-active .player .hand .card:hover {
     display: flex;
     justify-content: space-between;
     margin-top: auto;
-    background: rgba(0, 0, 0, 0.3);
+    background: transparent;
 }
 
 .stat-atk,
@@ -1728,7 +1735,8 @@ body.dragging-active .player .hand .card:hover {
 
 /* Center Line Controls */
 .center-line {
-    height: 50px;
+    height: 1px;
+    overflow: visible;
     /* Spacer */
     background: transparent;
     border: none;
@@ -1737,8 +1745,40 @@ body.dragging-active .player .hand .card:hover {
     justify-content: center;
     align-items: center;
     position: relative;
-    z-index: 50;
+    z-index: 10;
+    pointer-events: none;
+    /* Let clicks pass through the spacer */
 }
+
+.center-line>* {
+    pointer-events: auto;
+    /* Re-enable clicks for buttons and indicators */
+}
+
+/* Fine, shallow, and broken hand-drawn scratch effect */
+.center-line::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 20%;
+    width: 40%;
+    height: 2px;
+    background: linear-gradient(90deg,
+            transparent 0%,
+            rgba(93, 64, 55, 0.3) 15%,
+            transparent 30%,
+            rgba(93, 64, 55, 0.4) 45%,
+            transparent 55%,
+            rgba(93, 64, 55, 0.5) 80%,
+            /* Darker right side */
+            transparent 100%);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.2);
+    transform: rotate(-0.1deg);
+    filter: blur(0.2px);
+    z-index: 0;
+}
+
+
 
 #btn-surrender {
     position: absolute;
@@ -2538,37 +2578,39 @@ body.dragging-active .player .hand .card:hover {
     background: url('img/mana_frame.png') no-repeat center center;
     background-size: 100% 100%;
     border: none;
-    border-radius: 4px;
+    border-radius: 0;
     padding: 37px 30px 37px 30px;
     display: flex;
     gap: 8px;
-    box-shadow:
-        0 12px 24px rgba(0, 0, 0, 0.7),
-        inset 0 2px 4px rgba(255, 255, 255, 0.15),
-        inset 0 -6px 10px rgba(0, 0, 0, 0.5);
+    box-shadow: none;
+    /* Remove box-shadow to prevent rectangular frame */
     min-width: 280px;
     align-items: center;
     justify-content: center;
-    filter: drop-shadow(0 6px 8px rgba(0, 0, 0, 0.6));
+    filter: drop-shadow(0 20px 30px rgba(0, 0, 0, 0.95));
+    /* Maximum shadow */
 }
 
 /* Override Mana Text for Top Positioning */
 .mana-text {
     position: absolute;
-    top: -22px;
+    top: -25px;
     left: 50%;
     transform: translateX(-50%);
     width: auto;
-    background: rgba(10, 10, 10, 0.85);
-    padding: 4px 16px;
-    border-radius: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.2);
-    font-size: 20px;
+    background: none;
+    /* Remove background box */
+    padding: 0;
+    border: none;
+    /* Remove border */
+    font-size: 24px;
     color: #00f2fe;
-    font-weight: 800;
-    text-shadow: 0 0 10px rgba(0, 243, 255, 0.8);
+    font-weight: 900;
+    text-shadow:
+        0 0 10px rgba(0, 243, 255, 0.8),
+        2px 2px 4px rgba(0, 0, 0, 0.9);
     z-index: 10;
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.6);
+    box-shadow: none;
     font-family: 'Noto Sans TC', sans-serif;
     letter-spacing: 1px;
 }
