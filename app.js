@@ -50,7 +50,26 @@ let isDebugMode = false;
 let currentDifficulty = 'NORMAL';
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
+// UI Transition state
+let currentViewId = null;
+let transitionTimeout = null;
+
+// Drag-related state variables (declared early to avoid TDZ)
+let dragging = false;
+let attackerIndex = null;
+let draggingFromHand = false;
+let draggedEl = null;
+let isBattlecryTargeting = false;
+let battlecrySourceIndex = -1;
+let battlecrySourceType = 'MINION'; // 'MINION' or 'NEWS'
+let battlecryTargetRule = null;
+let draggingMode = 'DAMAGE'; // 'DAMAGE', 'HEAL', 'BUFF'
+let currentInsertionIndex = -1;
+let dragLine = null; // Will be initialized in init()
+
 function init() {
+    // Initialize drag line element
+    dragLine = document.getElementById('drag-line');
 
     gameEngine = new GameEngine(CARD_DATA);
 
@@ -272,7 +291,7 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
         // 渲染日誌內容
         list.innerHTML = UPDATE_LOGS.map(log => `
             <div class="update-version-section">
-                <h3 style="color: var(--neon-cyan); margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
+                <h3 style="color: var(--neon-yellow); margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
                 <ul style="list-style: none; padding: 0;">
                     ${log.items.map(item => `
                         <li style="margin-bottom: 15px;">
@@ -546,37 +565,58 @@ function renderDeckSelect() {
 }
 
 
-async function showView(viewId) {
-    const views = document.querySelectorAll('.view');
-    const currentView = Array.from(views).find(v => v.style.display === 'flex');
+
+
+function showView(viewId) {
     const nextView = document.getElementById(viewId);
+    if (!nextView) return;
 
-    if (!nextView || nextView === currentView) return;
-
-    // Transition Logic
-    if (currentView) {
-        currentView.classList.add('exit-active');
-        currentView.classList.remove('enter-active');
-
-        // Let it stay visible while sliding out
-        setTimeout(() => {
-            currentView.style.display = 'none';
-            currentView.classList.remove('exit-active');
-        }, 700);
+    // If same view is already fully displayed, ignore
+    if (viewId === currentViewId && nextView.style.display === 'flex' && !nextView.classList.contains('enter-active')) {
+        return;
     }
 
-    // Trigger Entrance
-    nextView.style.display = 'flex';
-    nextView.classList.remove('exit-active');
-    nextView.classList.add('enter-active');
+    // Cancel existing transition cleanup
+    if (transitionTimeout) {
+        clearTimeout(transitionTimeout);
+        transitionTimeout = null;
+    }
 
-    // Clean up entrance class after it's done
-    setTimeout(() => {
+    const views = document.querySelectorAll('.view');
+
+    // Identify and transition out all visible views except the target
+    views.forEach(v => {
+        if (v.style.display === 'flex' && v.id !== viewId) {
+            v.classList.add('exit-active');
+            v.classList.remove('enter-active');
+        } else if (v.id !== viewId) {
+            // Immediately hide non-active non-target views
+            v.style.display = 'none';
+            v.classList.remove('enter-active', 'exit-active');
+        }
+    });
+
+    // Animate target view in
+    nextView.style.display = 'flex';
+    nextView.classList.add('enter-active');
+    nextView.classList.remove('exit-active');
+    nextView.scrollTop = 0;
+
+    currentViewId = viewId;
+
+    transitionTimeout = setTimeout(() => {
+        const currentViews = document.querySelectorAll('.view');
+        currentViews.forEach(v => {
+            if (v.id !== viewId) {
+                v.style.display = 'none';
+                v.classList.remove('exit-active', 'enter-active');
+            }
+        });
         nextView.classList.remove('enter-active');
-    }, 700);
+        transitionTimeout = null;
+    }, 1600);
 
     // --- Original Logic for UI Elements ---
-    // Toggle message log visibility
     const log = document.getElementById('message-log');
     if (log) {
         log.style.display = (viewId === 'battle-view') ? 'flex' : 'none';
@@ -1462,6 +1502,7 @@ function positionPreviewNearElement(element) {
     preview.style.transform = 'none';
 }
 
+
 function createCardEl(card, index) {
     const el = document.createElement('div');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
@@ -1690,19 +1731,6 @@ function createMinionEl(minion, index, isPlayer) {
 
     return el;
 }
-
-let dragging = false;
-let attackerIndex = null;
-let draggingFromHand = false;
-let draggedEl = null;
-let isBattlecryTargeting = false;
-let battlecrySourceIndex = -1;
-let battlecrySourceType = 'MINION'; // 'MINION' or 'NEWS'
-let battlecryTargetRule = null;
-let draggingMode = 'DAMAGE'; // 'DAMAGE', 'HEAL', 'BUFF'
-let currentInsertionIndex = -1;
-
-const dragLine = document.getElementById('drag-line');
 
 function onDragStart(e, index, fromHand = false) {
     if (gameState.currentPlayerIdx !== 0) return;
