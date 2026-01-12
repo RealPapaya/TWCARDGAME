@@ -49,10 +49,24 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Noto Sans TC', sans-serif;
-    background-color: #0d0d0d;
+    background: url('img/main_menu_bg.jpg') no-repeat center center fixed;
+    background-size: cover;
     color: #e0e0e0;
     overflow: hidden;
     user-select: none;
+}
+
+/* Global Static Overlay */
+body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.4);
+    z-index: -1;
+    /* Behind content but above body background */
 }
 
 .view {
@@ -60,27 +74,99 @@ body {
     height: 100vh;
     display: flex;
     flex-direction: column;
+    position: absolute;
+    /* Stack views for transition */
+    top: 0;
+    left: 0;
+    overflow: hidden;
 }
+
+/* Page Transitions */
+@keyframes viewSlideUpEnter {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+@keyframes viewSlideUpExit {
+    from {
+        transform: translateY(0);
+        opacity: 1;
+    }
+
+    to {
+        transform: translateY(-100%);
+        opacity: 0;
+    }
+}
+
+.view.enter-active {
+    animation: viewSlideUpEnter 0.7s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+    z-index: 10;
+}
+
+.view.exit-active {
+    animation: viewSlideUpExit 0.7s cubic-bezier(0.165, 0.84, 0.44, 1) forwards;
+    z-index: 5;
+}
+
+/* Staggered Content Entrance */
+@keyframes contentSlideUpIn {
+    from {
+        transform: translateY(40px);
+        opacity: 0;
+        filter: blur(8px);
+    }
+
+    to {
+        transform: translateY(0);
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+.view.enter-active .menu-content>* {
+    animation: contentSlideUpIn 0.9s cubic-bezier(0.19, 1, 0.22, 1) both;
+}
+
+.view.enter-active .menu-content>*:nth-child(1) {
+    animation-delay: 0.1s;
+}
+
+.view.enter-active .menu-content>*:nth-child(2) {
+    animation-delay: 0.2s;
+}
+
+.view.enter-active .menu-content>*:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.view.enter-active .menu-content>*:nth-child(4) {
+    animation-delay: 0.4s;
+}
+
+.view.enter-active .menu-content>*:nth-child(5) {
+    animation-delay: 0.5s;
+}
+
+
 
 /* Main Menu Styles */
 #main-menu {
     justify-content: center;
     align-items: center;
-    background: url('img/main_menu_bg.jpg') no-repeat center center;
-    background-size: cover;
+    background: transparent;
+    /* Changed to transparent */
     position: relative;
 }
 
-#main-menu::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: 1;
-}
+/* Removed old #main-menu::before as it's now global */
 
 #main-menu .menu-content {
     position: relative;
@@ -154,19 +240,41 @@ body {
 }
 
 .deck-slot {
-    background: rgba(20, 20, 30, 0.8);
-    border: 2px solid var(--neon-blue);
+    background: url('img/deck_slot_bg.png') no-repeat center center;
+    background-size: 100% 100%;
+    border: none;
     border-radius: 12px;
-    padding: 15px;
-    width: 200px;
+    padding: 30px 25px 25px 25px;
+    /* Adjust padding to fit the wood frame */
+    width: 220px;
+    /* Slightly wider for the frame */
+    height: 120px;
+    /* Fixed height for consistency */
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 10px;
-    transition: all 0.3s ease;
-    cursor: pointer;
+    justify-content: center;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
+    transition: all 0.2s;
     position: relative;
 }
+
+.deck-slot h3 {
+    color: #f0e6d2;
+    /* Light parchment color */
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+    margin: 5px 0;
+    font-size: 1.1rem;
+    z-index: 2;
+}
+
+.deck-slot .slot-info {
+    color: #c0b0a0;
+    font-size: 0.9rem;
+    font-weight: bold;
+    z-index: 2;
+}
+
 
 .deck-slot:hover {
     box-shadow: 0 0 15px var(--neon-blue);
@@ -507,11 +615,13 @@ body {
 .sub-title {
     font-size: 40px;
     margin-bottom: 40px;
-    color: var(--neon-blue);
-    text-shadow: 0 0 15px var(--neon-blue);
+    color: #f1e4d1;
+    /* Parchment color */
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
     letter-spacing: 5px;
     text-align: center;
     width: 100%;
+    font-weight: 700;
 }
 
 /* Difficulty Selection Redesign */
@@ -1349,11 +1459,10 @@ body {
     left: 40px;
     width: 60px;
     height: 85px;
-    background: repeating-linear-gradient(45deg,
-            #2c2c35,
-            #2c2c35 5px,
-            #3a3a45 5px,
-            #3a3a45 10px);
+    background: url('img/card_back.jpg') no-repeat center center;
+    background-size: 100% 100%;
+    border-radius: 6px;
+    border: 2px solid #444;
     border-radius: 6px;
     border: 2px solid #444;
     box-shadow:
@@ -1716,11 +1825,8 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .opponent .hand .card {
-    background: repeating-linear-gradient(45deg,
-            #2c2c35,
-            #2c2c35 10px,
-            #3a3a45 10px,
-            #3a3a45 20px);
+    background: url('img/card_back.jpg') no-repeat center center;
+    background-size: 100% 100%;
     border: 2px solid #444;
     /* Opponent: Mirror rotation */
     transform: rotate(calc(180deg - var(--rot, 0deg))) translateY(calc(180px + var(--y, 0px)));

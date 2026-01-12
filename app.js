@@ -546,11 +546,36 @@ function renderDeckSelect() {
 }
 
 
-function showView(viewId) {
-    document.querySelectorAll('.view').forEach(v => v.style.display = 'none');
-    const view = document.getElementById(viewId);
-    if (view) view.style.display = 'flex';
+async function showView(viewId) {
+    const views = document.querySelectorAll('.view');
+    const currentView = Array.from(views).find(v => v.style.display === 'flex');
+    const nextView = document.getElementById(viewId);
 
+    if (!nextView || nextView === currentView) return;
+
+    // Transition Logic
+    if (currentView) {
+        currentView.classList.add('exit-active');
+        currentView.classList.remove('enter-active');
+
+        // Let it stay visible while sliding out
+        setTimeout(() => {
+            currentView.style.display = 'none';
+            currentView.classList.remove('exit-active');
+        }, 700);
+    }
+
+    // Trigger Entrance
+    nextView.style.display = 'flex';
+    nextView.classList.remove('exit-active');
+    nextView.classList.add('enter-active');
+
+    // Clean up entrance class after it's done
+    setTimeout(() => {
+        nextView.classList.remove('enter-active');
+    }, 700);
+
+    // --- Original Logic for UI Elements ---
     // Toggle message log visibility
     const log = document.getElementById('message-log');
     if (log) {
