@@ -150,6 +150,14 @@ class GameState {
                 }
                 return null;
             },
+            'LOCK_SELF': (bc, target, source) => {
+                if (source) {
+                    source.lockedTurns = (source.lockedTurns || 0) + bc.value;
+                    source.canAttack = false;
+                    return { type: 'LOCK', target: source, value: bc.value };
+                }
+                return null;
+            },
             'LOCK_ALL_ENEMY': (bc) => {
                 const affected = [];
                 this.opponent.board.forEach((m, i) => {
@@ -814,6 +822,25 @@ class GameState {
                     }
                 }
                 return { type: 'MULTI_DAMAGE', hits };
+            },
+            'FULL_HEAL_AND_DRAW': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const oldHealth = targetUnit.currentHealth;
+                    targetUnit.currentHealth = targetUnit.health;
+                    this.updateEnrage(targetUnit);
+                    this.currentPlayer.drawCard();
+                    return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: targetUnit.health - oldHealth, draw: 1 };
+                }
+                return null;
+            },
+            'SET_DEATH_TIMER': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    targetUnit.deathTimer = bc.value || 3;
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, deathTimer: targetUnit.deathTimer };
+                }
+                return null;
             }
         };
     }
@@ -910,6 +937,20 @@ class GameState {
             if (minion.lockedTurns > 0) minion.canAttack = false;
         });
 
+        // Handle Delayed Death (Death Grip) for ALL minions on the board
+        // This makes the timer tick down on every turn start (Player or AI)
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(minion => {
+                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+                    minion.deathTimer--;
+                    if (minion.deathTimer === 0) {
+                        minion.currentHealth = 0;
+                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
+                    }
+                }
+            });
+        });
+
         // Sleeping minions from last turn wake up (simplified: all board minions can attack unless just summoned)
         // Actually, logic is: Minions summoned LAST turn can attack THIS turn.
         // So we set sleeping = false for all.
@@ -917,8 +958,8 @@ class GameState {
 
         this.updateAuras();
 
-        // Resolve deaths for minions that died from survival mechanic
-        this.resolveDeaths();
+        // resolveDeaths is now removed from startTurn to allow UI to animate turn-start deaths
+        // this.resolveDeaths();
     }
 
     /**
@@ -996,7 +1037,8 @@ class GameState {
             }
         });
 
-        this.resolveDeaths();
+        // resolveDeaths is now removed from endTurn to allow UI to animate end-turn deaths
+        // this.resolveDeaths();
 
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
         this.startTurn();

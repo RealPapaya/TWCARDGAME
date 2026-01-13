@@ -260,11 +260,12 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 });
 
 // --- Battle Listeners ---
-document.getElementById('end-turn-btn').addEventListener('click', () => {
+document.getElementById('end-turn-btn').addEventListener('click', async () => {
     if (isBattlecryTargeting || dragging) return;
     try {
         gameState.endTurn();
         render();
+        await resolveDeaths();
         if (gameState.currentPlayerIdx === 1) {
             setTimeout(aiTurn, 1000);
         }
@@ -1050,12 +1051,14 @@ async function aiTurn() {
 
         gameState.endTurn();
         render();
+        await resolveDeaths();
         showTurnAnnouncement("你的回合");
     } catch (e) {
         logMessage("AI Error: " + e.message);
         console.error(e);
         gameState.endTurn();
         render();
+        await resolveDeaths();
         showTurnAnnouncement("你的回合"); // Ensure turn passes back even on error
     }
 }
@@ -1686,6 +1689,9 @@ function createMinionEl(minion, index, isPlayer) {
         if (remaining >= 0) {
             countdownHtml += `<div class="countdown-badge quest-countdown">⏳ ${remaining}</div>`;
         }
+    }
+    if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+        countdownHtml += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">💀 ${minion.deathTimer}</div>`;
     }
 
     el.innerHTML = `
