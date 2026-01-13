@@ -1761,6 +1761,10 @@ body.dragging-active .player .hand .card:hover {
 .card-desc b {
     color: var(--neon-yellow);
     font-weight: 900;
+    background: rgba(255, 255, 255, 0.1);
+    /* Subtle gray background */
+    padding: 1px 3px;
+    border-radius: 3px;
 }
 
 .card-desc::-webkit-scrollbar {

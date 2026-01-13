@@ -1274,17 +1274,12 @@ function formatDesc(text, newsBonus = 0, isNews = false) {
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
     // 2. Auto-bold common keywords
-    const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒", "持續效果"];
+    const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒", "持續效果", "沉默", "沈默", "遺志", "任務"];
     keywords.forEach(k => {
         const reg = new RegExp(k, 'g');
         formatted = formatted.replace(reg, `<b>${k}</b>`);
     });
 
-    // 3. Special highlighting for "遺志" (Deathrattle), "沉默" (Silence), and "任務" (Quest) in yellow
-    formatted = formatted.replace(/遺志/g, '<b style="color: #ffd700;">遺志</b>');
-    formatted = formatted.replace(/沉默/g, '<b style="color: #ffd700;">沉默</b>');
-    formatted = formatted.replace(/沈默/g, '<b style="color: #ffd700;">沈默</b>');
-    formatted = formatted.replace(/任務/g, '<b style="color: #ffd700;">任務</b>');
 
     // 4. News Power Keywords Formatting
     // Bold {新聞數值+n} or 新聞數值+n with green color
@@ -1427,10 +1422,14 @@ function showPreview(card) {
     }
     // Check for Silence/Lock (Battlecry-based)
     const battlecryType = card.keywords?.battlecry?.type;
-    if (battlecryType === 'LOCK_ATTACK' || battlecryType === 'LOCK_ALL_ENEMY') {
-        const turns = card.keywords.battlecry.value || 1;
+    const hasSilenceKeyword = battlecryType && battlecryType.startsWith('LOCK_');
+    const hasSilenceText = card.description && (card.description.includes('沉默') || card.description.includes('沈默'));
+
+    if (hasSilenceKeyword || hasSilenceText) {
+        const turns = card.keywords?.battlecry?.value || 6; // Default to 6 turns for display if not specified (like standard silence)
         keywordsList.push({ title: "沉默", desc: `使隨從無法攻擊 ${turns} 回合` });
     }
+
     // Check for Quest
     if (card.keywords?.quest) {
         keywordsList.push({ title: "任務", desc: "達成特定條件後觸發" });
