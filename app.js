@@ -1318,7 +1318,8 @@ function showPreview(card) {
     const base = CARD_DATA.find(c => c.id === card.id) || card;
     let statsHtml = '';
     if (card.attack !== undefined && card.health !== undefined && card.type !== 'NEWS') {
-        const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
+        const effectiveBaseAttack = card.baseAttackOverride !== undefined ? card.baseAttackOverride : base.attack;
+        const atkClass = card.attack > effectiveBaseAttack ? 'stat-buffed' : (card.attack < effectiveBaseAttack ? 'stat-damaged' : '');
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
         const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
 
@@ -1671,7 +1672,8 @@ function createMinionEl(minion, index, isPlayer) {
     el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}${summonClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
-    const atkClass = minion.attack > base.attack ? 'stat-buffed' : (minion.attack < base.attack ? 'stat-damaged' : '');
+    const effectiveBaseAttack = minion.baseAttackOverride !== undefined ? minion.baseAttackOverride : base.attack;
+    const atkClass = minion.attack > effectiveBaseAttack ? 'stat-buffed' : (minion.attack < effectiveBaseAttack ? 'stat-damaged' : '');
     const hpClass = minion.currentHealth < minion.health ? 'stat-damaged' : (minion.health > base.health ? 'stat-buffed' : '');
 
     // Countdown timers

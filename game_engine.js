@@ -600,6 +600,18 @@ class GameState {
                     return { type: 'DAMAGE', target: { ...this.currentPlayer.hero, index: -1 }, value: bc.value };
                 }
             },
+            'SET_ATTACK_ALL': (bc) => {
+                const affected = [];
+                [this.currentPlayer, this.opponent].forEach(p => {
+                    p.board.forEach((m, i) => {
+                        const auraAtk = m.ongoingStats?.attack || 0;
+                        m.attack = bc.value + auraAtk;
+                        m.baseAttackOverride = bc.value; // Store the new base
+                        affected.push({ unit: { ...m, index: i, side: p.side }, type: 'BUFF' });
+                    });
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
             'BUFF_ADJACENT': (bc, target, source) => {
                 const affected = [];
                 if (source) {
