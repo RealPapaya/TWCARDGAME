@@ -1101,8 +1101,29 @@ function renderGameUI(p1, p2) {
         p2HeroEl.dataset.currentHealth = p2.hero.hp;
     }
 
-    document.getElementById('player-hp').innerText = p1.hero.hp;
-    document.getElementById('opp-hp').innerText = p2.hero.hp;
+    // Hero HP Pop Animation tracking
+    const p1HpEl = document.getElementById('player-hp');
+    const p2HpEl = document.getElementById('opp-hp');
+
+    if (p1HpEl) {
+        if (p1.hero._lastHp !== undefined && p1.hero._lastHp !== p1.hero.hp) {
+            p1HpEl.classList.remove('stat-pop');
+            void p1HpEl.offsetWidth;
+            p1HpEl.classList.add('stat-pop');
+        }
+        p1.hero._lastHp = p1.hero.hp;
+        p1HpEl.innerText = p1.hero.hp;
+    }
+
+    if (p2HpEl) {
+        if (p2.hero._lastHp !== undefined && p2.hero._lastHp !== p2.hero.hp) {
+            p2HpEl.classList.remove('stat-pop');
+            void p2HpEl.offsetWidth;
+            p2HpEl.classList.add('stat-pop');
+        }
+        p2.hero._lastHp = p2.hero.hp;
+        p2HpEl.innerText = p2.hero.hp;
+    }
 
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
     document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
@@ -1537,13 +1558,20 @@ function createCardEl(card, index) {
     let statsHtml = '';
     if (card.attack !== undefined && card.health !== undefined) {
         const atkClass = card.attack > base.attack ? 'stat-buffed' : (card.attack < base.attack ? 'stat-damaged' : '');
+        const currentHp = card.currentHealth !== undefined ? card.currentHealth : card.health;
         const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
-        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
+        const hpValue = currentHp;
+
+        // Stat Pop Animation tracking
+        const atkPop = (card._lastAtk !== undefined && card._lastAtk !== card.attack) ? 'stat-pop' : '';
+        const hpPop = (card._lastHp !== undefined && card._lastHp !== currentHp) ? 'stat-pop' : '';
+        card._lastAtk = card.attack;
+        card._lastHp = currentHp;
 
         statsHtml = `
         <div class="minion-stats">
-            <span class="stat-atk ${atkClass}"><span>${card.attack}</span></span>
-            <span class="stat-hp ${hpClass}">${hpValue}</span>
+            <span class="stat-atk ${atkClass} ${atkPop}"><span>${card.attack}</span></span>
+            <span class="stat-hp ${hpClass} ${hpPop}">${hpValue}</span>
         </div>`;
     }
 
@@ -1694,13 +1722,19 @@ function createMinionEl(minion, index, isPlayer) {
         countdownHtml += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">💀 ${minion.deathTimer}</div>`;
     }
 
+    // Stat Pop Animation tracking
+    const atkPop = (minion._lastAtk !== undefined && minion._lastAtk !== minion.attack) ? 'stat-pop' : '';
+    const hpPop = (minion._lastHp !== undefined && minion._lastHp !== minion.currentHealth) ? 'stat-pop' : '';
+    minion._lastAtk = minion.attack;
+    minion._lastHp = minion.currentHealth;
+
     el.innerHTML = `
         <div class="minion-art" style="${imageStyle}"></div>
         ${countdownHtml}
         <div class="card-title">${minion.name}</div>
         <div class="minion-stats">
-            <span class="stat-atk ${atkClass}"><span>${minion.attack}</span></span>
-            <span class="stat-hp ${hpClass}">${minion.currentHealth}</span>
+            <span class="stat-atk ${atkClass} ${atkPop}"><span>${minion.attack}</span></span>
+            <span class="stat-hp ${hpClass} ${hpPop}">${minion.currentHealth}</span>
         </div>
     `;
 
