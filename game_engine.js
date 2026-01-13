@@ -160,6 +160,30 @@ class GameState {
                 });
                 return { type: 'LOCK_ALL', affected, value: bc.value };
             },
+            'LOCK_ALL_AND_BUFF_CATEGORY': (bc) => {
+                const affected = [];
+                const buffed = [];
+                // Target ALL minions on board (both players)
+                [this.currentPlayer, this.opponent].forEach(player => {
+                    player.board.forEach((m, i) => {
+                        // Lock
+                        m.lockedTurns = Math.max(m.lockedTurns || 0, bc.value || 1);
+                        m.canAttack = false;
+                        affected.push({ ...m, index: i, side: player.side });
+
+                        // Buff if category matches
+                        if (m.category === bc.target_category) {
+                            if (bc.buff_stat === 'HEALTH') {
+                                m.health += bc.buff_value;
+                                m.currentHealth += bc.buff_value;
+                                this.updateEnrage(m);
+                                buffed.push({ ...m, index: i, side: player.side });
+                            }
+                        }
+                    });
+                });
+                return { type: 'LOCK_ALL_AND_BUFF', affected, buffed, value: bc.value };
+            },
             'HEAL_ALL_FRIENDLY': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
@@ -1258,8 +1282,39 @@ class GameState {
         // Triggered effects on board whenever a News card is played
         player.board.forEach(m => {
             if (m.keywords && m.keywords.triggered && m.keywords.triggered.type === 'ON_PLAY_NEWS') {
-                const val = m.keywords.triggered.value || 1;
-                m.attack += val;
+                const triggered = m.keywords.triggered;
+
+                // Existing Action: Buff Attack (Default if no action specified)
+                if (!triggered.action || triggered.action === 'BUFF_ATTACK') {
+                    const val = triggered.value || 1;
+                    m.attack += val;
+                }
+
+                // New Action: Heal Self
+                if (triggered.action === 'HEAL') {
+                    const val = triggered.value || 1;
+                    const oldHealth = m.currentHealth;
+                    m.currentHealth = Math.min(m.health, m.currentHealth + val);
+                    const healedAmount = m.currentHealth - oldHealth;
+                    this.updateEnrage(m);
+
+                    // Visualize heal
+                    if (typeof window !== 'undefined' && window.showDamageNumber && healedAmount > 0) {
+                        setTimeout(() => {
+                            const boardId = m.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                            const board = document.getElementById(boardId);
+                            if (board) {
+                                const cards = board.querySelectorAll('.card');
+                                const playerObj = m.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                                const index = playerObj.board.indexOf(m);
+                                if (index >= 0 && cards[index]) {
+                                    window.showDamageNumber(cards[index], healedAmount, 'heal');
+                                }
+                            }
+                        }, 50);
+                    }
+                }
+
                 // Attack increase should be reflected immediately in UI during render
             }
         });

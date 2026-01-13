@@ -1,4 +1,4 @@
-# 寶島保護戰 (Treasure Island Duel) - 開發指南 v0.2.1
+# 寶島保護戰 (Treasure Island Duel) - 開發指南 v0.4.0
 
 ## 如何新增卡牌
 
@@ -61,3 +61,4 @@
     - `DAMAGE_NON_CATEGORY`: 對非指定類別的單位造成傷害
     - `DAMAGE_ALL_NON_CATEGORIES`: 對所有非指定類別列表的單位造成傷害
     - `BUFF_CATEGORY`: 強化指定類別的單位
+
