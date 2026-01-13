@@ -82,6 +82,9 @@ const CARD_DATA = [
     { "id": "S020", "name": "政治清算", "category": "新聞", "cost": 5, "type": "NEWS", "rarity": "RARE", "description": "對一個敵方單位造成7點傷害", "keywords": { "battlecry": { "type": "DAMAGE", "value": 7, "target": { "side": "ENEMY", "type": "ALL" } } }, "image": "img/political_purge.png" },
     { "id": "S021", "name": "哈們", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "交換一名隨從的攻擊力和生命值", "keywords": { "battlecry": { "type": "SWAP_ATTACK_HEALTH", "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/hamen.png" },
     { "id": "S022", "name": "電子腳鐐", "category": "新聞", "cost": 0, "type": "NEWS", "rarity": "COMMON", "description": "沈默一名隨從2回合", "keywords": { "battlecry": { "type": "LOCK_ATTACK", "value": 2, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/electronic_monitoring.png" },
+    { "id": "S023", "name": "無期徒刑", "category": "新聞", "cost": 4, "type": "NEWS", "rarity": "COMMON", "description": "沈默一名隨從99回合", "keywords": { "battlecry": { "type": "LOCK_ATTACK", "value": 99, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/life_imprisonment.png" },
+    { "id": "S024", "name": "鉅額交保", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "解除沈默的角色並+1生命值", "keywords": { "battlecry": { "type": "UNLOCK_AND_BUFF_HEALTH", "value": 1, "target": { "side": "ALL", "type": "MINION" } } }, "image": "img/huge_bail.png" },
+    { "id": "S025", "name": "普發一萬", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "賦予我方所有隨從+1/+1", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ALL" } }, "image": "img/cash_handout.png" },
 
     // --- 隨從 (Minions) - 網軍 ---
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/cyber_army.png" },
@@ -103,7 +106,8 @@ const CARD_DATA = [
     { "id": "TW061", "name": "陳其邁", "category": "民進黨政治人物", "cost": 7, "attack": 3, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "戰吼:沈默所有敵方隨從2回合\n遺志:召喚藍亦明", "keywords": { "battlecry": { "type": "LOCK_ALL_ENEMY", "value": 2 }, "deathrattle": { "type": "SUMMON", "cardId": "TW062" } }, "image": "img/chen_chi_mai.png" },
     { "id": "TW062", "name": "藍亦明", "category": "公眾人物", "cost": 2, "attack": 2, "health": 2, "type": "MINION", "rarity": "RARE", "description": "任務:如果存活3回合則死亡並召喚陳其邁", "keywords": { "quest": { "turns": 3, "summonCardId": "TW061" } }, "image": "img/lan_yi_ming.png" },
     { "id": "TW063", "name": "核電廠", "category": "建築", "cost": 3, "attack": 0, "health": 6, "type": "MINION", "rarity": "COMMON", "description": "任務:如果存活5回合 對全部隨從造成25點傷害", "keywords": { "quest": { "turns": 6, "effect": { "type": "DAMAGE_ALL_MINIONS", "value": 25 } } }, "image": "img/nuclear_power_plant.png" },
-    { "id": "TW064", "name": "鄭文燦", "category": "民進黨政治人物", "cost": 5, "attack": 5, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "摸頭燦笑\n嘲諷+戰吼: 使一名敵軍回到手牌", "keywords": { "taunt": true, "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/zheng_wen_tsan.png" }
+    { "id": "TW064", "name": "鄭文燦", "category": "民進黨政治人物", "cost": 5, "attack": 5, "health": 5, "type": "MINION", "rarity": "EPIC", "description": "摸頭燦笑\n嘲諷+戰吼: 使一名敵軍回到手牌", "keywords": { "taunt": true, "battlecry": { "type": "BOUNCE_TARGET", "target": { "side": "ENEMY", "type": "MINION" } } }, "image": "img/zheng_wen_tsan.png" },
+    { "id": "TW065", "name": "8+9", "category": "平民", "cost": 4, "attack": 3, "health": 3, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "img/8plus9.png" }
 ];
 
 // Export for browser

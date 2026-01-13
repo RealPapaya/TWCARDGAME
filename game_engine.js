@@ -532,15 +532,35 @@ class GameState {
                 });
                 return { type: 'BUFF_ALL', affected };
             },
+            'UNLOCK_AND_BUFF_HEALTH': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    // Unlock
+                    targetUnit.lockedTurns = 0;
+                    if (!targetUnit.sleeping) {
+                        targetUnit.canAttack = true;
+                    }
+
+                    // Buff Health
+                    targetUnit.health += bc.value;
+                    targetUnit.currentHealth += bc.value;
+                    this.updateEnrage(targetUnit);
+
+                    return { type: 'UNLOCK_AND_BUFF', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
             'BUFF_ALL': (bc) => {
                 const affected = [];
                 this.currentPlayer.board.forEach((m, i) => {
-                    if (bc.stat === 'ATTACK') m.attack += bc.value;
-                    else if (bc.stat === 'HEALTH') {
+                    if (bc.stat === 'ATTACK' || bc.stat === 'ALL') {
+                        m.attack += bc.value;
+                    }
+                    if (bc.stat === 'HEALTH' || bc.stat === 'ALL') {
                         m.health += bc.value;
                         m.currentHealth += bc.value;
                     }
-                    affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
+                    affected.push({ unit: { ...m, index: i }, type: 'BUFF', stat: bc.stat, value: bc.value });
                 });
                 return { type: 'BUFF_ALL', affected };
             },
