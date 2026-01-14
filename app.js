@@ -3315,12 +3315,13 @@ function triggerCombatEffect(el, type) {
     }, 1000);
 }
 
-// Global listeners
-window.addEventListener('contextmenu', (e) => {
+// Global listeners to lock right-click menu and handle targeting cancellation
+document.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
     if (isBattlecryTargeting) {
-        e.preventDefault();
         cancelBattlecryTargeting();
     }
+    return false;
 });
 
 // Start
