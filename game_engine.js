@@ -841,6 +841,23 @@ class GameState {
                     return { type: 'BUFF', target: { ...targetUnit, index: target.index }, deathTimer: targetUnit.deathTimer };
                 }
                 return null;
+            },
+            'DAMAGE_NON_CATEGORY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && (!targetUnit.category || !targetUnit.category.includes(bc.target_category))) {
+                    this.applyDamage(targetUnit, bc.value);
+                    return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
+            'EAT_FRIENDLY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const stats = { attack: targetUnit.attack, health: targetUnit.health };
+                    targetUnit.currentHealth = 0; // Trigger death
+                    return { type: 'EAT', target: { ...targetUnit, index: target.index }, stats };
+                }
+                return null;
             }
         };
     }
@@ -1303,7 +1320,14 @@ class GameState {
 
         const handler = this.battlecryHandlers[effectiveBattlecry.type];
         if (handler) {
-            return handler(effectiveBattlecry, target, sourceMinion);
+            const res = handler(effectiveBattlecry, target, sourceMinion);
+            // Post-handler logic for specific types
+            if (effectiveBattlecry.type === 'EAT_FRIENDLY' && res && sourceMinion) {
+                sourceMinion.attack += res.stats.attack;
+                sourceMinion.health += res.stats.health;
+                sourceMinion.currentHealth += res.stats.health;
+            }
+            return res;
         }
 
         console.warn("Unhandled Battlecry Type:", effectiveBattlecry.type);
@@ -1845,7 +1869,7 @@ class AIEngine {
                         // User requirement: If target is required but missing, don't play (or skip if optional? Usually cards in this game need target)
                         // If card is a direct "Destroy" or high damage, let's skip playing if no target.
                         const type = choice.keywords.battlecry.type;
-                        const isHardTarget = ['DESTROY', 'DAMAGE', 'HEAL', 'BUFF_STAT_TARGET', 'GIVE_DIVINE_SHIELD'].includes(type);
+                        const isHardTarget = ['DESTROY', 'DAMAGE', 'HEAL', 'BUFF_STAT_TARGET', 'GIVE_DIVINE_SHIELD', 'DAMAGE_NON_CATEGORY', 'EAT_FRIENDLY'].includes(type);
                         if (isHardTarget && !target) continue;
                     }
 
@@ -1946,7 +1970,15 @@ class AIEngine {
         // Filtering
         let filteredMinions = potentialMinions;
         if (rule.type === 'MINION') filteredMinions = potentialMinions.filter(p => p.unit.type === 'MINION');
-        if (battlecry.target_category) filteredMinions = filteredMinions.filter(p => p.unit.category === battlecry.target_category);
+
+        // Category check
+        if (battlecry.target_category) {
+            if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
+                filteredMinions = filteredMinions.filter(p => !p.unit.category || !p.unit.category.includes(battlecry.target_category));
+            } else {
+                filteredMinions = filteredMinions.filter(p => p.unit.category && p.unit.category.includes(battlecry.target_category));
+            }
+        }
 
         // Preference Logic
         if (battlecry.type === 'HEAL' || battlecry.type?.includes('BUFF') || battlecry.type === 'GIVE_DIVINE_SHIELD') {

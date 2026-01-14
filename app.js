@@ -66,6 +66,7 @@ let battlecryTargetRule = null;
 let draggingMode = 'DAMAGE'; // 'DAMAGE', 'HEAL', 'BUFF'
 let currentInsertionIndex = -1;
 let dragLine = null; // Will be initialized in init()
+let animatingDrawCards = new Set(); // Track cards currently in draw animation
 
 function init() {
     // Initialize drag line element
@@ -999,8 +1000,10 @@ async function aiTurn() {
                         const type = card.keywords?.battlecry?.type;
                         let color = '#ff0000';
                         let effectType = 'DAMAGE';
-                        if (type === 'HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
-                        else if (type === 'BUFF_STAT_TARGET') { color = '#ffa500'; effectType = 'BUFF'; }
+                        if (type === 'HEAL' || type === 'FULL_HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
+                        else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') { color = '#ffa500'; effectType = 'BUFF'; }
+                        else if (type === 'EAT_FRIENDLY') { color = '#ff00ff'; effectType = 'BUFF'; }
+                        else if (type === 'DAMAGE_NON_CATEGORY') { color = '#ff0000'; effectType = 'DAMAGE'; }
 
                         await animateAbility(sourceEl, destEl, color);
                         triggerCombatEffect(destEl, effectType);
@@ -1155,11 +1158,22 @@ function renderHands(p1, p2) {
         const children = handEl.children;
         if (newCount > 0 && newCount < 15) {
             for (let i = Math.max(0, children.length - newCount); i < children.length; i++) {
-                if (children[i]) animateCardFromDeck(children[i]);
+                if (children[i]) {
+                    const cardObj = p1.hand[i];
+                    animateCardFromDeck(cardObj, children[i]);
+                }
             }
         }
     }
     previousPlayerHandSize = p1.hand.length;
+
+    // Force hidden opacity for cards currently animating
+    p1.hand.forEach((card, idx) => {
+        if (animatingDrawCards.has(card)) {
+            const child = handEl.children[idx];
+            if (child) child.style.opacity = '0';
+        }
+    });
 
     // Opponent Hand
     oppHandEl.innerHTML = '';
@@ -2819,51 +2833,89 @@ function logMessage(msg) {
  * Reference for S001 (Perfect Animation).
  * @param {HTMLElement} cardEl The final destination element in hand
  */
-function animateCardFromDeck(cardEl) {
+function animateCardFromDeck(cardObj, initialCardEl) {
     const deckEl = document.getElementById('player-deck');
-    if (!deckEl || !cardEl) return;
+    if (!deckEl) return;
 
-    cardEl.style.opacity = '0';
+    // Track this card as animating
+    animatingDrawCards.add(cardObj);
 
+    // Initial hide of the destination element if it exists
+    if (initialCardEl) initialCardEl.style.opacity = '0';
+
+    // Wait for two frames to ensure the element is committed to DOM and has stable coordinates
     requestAnimationFrame(() => {
-        const deckRect = deckEl.getBoundingClientRect();
-        const cardRect = cardEl.getBoundingClientRect();
-
-        const clone = cardEl.cloneNode(true);
-        clone.style.position = 'fixed';
-        clone.style.left = '0';
-        clone.style.top = '0';
-        clone.style.width = `${cardEl.offsetWidth || 100}px`;
-        clone.style.height = `${cardEl.offsetHeight || 140}px`;
-        clone.style.zIndex = '9999';
-        clone.style.margin = '0';
-
-        // Use transform for hardware acceleration
-        const startX = deckRect.left;
-        const startY = deckRect.top;
-        const endX = cardRect.left;
-        const endY = cardRect.top;
-
-        clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
-        clone.style.transition = 'none'; // Initial position without transition
-        clone.style.pointerEvents = 'none';
-        clone.style.opacity = '1';
-        clone.className = cardEl.className;
-
-        document.body.appendChild(clone);
-
         requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-                clone.style.transition = 'transform 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.3s ease';
-                clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
-            });
-        });
-
-        clone.addEventListener('transitionend', (e) => {
-            if (e.propertyName === 'transform') {
-                clone.remove();
-                cardEl.style.opacity = '1';
+            // Find the CURRENT element in hand for this card, as a re-render might have happened
+            if (!gameState || !gameState.players[0]) return;
+            const p = gameState.players[0];
+            const idx = p.hand.indexOf(cardObj);
+            if (idx === -1) {
+                animatingDrawCards.delete(cardObj);
+                return;
             }
+
+            const handEl = document.getElementById('player-hand');
+            const targetEl = handEl ? handEl.children[idx] : null;
+
+            if (!targetEl) {
+                animatingDrawCards.delete(cardObj);
+                render();
+                return;
+            }
+
+            const deckRect = deckEl.getBoundingClientRect();
+            const cardRect = targetEl.getBoundingClientRect();
+
+            // Safety check: if coordinates are still zero, layout fails. Skip animation.
+            if (cardRect.width === 0 || (cardRect.left === 0 && cardRect.top === 0)) {
+                animatingDrawCards.delete(cardObj);
+                render();
+                return;
+            }
+
+            const clone = targetEl.cloneNode(true);
+            clone.style.position = 'fixed';
+            clone.style.left = '0';
+            clone.style.top = '0';
+            clone.style.width = `${targetEl.offsetWidth || 100}px`;
+            clone.style.height = `${targetEl.offsetHeight || 140}px`;
+            clone.style.zIndex = '9999';
+            clone.style.margin = '0';
+
+            const startX = deckRect.left;
+            const startY = deckRect.top;
+            const endX = cardRect.left;
+            const endY = cardRect.top;
+
+            clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
+            clone.style.transition = 'none';
+            clone.style.pointerEvents = 'none';
+            clone.style.opacity = '1';
+            clone.className = targetEl.className;
+
+            document.body.appendChild(clone);
+
+            requestAnimationFrame(() => {
+                requestAnimationFrame(() => {
+                    clone.style.transition = 'transform 0.6s cubic-bezier(0.18, 0.89, 0.32, 1.15), opacity 0.3s ease';
+                    clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
+                });
+            });
+
+            const cleanup = (e) => {
+                if (e.propertyName === 'transform' || e.type === 'timeout') {
+                    clone.remove();
+                    animatingDrawCards.delete(cardObj);
+                    // Final render to restore visibility in the current DOM
+                    render();
+                    clone.removeEventListener('transitionend', cleanup);
+                    clearTimeout(failSafe);
+                }
+            };
+
+            const failSafe = setTimeout(() => cleanup({ type: 'timeout' }), 1000);
+            clone.addEventListener('transitionend', cleanup);
         });
     });
 }
