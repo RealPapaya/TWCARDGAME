@@ -3656,9 +3656,9 @@ body.dragging-active .player .hand .card:hover {
 
 /* Drag Line Base Styles */
 #drag-line {
-    stroke-width: 40 !important;
-    stroke-dasharray: 70, 40 !important;
-    animation: drag-line-anim 4s linear infinite;
+    stroke-width: 30 !important;
+    stroke-dasharray: 60, 40 !important;
+    animation: drag-line-anim 1s linear infinite;
 }
 
 @keyframes drag-line-anim {
