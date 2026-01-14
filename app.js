@@ -567,14 +567,24 @@ function renderDeckSelect() {
     // Just keep the existing title
 
     // Reset Buttons
-    if (startBtn) startBtn.style.display = 'none';
-    if (editBtn) editBtn.style.display = 'none';
+    const isNoSelection = selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length;
+    if (startBtn) {
+        startBtn.style.display = 'none';
+        startBtn.style.opacity = isNoSelection ? '0.5' : '1';
+    }
+    if (editBtn) {
+        editBtn.style.display = 'none';
+        editBtn.style.opacity = isNoSelection ? '0.5' : '1';
+    }
 
     if (pendingViewMode === 'BATTLE' || pendingViewMode === 'DEBUG') {
         if (startBtn) {
             startBtn.style.display = 'block';
             startBtn.onclick = async () => {
-                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
+                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) {
+                    await showCustomAlert("請先選擇一個牌組再開始遊戲！");
+                    return;
+                }
                 const deck = userDecks[selectedDeckIdx];
                 const isTest = deck.isTest || isDebugMode;
                 if (deck.cards.length === 30 || (isTest && deck.cards.length > 0)) {
@@ -592,8 +602,11 @@ function renderDeckSelect() {
     if (pendingViewMode === 'BUILDER' || pendingViewMode === 'DEBUG') {
         if (editBtn) {
             editBtn.style.display = 'block';
-            editBtn.onclick = () => {
-                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) return;
+            editBtn.onclick = async () => {
+                if (selectedDeckIdx < 0 || selectedDeckIdx >= userDecks.length) {
+                    await showCustomAlert("請先選擇一個牌組進行編輯！");
+                    return;
+                }
                 editingDeckIdx = selectedDeckIdx;
                 // Deep copy for editing
                 tempDeck = JSON.parse(JSON.stringify(userDecks[editingDeckIdx]));
