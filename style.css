@@ -3645,11 +3645,33 @@ body.dragging-active .player .hand .card:hover {
     }
 
     100% {
-        transform: scale(1);
+        transform: rotate(0deg);
     }
 }
 
 .stat-pop {
     animation: stat-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     z-index: 10;
+}
+
+/* Drag Line Color Variants */
+#drag-line.heal-line {
+    stroke: #43e97b !important;
+    filter: drop-shadow(0 0 8px #43e97b);
+}
+
+#drag-line.buff-line {
+    stroke: #ffa500 !important;
+    filter: drop-shadow(0 0 8px #ffa500);
+}
+
+#drag-line.bounce-line {
+    stroke: #a335ee !important;
+    filter: drop-shadow(0 0 8px #a335ee);
+}
+
+#drag-line.destroy-line {
+    stroke: #000000 !important;
+    marker-end: url(#arrowhead-destroy) !important;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
 }
