@@ -1882,7 +1882,7 @@ function onDragMove(e) {
         let newX2, newY2;
 
         // Only shorten if line is long enough, otherwise hide or clamp
-        const arrowOffset = 45;
+        const arrowOffset = 30;
         if (dist > arrowOffset) {
             const ratio = (dist - arrowOffset) / dist;
             newX2 = x1 + dx * ratio;
