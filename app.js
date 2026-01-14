@@ -263,6 +263,10 @@ document.querySelectorAll('.sort-btn').forEach(btn => {
 // --- Battle Listeners ---
 document.getElementById('end-turn-btn').addEventListener('click', async () => {
     if (isBattlecryTargeting || dragging) return;
+    if (gameState.currentPlayerIdx !== 0) {
+        logMessage(UI_TEXT.NOT_YOUR_TURN);
+        return;
+    }
     try {
         gameState.endTurn();
         render();
@@ -926,7 +930,7 @@ function getBorderColor(rarity) {
 }
 
 async function aiTurn() {
-    logMessage("Opponent is thinking...");
+    logMessage(UI_TEXT.OPPONENT_THINKING);
     try {
         // Simple loop to execute actions one by one
         let moves = 0;
@@ -944,7 +948,7 @@ async function aiTurn() {
                 const card = gameState.currentPlayer.hand[action.index];
                 if (!card) break;
 
-                logMessage(`Opponent plays ${card.name}`);
+                logMessage(`${UI_TEXT.OPPONENT_PLAYS}${card.name}`);
 
                 const oppBoard = document.getElementById('opp-board');
                 const insertionIndex = action.insertionIndex !== undefined ? action.insertionIndex : -1;
@@ -1904,6 +1908,7 @@ function onDragMove(e) {
 
             // Get the card being dragged
             const card = gameState.currentPlayer.hand[attackerIndex];
+            if (!card) return;
 
             // Only show placement indicator for minions, not newss
             const targetEl = document.elementFromPoint(e.clientX, e.clientY);
@@ -2084,7 +2089,7 @@ async function onDragEnd(e) {
 
             if (!isPlayValidated) {
                 // Return to hand visuals
-                logMessage("Play cancelled");
+                logMessage(UI_TEXT.PLAY_CANCELLED);
                 const originalEl = document.getElementById('player-hand').children[attackerIndex];
                 if (originalEl) originalEl.style.opacity = '1';
                 render();
@@ -2098,12 +2103,13 @@ async function onDragEnd(e) {
                     const actualCost = gameState.getCardActualCost(card);
                     if (gameState.currentPlayer.mana.current < actualCost) {
                         shakeManaContainer(true);
+                        logMessage(UI_TEXT.INSUFFICIENT_MANA);
                     } else if (card.type === 'MINION' && gameState.currentPlayer.board.length >= 7) {
-                        logMessage("戰場已滿!");
+                        logMessage(UI_TEXT.BOARD_FULL);
                     } else if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM') {
-                        logMessage("手牌不足以發動棄牌效果!");
+                        logMessage(UI_TEXT.DISCARD_FAILED);
                     } else {
-                        logMessage("無法打出此卡!");
+                        logMessage(UI_TEXT.CANNOT_PLAY_CARD);
                     }
                     // End: Diagnostics
 
@@ -2130,7 +2136,7 @@ async function onDragEnd(e) {
                     // Special rule: For newss, even if no minions exist, allow hero-targeting UI to trigger
                     // to avoid "dead" drag experience (user can still cancel or try to hit hero if rule allows)
                     if (validTargets.length === 0 && card.type !== 'NEWS') {
-                        logMessage("無合法目標！");
+                        logMessage(UI_TEXT.NO_VALID_TARGET);
                         render();
                         return;
                     }
@@ -2411,7 +2417,7 @@ async function onDragEnd(e) {
                 }
             } else {
                 // Return to hand visuals (already handled by cleaning up ghost)
-                logMessage("Play cancelled");
+                logMessage(UI_TEXT.PLAY_CANCELLED);
                 render(); // Ensure correct state
             }
             return;
@@ -2467,7 +2473,7 @@ async function onDragEnd(e) {
             if (isTargetEligible(battlecryTargetRule, targetInfo)) {
                 target = targetInfo;
             } else {
-                logMessage("Invalid target!");
+                logMessage(UI_TEXT.INVALID_TARGET);
                 // DO NOT clear targeting state, let user try again
                 return;
             }
@@ -2595,13 +2601,13 @@ function cancelBattlecryTargeting() {
             // Restore mana
             gameState.currentPlayer.mana.current += minion.cost;
             gameState.currentPlayer.hand.push(minion);
-            logMessage("取消出牌 (隨從已退回)");
+            logMessage(UI_TEXT.CANCEL_PLAY_REFUND);
         }
     } else {
         // News: Mana wasn't spent yet, just show card again
         const handCardEl = document.getElementById('player-hand').children[battlecrySourceIndex];
         if (handCardEl) handCardEl.style.opacity = '1';
-        logMessage("取消出牌");
+        logMessage(UI_TEXT.PLAY_CANCELLED);
     }
     render();
 }
@@ -2712,7 +2718,8 @@ function startBattlecryTargeting(sourceIndex, x, y, mode = 'DAMAGE', targetRule 
     dragLine.setAttribute('y2', y);
     dragLine.style.display = 'block';
 
-    logMessage("Choose a target for Battlecry!");
+    const msg = sourceType === 'NEWS' ? UI_TEXT.SPELL_CHOOSE_TARGET : UI_TEXT.BATTLECRY_CHOOSE_TARGET;
+    logMessage(msg);
 }
 
 /**
@@ -2911,10 +2918,28 @@ function animateAttack(fromEl, toEl) {
 
 function logMessage(msg) {
     const log = document.getElementById('message-log');
-    const line = document.createElement('div');
-    line.innerText = msg;
-    log.appendChild(line);
-    log.scrollTop = log.scrollHeight;
+    if (log) {
+        const line = document.createElement('div');
+        line.innerText = msg;
+        log.appendChild(line);
+        log.scrollTop = log.scrollHeight;
+    }
+
+    // Also show as a visual alert if it's a known UI_TEXT or error
+    if (msg) showBattleAlert(msg);
+}
+
+function showBattleAlert(text) {
+    // Prevent showing duplicated AI thinking/plays in the center if we want to keep it clean
+    if (text.includes(UI_TEXT.OPPONENT_THINKING) || text.includes(UI_TEXT.OPPONENT_PLAYS)) return;
+
+    const alert = document.createElement('div');
+    alert.className = 'battle-alert';
+    alert.innerText = text;
+    document.body.appendChild(alert);
+
+    // Cleanup after animation
+    setTimeout(() => alert.remove(), 2000);
 }
 
 /**

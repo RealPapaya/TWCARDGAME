@@ -3698,3 +3698,44 @@ body.dragging-active .player .hand .card:hover {
     marker-end: url(#arrowhead-damage) !important;
     filter: drop-shadow(0 0 8px #ff0000);
 }
+
+/* Battle Alert / Toast Notifications */
+.battle-alert {
+    position: fixed;
+    bottom: 120px;
+    left: 20px;
+    background: rgba(0, 0, 0, 0.85);
+    color: var(--neon-yellow);
+    padding: 12px 24px;
+    border: 2px solid var(--neon-yellow);
+    border-radius: 8px;
+    font-size: 18px;
+    font-weight: bold;
+    z-index: 30000;
+    pointer-events: none;
+    box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+    text-shadow: 0 0 5px black;
+    animation: alert-slide-in-out 3s forwards;
+}
+
+@keyframes alert-slide-in-out {
+    0% {
+        opacity: 0;
+        transform: translateX(-100%);
+    }
+
+    10% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    90% {
+        opacity: 1;
+        transform: translateX(0);
+    }
+
+    100% {
+        opacity: 0;
+        transform: translateX(-50%);
+    }
+}
