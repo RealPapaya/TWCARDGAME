@@ -1144,10 +1144,19 @@ async function aiTurn() {
                         const sourceName = card.name;
                         const destSide = action.target.side === 'OPPONENT' ? 'PLAYER' : 'OPPONENT';
                         const destName = getUnitName(destSide, action.target.index, action.target.type);
+
+                        const isAiNews = card.type === 'NEWS';
+                        const aiValue = card.keywords?.battlecry?.value || card.keywords?.battlecry?.bonus_value || 0;
+
                         if (effectType === 'HEAL') {
-                            MatchHistory.add('HEAL', { source: sourceName, target: destName, value: '' });
-                        } else if (effectType === 'DAMAGE' || effectType === 'DESTROY') {
-                            MatchHistory.add('DAMAGE', { source: sourceName, target: destName, value: '' });
+                            const eventType = isAiNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
+                            MatchHistory.add(eventType, { source: sourceName, target: destName, value: aiValue });
+                        } else if (effectType === 'DESTROY') {
+                            const eventType = isAiNews ? 'NEWS_DESTROY' : 'BATTLECRY_DESTROY';
+                            MatchHistory.add(eventType, { source: sourceName, target: destName });
+                        } else if (effectType === 'DAMAGE') {
+                            const eventType = isAiNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
+                            MatchHistory.add(eventType, { source: sourceName, target: destName, value: aiValue });
                         }
                     }
                 } else if (card.keywords?.battlecry) {
@@ -2303,6 +2312,12 @@ async function onDragEnd(e) {
                             // Pass full battlecry object to support category checks
                             startBattlecryTargeting(attackerIndex, startX, startY, mode, battlecry, 'NEWS');
                         } else { // Minion with Battlecry
+                            // Log history immediately when card is spent
+                            MatchHistory.add('PLAY', {
+                                player: "你",
+                                card: card.name
+                            });
+
                             gameState.playCard(attackerIndex, 'PENDING', currentInsertionIndex);
                             render();
 
@@ -2683,9 +2698,9 @@ async function onDragEnd(e) {
                     (target.side === 'OPPONENT' ? document.getElementById('opp-board').children[target.index] : document.getElementById('player-board').children[target.index]);
 
                 // 2. Animate BEFORE applying logic (so target is still alive)
+                let effectType = 'DAMAGE';
                 if (sourceEl && destEl) {
                     let color = '#ff0000'; // Default Damage Red
-                    let effectType = 'DAMAGE';
 
                     // Determine color based on card/mode
                     if (draggingMode === 'HEAL') {
@@ -2704,14 +2719,16 @@ async function onDragEnd(e) {
                         effectType = 'DESTROY';
                     }
 
-                    await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
+                    await animateAbility(sourceEl, destEl, color, effectType !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
 
                     // Impact Delay (Reduced for efficiency)
                     await new Promise(r => setTimeout(r, 400));
                 }
 
-                const sourceName = battlecrySourceType === 'NEWS' ? gameState.currentPlayer.hand[battlecrySourceIndex]?.name : gameState.currentPlayer.board[battlecrySourceIndex]?.name;
+                const sourceName = battlecrySourceType === 'NEWS' ?
+                    (gameState.currentPlayer.hand[battlecrySourceIndex]?.name || "新聞") :
+                    (gameState.currentPlayer.board[battlecrySourceIndex]?.name || "隨從");
                 const destName = getUnitName(target.side, target.index, target.type);
 
                 // 3. Execute Game Logic (Phase 2)
@@ -2741,14 +2758,14 @@ async function onDragEnd(e) {
 
                 console.log('[TARGETED BATTLECRY] isNews:', isNews, 'value:', value);
 
-                if (draggingMode === 'HEAL') {
+                if (draggingMode === 'HEAL' || effectType === 'HEAL') {
                     const eventType = isNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
                     MatchHistory.add(eventType, { source: sourceName, target: destName, value: value });
-                } else if (draggingMode === 'DESTROY') {
+                } else if (draggingMode === 'DESTROY' || effectType === 'DESTROY') {
                     // 擊殺類型單獨處理
                     const eventType = isNews ? 'NEWS_DESTROY' : 'BATTLECRY_DESTROY';
                     MatchHistory.add(eventType, { source: sourceName, target: destName });
-                } else if (draggingMode === 'DAMAGE') {
+                } else if (draggingMode === 'DAMAGE' || effectType === 'DAMAGE') {
                     const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
                     MatchHistory.add(eventType, { source: sourceName, target: destName, value: value });
                 }

@@ -37,10 +37,10 @@ window.UI_TEXT = {
     HISTORY_PLAY: "<b>{player}</b> 打出了 <b>{card}</b>",
     HISTORY_NORMAL_ATTACK: "<b>{attacker}</b> 普通攻擊 <b>{target}</b> 造成了 {damage} 點傷害",
     HISTORY_BATTLECRY_DAMAGE: "<b>{source}</b> 戰吼攻擊 <b>{target}</b> 造成了 {value} 點傷害",
-    HISTORY_BATTLECRY_HEAL: "<b>{source}</b> 戰吼回復 <b>{target}</b> 回復了 {value} 點生命",
+    HISTORY_BATTLECRY_HEAL: "<b>{source}</b> 戰吼為 <b>{target}</b> 回復了 {value} 點生命",
     HISTORY_BATTLECRY_DESTROY: "<b>{source}</b> 戰吼擊殺了 <b>{target}</b>",
     HISTORY_NEWS_DAMAGE: "<b>{source}</b> 攻擊 <b>{target}</b> 造成了 {value} 點傷害",
-    HISTORY_NEWS_HEAL: "<b>{source}</b> 回復 <b>{target}</b> 回復了 {value} 點生命",
+    HISTORY_NEWS_HEAL: "<b>{source}</b> 為 <b>{target}</b> 回復了 {value} 點生命",
     HISTORY_NEWS_DESTROY: "<b>{source}</b> 擊殺了 <b>{target}</b>",
     HISTORY_DEATH: "<b>{unit}</b> 已死亡"
 };
