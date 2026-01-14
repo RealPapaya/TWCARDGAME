@@ -68,6 +68,103 @@ let currentInsertionIndex = -1;
 let dragLine = null; // Will be initialized in init()
 let animatingDrawCards = new Set(); // Track cards currently in draw animation
 
+/**
+ * 對戰歷史紀錄管理器
+ */
+const MatchHistory = {
+    logs: [],
+
+    add(type, data) {
+        let template = UI_TEXT[`HISTORY_${type}`] || "{msg}";
+        let html = template;
+
+        // 格式化模板
+        for (const [key, value] of Object.entries(data)) {
+            html = html.replace(new RegExp(`\\{${key}\\}`, 'g'), value);
+        }
+
+        const logEntry = {
+            type: type.toLowerCase(),
+            html: html,
+            timestamp: Date.now()
+        };
+
+        this.logs.push(logEntry);
+        this.renderEntry(logEntry);
+
+        // 自動捲動到最底
+        const list = document.getElementById('history-list');
+        if (list) list.scrollTop = list.scrollHeight;
+    },
+
+    renderEntry(entry) {
+        const list = document.getElementById('history-list');
+        if (!list) return;
+
+        const div = document.createElement('div');
+        div.className = `history-item ${entry.type}`;
+        div.innerHTML = entry.html;
+        list.appendChild(div);
+
+        // 為卡牌名稱添加預覽功能（類似更新日誌）
+        const boldElements = div.querySelectorAll('b');
+        boldElements.forEach(el => {
+            const text = el.innerText;
+            // 嘗試在卡牌資料庫中找到這張卡
+            const card = CARD_DATA.find(c => c.name === text);
+            if (card) {
+                el.style.cursor = 'pointer';
+                el.style.textDecoration = 'underline';
+                el.addEventListener('mouseenter', () => {
+                    showPreview(card);
+                    // 將預覽定位在歷史面板右側
+                    const panel = document.getElementById('match-history-panel');
+                    if (panel) {
+                        const preview = document.getElementById('card-preview');
+                        const panelRect = panel.getBoundingClientRect();
+                        preview.style.position = 'fixed';
+                        preview.style.left = `${panelRect.right + 20}px`;
+                        preview.style.top = `${panelRect.top + 50}px`;
+                    }
+                });
+                el.addEventListener('mouseleave', hidePreview);
+            }
+        });
+    },
+
+    clear() {
+        this.logs = [];
+        const list = document.getElementById('history-list');
+        if (list) list.innerHTML = '';
+    }
+};
+
+/**
+ * 獲取單位名稱用於紀錄
+ */
+function getUnitName(side, index, type) {
+    if (type === 'HERO') {
+        return side === 'PLAYER' ? "你" : "對手";
+    }
+
+    // 確保 side 正確對應到 gameState 的 player
+    const unitSide = side === 'PLAYER' ? gameState.currentPlayer : gameState.opponent;
+
+    if (!unitSide || !unitSide.board) {
+        console.warn(`[getUnitName] Invalid unitSide:`, side, unitSide);
+        return "未知隨從";
+    }
+
+    const minion = unitSide.board[index];
+
+    if (!minion) {
+        console.warn(`[getUnitName] Minion not found at index ${index} for side ${side}`);
+        return "未知隨從";
+    }
+
+    return minion.name;
+}
+
 function init() {
     // Initialize drag line element
     dragLine = document.getElementById('drag-line');
@@ -243,6 +340,8 @@ function init() {
             catSelect.appendChild(opt);
         });
     }
+
+    console.log("Game initialized.");
 }
 
 // Sort Listeners
@@ -632,6 +731,7 @@ function showView(viewId) {
 let previousPlayerHandSize = 0;
 
 async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
+    MatchHistory.clear();
     // Use provided opponent deck or generate random one
     let oppDeck;
     if (oppDeckIds && oppDeckIds.length > 0) {
@@ -958,6 +1058,11 @@ async function aiTurn() {
 
                 try {
                     gameState.playCard(action.index, action.target, insertionIndex);
+                    // Match History log
+                    MatchHistory.add('PLAY', {
+                        player: "對手",
+                        card: card.name
+                    });
                 } catch (e) {
                     console.error("AI failed to play card:", e);
                     break;
@@ -1034,6 +1139,16 @@ async function aiTurn() {
 
                         await animateAbility(sourceEl, destEl, color);
                         triggerCombatEffect(destEl, effectType);
+
+                        // Log AI Battlecry history
+                        const sourceName = card.name;
+                        const destSide = action.target.side === 'OPPONENT' ? 'PLAYER' : 'OPPONENT';
+                        const destName = getUnitName(destSide, action.target.index, action.target.type);
+                        if (effectType === 'HEAL') {
+                            MatchHistory.add('HEAL', { source: sourceName, target: destName, value: '' });
+                        } else if (effectType === 'DAMAGE' || effectType === 'DESTROY') {
+                            MatchHistory.add('DAMAGE', { source: sourceName, target: destName, value: '' });
+                        }
                     }
                 } else if (card.keywords?.battlecry) {
                     const type = card.keywords.battlecry.type;
@@ -1069,6 +1184,19 @@ async function aiTurn() {
                 if (attackerEl && targetEl) {
                     await animateAttack(attackerEl, targetEl);
                 }
+
+                // 取得攻擊者和傷害數值
+                const attacker = gameState.opponent.board[attackerIdx];
+                const attackerName = getUnitName('OPPONENT', attackerIdx, 'MINION');
+                const tSide = action.target.side === 'OPPONENT' ? 'OPPONENT' : 'PLAYER';
+                const targetName = getUnitName(tSide, targetIndex, targetType);
+                const damage = attacker ? attacker.attack : 0;
+
+                MatchHistory.add('NORMAL_ATTACK', {
+                    attacker: attackerName,
+                    target: targetName,
+                    damage: damage
+                });
 
                 gameState.attack(attackerIdx, action.target);
                 render();
@@ -1282,6 +1410,10 @@ async function resolveDeaths() {
         const animations = [];
 
         for (const death of dead) {
+            // Log history
+            const unitName = getUnitName(death.side, death.index, death.type);
+            MatchHistory.add('DEATH', { unit: unitName });
+
             const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
             if (board && board.children[death.index]) {
                 animations.push(animateShatter(board.children[death.index]));
@@ -2193,6 +2325,12 @@ async function onDragEnd(e) {
                     // 1. Play Card but SKIP battlecry execution in engine
                     const { card: playedCard } = gameState.playCard(attackerIndex, null, currentInsertionIndex, true);
 
+                    // Log history
+                    MatchHistory.add('PLAY', {
+                        player: "你",
+                        card: playedCard.name
+                    });
+
                     // 2. Render to show the minion LANDING on the board
                     render();
 
@@ -2253,6 +2391,30 @@ async function onDragEnd(e) {
 
                                     await animateAbility(newMinionEl, targetEl, arrowColor, true);
                                     triggerCombatEffect(targetEl, effectType);
+                                }
+
+                                // Log history (moved outside targetEl check so it always logs)
+                                console.log('[BATTLECRY LOG] playedCard:', playedCard.name, 'type:', playedCard.type);
+                                console.log('[BATTLECRY LOG] result:', result);
+
+                                const sourceName = playedCard.name;
+                                const destSide = result.target.side;
+                                const destName = getUnitName(destSide, result.target.index, result.target.type);
+
+                                console.log('[BATTLECRY LOG] sourceName:', sourceName, 'destName:', destName, 'destSide:', destSide);
+
+                                // 區分新聞牌和隨從的記錄
+                                const isNews = playedCard.type === 'NEWS';
+                                console.log('[BATTLECRY LOG] isNews:', isNews, 'result.type:', result.type);
+
+                                if (result.type === 'HEAL') {
+                                    const eventType = isNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
+                                    console.log('[BATTLECRY LOG] Adding HEAL event:', eventType);
+                                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
+                                } else if (result.type === 'DAMAGE') {
+                                    const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
+                                    console.log('[BATTLECRY LOG] Adding DAMAGE event:', eventType, 'value:', result.value);
+                                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
                                 }
                             } else if (result.type === 'EAT') {
                                 // Find target
@@ -2404,6 +2566,8 @@ async function onDragEnd(e) {
                                         }
                                     });
                                 }
+                                // Log AOE Buff
+                                MatchHistory.add('PLAY', { player: "你", card: `${playedCard.name} (集體增益)` });
                             }
                         }
                     }
@@ -2438,6 +2602,20 @@ async function onDragEnd(e) {
                     if (sourceEl && targetData) {
                         await animateAttack(sourceEl, targetData);
                     }
+
+                    // 取得攻擊者和目標名稱
+                    const attacker = gameState.currentPlayer.board[attackerIndex];
+                    const attackerName = getUnitName('PLAYER', attackerIndex, 'MINION');
+                    const targetName = getUnitName(targetData.id === 'opp-hero' ? 'OPPONENT' : 'OPPONENT', index, type);
+                    const damage = attacker ? attacker.attack : 0;
+
+                    // 記錄普通攻擊
+                    MatchHistory.add('NORMAL_ATTACK', {
+                        attacker: attackerName,
+                        target: targetName,
+                        damage: damage
+                    });
+
                     gameState.attack(attackerIndex, { type, index });
                     render();
                     await resolveDeaths();
@@ -2533,10 +2711,17 @@ async function onDragEnd(e) {
                     await new Promise(r => setTimeout(r, 400));
                 }
 
+                const sourceName = battlecrySourceType === 'NEWS' ? gameState.currentPlayer.hand[battlecrySourceIndex]?.name : gameState.currentPlayer.board[battlecrySourceIndex]?.name;
+                const destName = getUnitName(target.side, target.index, target.type);
+
                 // 3. Execute Game Logic (Phase 2)
                 if (battlecrySourceType === 'NEWS') {
                     // For News: Now we play it
                     const card = gameState.currentPlayer.hand[battlecrySourceIndex];
+                    MatchHistory.add('PLAY', {
+                        player: "你",
+                        card: card.name
+                    });
                     gameState.playCard(battlecrySourceIndex, target);
                 } else {
                     // For Minion: It's already pending on board, just resolve battlecry
@@ -2544,6 +2729,28 @@ async function onDragEnd(e) {
                     if (minionInfo && minionInfo.keywords?.battlecry) {
                         gameState.resolveBattlecry(minionInfo.keywords.battlecry, target, minionInfo);
                     }
+                }
+
+                // Log target effect after resolution
+                console.log('[TARGETED BATTLECRY] Logging:', draggingMode, 'source:', sourceName, 'target:', destName);
+                console.log('[TARGETED BATTLECRY] battlecrySourceType:', battlecrySourceType, 'battlecryTargetRule:', battlecryTargetRule);
+
+                // 區分新聞牌和隨從
+                const isNews = battlecrySourceType === 'NEWS';
+                const value = battlecryTargetRule?.value || battlecryTargetRule?.bonus_value || 0;
+
+                console.log('[TARGETED BATTLECRY] isNews:', isNews, 'value:', value);
+
+                if (draggingMode === 'HEAL') {
+                    const eventType = isNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
+                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: value });
+                } else if (draggingMode === 'DESTROY') {
+                    // 擊殺類型單獨處理
+                    const eventType = isNews ? 'NEWS_DESTROY' : 'BATTLECRY_DESTROY';
+                    MatchHistory.add(eventType, { source: sourceName, target: destName });
+                } else if (draggingMode === 'DAMAGE') {
+                    const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
+                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: value });
                 }
 
                 render();
