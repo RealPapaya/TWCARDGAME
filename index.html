@@ -295,25 +295,27 @@
 
     <!-- Drag Line SVG Layer -->
     <svg id="drag-layer">
-        <defs>
-            <marker id="arrowhead-damage" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
-                markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L6,3 z" fill="#ff0000" />
-            </marker>
-            <marker id="arrowhead-heal" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
-                markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L6,3 z" fill="#43e97b" />
-            </marker>
-            <marker id="arrowhead-buff" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
-                markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L6,3 z" fill="#ffa500" />
-            </marker>
-            <marker id="arrowhead-bounce" markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto"
-                markerUnits="strokeWidth">
-                <path d="M0,0 L0,6 L6,3 z" fill="#a335ee" />
-            </marker>
-        </defs>
-        <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="4"
+        <marker id="arrowhead-damage" markerWidth="50" markerHeight="50" refX="2" refY="25" orient="auto"
+            markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,50 L50,25 z" fill="#ff0000" />
+        </marker>
+        <marker id="arrowhead-heal" markerWidth="50" markerHeight="50" refX="2" refY="25" orient="auto"
+            markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,50 L50,25 z" fill="#43e97b" />
+        </marker>
+        <marker id="arrowhead-buff" markerWidth="50" markerHeight="50" refX="2" refY="25" orient="auto"
+            markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,50 L50,25 z" fill="#ffa500" />
+        </marker>
+        <marker id="arrowhead-bounce" markerWidth="50" markerHeight="50" refX="2" refY="25" orient="auto"
+            markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,50 L50,25 z" fill="#a335ee" />
+        </marker>
+        <marker id="arrowhead-destroy" markerWidth="50" markerHeight="50" refX="2" refY="25" orient="auto"
+            markerUnits="userSpaceOnUse">
+            <path d="M0,0 L0,50 L50,25 z" fill="#000000" />
+        </marker>
+        <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="6" stroke-dasharray="8, 4"
             style="display:none; pointer-events: none;" />
     </svg>
 

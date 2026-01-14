@@ -1000,10 +1000,33 @@ async function aiTurn() {
                         const type = card.keywords?.battlecry?.type;
                         let color = '#ff0000';
                         let effectType = 'DAMAGE';
-                        if (type === 'HEAL' || type === 'FULL_HEAL') { color = '#43e97b'; effectType = 'HEAL'; }
-                        else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') { color = '#ffa500'; effectType = 'BUFF'; }
-                        else if (type === 'EAT_FRIENDLY') { color = '#ff00ff'; effectType = 'BUFF'; }
-                        else if (type === 'DAMAGE_NON_CATEGORY') { color = '#ff0000'; effectType = 'DAMAGE'; }
+
+                        // Match arrow colors with effect particles:
+                        // Green arrow (#43e97b) -> Green "+" (HEAL)
+                        // Orange arrow (#ffa500) -> Orange "↑" (BUFF)
+                        // Dark purple arrow (#4a0e4e) -> DESTROY effect
+                        if (type === 'HEAL' || type === 'FULL_HEAL') {
+                            color = '#43e97b';
+                            effectType = 'HEAL';
+                        }
+                        else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') {
+                            color = '#ffa500';
+                            effectType = 'BUFF';
+                        }
+                        else if (type === 'EAT_FRIENDLY') {
+                            color = '#ffa500';
+                            effectType = 'BUFF';
+                        }
+                        else if (type === 'DESTROY' || type === 'DESTROY_DAMAGED' ||
+                            type === 'DESTROY_LOW_ATTACK' || type === 'DESTROY_HIGH_ATTACK' ||
+                            type === 'SET_DEATH_TIMER') {
+                            color = '#4a0e4e'; // Dark purple for all destroy effects
+                            effectType = 'DESTROY';
+                        }
+                        else if (type === 'DAMAGE_NON_CATEGORY') {
+                            color = '#ff0000';
+                            effectType = 'DAMAGE';
+                        }
 
                         await animateAbility(sourceEl, destEl, color);
                         triggerCombatEffect(destEl, effectType);
@@ -1811,7 +1834,7 @@ function onDragStart(e, index, fromHand = false) {
     draggingFromHand = fromHand;
     draggingMode = 'DAMAGE'; // Reset to default
 
-    dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line', 'bounce-line');
+    dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line', 'bounce-line', 'destroy-line');
     dragLine.setAttribute('x1', e.clientX);
     dragLine.setAttribute('y1', e.clientY);
     dragLine.setAttribute('x2', e.clientX);
@@ -1848,11 +1871,35 @@ function updateDraggedElPosition(x, y) {
 function onDragMove(e) {
     if (!dragging && !isBattlecryTargeting) return;
 
-    if (dragging) {
-        dragLine.setAttribute('x2', e.clientX);
-        dragLine.setAttribute('y2', e.clientY);
+    if (dragging || isBattlecryTargeting) {
+        // Calculate shortened line coordinates to account for arrow length (95px)
+        const x1 = parseFloat(dragLine.getAttribute('x1'));
+        const y1 = parseFloat(dragLine.getAttribute('y1'));
+        const dx = e.clientX - x1;
+        const dy = e.clientY - y1;
+        const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (draggingFromHand) {
+        let newX2, newY2;
+
+        // Only shorten if line is long enough, otherwise hide or clamp
+        const arrowOffset = 45;
+        if (dist > arrowOffset) {
+            const ratio = (dist - arrowOffset) / dist;
+            newX2 = x1 + dx * ratio;
+            newY2 = y1 + dy * ratio;
+            dragLine.style.opacity = '1';
+        } else {
+            // If too close, just point at mouse (arrow will overlap start) or hide
+            // Hiding is cleaner to avoid visual glitches
+            newX2 = e.clientX;
+            newY2 = e.clientY;
+            // Optional: dragLine.style.opacity = '0'; if you want to hide it
+        }
+
+        dragLine.setAttribute('x2', newX2);
+        dragLine.setAttribute('y2', newY2);
+
+        if (dragging && draggingFromHand) {
             updateDraggedElPosition(e.clientX, e.clientY);
 
             // Get the card being dragged
@@ -1921,36 +1968,49 @@ function onDragMove(e) {
                 currentInsertionIndex = -1;
             }
         }
-    } else if (isBattlecryTargeting) {
-        // Redraw green line from the "pending" card to mouse
-        dragLine.setAttribute('x2', e.clientX);
-        dragLine.setAttribute('y2', e.clientY);
+        else if (isBattlecryTargeting) {
+            // Battlecry Logic - Check for snap target
+            const targetEl = document.elementFromPoint(e.clientX, e.clientY);
+            const unitEl = targetEl?.closest('[data-type]'); // Look for units (minions or heroes)
 
-        const targetEl = document.elementFromPoint(e.clientX, e.clientY);
-        const unitEl = targetEl?.closest('[data-type]'); // Look for units (minions or heroes)
+            if (unitEl) {
+                const side = unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
+                const type = unitEl.dataset.type;
+                const idx = unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1;
 
-        if (unitEl) {
-            const side = unitEl.id === 'player-hero' || unitEl.parentElement?.id === 'player-board' ? 'PLAYER' : 'OPPONENT';
-            const type = unitEl.dataset.type;
-            const idx = unitEl.dataset.index ? parseInt(unitEl.dataset.index) : -1;
+                const targetInfo = {
+                    type: type,
+                    side: side,
+                    index: idx,
+                    category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
+                    cost: parseInt(unitEl.dataset.cost) || 0,
+                    attack: parseInt(unitEl.dataset.attack) || 0,
+                    health: parseInt(unitEl.dataset.health) || 0,
+                    currentHealth: (unitEl.dataset.currentHealth !== undefined) ? parseInt(unitEl.dataset.currentHealth) : (parseInt(unitEl.dataset.health) || 0)
+                };
 
-            const targetInfo = {
-                type: type,
-                side: side,
-                index: idx,
-                category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
-                cost: parseInt(unitEl.dataset.cost) || 0,
-                attack: parseInt(unitEl.dataset.attack) || 0,
-                health: parseInt(unitEl.dataset.health) || 0,
-                currentHealth: (unitEl.dataset.currentHealth !== undefined) ? parseInt(unitEl.dataset.currentHealth) : (parseInt(unitEl.dataset.health) || 0)
-            };
+                if (isTargetEligible(battlecryTargetRule, targetInfo)) {
+                    // Lock-in visual (snap)
+                    const rect = unitEl.getBoundingClientRect();
+                    // Calculate vector to center of target
+                    const tx = rect.left + rect.width / 2;
+                    const ty = rect.top + rect.height / 2;
 
-            if (isTargetEligible(battlecryTargetRule, targetInfo)) {
-                // Lock-in visual (snap)
-                const rect = unitEl.getBoundingClientRect();
-                dragLine.setAttribute('x2', rect.left + rect.width / 2);
-                dragLine.setAttribute('y2', rect.top + rect.height / 2);
-                return;
+                    // Recalculate shortening based on TARGET center
+                    const tdx = tx - x1;
+                    const tdy = ty - y1;
+                    const tdist = Math.sqrt(tdx * tdx + tdy * tdy);
+
+                    if (tdist > arrowOffset) {
+                        const tratio = (tdist - arrowOffset) / tdist;
+                        dragLine.setAttribute('x2', x1 + tdx * tratio);
+                        dragLine.setAttribute('y2', y1 + tdy * tratio);
+                    } else {
+                        dragLine.setAttribute('x2', tx);
+                        dragLine.setAttribute('y2', ty);
+                    }
+                    return;
+                }
             }
         }
     }
@@ -2083,6 +2143,10 @@ async function onDragEnd(e) {
                             mode = 'BUFF';
                         } else if (battlecry.type === 'BOUNCE_TARGET' || battlecry.type === 'BOUNCE_CATEGORY') {
                             mode = 'BOUNCE';
+                        } else if (battlecry.type === 'DESTROY' || battlecry.type === 'DESTROY_DAMAGED' ||
+                            battlecry.type === 'DESTROY_LOW_ATTACK' || battlecry.type === 'DESTROY_HIGH_ATTACK' ||
+                            battlecry.type === 'SET_DEATH_TIMER') {
+                            mode = 'DESTROY';
                         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE';
                         }
@@ -2162,9 +2226,27 @@ async function onDragEnd(e) {
                                 }
 
                                 if (targetEl) {
-                                    // Use mandatory projectile for better visual feedback
-                                    await animateAbility(newMinionEl, targetEl, result.type === 'HEAL' ? '#43e97b' : '#ff0000', true);
-                                    triggerCombatEffect(targetEl, result.type === 'HEAL' ? 'HEAL' : 'DAMAGE');
+                                    // Determine arrow color based on battlecry type
+                                    const bcType = playedCard.keywords?.battlecry?.type;
+                                    let arrowColor = '#ff0000'; // Default red for damage
+                                    let effectType = 'DAMAGE';
+
+                                    if (result.type === 'HEAL') {
+                                        arrowColor = '#43e97b';
+                                        effectType = 'HEAL';
+                                    } else if (result.type === 'BUFF') {
+                                        arrowColor = '#ffa500';
+                                        effectType = 'BUFF';
+                                    } else if (result.type === 'DESTROY' || result.type === 'EAT' ||
+                                        bcType === 'DESTROY' || bcType === 'DESTROY_DAMAGED' ||
+                                        bcType === 'DESTROY_LOW_ATTACK' || bcType === 'DESTROY_HIGH_ATTACK' ||
+                                        bcType === 'SET_DEATH_TIMER') {
+                                        arrowColor = '#000000'; // Black for destroy
+                                        effectType = 'DESTROY';
+                                    }
+
+                                    await animateAbility(newMinionEl, targetEl, arrowColor, true);
+                                    triggerCombatEffect(targetEl, effectType);
                                 }
                             } else if (result.type === 'EAT') {
                                 // Find target
@@ -2172,8 +2254,8 @@ async function onDragEnd(e) {
                                 const targetEl = document.getElementById(boardId).children[result.target.index];
 
                                 if (targetEl) {
-                                    await animateAbility(newMinionEl, targetEl, '#ff0000', true);
-                                    triggerCombatEffect(targetEl, 'DAMAGE');
+                                    await animateAbility(newMinionEl, targetEl, '#000000', true); // Black for destroy/eat
+                                    triggerCombatEffect(targetEl, 'DESTROY');
                                     // Visual delay before buffing self
                                     await new Promise(r => setTimeout(r, 200));
                                     triggerCombatEffect(newMinionEl, 'BUFF');
@@ -2428,7 +2510,15 @@ async function onDragEnd(e) {
                     }
                     else if (draggingMode === 'BUFF') { color = '#ffa500'; effectType = 'BUFF'; }
                     else if (draggingMode === 'BOUNCE') { color = '#a335ee'; effectType = 'BOUNCE'; }
-                    else if (battlecryTargetRule?.type.startsWith('DESTROY')) { color = '#333333'; effectType = 'DAMAGE'; }
+                    else if (draggingMode === 'DESTROY') { color = '#000000'; effectType = 'DESTROY'; }
+                    else if (battlecryTargetRule?.type === 'DESTROY' ||
+                        battlecryTargetRule?.type === 'DESTROY_DAMAGED' ||
+                        battlecryTargetRule?.type === 'DESTROY_LOW_ATTACK' ||
+                        battlecryTargetRule?.type === 'DESTROY_HIGH_ATTACK' ||
+                        battlecryTargetRule?.type === 'SET_DEATH_TIMER') {
+                        color = '#000000';
+                        effectType = 'DESTROY';
+                    }
 
                     await animateAbility(sourceEl, destEl, color, draggingMode !== 'HEAL');
                     triggerCombatEffect(destEl, effectType);
@@ -2614,6 +2704,7 @@ function startBattlecryTargeting(sourceIndex, x, y, mode = 'DAMAGE', targetRule 
     if (mode === 'HEAL') dragLine.classList.add('heal-line');
     if (mode === 'BUFF') dragLine.classList.add('buff-line');
     if (mode === 'BOUNCE') dragLine.classList.add('bounce-line');
+    if (mode === 'DESTROY') dragLine.classList.add('destroy-line');
 
     dragLine.setAttribute('x1', x);
     dragLine.setAttribute('y1', y);
@@ -3142,6 +3233,21 @@ function triggerCombatEffect(el, type) {
             p.style.top = `${Math.random() * 60 + 20}%`;
             p.style.fontSize = `${18 + Math.random() * 12}px`;
             p.style.animationDelay = `${Math.random() * 0.4}s`;
+            container.appendChild(p);
+        }
+    } else if (type === 'DESTROY') {
+        // Dark destruction effect
+        const count = 8;
+        for (let i = 0; i < count; i++) {
+            const p = document.createElement('div');
+            p.className = 'buff-particle';
+            p.innerText = '💀';
+            p.style.color = '#000000';
+            p.style.textShadow = '0 0 10px #ff0000, 0 0 20px #000000';
+            p.style.left = `${Math.random() * 60 + 20}%`;
+            p.style.top = `${Math.random() * 60 + 20}%`;
+            p.style.fontSize = `${20 + Math.random() * 16}px`;
+            p.style.animationDelay = `${Math.random() * 0.3}s`;
             container.appendChild(p);
         }
     } else if (type === 'HEAL_ARROW') {

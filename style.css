@@ -3645,11 +3645,56 @@ body.dragging-active .player .hand .card:hover {
     }
 
     100% {
-        transform: scale(1);
+        transform: rotate(0deg);
     }
 }
 
 .stat-pop {
     animation: stat-pop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     z-index: 10;
+}
+
+/* Drag Line Base Styles */
+#drag-line {
+    stroke-width: 30 !important;
+    stroke-dasharray: 70, 40 !important;
+    animation: drag-line-anim 4s linear infinite;
+}
+
+@keyframes drag-line-anim {
+    to {
+        stroke-dashoffset: -100;
+    }
+}
+
+/* Drag Line Color Variants */
+#drag-line.heal-line {
+    stroke: #43e97b !important;
+    marker-end: url(#arrowhead-heal) !important;
+    filter: drop-shadow(0 0 8px #43e97b);
+}
+
+#drag-line.buff-line {
+    stroke: #ffa500 !important;
+    marker-end: url(#arrowhead-buff) !important;
+    filter: drop-shadow(0 0 8px #ffa500);
+}
+
+#drag-line.bounce-line {
+    stroke: #a335ee !important;
+    marker-end: url(#arrowhead-bounce) !important;
+    filter: drop-shadow(0 0 8px #a335ee);
+}
+
+#drag-line.destroy-line {
+    stroke: #000000 !important;
+    marker-end: url(#arrowhead-destroy) !important;
+    filter: drop-shadow(0 0 4px rgba(0, 0, 0, 0.8));
+}
+
+/* Default damage line (no class) */
+#drag-line:not(.heal-line):not(.buff-line):not(.bounce-line):not(.destroy-line) {
+    stroke: #ff0000 !important;
+    marker-end: url(#arrowhead-damage) !important;
+    filter: drop-shadow(0 0 8px #ff0000);
 }
