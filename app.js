@@ -193,7 +193,8 @@ function init() {
 
     // --- Mode Selection Listeners ---
     document.getElementById('btn-mode-ai').addEventListener('click', () => {
-        showView('difficulty-selection');
+        showView('ai-battle-setup');
+        renderAIBattleSetup();
     });
 
     // --- Difficulty Selection Listeners ---
@@ -224,6 +225,8 @@ function init() {
         btn.addEventListener('click', () => {
             if (document.getElementById('mode-selection').style.display === 'flex') {
                 showView('main-menu');
+            } else if (document.getElementById('ai-battle-setup').style.display === 'flex') {
+                showView('mode-selection');
             } else if (document.getElementById('difficulty-selection').style.display === 'flex') {
                 showView('mode-selection');
             } else if (document.getElementById('test-mode-selection').style.display === 'flex') {
@@ -244,7 +247,7 @@ function init() {
                 } else if (pendingViewMode === 'BUILDER') {
                     showView('main-menu');
                 } else {
-                    showView('theme-selection');
+                    showView('ai-battle-setup');
                 }
             }
         });
@@ -4000,3 +4003,109 @@ window.triggerNuclearExplosion = triggerNuclearExplosion;
         };
     }
 })();
+
+function renderAIBattleSetup() {
+    let selectedDeck = null;
+    let selectedDifficulty = null;
+
+    // Deck name mapping
+    const deckNames = {
+        'dpp': '賴清德-新聞湧動',
+        'kmt': '韓國瑜-政壇輪迴',
+        'tpp': '柯文哲-台大醫科'
+    };
+
+    // Render deck options
+    const deckContainer = document.getElementById('deck-options-container');
+    deckContainer.innerHTML = '';
+
+    const startBtnWrapper = document.getElementById('start-battle-wrapper');
+    const startBtn = document.getElementById('btn-start-ai-battle');
+
+    // Reset state
+    startBtnWrapper.style.opacity = '0.5';
+    startBtnWrapper.style.pointerEvents = 'none';
+
+    aiThemeDecks.forEach(theme => {
+        const group = document.createElement('div');
+        group.className = 'deck-option-group';
+
+        const emojis = { 'dpp': '🟢', 'kmt': '🔵', 'tpp': '🟡' };
+        group.innerHTML = `
+            <div class="option-item" data-deck-id="${theme.id}" data-image="${theme.image}" data-desc="${deckNames[theme.id] || theme.name} - ${theme.cards.length} 張卡">
+                <span class="option-icon">${emojis[theme.id] || '🎴'}</span>
+                <span class="option-label">${deckNames[theme.id] || theme.name}</span>
+                <span class="expand-arrow">▶</span>
+            </div>
+            <div class="difficulty-options">
+                <div class="sub-difficulty-btn" data-value="NORMAL">普通級</div>
+                <div class="sub-difficulty-btn" data-value="HARD">專家級</div>
+                <div class="sub-difficulty-btn" data-value="HELL">大師級</div>
+            </div>
+        `;
+
+        const header = group.querySelector('.option-item');
+        header.addEventListener('click', () => {
+            // Collapse others
+            document.querySelectorAll('.deck-option-group').forEach(el => {
+                if (el !== group) el.classList.remove('expanded');
+            });
+
+            // Toggle current
+            const isExpanded = group.classList.toggle('expanded');
+
+            if (isExpanded) {
+                selectedDeck = theme.id;
+
+                // Update preview
+                const previewImg = document.getElementById('preview-image');
+                const previewText = document.getElementById('preview-text');
+                if (theme.image) {
+                    previewImg.src = theme.image;
+                    previewImg.style.display = 'block';
+                }
+                previewText.textContent = header.dataset.desc;
+
+                // Reset difficulty if switching decks
+                if (selectedDeck !== theme.id) {
+                    selectedDifficulty = null;
+                    group.querySelectorAll('.sub-difficulty-btn').forEach(btn => btn.classList.remove('selected'));
+                    startBtnWrapper.style.opacity = '0.5';
+                    startBtnWrapper.style.pointerEvents = 'none';
+                }
+            } else {
+                selectedDeck = null;
+            }
+        });
+
+        // Sub-difficulty selection
+        group.querySelectorAll('.sub-difficulty-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+
+                // Update UI
+                document.querySelectorAll('.sub-difficulty-btn').forEach(b => b.classList.remove('selected'));
+                btn.classList.add('selected');
+
+                selectedDifficulty = btn.dataset.value;
+
+                // Enable start button
+                startBtnWrapper.style.opacity = '1';
+                startBtnWrapper.style.pointerEvents = 'auto';
+            });
+        });
+
+        deckContainer.appendChild(group);
+    });
+
+    startBtn.onclick = async () => {
+        if (!selectedDeck || !selectedDifficulty) return;
+
+        currentDifficulty = selectedDifficulty;
+        selectedThemeId = selectedDeck;
+        pendingViewMode = 'BATTLE';
+        showView('deck-selection');
+        document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
+        renderDeckSelect();
+    };
+}
