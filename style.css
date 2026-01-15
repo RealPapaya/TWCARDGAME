@@ -4212,13 +4212,12 @@ body.dragging-active .player .hand .card:hover {
     /* Hide scrollbar since we are overflowing */
 }
 
+/* AI牌組選擇 請勿刪除 */
 #deck-options-container {
     position: relative;
     right: 250px;
-    /* Moved right (was 280px) */
     width: 340px;
-    margin-top: 130px;
-    /* Moved down (was 50px) */
+    margin-top: 150px;
     /* Align with the AI_Selection image */
     /* Fit inside the graphic */
     /* Center clearer vertically */
@@ -4236,16 +4235,17 @@ body.dragging-active .player .hand .card:hover {
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+/* 木頭背板 請勿刪除 */
 .ai-selection-decoration {
     position: absolute;
-    right: 300px;
+    right: 270px;
     /* [左右位置] */
-    top: 47%;
+    top: 47.5%;
     /* [上下位置] */
     transform: translateY(-50%);
 
     /* [長度] 改這裡 (例如 80% 或 px) */
-    height: 100%;
+    height: 90%;
 
     /* [陰影] 改這裡 (x偏移 y偏移 模糊半徑 顏色) */
     filter: drop-shadow(10px 10px 20px rgba(0, 0, 0, 0.8));
@@ -4353,15 +4353,15 @@ body.dragging-active .player .hand .card:hover {
     opacity: 1;
 }
 
-/* Hearthstone Select Button */
+/* 選擇 返回按鈕 */
 .setup-footer {
     display: flex;
     flex-direction: column;
     align-items: center;
     gap: 15px;
     position: absolute;
-    bottom: 20px;
-    right: 60px;
+    bottom: 110px;
+    right: 115px;
     z-index: 20;
     pointer-events: auto;
     /* Ensure clickable */
