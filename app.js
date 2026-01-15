@@ -4163,6 +4163,14 @@ function renderAIBattleSetup() {
             const illuSubtitle = document.getElementById('preview-illustration-subtitle');
 
             if (isExpanded) {
+                // Reset difficulty if switching decks
+                if (selectedDeck !== theme.id) {
+                    selectedDifficulty = null;
+                    document.querySelectorAll('.sub-difficulty-btn').forEach(btn => btn.classList.remove('selected'));
+                    startBtnWrapper.style.opacity = '0.5';
+                    startBtnWrapper.style.pointerEvents = 'none';
+                }
+
                 selectedDeck = theme.id;
 
                 // Update preview
@@ -4178,14 +4186,6 @@ function renderAIBattleSetup() {
                 if (illuSubtitle) illuSubtitle.textContent = subtitle || '';
 
                 previewText.textContent = header.dataset.desc;
-
-                // Reset difficulty if switching decks
-                if (selectedDeck !== theme.id) {
-                    selectedDifficulty = null;
-                    group.querySelectorAll('.sub-difficulty-btn').forEach(btn => btn.classList.remove('selected'));
-                    startBtnWrapper.style.opacity = '0.5';
-                    startBtnWrapper.style.pointerEvents = 'none';
-                }
             } else {
                 selectedDeck = null;
                 previewImg.style.display = 'none';
