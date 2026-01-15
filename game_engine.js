@@ -864,18 +864,10 @@ class GameState {
             },
             'DESTROY_LOCKED': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
+                if (this.debugMode) console.log(`[ENGINE] DESTROY_LOCKED target:`, targetUnit?.name, "lockedTurns:", targetUnit?.lockedTurns);
                 if (targetUnit && targetUnit.type === 'MINION' && targetUnit.lockedTurns > 0) {
                     targetUnit.currentHealth = 0;
                     return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
-                }
-                return null;
-            },
-            'EAT_FRIENDLY': (bc, target) => {
-                const targetUnit = this.getTargetUnit(target);
-                if (targetUnit && targetUnit.type === 'MINION') {
-                    const stats = { attack: targetUnit.attack, health: targetUnit.health };
-                    targetUnit.currentHealth = 0; // Trigger death
-                    return { type: 'EAT', target: { ...targetUnit, index: target.index }, stats };
                 }
                 return null;
             }
@@ -1317,6 +1309,8 @@ class GameState {
 
     resolveBattlecry(battlecry, target, sourceMinion = null) {
         if (!battlecry || target === 'PENDING') return null;
+
+        if (this.debugMode) console.log(`[ENGINE] resolveBattlecry: ${battlecry.type}`, target, sourceMinion?.name);
 
         // Apply News Power bonus if source is a News card
         // Strictly only for DAMAGE and HEAL types. Exclude DRAW, COST and REDUCE variants.

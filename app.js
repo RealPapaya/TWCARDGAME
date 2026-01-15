@@ -2435,7 +2435,7 @@ async function onDragEnd(e) {
                                     } else if (result.type === 'DESTROY' || result.type === 'EAT' ||
                                         bcType === 'DESTROY' || bcType === 'DESTROY_DAMAGED' ||
                                         bcType === 'DESTROY_LOW_ATTACK' || bcType === 'DESTROY_HIGH_ATTACK' ||
-                                        bcType === 'SET_DEATH_TIMER') {
+                                        bcType === 'SET_DEATH_TIMER' || bcType === 'DESTROY_LOCKED') {
                                         arrowColor = '#000000'; // Black for destroy
                                         effectType = 'DESTROY';
                                     }
@@ -2705,6 +2705,7 @@ async function onDragEnd(e) {
                 side: side,
                 index: idx,
                 category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
+                isLocked: unitEl.dataset.locked === 'true',
                 cost: parseInt(unitEl.dataset.cost) || 0,
                 attack: parseInt(unitEl.dataset.attack) || 0,
                 health: parseInt(unitEl.dataset.health) || 0,
@@ -2762,7 +2763,8 @@ async function onDragEnd(e) {
                         battlecryTargetRule?.type === 'DESTROY_DAMAGED' ||
                         battlecryTargetRule?.type === 'DESTROY_LOW_ATTACK' ||
                         battlecryTargetRule?.type === 'DESTROY_HIGH_ATTACK' ||
-                        battlecryTargetRule?.type === 'SET_DEATH_TIMER') {
+                        battlecryTargetRule?.type === 'SET_DEATH_TIMER' ||
+                        battlecryTargetRule?.type === 'DESTROY_LOCKED') {
                         color = '#000000';
                         effectType = 'DESTROY';
                     }
@@ -2918,6 +2920,7 @@ function isTargetEligible(rule, targetInfo) {
 
     // Locked check for DESTROY_LOCKED
     if (rule.type === 'DESTROY_LOCKED') {
+        if (typeof isDebugMode !== 'undefined' && isDebugMode) console.log(`[APP] checking DESTROY_LOCKED: targetInfo.isLocked = ${targetInfo.isLocked}`, targetInfo);
         if (!targetInfo.isLocked) return false;
     }
 
