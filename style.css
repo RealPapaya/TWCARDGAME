@@ -3936,9 +3936,9 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .preview-image-container img {
-    width: 60%;
-    /* 略小於框的 65%，確保邊緣不會跑出框外 */
-    height: 60%;
+    width: 57%;
+    /* Match background-size */
+    height: 57%;
     object-fit: cover;
     border-radius: 4px;
     z-index: 1;
@@ -3948,14 +3948,15 @@ body.dragging-active .player .hand .card:hover {
 
 .preview-illustration-overlay {
     position: absolute;
-    width: 60%;
-    height: 60%;
+    width: 52%;
+    /* Match background-size */
+    height: 52%;
     transform: translate(-45px, -15px);
     z-index: 2;
     pointer-events: none;
     border-radius: 4px;
     /* 改成左邊暗 (black), 右邊亮 (transparent) */
-    background: linear-gradient(to right, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 80%);
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.9) 20%, rgba(0, 0, 0, 0) 90%);
     padding: 25px;
     box-sizing: border-box;
     display: none;
@@ -3970,9 +3971,11 @@ body.dragging-active .player .hand .card:hover {
 
 .illustration-title {
     color: #fff;
+    font-family: 'Noto Serif TC', serif;
+    /* 更有新聞/史詩感的明體 */
     font-size: 96px;
-    /* 32px * 3 */
-    font-weight: bold;
+    font-weight: 900;
+    /* 最粗體 */
     text-shadow: 4px 4px 16px rgba(0, 0, 0, 0.9);
     margin-bottom: 10px;
     letter-spacing: 4px;
@@ -3981,10 +3984,9 @@ body.dragging-active .player .hand .card:hover {
 
 .illustration-subtitle {
     color: rgba(255, 255, 255, 0.9);
-    /*稍微亮一點 */
+    font-family: 'Noto Serif TC', serif;
     font-size: 54px;
-    /* 18px * 3 */
-    font-weight: normal;
+    font-weight: 700;
     text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
     letter-spacing: 2px;
 }
@@ -4005,16 +4007,36 @@ body.dragging-active .player .hand .card:hover {
     flex: 0 0 450px;
     display: flex;
     flex-direction: column;
+    position: relative;
+    /* Create stacking context */
+    z-index: 5;
 }
 
 .options-scroll-area {
     flex: 1;
-    overflow-y: auto;
-    padding-right: 10px;
+    overflow: visible;
+    /* Allow content to protrude left */
+    padding-right: 0;
+    position: relative;
+    z-index: 2;
+    /* Above decoration */
 }
 
 .options-scroll-area::-webkit-scrollbar {
-    width: 6px;
+    width: 0;
+    /* Hide scrollbar since we are overflowing */
+}
+
+#deck-options-container {
+    position: relative;
+    right: 250px;
+    /* Moved right (was 280px) */
+    width: 340px;
+    margin-top: 130px;
+    /* Moved down (was 50px) */
+    /* Align with the AI_Selection image */
+    /* Fit inside the graphic */
+    /* Center clearer vertically */
 }
 
 .options-scroll-area::-webkit-scrollbar-thumb {
@@ -4027,6 +4049,20 @@ body.dragging-active .player .hand .card:hover {
     border-radius: 12px;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ai-selection-decoration {
+    position: absolute;
+    right: 300px;
+    /* Adjust based on exact preference */
+    top: 48%;
+    transform: translateY(-50%);
+    height: 97%;
+    /* Prominent size */
+    z-index: 0;
+    /* Behind the options panel content if needed, but likely beside it */
+    pointer-events: none;
+    opacity: 0.9;
 }
 
 .option-item {
@@ -4058,6 +4094,8 @@ body.dragging-active .player .hand .card:hover {
 .option-icon {
     font-size: 32px;
     flex-shrink: 0;
+    display: none;
+    /* User requested no illustration */
 }
 
 .option-label {
