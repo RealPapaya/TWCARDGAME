@@ -3962,20 +3962,20 @@ body.dragging-active .player .hand .card:hover {
     display: none;
     /* 預設隱藏，由 JS 控制顯示 */
     flex-direction: column;
+
+    /* [位置調整] 改為靠上對齊 (flex-start)，搭配 padding-top 來精準控制位置 */
     justify-content: flex-start;
-    /* 改為垂直置中也許更好？但用戶沒說，先維持靠上或置中 */
     align-items: flex-start;
-    /* 為了文字垂直置中於左側，可以考慮 justify-content: center */
-    justify-content: center;
+
+    /* 這裡的數值越大，文字就會越往下移 */
+    padding-top: 260px;
 }
 
 .illustration-title {
     color: #fff;
     font-family: 'Noto Serif TC', serif;
-    /* 更有新聞/史詩感的明體 */
     font-size: 96px;
     font-weight: 900;
-    /* 最粗體 */
     text-shadow: 4px 4px 16px rgba(0, 0, 0, 0.9);
     margin-bottom: 10px;
     letter-spacing: 4px;
@@ -4200,19 +4200,18 @@ body.dragging-active .player .hand .card:hover {
 
 /* Hearthstone Select Button */
 .setup-footer {
-    padding: 30px 0 0 0;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
-
-    /* Move buttons up and right */
-    position: relative;
-    top: -80px;
-    /* 往上 */
-    left: 30px;
-    /* 往右 */
+    gap: 15px;
+    position: absolute;
+    bottom: 20px;
+    right: 60px;
+    z-index: 20;
+    pointer-events: auto;
+    /* Ensure clickable */
 }
+
 
 .hearth-select-btn {
     position: relative;
