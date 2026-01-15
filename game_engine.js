@@ -850,6 +850,26 @@ class GameState {
                 }
                 return null;
             },
+            'BOUNCE_RANDOM_ENEMY': (bc) => {
+                const owner = this.opponent;
+                if (owner.board.length > 0) {
+                    const idx = Math.floor(Math.random() * owner.board.length);
+                    const targetUnit = owner.board[idx];
+                    owner.board.splice(idx, 1);
+                    const cardToHand = this._createBounceCard(targetUnit);
+                    if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                    return { type: 'BOUNCE', target: { ...targetUnit, index: idx, side: owner.side } };
+                }
+                return null;
+            },
+            'DESTROY_LOCKED': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.lockedTurns > 0) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
             'EAT_FRIENDLY': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {

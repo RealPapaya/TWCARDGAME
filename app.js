@@ -26,6 +26,7 @@ function generateDefaultDeck() {
 
 let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
     { id: 'dpp', name: '民進黨牌組', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'dpp2', name: '民進黨牌組2', image: 'img/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
     { id: 'kmt', name: '國民黨牌組', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
     { id: 'tpp', name: '民眾黨牌組', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
@@ -1073,12 +1074,28 @@ async function aiTurn() {
                 await showCardPlayPreview(card, true, targetSlot);
 
                 try {
-                    gameState.playCard(action.index, action.target, insertionIndex);
+                    const { battlecryResult: result } = gameState.playCard(action.index, action.target, insertionIndex);
                     // Match History log
                     MatchHistory.add('PLAY', {
                         player: "對手",
                         card: card.name
                     });
+
+                    // Visuals for BOUNCE battlecry result in AI turn
+                    if (result && result.type === 'BOUNCE') {
+                        const board = document.getElementById('opp-board');
+                        const sourceEl = board.children[board.children.length - 1]; // Assume newly played minion is at the end
+                        const side = result.target.side || 'PLAYER';
+                        const targetBoardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                        const targetEl = document.getElementById(targetBoardId).children[result.target.index];
+
+                        if (sourceEl && targetEl) {
+                            await animateAbility(sourceEl, targetEl, '#a335ee');
+                            triggerCombatEffect(targetEl, 'BOUNCE');
+                            await new Promise(r => setTimeout(r, 400));
+                            render();
+                        }
+                    }
                 } catch (e) {
                     console.error("AI failed to play card:", e);
                     break;
@@ -1144,7 +1161,7 @@ async function aiTurn() {
                         }
                         else if (type === 'DESTROY' || type === 'DESTROY_DAMAGED' ||
                             type === 'DESTROY_LOW_ATTACK' || type === 'DESTROY_HIGH_ATTACK' ||
-                            type === 'SET_DEATH_TIMER') {
+                            type === 'SET_DEATH_TIMER' || type === 'DESTROY_LOCKED') {
                             color = '#4a0e4e'; // Dark purple for all destroy effects
                             effectType = 'DESTROY';
                         }
@@ -1961,6 +1978,7 @@ function createMinionEl(minion, index, isPlayer) {
     // Target Drop Data (Needed for both enemy attacks AND friendly buffs)
     el.dataset.type = 'MINION';
     el.dataset.index = index;
+    el.dataset.locked = minion.lockedTurns > 0;
     el.dataset.category = minion.category || ''; // Added for category-based targeting rules
     el.dataset.cost = minion.cost !== undefined ? minion.cost : 0;
     el.dataset.attack = minion.attack !== undefined ? minion.attack : 0;
@@ -2145,6 +2163,7 @@ function onDragMove(e) {
                     side: side,
                     index: idx,
                     category: unitEl.dataset.category || (type === 'HERO' ? '英雄' : ''),
+                    isLocked: unitEl.dataset.locked === 'true',
                     cost: parseInt(unitEl.dataset.cost) || 0,
                     attack: parseInt(unitEl.dataset.attack) || 0,
                     health: parseInt(unitEl.dataset.health) || 0,
@@ -2308,7 +2327,7 @@ async function onDragEnd(e) {
                             mode = 'BOUNCE';
                         } else if (battlecry.type === 'DESTROY' || battlecry.type === 'DESTROY_DAMAGED' ||
                             battlecry.type === 'DESTROY_LOW_ATTACK' || battlecry.type === 'DESTROY_HIGH_ATTACK' ||
-                            battlecry.type === 'SET_DEATH_TIMER') {
+                            battlecry.type === 'SET_DEATH_TIMER' || battlecry.type === 'DESTROY_LOCKED') {
                             mode = 'DESTROY';
                         } else if (battlecry.type === 'DAMAGE_NON_CATEGORY') {
                             mode = 'DAMAGE';
@@ -2508,7 +2527,19 @@ async function onDragEnd(e) {
                                     }, 50);
                                 }
                             } else if (result.type === 'BOUNCE') {
-                                // Single bounce - suppress deck animation
+                                // Find target
+                                const side = result.target.side || 'OPPONENT';
+                                const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                const board = document.getElementById(boardId);
+                                const targetEl = (board && result.target.index !== undefined) ? board.children[result.target.index] : null;
+
+                                if (targetEl) {
+                                    // Visual arrow
+                                    await animateAbility(newMinionEl, targetEl, '#a335ee', true);
+                                    triggerCombatEffect(targetEl, 'BOUNCE');
+                                    await new Promise(r => setTimeout(r, 400));
+                                    render();
+                                }
                                 previousPlayerHandSize = gameState.currentPlayer.hand.length;
                             } else if (result.type === 'ADD_CARD') {
                                 // Cards added to hand (e.g., 高端疫苗 from 陳時中)
@@ -2884,6 +2915,11 @@ function isTargetEligible(rule, targetInfo) {
         if (targetInfo.currentHealth >= targetInfo.health) return false; // Not damaged
     }
 
+    // Locked check for DESTROY_LOCKED
+    if (rule.type === 'DESTROY_LOCKED') {
+        if (!targetInfo.isLocked) return false;
+    }
+
 
     // Side check
     if (actualRule.side === 'ENEMY' && targetInfo.side !== 'OPPONENT') return false;
@@ -2911,6 +2947,7 @@ function getValidTargets(rule) {
         side: side,
         index: index,
         category: unit.category || (type === 'HERO' ? '英雄' : ''),
+        isLocked: unit.lockedTurns > 0,
         cost: unit.cost || 0,
         attack: unit.attack || 0,
         health: unit.health || unit.maxHp || 0,
@@ -4011,6 +4048,7 @@ function renderAIBattleSetup() {
     // Deck name mapping
     const deckNames = {
         'dpp': '賴清德-新聞湧動',
+        'dpp2': '蔡英文-無限回溯',
         'kmt': '韓國瑜-政壇輪迴',
         'tpp': '柯文哲-台大醫科'
     };
@@ -4018,7 +4056,8 @@ function renderAIBattleSetup() {
     // Deck Description mapping (Edit here)
     const deckDescriptions = {
         'dpp': '透過賴清德強力的新聞數值造成高傷害的疊加牌組',
-        'kmt': '以韓國瑜為核心透過來回進出戰場反覆執政來增加體質強度的黏濁牌組',
+        'dpp2': '透過沉默、回手牌使輕易使戰場扭轉局面的奇幻蔡英文牌組',
+        'kmt': '以韓國瑜為核心透過不斷來回進出戰場來增加體質強度的黏濁牌組',
         'tpp': '柯文哲為核心賦予治療光盾以及強化的簡單強力牌組'
     };
 
