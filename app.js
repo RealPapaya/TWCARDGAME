@@ -25,9 +25,9 @@ function generateDefaultDeck() {
 }
 
 let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
-    { id: 'dpp', name: '民進黨牌組', image: 'img/theme_dpp.png', cards: DEFAULT_THEME_DECKS.dpp },
-    { id: 'kmt', name: '國民黨牌組', image: 'img/theme_kmt.png', cards: DEFAULT_THEME_DECKS.kmt },
-    { id: 'tpp', name: '民眾黨牌組', image: 'img/theme_tpp.png', cards: DEFAULT_THEME_DECKS.tpp }
+    { id: 'dpp', name: '民進黨牌組', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'kmt', name: '國民黨牌組', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'tpp', name: '民眾黨牌組', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
 let editingThemeIdx = -1; // -1 means not editing theme
 
