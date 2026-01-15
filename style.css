@@ -3992,15 +3992,45 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .preview-description {
-    color: #f1e4d1;
-    font-size: 24px;
+    color: #e0d0b0;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
     line-height: 1.6;
-    padding: 20px 40px;
-    background: transparent;
-    text-align: left;
-    width: 100%;
+
+    /* Themed background box */
+    background: rgba(20, 15, 10, 0.85);
+    /* Deep dark brown/black transparency */
+    border: 2px solid #8b7355;
+    /* Wood/Gold accent border */
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.8);
+
+    /* Layout adjustments */
+    width: 49%;
+    /* Narrower */
+    /* Match the wood frame width above */
+    height: auto;
+    min-height: 175px;
+    /* Taller */
+    /* [位置] top:往上(負數), left:往左(負數)/往右(正數) */
+    margin: 0 auto;
+    top: -180px;
+    left: -45px;
+    /* 負數往左 */
+    padding: 20px;
+
+    text-align: center;
     box-sizing: border-box;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.9);
+    text-shadow: 1px 1px 2px black;
+
+    /* Flex alignment */
+    align-self: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    position: relative;
+    z-index: 2;
 }
 
 .setup-options-panel {
@@ -4054,13 +4084,18 @@ body.dragging-active .player .hand .card:hover {
 .ai-selection-decoration {
     position: absolute;
     right: 300px;
-    /* Adjust based on exact preference */
-    top: 48%;
+    /* [左右位置] */
+    top: 47%;
+    /* [上下位置] */
     transform: translateY(-50%);
-    height: 97%;
-    /* Prominent size */
+
+    /* [長度] 改這裡 (例如 80% 或 px) */
+    height: 100%;
+
+    /* [陰影] 改這裡 (x偏移 y偏移 模糊半徑 顏色) */
+    filter: drop-shadow(10px 10px 20px rgba(0, 0, 0, 0.8));
+
     z-index: 0;
-    /* Behind the options panel content if needed, but likely beside it */
     pointer-events: none;
     opacity: 0.9;
 }
@@ -4170,6 +4205,13 @@ body.dragging-active .player .hand .card:hover {
     flex-direction: column;
     align-items: center;
     gap: 20px;
+
+    /* Move buttons up and right */
+    position: relative;
+    top: -80px;
+    /* 往上 */
+    left: 30px;
+    /* 往右 */
 }
 
 .hearth-select-btn {

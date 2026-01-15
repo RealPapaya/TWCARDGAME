@@ -4015,6 +4015,13 @@ function renderAIBattleSetup() {
         'tpp': '柯文哲-台大醫科'
     };
 
+    // Deck Description mapping (Edit here)
+    const deckDescriptions = {
+        'dpp': '透過賴清德強力的新聞數值造成高傷害的疊加牌組',
+        'kmt': '以韓國瑜為核心透過來回進出戰場反覆執政來增加體質強度的黏濁牌組',
+        'tpp': '柯文哲為核心賦予治療光盾以及強化的簡單強力牌組'
+    };
+
     // Render deck options
     const deckContainer = document.getElementById('deck-options-container');
     deckContainer.innerHTML = '';
@@ -4032,7 +4039,7 @@ function renderAIBattleSetup() {
 
         const emojis = { 'dpp': '🟢', 'kmt': '🔵', 'tpp': '🟡' };
         group.innerHTML = `
-            <div class="option-item" data-deck-id="${theme.id}" data-image="${theme.image}" data-desc="${deckNames[theme.id] || theme.name} - ${theme.cards.length} 張卡">
+            <div class="option-item" data-deck-id="${theme.id}" data-image="${theme.image}" data-desc="${deckDescriptions[theme.id] || '請輸入描述...'}">
                 <span class="option-icon">${emojis[theme.id] || '🎴'}</span>
                 <span class="option-label">${deckNames[theme.id] || theme.name}</span>
                 <span class="expand-arrow">▶</span>
