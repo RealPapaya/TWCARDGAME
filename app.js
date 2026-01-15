@@ -28,6 +28,7 @@ let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
     { id: 'dpp', name: '民進黨牌組', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
     { id: 'dpp2', name: '民進黨牌組2', image: 'img/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
     { id: 'kmt', name: '國民黨牌組', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'kmt2', name: '國民黨牌組2', image: 'img/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
     { id: 'tpp', name: '民眾黨牌組', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
 let editingThemeIdx = -1; // -1 means not editing theme
@@ -4050,6 +4051,7 @@ function renderAIBattleSetup() {
         'dpp': '賴清德-新聞湧動',
         'dpp2': '蔡英文-無限回溯',
         'kmt': '韓國瑜-政壇輪迴',
+        'kmt2': '傅崑萁-江湖棄殺',
         'tpp': '柯文哲-台大醫科'
     };
 
@@ -4058,6 +4060,7 @@ function renderAIBattleSetup() {
         'dpp': '透過賴清德強力的新聞數值造成高傷害的疊加牌組',
         'dpp2': '透過沉默、回手牌使輕易使戰場扭轉局面的奇幻蔡英文牌組',
         'kmt': '以韓國瑜為核心透過不斷來回進出戰場來增加體質強度的黏濁牌組',
+        'kmt2': '以傅崑萁與棄牌機制為核心，透過頻繁棄牌觸發強大增益與召喚效果的強力快攻牌組',
         'tpp': '柯文哲為核心賦予治療光盾以及強化的簡單強力牌組'
     };
 
