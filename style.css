@@ -49,29 +49,59 @@ body {
     margin: 0;
     padding: 0;
     font-family: 'Noto Sans TC', sans-serif;
-    background: url('img/main_menu_bg.jpg') no-repeat center center fixed;
-    background-size: cover;
+    background: #000;
     color: #e0e0e0;
     overflow: hidden;
     user-select: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
 }
 
-/* Global Static Overlay */
-body::before {
-    content: '';
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.4);
-    z-index: -1;
-    /* Behind content but above body background */
-}
-
-.view {
+/* 16:9 Aspect Ratio Container */
+#game-container-16-9 {
+    position: relative;
     width: 100vw;
     height: 100vh;
+    max-width: calc(100vh * 16 / 9);
+    max-height: calc(100vw * 9 / 16);
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+}
+
+/* Fallback for browsers without aspect-ratio support */
+@supports not (aspect-ratio: 16 / 9) {
+    #game-container-16-9 {
+        width: 100vw;
+        height: 56.25vw;
+        max-height: 100vh;
+    }
+
+    @media (min-aspect-ratio: 16/9) {
+        #game-container-16-9 {
+            width: 177.78vh;
+            height: 100vh;
+        }
+    }
+}
+
+/* Content Scaler Wrapper - Fixed 1920x1200 Design Base (adjusted for battle view) */
+#game-content-scaler {
+    width: 1920px;
+    height: 1200px;
+    transform-origin: top left;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Global Static Overlay - REMOVED (user preference for brighter display) */
+
+.view {
+    width: 100%;
+    height: 100%;
     display: flex;
     flex-direction: column;
     position: absolute;
@@ -79,8 +109,8 @@ body::before {
     top: 0;
     left: 0;
     overflow: hidden;
-    z-index: 1;
-    /* Base z-index */
+    z-index: 2;
+    /* Above overlay */
 }
 
 /* Page Transitions */
@@ -171,8 +201,8 @@ body::before {
 #main-menu {
     justify-content: center;
     align-items: center;
-    background: transparent;
-    /* Changed to transparent */
+    background: url('img/main_menu_bg.jpg') no-repeat center center;
+    background-size: cover;
     position: relative;
     pointer-events: auto;
 }
@@ -1058,7 +1088,8 @@ body::before {
 #game-container {
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     background: url('img/arena_bg.png') no-repeat center center;
     background-size: cover;
     box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
@@ -4018,8 +4049,8 @@ body.dragging-active .player .hand .card:hover {
 .battle-setup-container {
     display: flex;
     gap: 60px;
-    width: 100vw;
-    height: 100vh;
+    width: 100%;
+    height: 100%;
     padding: 60px;
     box-sizing: border-box;
 }

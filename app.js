@@ -1,3 +1,48 @@
+// ===== Responsive Scaling System =====
+// Design base: 1920x1200 (adjusted for battle view)
+function updateGameScale() {
+    const container = document.getElementById('game-container-16-9');
+    const scaler = document.getElementById('game-content-scaler');
+
+    if (!container || !scaler) return;
+
+    const containerWidth = container.offsetWidth;
+    const containerHeight = container.offsetHeight;
+
+    // Design base dimensions (adjusted to accommodate battle view)
+    const baseWidth = 1920;
+    const baseHeight = 1200;
+
+    // Calculate scale factor (use the smaller scale to fit)
+    const scaleX = containerWidth / baseWidth;
+    const scaleY = containerHeight / baseHeight;
+    const scale = Math.min(scaleX, scaleY);
+
+    // Apply scale transform
+    scaler.style.transform = `scale(${scale})`;
+
+    // Center the scaled content
+    const scaledWidth = baseWidth * scale;
+    const scaledHeight = baseHeight * scale;
+    const offsetX = (containerWidth - scaledWidth) / 2;
+    const offsetY = (containerHeight - scaledHeight) / 2;
+
+    scaler.style.left = `${offsetX}px`;
+    scaler.style.top = `${offsetY}px`;
+}
+
+// Initialize on load
+window.addEventListener('load', updateGameScale);
+
+// Update on resize
+window.addEventListener('resize', updateGameScale);
+
+// Update on orientation change (mobile)
+window.addEventListener('orientationchange', () => {
+    setTimeout(updateGameScale, 100);
+});
+
+// ===== Game Engine & State =====
 let gameEngine;
 let gameState;
 // Card data is now loaded from card_data.js
