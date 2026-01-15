@@ -18,6 +18,15 @@
 </head>
 
 <body>
+    <!-- SVG filter to remove white background from wood frame -->
+    <svg style="position: absolute; width: 0; height: 0;">
+        <filter id="remove-white">
+            <feColorMatrix type="matrix" values="1 0 0 0 0
+                                                 0 1 0 0 0
+                                                 0 0 1 0 0
+                                                 -1 -1 -1 1 1" />
+        </filter>
+    </svg>
     <!-- Main Menu View -->
     <div id="main-menu" class="view">
         <div class="menu-content">
@@ -119,6 +128,10 @@
             <div class="setup-preview-panel">
                 <div class="preview-image-container">
                     <img id="preview-image" src="" alt="預覽" style="display: none;">
+                    <div class="preview-illustration-overlay">
+                        <div id="preview-illustration-title" class="illustration-title"></div>
+                        <div id="preview-illustration-subtitle" class="illustration-subtitle"></div>
+                    </div>
                 </div>
                 <div class="preview-description">
                     <p id="preview-text">請選擇對戰牌組</p>

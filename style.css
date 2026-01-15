@@ -3885,6 +3885,12 @@ body.dragging-active .player .hand .card:hover {
 }
 
 /* AI Battle Setup Layout */
+#ai-battle-setup,
+#deck-selection {
+    background: url('img/deck_selection_bg.jpg') no-repeat center center;
+    background-size: 100% 100% !important;
+}
+
 .battle-setup-container {
     display: flex;
     gap: 60px;
@@ -3906,20 +3912,81 @@ body.dragging-active .player .hand .card:hover {
     width: 80%;
     margin: 0 auto;
     aspect-ratio: 1;
-    background: #000;
-    border: 6px solid #6d5b4b;
-    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
-    overflow: hidden;
-    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8), inset 0 0 40px rgba(0, 0, 0, 0.5);
+    padding: 42px;
+    box-sizing: border-box;
+    position: relative;
+    filter: drop-shadow(0 10px 20px rgba(0, 0, 0, 0.8));
+}
+
+.preview-image-container::before {
+    content: '';
+    position: absolute;
+    inset: -5px;
+    background: url('img/wood_frame.png') no-repeat center center;
+    /* 保持背景置中，用 transform 移動整個框較直觀 */
+    background-size: 65% 65%;
+    mix-blend-mode: multiply;
+    z-index: -1;
+    pointer-events: none;
+    transform: translate(-45px, -15px);
+    /* 向左移動 15px，向下移動 15px */
 }
 
 .preview-image-container img {
-    width: 100%;
-    height: 100%;
+    width: 60%;
+    /* 略小於框的 65%，確保邊緣不會跑出框外 */
+    height: 60%;
     object-fit: cover;
+    border-radius: 4px;
+    z-index: 1;
+    transform: translate(-45px, -15px);
+    /* 同步木框的位置 */
+}
+
+.preview-illustration-overlay {
+    position: absolute;
+    width: 60%;
+    height: 60%;
+    transform: translate(-45px, -15px);
+    z-index: 2;
+    pointer-events: none;
+    border-radius: 4px;
+    /* 改成左邊暗 (black), 右邊亮 (transparent) */
+    background: linear-gradient(to right, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0) 80%);
+    padding: 25px;
+    box-sizing: border-box;
+    display: none;
+    /* 預設隱藏，由 JS 控制顯示 */
+    flex-direction: column;
+    justify-content: flex-start;
+    /* 改為垂直置中也許更好？但用戶沒說，先維持靠上或置中 */
+    align-items: flex-start;
+    /* 為了文字垂直置中於左側，可以考慮 justify-content: center */
+    justify-content: center;
+}
+
+.illustration-title {
+    color: #fff;
+    font-size: 96px;
+    /* 32px * 3 */
+    font-weight: bold;
+    text-shadow: 4px 4px 16px rgba(0, 0, 0, 0.9);
+    margin-bottom: 10px;
+    letter-spacing: 4px;
+    line-height: 1.1;
+}
+
+.illustration-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    /*稍微亮一點 */
+    font-size: 54px;
+    /* 18px * 3 */
+    font-weight: normal;
+    text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
+    letter-spacing: 2px;
 }
 
 .preview-description {

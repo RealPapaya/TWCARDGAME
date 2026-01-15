@@ -4054,16 +4054,27 @@ function renderAIBattleSetup() {
             // Toggle current
             const isExpanded = group.classList.toggle('expanded');
 
+            const previewImg = document.getElementById('preview-image');
+            const previewText = document.getElementById('preview-text');
+            const illuOverlay = document.querySelector('.preview-illustration-overlay');
+            const illuTitle = document.getElementById('preview-illustration-title');
+            const illuSubtitle = document.getElementById('preview-illustration-subtitle');
+
             if (isExpanded) {
                 selectedDeck = theme.id;
 
                 // Update preview
-                const previewImg = document.getElementById('preview-image');
-                const previewText = document.getElementById('preview-text');
                 if (theme.image) {
                     previewImg.src = theme.image;
                     previewImg.style.display = 'block';
+                    if (illuOverlay) illuOverlay.style.display = 'flex';
                 }
+
+                const fullDesc = deckNames[theme.id] || theme.name;
+                const [title, subtitle] = fullDesc.split('-');
+                if (illuTitle) illuTitle.textContent = title || '';
+                if (illuSubtitle) illuSubtitle.textContent = subtitle || '';
+
                 previewText.textContent = header.dataset.desc;
 
                 // Reset difficulty if switching decks
@@ -4075,6 +4086,9 @@ function renderAIBattleSetup() {
                 }
             } else {
                 selectedDeck = null;
+                previewImg.style.display = 'none';
+                if (illuOverlay) illuOverlay.style.display = 'none';
+                previewText.textContent = '請選擇對戰牌組';
             }
         });
 
