@@ -4291,3 +4291,149 @@ body.dragging-active .player .hand .card:hover {
         transform: rotate(360deg);
     }
 }
+
+/* --- Medieval Hand-drawn Style Modals --- */
+.parchment-modal {
+    background: url('img/parchment_bg.png') no-repeat center center !important;
+    background-size: cover !important;
+    border: 15px solid transparent !important;
+    border-image: url('img/wood_frame.png') 30 stretch !important;
+    padding: 40px !important;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+    color: #4a2c1d !important;
+    font-family: 'Noto Serif TC', serif !important;
+    position: relative;
+}
+
+.wide-modal {
+    max-width: 900px !important;
+    width: 90% !important;
+}
+
+.medieval-title {
+    font-size: 2.5rem !important;
+    color: #5d2e17 !important;
+    text-align: center !important;
+    margin-bottom: 20px !important;
+    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5) !important;
+    border-bottom: 2px solid #8b4513 !important;
+    padding-bottom: 10px !important;
+}
+
+.medieval-subtitle {
+    font-size: 1.2rem !important;
+    color: #7a4a3a !important;
+    text-align: center !important;
+    margin-bottom: 30px !important;
+}
+
+.medieval-button-group {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 15px !important;
+    align-items: center !important;
+}
+
+.medieval-button {
+    background: #8b4513 !important;
+    color: #f4e4bc !important;
+    border: 3px solid #5d2e17 !important;
+    padding: 12px 30px !important;
+    font-size: 1.2rem !important;
+    font-family: 'Noto Sans TC', sans-serif !important;
+    font-weight: bold !important;
+    cursor: pointer !important;
+    transition: all 0.2s ease !important;
+    width: 250px !important;
+    text-align: center !important;
+    box-shadow: 3px 3px 5px rgba(0, 0, 0, 0.4) !important;
+}
+
+.medieval-button:hover {
+    background: #a0522d !important;
+    transform: translateY(-2px) !important;
+    box-shadow: 5px 5px 10px rgba(0, 0, 0, 0.5) !important;
+}
+
+.medieval-button:active {
+    transform: translateY(1px) !important;
+}
+
+.medieval-button.secondary {
+    background: #696969 !important;
+    border-color: #4f4f4f !important;
+}
+
+/* Theme Grid */
+.medieval-theme-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)) !important;
+    gap: 20px !important;
+    margin-top: 20px !important;
+    max-height: 50vh !important;
+    overflow-y: auto !important;
+    padding: 10px !important;
+}
+
+.theme-preview-card {
+    background: rgba(139, 69, 19, 0.1) !important;
+    border: 3px solid #8b4513 !important;
+    padding: 15px !important;
+    cursor: pointer !important;
+    transition: all 0.3s ease !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    border-radius: 5px !important;
+}
+
+.theme-preview-card:hover {
+    background: rgba(139, 69, 19, 0.25) !important;
+    border-color: #d2691e !important;
+    transform: scale(1.02) !important;
+}
+
+.theme-preview-card h3 {
+    margin: 10px 0 !important;
+    color: #5d2e17 !important;
+    font-size: 1.4rem !important;
+}
+
+.theme-preview-card .deck-preview-img {
+    width: 100% !important;
+    height: 120px !important;
+    background-size: cover !important;
+    background-position: center !important;
+    border: 3px solid #5d2e17 !important;
+}
+
+.theme-preview-card .deck-size {
+    color: #7a4a3a !important;
+    font-weight: bold !important;
+}
+
+/* Medieval Toast */
+.medieval-toast {
+    position: fixed;
+    bottom: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #8b4513;
+    color: #f4e4bc;
+    padding: 15px 40px;
+    border: 5px solid #5d2e17;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: bold;
+    font-size: 1.2rem;
+    z-index: 30000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+}
+
+.medieval-toast.show {
+    opacity: 1;
+    visibility: visible;
+    bottom: 80px;
+}

@@ -346,6 +346,21 @@ function init() {
         });
     }
 
+    // --- Deck Creation Modal Listeners ---
+    document.getElementById('btn-create-custom')?.addEventListener('click', () => {
+        document.getElementById('deck-creation-modal').style.display = 'none';
+        addNewPlayerDeck(null); // Create empty deck
+    });
+
+    document.getElementById('btn-create-theme')?.addEventListener('click', () => {
+        document.getElementById('deck-creation-modal').style.display = 'none';
+        showPlayerThemeSelection();
+    });
+
+    document.getElementById('btn-create-cancel')?.addEventListener('click', () => {
+        document.getElementById('deck-creation-modal').style.display = 'none';
+    });
+
     console.log("Game initialized.");
 }
 
@@ -487,6 +502,10 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
 
 document.getElementById('btn-update-log-close')?.addEventListener('click', () => {
     document.getElementById('update-log-modal').style.display = 'none';
+});
+
+document.getElementById('btn-player-theme-cancel')?.addEventListener('click', () => {
+    document.getElementById('player-theme-selection-modal').style.display = 'none';
 });
 
 // --- Result View Listeners ---
@@ -673,22 +692,53 @@ function renderDeckSelect() {
             <div>建立${isDebugMode ? '測試' : '新'}牌組</div>
         `;
         addSlot.onclick = () => {
-            const newDeck = {
-                name: (isDebugMode ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
-                cards: []
-            };
-            if (isDebugMode) newDeck.isTest = true;
-            userDecks.push(newDeck);
-            localStorage.setItem('userDecks', JSON.stringify(userDecks));
-            selectedDeckIdx = userDecks.length - 1;
-            renderDeckSelect();
+            showDeckCreationOptions();
         };
         container.appendChild(addSlot);
     }
 }
 
+function showDeckCreationOptions() {
+    document.getElementById('deck-creation-modal').style.display = 'flex';
+}
 
+function addNewPlayerDeck(cardIds = null, themeName = null) {
+    const newDeck = {
+        name: themeName || (isDebugMode ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
+        cards: cardIds ? [...cardIds] : []
+    };
+    if (isDebugMode) newDeck.isTest = true;
+    userDecks.push(newDeck);
+    localStorage.setItem('userDecks', JSON.stringify(userDecks));
+    selectedDeckIdx = userDecks.length - 1;
+    renderDeckSelect();
+}
 
+function showPlayerThemeSelection() {
+    document.getElementById('player-theme-selection-modal').style.display = 'flex';
+    renderPlayerThemeList();
+}
+
+function renderPlayerThemeList() {
+    const container = document.getElementById('player-theme-list');
+    container.innerHTML = '';
+
+    aiThemeDecks.forEach((theme) => {
+        const card = document.createElement('div');
+        card.className = 'theme-preview-card';
+        card.innerHTML = `
+            <div class="deck-preview-img" style="background-image: url('${theme.image}')"></div>
+            <h3>${theme.name}</h3>
+            <div class="deck-size">${theme.cards.length} 張卡片</div>
+        `;
+        card.onclick = () => {
+            document.getElementById('player-theme-selection-modal').style.display = 'none';
+            addNewPlayerDeck(theme.cards, theme.name);
+            showToast(`已匯入${theme.name}`);
+        };
+        container.appendChild(card);
+    });
+}
 
 function showView(viewId) {
     const nextView = document.getElementById(viewId);
@@ -4174,4 +4224,19 @@ function renderAIBattleSetup() {
         document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
         renderDeckSelect();
     };
+}
+
+function showToast(message) {
+    let toast = document.getElementById('custom-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'custom-toast';
+        document.body.appendChild(toast);
+    }
+    toast.innerText = message;
+    toast.className = 'medieval-toast show';
+
+    setTimeout(() => {
+        toast.className = 'medieval-toast';
+    }, 3000);
 }

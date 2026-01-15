@@ -347,6 +347,32 @@
         </div>
     </div>
 
+    <!-- Deck Creation Mode Selection Modal -->
+    <div id="deck-creation-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal">
+            <h2 class="medieval-title">新增牌組</h2>
+            <p class="medieval-subtitle">請選擇牌組建立方式</p>
+            <div class="modal-buttons medieval-button-group">
+                <button id="btn-create-custom" class="medieval-button">自由組建</button>
+                <button id="btn-create-theme" class="medieval-button">使用預設牌組</button>
+                <button id="btn-create-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Player Theme Selection Modal -->
+    <div id="player-theme-selection-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal wide-modal">
+            <h2 class="medieval-title">選擇預設牌組</h2>
+            <div id="player-theme-list" class="medieval-theme-grid">
+                <!-- Themes will be injected by JS -->
+            </div>
+            <div class="modal-buttons medieval-button-group" style="margin-top: 20px;">
+                <button id="btn-player-theme-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Full Screen Result View -->
     <div id="game-result-view" class="view result-overlay" style="display: none;">
         <div class="result-content">
