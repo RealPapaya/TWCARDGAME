@@ -33,7 +33,7 @@
     <div id="main-menu" class="view">
         <div class="menu-content">
             <h1 class="game-title">寶島遊戲王</h1>
-            <div class="game-version">v0.5.0</div>
+            <div class="game-version">v0.6.0</div>
             <div class="menu-buttons main-nav">
                 <button id="btn-main-battle" class="neon-button">進入戰鬥</button>
                 <button id="btn-main-builder" class="neon-button">牌組組建</button>
@@ -337,13 +337,15 @@
 
     <!-- Update Log Modal -->
     <div id="update-log-modal" class="modal-overlay" style="display: none;">
-        <div class="modal-content">
-            <h2 class="sub-title" style="font-size: 28px; margin-bottom: 20px;">更新日誌</h2>
+        <div class="modal-content parchment-modal wide-modal">
+            <h2 class="medieval-title">更新日誌</h2>
             <div id="update-log-list"
-                style="text-align: left; margin-bottom: 30px; max-height: 400px; overflow-y: auto;">
+                style="text-align: left; margin-bottom: 30px; max-height: 700px; overflow-y: auto;">
                 <!-- Content will be injected from updates.js via app.js -->
             </div>
-            <button id="btn-update-log-close" class="neon-button">關閉</button>
+            <div class="modal-buttons medieval-button-group">
+                <button id="btn-update-log-close" class="medieval-button secondary">關閉</button>
+            </div>
         </div>
     </div>
 

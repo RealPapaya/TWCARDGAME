@@ -2962,8 +2962,28 @@ body.dragging-active .player .hand .card:hover {
 
 /* Update Log Modal */
 #update-log-modal .modal-content {
-    max-width: 600px;
+    max-width: 800px;
     text-align: left;
+}
+
+#update-log-list::-webkit-scrollbar {
+    width: 12px;
+}
+
+#update-log-list::-webkit-scrollbar-track {
+    background: #e6d5b8;
+    border-radius: 10px;
+    border: 1px solid #d2b48c;
+}
+
+#update-log-list::-webkit-scrollbar-thumb {
+    background: #8b4513;
+    border-radius: 10px;
+    border: 2px solid #5d2e17;
+}
+
+#update-log-list::-webkit-scrollbar-thumb:hover {
+    background: #a0522d;
 }
 
 #update-log-modal ul {
@@ -2972,12 +2992,34 @@ body.dragging-active .player .hand .card:hover {
 }
 
 #update-log-modal li {
-    margin-bottom: 10px;
-    color: var(--text-primary);
+    margin-bottom: 15px;
+    color: #4a2c1d;
+    border-left: 4px solid #8b4513;
+    padding-left: 15px;
 }
 
 #update-log-modal li b {
-    color: var(--neon-yellow);
+    color: #5d2e17;
+    font-size: 1.1rem;
+}
+
+.update-version-section {
+    background: #f4e4bc;
+    /* 羊皮紙色底，極其顯眼 */
+    padding: 30px;
+    /* 增加內距，讓區塊更高 */
+    border-radius: 4px;
+    margin-bottom: 25px;
+    border: 3px solid #8b4513;
+    /* 深木色邊框 */
+    box-shadow: 2px 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.update-version-section h3 {
+    border-bottom: 2px solid #8b4513;
+    padding-bottom: 8px;
+    margin-top: 5px;
+    color: #5d2e17 !important;
 }
 
 /* Full Board Heal Animation */
@@ -3612,7 +3654,8 @@ body.dragging-active .player .hand .card:hover {
     text-transform: uppercase;
     letter-spacing: 2px;
     backdrop-filter: blur(5px);
-    box-shadow: 0 0 10px rgba(0, 243, 255, 0.1);
+    /* 移除霓虹光暈 */
+    box-shadow: none;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -3621,13 +3664,14 @@ body.dragging-active .player .hand .card:hover {
 .update-log-btn:hover {
     background: var(--neon-blue);
     color: #000;
-    box-shadow: 0 0 25px var(--neon-blue), 0 0 50px rgba(0, 243, 255, 0.4);
+    /* 移除懸停時的光暈 */
+    box-shadow: none;
     transform: translateY(-2px);
 }
 
 .update-log-btn:active {
     transform: translateY(0);
-    box-shadow: 0 0 10px var(--neon-blue);
+    box-shadow: none;
 }
 
 /* Ensure modal is on top */
@@ -4311,10 +4355,12 @@ body.dragging-active .player .hand .card:hover {
 
 .medieval-title {
     font-size: 2.5rem !important;
-    color: #5d2e17 !important;
+    color: #f4e4bc !important;
+    /* 羊皮紙色 */
     text-align: center !important;
     margin-bottom: 20px !important;
-    text-shadow: 1px 1px 2px rgba(255, 255, 255, 0.5) !important;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
+    /* 加深陰影以確保可讀性 */
     border-bottom: 2px solid #8b4513 !important;
     padding-bottom: 10px !important;
 }

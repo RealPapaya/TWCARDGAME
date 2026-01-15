@@ -416,17 +416,17 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
         // 渲染日誌內容
         list.innerHTML = UPDATE_LOGS.map(log => `
             <div class="update-version-section">
-                <h3 style="color: var(--neon-yellow); margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
+                <h3 style="color: #5d2e17; margin-bottom: 10px;">版本 ${log.version} (${log.date})</h3>
                 <ul style="list-style: none; padding: 0;">
                     ${log.items.map(item => `
-                        <li style="margin-bottom: 15px;">
-                            <b style="color: var(--neon-yellow);">${item.title}</b><br>
-                            <span style="color: #ccc; font-size: 14px; display: block; margin-top: 4px; white-space: pre-wrap;">${item.desc}</span>
+                        <li style="margin-bottom: 15px; border-left: 4px solid #8b4513; padding-left: 15px;">
+                            <b style="color: #5d2e17;">${item.title}</b><br>
+                            <span style="color: #7a4a3a; font-size: 14px; display: block; margin-top: 4px; white-space: pre-wrap;">${item.desc}</span>
                         </li>
                     `).join('')}
                 </ul>
             </div>
-        `).join('<hr style="border: 0; border-top: 1px solid #333; margin: 20px 0;">');
+        `).join('<hr style="border: 0; border-top: 1px solid #c19a6b; margin: 20px 0;">');
 
         // 自動掃描並包裝卡牌名稱以實現懸停預覽
         const allCardNames = CARD_DATA.map(c => c.name);
@@ -1693,7 +1693,7 @@ function showPreview(card) {
 
     if (hasSilenceKeyword || hasSilenceText) {
         const turns = card.keywords?.battlecry?.value || 6; // Default to 6 turns for display if not specified (like standard silence)
-        keywordsList.push({ title: "沉默", desc: `使隨從無法攻擊 ${turns} 回合` });
+        keywordsList.push({ title: "沉默", desc: `使隨從無法攻擊n回合` });
     }
 
     // Check for Quest
