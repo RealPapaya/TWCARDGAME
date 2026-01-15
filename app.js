@@ -24,13 +24,37 @@ function generateDefaultDeck() {
     return deck;
 }
 
-let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || [
-    { id: 'dpp', name: '民進黨牌組', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
-    { id: 'dpp2', name: '民進黨牌組2', image: 'img/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
-    { id: 'kmt', name: '國民黨牌組', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
-    { id: 'kmt2', name: '國民黨牌組2', image: 'img/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
-    { id: 'tpp', name: '民眾黨牌組', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
+const defaultAIThemes = [
+    { id: 'dpp', name: '賴清德-新聞湧動', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'dpp2', name: '蔡英文-無限回溯', image: 'img/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
+    { id: 'kmt', name: '韓國瑜-政壇輪迴', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'kmt2', name: '傅崑萁-江湖棄殺', image: 'img/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
+    { id: 'tpp', name: '柯文哲-台大醫科', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
+
+let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || defaultAIThemes;
+
+// 自動同步：確保所有使用者看到的名稱、圖片與 ID 都與預設一致
+let needsUpdate = false;
+defaultAIThemes.forEach(defDeck => {
+    let existing = aiThemeDecks.find(d => d.id === defDeck.id);
+    if (!existing) {
+        aiThemeDecks.push(JSON.parse(JSON.stringify(defDeck)));
+        needsUpdate = true;
+    } else {
+        // 強制更新名稱與圖片，確保與最新版本相符
+        if (existing.name !== defDeck.name || existing.image !== defDeck.image) {
+            existing.name = defDeck.name;
+            existing.image = defDeck.image;
+            needsUpdate = true;
+        }
+    }
+});
+
+// 如果有補齊或修正資料，則寫回快取
+if (needsUpdate) {
+    localStorage.setItem('aiThemeDecks', JSON.stringify(aiThemeDecks));
+}
 let editingThemeIdx = -1; // -1 means not editing theme
 
 
@@ -4104,7 +4128,7 @@ function renderAIBattleSetup() {
         'dpp': '賴清德-新聞湧動',
         'dpp2': '蔡英文-無限回溯',
         'kmt': '韓國瑜-政壇輪迴',
-        'kmt2': '傅崑萁-江湖棄殺',
+        'kmt2': '傅崐萁-江湖棄殺',
         'tpp': '柯文哲-台大醫科'
     };
 
@@ -4113,7 +4137,7 @@ function renderAIBattleSetup() {
         'dpp': '透過賴清德強力的新聞數值造成高傷害的疊加牌組',
         'dpp2': '透過沉默、回手牌使輕易使戰場扭轉局面的奇幻蔡英文牌組',
         'kmt': '以韓國瑜為核心透過不斷來回進出戰場來增加體質強度的黏濁牌組',
-        'kmt2': '以傅崑萁與棄牌機制為核心，透過頻繁棄牌觸發強大增益與召喚效果的強力快攻牌組',
+        'kmt2': '以傅崐萁與棄牌機制為核心，透過頻繁棄牌觸發強大增益與召喚效果的強力快攻牌組',
         'tpp': '柯文哲為核心賦予治療光盾以及強化的簡單強力牌組'
     };
 

@@ -231,23 +231,15 @@ body::before {
 
 .deck-slots-container {
     display: flex;
-    gap: 20px;
+    gap: 30px;
     justify-content: center;
     flex-wrap: wrap;
     width: 100%;
-    max-width: 1000px;
+    max-width: 1200px;
+    padding: 20px;
 }
 
-.deck-list {
-    width: 280px;
-    background: rgba(10, 10, 20, 0.8);
-    border-left: 2px solid var(--neon-blue);
-    padding: 20px;
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    overflow-y: auto;
-}
+/* Side List Removed */
 
 #my-deck-list {
     flex-grow: 1;
@@ -258,21 +250,20 @@ body::before {
 .deck-slot {
     background: url('img/deck_slot_bg.png') no-repeat center center;
     background-size: 100% 100%;
-    border: none;
-    border-radius: 12px;
+    border: none !important;
+    outline: none !important;
+    box-shadow: none !important;
     padding: 30px 25px 25px 25px;
-    /* Adjust padding to fit the wood frame */
     width: 220px;
-    /* Slightly wider for the frame */
     height: 120px;
-    /* Fixed height for consistency */
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.6));
-    transition: all 0.2s;
+    filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.6));
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
     position: relative;
+    cursor: pointer;
 }
 
 .deck-slot h3 {
@@ -293,15 +284,14 @@ body::before {
 
 
 .deck-slot:hover {
-    box-shadow: 0 0 15px var(--neon-blue);
-    transform: translateY(-5px);
+    transform: translateY(-10px) scale(1.05);
+    filter: drop-shadow(0 15px 25px rgba(0, 0, 0, 0.8));
+    border: none !important;
+    box-shadow: none !important;
 }
 
 /* Deck Management */
-.deck-slot {
-    position: relative;
-    padding: 20px;
-}
+/* Management Styles */
 
 .btn-delete-deck {
     position: absolute;
@@ -340,32 +330,36 @@ body::before {
     transition: all 0.3s;
 }
 
-.add-deck-slot:hover {
-    border-color: var(--neon-cyan);
-    background: rgba(0, 255, 243, 0.05);
-}
-
 .add-deck-slot .plus-icon {
     font-size: 40px;
     margin-bottom: 10px;
-    color: var(--neon-cyan);
+    color: #8b4513;
 }
 
+/* Consolidated hover styles above */
+
 .deck-slot.selected {
-    border-color: var(--neon-yellow);
-    box-shadow: 0 0 20px var(--neon-yellow);
+    outline: none !important;
+    box-shadow: none !important;
+    border: none !important;
+    filter: drop-shadow(0 0 20px rgba(139, 69, 19, 0.6));
 }
 
 .deck-slot.selected::after {
-    content: "SELECTED";
+    content: "已選擇";
     position: absolute;
-    top: -10px;
-    background: var(--neon-yellow);
-    color: #000;
-    font-size: 10px;
-    padding: 2px 8px;
-    border-radius: 5px;
-    font-weight: bold;
+    top: -15px;
+    background: linear-gradient(to bottom, #ffd700, #b8860b);
+    color: #4a2c1d;
+    font-size: 14px;
+    padding: 4px 15px;
+    border-radius: 3px;
+    font-weight: 900;
+    font-family: 'Noto Serif TC', serif;
+    border: 2px solid #5d2e17;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+    letter-spacing: 2px;
 }
 
 .deck-slot h3 {
@@ -391,10 +385,7 @@ body::before {
     font-size: 0.8rem;
 }
 
-.deck-slot:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 0 20px rgba(0, 242, 254, 0.5);
-}
+/* Redundant hover removed */
 
 .deck-slot h3 {
     margin: 0;
@@ -444,21 +435,24 @@ body::before {
 .theme-card {
     width: 320px;
     height: 450px;
-    background: linear-gradient(135deg, #1a1a2e, #16213e);
-    border: 3px solid var(--neon-blue);
-    border-radius: 20px;
+    background: #2a1d14;
+    border: 5px solid #8b4513;
+    border-radius: 15px;
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
     overflow: hidden;
     position: relative;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
 }
 
+/* Cleaned up broken block */
+
 .theme-card:hover {
-    transform: scale(1.08) translateY(-10px);
-    box-shadow: 0 0 40px var(--neon-blue), 0 0 60px rgba(0, 243, 255, 0.4);
-    border-color: var(--neon-pink);
+    transform: scale(1.05) translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
+    border-color: #d2691e;
 }
 
 .theme-card-image {
@@ -516,19 +510,45 @@ body::before {
 }
 
 #deck-name-input {
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid #00f2fe;
+    background: #f4e4bc;
+    border: 3px solid #8b4513;
     border-radius: 5px;
-    color: white;
+    color: #4a2c1d;
     padding: 8px 12px;
-    font-size: 1rem;
+    font-size: 1.1rem;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: bold;
     outline: none;
-    transition: border-color 0.3s;
+    transition: all 0.3s;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 #deck-name-input:focus {
-    border-color: #4facfe;
-    box-shadow: 0 0 10px rgba(79, 172, 254, 0.5);
+    border-color: #d2691e;
+    box-shadow: 0 0 10px rgba(139, 69, 19, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#card-search-input {
+    margin-left: 15px;
+    background: #f4e4bc;
+    border: 3px solid #8b4513;
+    border-radius: 5px;
+    color: #4a2c1d;
+    padding: 8px 12px;
+    font-size: 1rem;
+    font-family: 'Noto Serif TC', serif;
+    outline: none;
+    transition: all 0.3s;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#card-search-input:focus {
+    border-color: #d2691e;
+    box-shadow: 0 0 10px rgba(139, 69, 19, 0.5), inset 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+#card-search-input::placeholder {
+    color: rgba(74, 44, 29, 0.6);
 }
 
 .neon-button {
@@ -661,23 +681,23 @@ body::before {
 .diff-square {
     width: 280px;
     height: 400px;
-    background-color: #1a1a2e;
+    background-color: #2a1d14;
     background-size: cover;
     background-position: center;
-    border: 3px solid var(--neon-blue);
-    border-radius: 20px;
+    border: 5px solid #8b4513;
+    border-radius: 15px;
     position: relative;
     overflow: hidden;
     cursor: pointer;
     transition: all 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
     display: flex;
     flex-direction: column;
 }
 
 .diff-square:hover {
-    transform: scale(1.08) translateY(-10px);
-    box-shadow: 0 15px 40px rgba(0, 243, 255, 0.5);
+    transform: scale(1.05) translateY(-10px);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.7);
 }
 
 .diff-title-bottom {
@@ -901,9 +921,12 @@ body::before {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    border-bottom: 2px solid var(--neon-cyan);
-    padding-bottom: 10px;
+    border-bottom: 3px double #8b4513;
+    padding-bottom: 15px;
     margin-bottom: 20px;
+    background: rgba(139, 69, 19, 0.1);
+    padding: 15px;
+    border-radius: 10px;
 }
 
 .deck-builder-main {
@@ -940,6 +963,27 @@ body::before {
     /* Allow filling remaining space */
     height: auto;
     /* Let flex control height */
+}
+
+/* Custom Scrollbar for Cards Grid (Matches Update Log) */
+.cards-grid::-webkit-scrollbar {
+    width: 12px;
+}
+
+.cards-grid::-webkit-scrollbar-track {
+    background: #e6d5b8;
+    border-radius: 10px;
+    border: 1px solid #d2b48c;
+}
+
+.cards-grid::-webkit-scrollbar-thumb {
+    background: #8b4513;
+    border-radius: 10px;
+    border: 2px solid #5d2e17;
+}
+
+.cards-grid::-webkit-scrollbar-thumb:hover {
+    background: #a0522d;
 }
 
 .my-deck-section {
@@ -2703,6 +2747,27 @@ body.dragging-active .player .hand .card:hover {
     border: 1px solid rgba(255, 255, 255, 0.1);
 }
 
+/* Custom Scrollbar for My Deck List */
+#my-deck-list::-webkit-scrollbar {
+    width: 12px;
+}
+
+#my-deck-list::-webkit-scrollbar-track {
+    background: #e6d5b8;
+    border-radius: 10px;
+    border: 1px solid #d2b48c;
+}
+
+#my-deck-list::-webkit-scrollbar-thumb {
+    background: #8b4513;
+    border-radius: 10px;
+    border: 2px solid #5d2e17;
+}
+
+#my-deck-list::-webkit-scrollbar-thumb:hover {
+    background: #a0522d;
+}
+
 /* Status Cluster (Bottom Right) */
 .status-cluster {
     position: absolute;
@@ -2807,25 +2872,37 @@ body.dragging-active .player .hand .card:hover {
 /* Filter Selects */
 .filter-select {
     margin-left: 10px;
-    background: rgba(0, 0, 0, 0.6);
-    border: 1px solid #00f2fe;
-    color: #fff;
-    padding: 5px 10px;
+    background: #f4e4bc;
+    border: 3px solid #8b4513;
+    color: #4a2c1d;
+    padding: 7px 10px;
     border-radius: 5px;
     outline: none;
-    font-family: 'Noto Sans TC', sans-serif;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: bold;
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .filter-select:hover {
-    background: rgba(0, 242, 254, 0.1);
-    box-shadow: 0 0 10px rgba(0, 242, 254, 0.3);
+    background: #fff5e0;
+    border-color: #d2691e;
 }
 
 .filter-select option {
-    background: #111;
-    color: #fff;
+    background: #f4e4bc;
+    color: #4a2c1d;
+}
+
+#deck-count-indicator {
+    background: #8b4513;
+    color: #f4e4bc;
+    padding: 8px 20px;
+    border-radius: 20px;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: bold;
+    border: 2px solid #5d2e17;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
 }
 
 
@@ -2887,26 +2964,29 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .sort-btn {
-    background: transparent;
-    border: 1px solid rgba(0, 242, 254, 0.5);
-    color: #ccc;
-    padding: 4px 10px;
-    border-radius: 4px;
+    background: #d2b48c;
+    border: 3px solid #8b4513;
+    color: #4a2c1d;
+    padding: 6px 15px;
+    border-radius: 8px;
     cursor: pointer;
-    font-family: inherit;
-    font-size: 0.9rem;
+    font-family: 'Noto Serif TC', serif;
+    font-weight: bold;
+    font-size: 1rem;
     transition: all 0.3s;
     display: flex;
     align-items: center;
-    gap: 5px;
+    gap: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .sort-btn:hover,
 .sort-btn.active {
-    border-color: #00f2fe;
-    color: #fff;
-    box-shadow: 0 0 8px rgba(0, 242, 254, 0.4);
-    background: rgba(0, 242, 254, 0.1);
+    background: #8b4513;
+    color: #f4e4bc;
+    border-color: #5d2e17;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+    transform: translateY(-2px);
 }
 
 .sort-arrow {
