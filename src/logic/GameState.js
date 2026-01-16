@@ -1,0 +1,1612 @@
+/**
+ * GameState.js
+ * 
+ * 用途: 存儲與管理單局遊戲的完整狀態，包含玩家資料、戰場、手牌以及回合流程控制。
+ * 負責執行具體的卡牌效果、傷害計算與死亡結算。
+ * 
+ * 會被誰應用:
+ * - src/logic/GameEngine.js (由引擎初始化並回傳)
+ * - src/legacy/app.js (前端介面顯示數據來源)
+ * - src/ui/DragManager.js (驗證出牌合法性)
+ * - src/logic/AIEngine.js (分析局勢以決定動作)
+ * 
+ * 又會用到誰:
+ * - src/logic/Player.js (管理個別玩家狀態)
+ * - src/data/translations.js (日誌文本相關)
+ */
+import { UI_TEXT } from '../data/translations.js';
+
+export class GameState {
+    constructor(players, startingIndex, debugMode = false, difficulty = 'NORMAL', collection = []) {
+        this.gameId = Date.now().toString();
+        this.turnCount = 0;
+        this.players = players;
+        this.currentPlayerIdx = startingIndex;
+        this.gameOver = false;
+        this.winner = null;
+        this.debugMode = debugMode;
+        this.difficulty = difficulty;
+        this.collection = collection;
+        this.questCompletionEvents = [];
+        this._initBattlecryHandlers();
+
+        // Apply Difficulty Modifiers to Opponent (AI)
+        const opponent = this.players.find(p => p.side === 'OPPONENT');
+        if (opponent) {
+            if (difficulty === 'HARD') {
+                opponent.hero.hp = 40;
+                opponent.hero.maxHp = 40;
+                opponent.mana.max = 2;
+                opponent.mana.current = 2;
+            } else if (difficulty === 'HELL') {
+                opponent.hero.hp = 50;
+                opponent.hero.maxHp = 50;
+                opponent.mana.max = 3;
+                opponent.mana.current = 3;
+            }
+        }
+
+        if (this.debugMode) {
+            this.players.forEach(p => {
+                p.hero.hp = 100;
+                p.hero.maxHp = 100;
+                p.mana.max = 10;
+                p.mana.current = 10;
+            });
+        }
+    }
+
+    _initBattlecryHandlers() {
+        this.battlecryHandlers = {
+            'DAMAGE': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target) || this.opponent.hero;
+                this.applyDamage(targetUnit, bc.value);
+                return { type: 'DAMAGE', target: targetUnit, value: bc.value };
+            },
+            'DAMAGE_SELF': (bc, target, source) => {
+                if (source) {
+                    this.applyDamage(source, bc.value);
+                    return { type: 'DAMAGE', target: source, value: bc.value };
+                }
+                return null;
+            },
+            'LOCK_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    targetUnit.lockedTurns = (targetUnit.lockedTurns || 0) + bc.value;
+                    targetUnit.canAttack = false; // Immediately disable
+                    return { type: 'LOCK', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
+            'LOCK_SELF': (bc, target, source) => {
+                if (source) {
+                    source.lockedTurns = (source.lockedTurns || 0) + bc.value;
+                    source.canAttack = false;
+                    return { type: 'LOCK', target: source, value: bc.value };
+                }
+                return null;
+            },
+            'LOCK_ALL_ENEMY': (bc) => {
+                const affected = [];
+                this.opponent.board.forEach((m, i) => {
+                    // Use max to prevent stacking - multiple locks extend duration, not add
+                    m.lockedTurns = Math.max(m.lockedTurns || 0, bc.value || 1);
+                    m.canAttack = false;
+                    affected.push({ ...m, index: i });
+                });
+                return { type: 'LOCK_ALL', affected, value: bc.value };
+            },
+            'LOCK_ALL_AND_BUFF_CATEGORY': (bc) => {
+                const affected = [];
+                const buffed = [];
+                // Target ALL minions on board (both players)
+                [this.currentPlayer, this.opponent].forEach(player => {
+                    player.board.forEach((m, i) => {
+                        // Lock
+                        m.lockedTurns = Math.max(m.lockedTurns || 0, bc.value || 1);
+                        m.canAttack = false;
+                        affected.push({ ...m, index: i, side: player.side });
+
+                        // Buff if category matches
+                        if (m.category === bc.target_category) {
+                            if (bc.buff_stat === 'HEALTH') {
+                                m.health += bc.buff_value;
+                                m.currentHealth += bc.buff_value;
+                                this.updateEnrage(m);
+                                buffed.push({ ...m, index: i, side: player.side });
+                            }
+                        }
+                    });
+                });
+                return { type: 'LOCK_ALL_AND_BUFF', affected, buffed, value: bc.value };
+            },
+            'HEAL_ALL_FRIENDLY': (bc) => {
+                const affected = [];
+                this.currentPlayer.board.forEach((m, i) => {
+                    const old = m.currentHealth;
+                    m.currentHealth = m.health;
+                    affected.push({ unit: { ...m, index: i }, healed: m.health - old });
+                    this.updateEnrage(m);
+                });
+                return { type: 'HEAL_ALL', affected };
+            },
+            'BOUNCE': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const owner = targetUnit.side === this.currentPlayer.side ? this.currentPlayer : this.opponent;
+                    const index = owner.board.indexOf(targetUnit);
+
+                    if (index > -1) {
+                        owner.board.splice(index, 1);
+                        const cardToHand = this._createBounceCard(targetUnit);
+
+                        if (owner.hand.length < 10) {
+                            owner.hand.push(cardToHand);
+                        }
+                        this.updateAuras();
+                        return { type: 'BOUNCE', target: { ...targetUnit, index: target.index } };
+                    }
+                }
+                return null;
+            },
+            'BOUNCE_ALL_ENEMY': (bc, target, source) => {
+                const bounced = [];
+                // 1. Bounce opponents
+                while (this.opponent.board.length > 0) {
+                    const m = this.opponent.board.shift();
+                    const cardToHand = this._createBounceCard(m);
+                    bounced.push(m);
+                    if (this.opponent.hand.length < 10) this.opponent.hand.push(cardToHand);
+                }
+
+                // 2. Summon Pets (Lele and Xiangxiang) around source
+                let summonedCount = 0;
+                if (bc.summon && source) {
+                    const idx = this.currentPlayer.board.indexOf(source);
+                    if (idx !== -1) {
+                        // Summon Lele (Left)
+                        const leleDef = (this.collection || []).find(c => c.id === bc.summon[0]);
+                        if (leleDef && this.currentPlayer.board.length < 7) {
+                            const lele = this.createMinion(leleDef, this.currentPlayer.side);
+                            this.currentPlayer.board.splice(idx, 0, lele);
+                            summonedCount++;
+                        }
+
+                        // Re-find source index because it might have shifted
+                        const newIdx = this.currentPlayer.board.indexOf(source);
+                        // Summon Xiangxiang (Right)
+                        const xiangDef = (this.collection || []).find(c => c.id === bc.summon[1]);
+                        if (xiangDef && this.currentPlayer.board.length < 7) {
+                            const xiang = this.createMinion(xiangDef, this.currentPlayer.side);
+                            this.currentPlayer.board.splice(newIdx + 1, 0, xiang);
+                            summonedCount++;
+                        }
+                    }
+                }
+
+                return { type: 'BOUNCE_ALL', bounced, summonedCount };
+            },
+            'DAMAGE_NON_CATEGORY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.category !== bc.target_category) {
+                    this.applyDamage(targetUnit, bc.value);
+                    return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
+            'DAMAGE_ALL_NON_CATEGORIES': (bc) => {
+                const excludedCategories = bc.excluded_categories || [];
+                const affected = [];
+                [this.currentPlayer, this.opponent].forEach(player => {
+                    player.board.forEach((m, i) => {
+                        if (!excludedCategories.includes(m.category)) {
+                            this.applyDamage(m, bc.value);
+                            affected.push({ unit: { ...m, index: i, side: player.side }, value: bc.value });
+                        }
+                    });
+                });
+                return { type: 'DAMAGE_ALL', affected };
+            },
+            'DAMAGE_ALL_ENEMY_MINIONS': (bc) => {
+                const affected = [];
+                this.opponent.board.forEach((m, i) => {
+                    this.applyDamage(m, bc.value);
+                    affected.push({ unit: { ...m, index: i, side: this.opponent.side }, value: bc.value });
+                });
+                return { type: 'DAMAGE_ALL', affected };
+            },
+            'HEAL': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit) {
+                    const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                    const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
+                    if (typeof max === 'number' && typeof current === 'number') {
+                        const healValue = Math.min(max - current, bc.value);
+                        const newHp = current + healValue;
+                        if (targetUnit.type === 'HERO') targetUnit.hp = newHp;
+                        else {
+                            targetUnit.currentHealth = newHp;
+                            this.updateEnrage(targetUnit);
+                        }
+
+                        // Trigger heal number animation
+                        if (typeof window !== 'undefined' && window.showDamageNumber && healValue > 0) {
+                            setTimeout(() => {
+                                let targetEl = null;
+                                if (targetUnit.type === 'HERO') {
+                                    targetEl = targetUnit.side === 'PLAYER' ?
+                                        document.getElementById('player-hero') :
+                                        document.getElementById('opp-hero');
+                                } else if (targetUnit.type === 'MINION') {
+                                    const boardId = targetUnit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                                    const board = document.getElementById(boardId);
+                                    if (board) {
+                                        const cards = board.querySelectorAll('.card');
+                                        const player = targetUnit.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                                        const index = player.board.indexOf(targetUnit);
+                                        if (index >= 0 && cards[index]) {
+                                            targetEl = cards[index];
+                                        }
+                                    }
+                                }
+                                if (targetEl) {
+                                    window.showDamageNumber(targetEl, healValue, 'heal');
+                                }
+                            }, 50);
+                        }
+
+                        return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
+                    }
+                }
+                return null;
+            },
+            'HEAL_CATEGORY_BONUS': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit) {
+                    let healAmount = bc.value;
+                    if (targetUnit.category && targetUnit.category.includes(bc.target_category_includes)) {
+                        healAmount = bc.bonus_value;
+                    }
+
+                    const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                    const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
+                    if (typeof max === 'number' && typeof current === 'number') {
+                        const healValue = Math.min(max - current, healAmount);
+                        const newHp = current + healValue;
+                        if (targetUnit.type === 'HERO') targetUnit.hp = newHp;
+                        else {
+                            targetUnit.currentHealth = newHp;
+                            this.updateEnrage(targetUnit);
+                        }
+                        return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: healValue };
+                    }
+                }
+                return null;
+            },
+            'FULL_HEAL': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit) {
+                    const max = targetUnit.type === 'HERO' ? targetUnit.maxHp : targetUnit.health;
+                    const current = targetUnit.type === 'HERO' ? targetUnit.hp : targetUnit.currentHealth;
+                    if (typeof max === 'number' && typeof current === 'number') {
+                        const healValue = max - current;
+                        if (targetUnit.type === 'HERO') targetUnit.hp = max;
+                        else {
+                            targetUnit.currentHealth = max;
+                            this.updateEnrage(targetUnit);
+                        }
+                        return { type: 'HEAL', target: targetUnit, value: healValue };
+                    }
+                }
+                return null;
+            },
+            'BUFF_STAT_TARGET': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    if (bc.stat === 'ATTACK') targetUnit.attack += bc.value;
+                    else if (bc.stat === 'HEALTH') {
+                        targetUnit.health += bc.value;
+                        targetUnit.currentHealth += bc.value;
+                        this.updateEnrage(targetUnit);
+                    }
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: bc.stat, value: bc.value };
+                }
+                return null;
+            },
+            'BUFF_STAT_TARGET_CATEGORY_BONUS': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    let buffValue = bc.value;
+                    if (targetUnit.category && targetUnit.category.includes(bc.target_category_includes)) {
+                        buffValue = bc.bonus_value;
+                    }
+
+                    if (bc.stat === 'ATTACK') targetUnit.attack += buffValue;
+                    else if (bc.stat === 'HEALTH') {
+                        targetUnit.health += buffValue;
+                        targetUnit.currentHealth += buffValue;
+                        this.updateEnrage(targetUnit);
+                    }
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: bc.stat, value: buffValue };
+                }
+                return null;
+            },
+            'BUFF_STAT_TARGET_TEMP': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const buff = { attack: 0, health: 0 };
+                    if (bc.stat === 'ALL' || !bc.stat) {
+                        buff.attack = buff.health = bc.value;
+                    } else if (bc.stat === 'ATTACK') buff.attack = bc.value;
+                    else if (bc.stat === 'HEALTH') buff.health = bc.value;
+
+                    targetUnit.attack += buff.attack;
+                    targetUnit.health += buff.health;
+                    targetUnit.currentHealth += buff.health;
+                    if (!targetUnit.tempBuffs) targetUnit.tempBuffs = [];
+                    targetUnit.tempBuffs.push(buff);
+                    this.updateEnrage(targetUnit);
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: 'ALL', value: bc.value };
+                }
+                return null;
+            },
+            'BUFF_HEALTH_AND_TAUNT_TARGET': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    // Increase Health (Max and Current)
+                    targetUnit.health += bc.value;
+                    targetUnit.currentHealth += bc.value;
+                    this.updateEnrage(targetUnit);
+
+                    // Grant Taunt
+                    if (!targetUnit.keywords) targetUnit.keywords = {};
+                    targetUnit.keywords.taunt = true;
+
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, stat: 'HEALTH', value: bc.value, taunt: true };
+                }
+                return null;
+            },
+            'GIVE_DIVINE_SHIELD': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    if (!targetUnit.keywords) targetUnit.keywords = {};
+                    targetUnit.keywords.divineShield = true;
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, shield: true };
+                }
+                return null;
+            },
+            'SUMMON_MULTIPLE': (bc, target, source) => {
+                const collection = this.collection || [];
+                const cardDef = collection.find(c => c.id === bc.cardId);
+                const count = bc.count || 1;
+                const summoned = [];
+
+                if (cardDef) {
+                    for (let i = 0; i < count; i++) {
+                        if (this.currentPlayer.board.length < 7) {
+                            const minion = this.createMinion(cardDef, this.currentPlayer.side);
+
+                            // Apply specific properties if needed
+                            if (bc.isTemporary) {
+                                minion.isTemporary = true;
+                            }
+
+                            // Redundant Charge Check
+                            if (minion.keywords && minion.keywords.charge) {
+                                minion.sleeping = false;
+                                minion.canAttack = true;
+                            }
+
+                            this.currentPlayer.board.push(minion);
+                            summoned.push(minion);
+                        }
+                    }
+                    if (summoned.length > 0) {
+                        this.updateAuras();
+                        return { type: 'SUMMON_MULTIPLE', count: summoned.length, cardId: bc.cardId };
+                    }
+                }
+                return null;
+            },
+            'ADD_CARD_TO_HAND': (bc) => {
+                const collection = this.collection || [];
+                const cardDef = collection.find(c => c.id === bc.cardId);
+                const count = bc.value || 1;
+                const added = [];
+
+                if (cardDef) {
+                    for (let i = 0; i < count; i++) {
+                        if (this.currentPlayer.hand.length < 10) {
+                            const card = JSON.parse(JSON.stringify(cardDef));
+                            card.side = this.currentPlayer.side; // Ensure side is set for tokens
+                            this.currentPlayer.hand.push(card);
+                            added.push(card);
+                        }
+                    }
+                    return { type: 'ADD_CARD', count: added.length, cardId: bc.cardId };
+                }
+                return null;
+            },
+            'GIVE_DIVINE_SHIELD_CATEGORY': (bc) => {
+                const affected = [];
+                this.currentPlayer.board.forEach((m, i) => {
+                    if (m.category === bc.target_category) {
+                        if (!m.keywords) m.keywords = {};
+                        m.keywords.divineShield = true;
+                        affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
+                    }
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
+            'GIVE_DIVINE_SHIELD_ALL': () => {
+                const affected = [];
+                this.currentPlayer.board.forEach((m, i) => {
+                    if (!m.keywords) m.keywords = {};
+                    m.keywords.divineShield = true;
+                    affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
+            'SWAP_ATTACK_HEALTH': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const oldAttack = targetUnit.attack;
+                    const oldHealth = targetUnit.health;
+                    const oldCurrentHealth = targetUnit.currentHealth;
+
+                    // Swap attack and max health
+                    targetUnit.attack = oldHealth;
+                    targetUnit.health = oldAttack;
+
+                    // Adjust current health proportionally, but ensure it's at least 1
+                    const healthRatio = oldCurrentHealth / oldHealth;
+                    targetUnit.currentHealth = Math.max(0, Math.floor(oldAttack * healthRatio));
+
+                    this.updateEnrage(targetUnit);
+                    return { type: 'SWAP', target: { ...targetUnit, index: target.index }, oldAttack, oldHealth };
+                }
+                return null;
+            },
+            'DESTROY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: 999 };
+                }
+                return null;
+            },
+            'BUFF_CATEGORY': (bc) => {
+                const affected = [];
+                this.currentPlayer.board.forEach((m, i) => {
+                    if (m.category === bc.target_category) {
+                        const val = bc.value || 0;
+                        if (bc.stat === 'HEALTH' || bc.stat === 'ALL') {
+                            m.health += val;
+                            m.currentHealth += val;
+                        }
+                        if (bc.stat === 'ATTACK' || bc.stat === 'ALL') {
+                            m.attack += val;
+                        }
+                        affected.push({ unit: { ...m, index: i }, type: 'BUFF' });
+                    }
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
+            'UNLOCK_AND_BUFF_HEALTH': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    // Unlock
+                    targetUnit.lockedTurns = 0;
+                    if (!targetUnit.sleeping) {
+                        targetUnit.canAttack = true;
+                    }
+
+                    // Buff Health
+                    targetUnit.health += bc.value;
+                    targetUnit.currentHealth += bc.value;
+                    this.updateEnrage(targetUnit);
+
+                    return { type: 'UNLOCK_AND_BUFF', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
+            'BUFF_ALL': (bc) => {
+                const affected = [];
+                this.currentPlayer.board.forEach((m, i) => {
+                    if (bc.stat === 'ATTACK' || bc.stat === 'ALL') {
+                        m.attack += bc.value;
+                    }
+                    if (bc.stat === 'HEALTH' || bc.stat === 'ALL') {
+                        m.health += bc.value;
+                        m.currentHealth += bc.value;
+                    }
+                    affected.push({ unit: { ...m, index: i }, type: 'BUFF', stat: bc.stat, value: bc.value });
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
+            'DAMAGE_RANDOM_FRIENDLY': (bc) => {
+                const board = this.currentPlayer.board;
+                if (board.length > 0) {
+                    const idx = Math.floor(Math.random() * board.length);
+                    const unit = board[idx];
+                    this.applyDamage(unit, bc.value);
+                    return { type: 'DAMAGE', target: { ...unit, index: idx }, value: bc.value };
+                } else {
+                    this.applyDamage(this.currentPlayer.hero, bc.value);
+                    return { type: 'DAMAGE', target: { ...this.currentPlayer.hero, index: -1 }, value: bc.value };
+                }
+            },
+            'SET_ATTACK_ALL': (bc) => {
+                const affected = [];
+                [this.currentPlayer, this.opponent].forEach(p => {
+                    p.board.forEach((m, i) => {
+                        const auraAtk = m.ongoingStats?.attack || 0;
+                        m.attack = bc.value + auraAtk;
+                        m.baseAttackOverride = bc.value; // Store the new base
+                        affected.push({ unit: { ...m, index: i, side: p.side }, type: 'BUFF' });
+                    });
+                });
+                return { type: 'BUFF_ALL', affected };
+            },
+            'BUFF_ADJACENT': (bc, target, source) => {
+                const affected = [];
+                if (source) {
+                    const idx = this.currentPlayer.board.indexOf(source);
+                    if (idx !== -1) {
+                        [idx - 1, idx + 1].forEach(nid => {
+                            if (nid >= 0 && nid < this.currentPlayer.board.length) {
+                                const neighbor = this.currentPlayer.board[nid];
+                                const val = bc.value || 1;
+                                neighbor.attack += val;
+                                neighbor.health += val;
+                                neighbor.currentHealth += val;
+                                this.updateEnrage(neighbor);
+                                affected.push({ unit: { ...neighbor, index: nid }, type: 'BUFF' });
+                            }
+                        });
+                    }
+                }
+                return { type: 'BUFF_ALL', affected };
+            },
+            'GIVE_KEYWORD_ADJACENT': (bc, target, source) => {
+                const affected = [];
+                if (source) {
+                    const idx = this.currentPlayer.board.indexOf(source);
+                    if (idx !== -1) {
+                        [idx - 1, idx + 1].forEach(nid => {
+                            if (nid >= 0 && nid < this.currentPlayer.board.length) {
+                                const neighbor = this.currentPlayer.board[nid];
+                                if (!neighbor.keywords) neighbor.keywords = {};
+                                neighbor.keywords[bc.keyword] = true;
+                                affected.push({ unit: { ...neighbor, index: nid }, type: 'BUFF' });
+                            }
+                        });
+                    }
+                }
+                return { type: 'BUFF_ALL', affected };
+            },
+            'BOUNCE_TARGET': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                    const idx = owner.board.indexOf(targetUnit);
+                    if (idx !== -1) {
+                        owner.board.splice(idx, 1);
+                        const cardToHand = this._createBounceCard(targetUnit);
+                        if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                        return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                    }
+                }
+                return null;
+            },
+            'EAT_FRIENDLY': (bc, target, source) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && source) {
+                    source.attack += targetUnit.attack;
+                    source.health += targetUnit.health;
+                    source.currentHealth += targetUnit.health;
+                    targetUnit.currentHealth = 0;
+                    return { type: 'EAT', target: target, value: { attack: targetUnit.attack, health: targetUnit.health } };
+                }
+                return null;
+            },
+            'BOUNCE_CATEGORY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    if (bc.target_category_includes && (!targetUnit.category || !targetUnit.category.includes(bc.target_category_includes))) return null;
+                    const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                    const idx = owner.board.indexOf(targetUnit);
+                    if (idx !== -1) {
+                        owner.board.splice(idx, 1);
+                        const cardToHand = this._createBounceCard(targetUnit);
+                        if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                        return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                    }
+                }
+                return null;
+            },
+            'BOUNCE_ALL_CATEGORY': (bc) => {
+                const bounced = [];
+                [this.currentPlayer, this.opponent].forEach(player => {
+                    for (let i = player.board.length - 1; i >= 0; i--) {
+                        const m = player.board[i];
+                        if (m.category && m.category.includes(bc.target_category_includes)) {
+                            player.board.splice(i, 1);
+                            bounced.push(m);
+                            const cardToHand = this._createBounceCard(m);
+                            if (player.hand.length < 10) player.hand.push(cardToHand);
+                        }
+                    }
+                });
+                return { type: 'BOUNCE_ALL', bounced };
+            },
+            'REDUCE_COST_ALL_HAND': (bc) => {
+                const affected = [];
+                this.currentPlayer.hand.forEach(card => {
+                    if (card.cost > 0) {
+                        card.cost -= Math.min(card.cost, bc.value);
+                        card.isReduced = true;
+                        affected.push(card);
+                    }
+                });
+                return { type: 'BUFF_HAND', affected };
+            },
+            'DRAW': (bc) => {
+                const count = bc.value || 1;
+                if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                    for (let i = 0; i < count; i++) this.currentPlayer.drawCard();
+                }
+                return { type: 'DRAW', value: count };
+            },
+            'DRAW_MINION_REDUCE_COST': (bc) => {
+                const idx = this.currentPlayer.deck.findIndex(c => c.type === 'MINION');
+                if (idx !== -1) {
+                    if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                        this.currentPlayer.drawCard(idx, bc.value);
+                    }
+                    return { type: 'DRAW', cardIndex: idx, reduction: bc.value, count: 1 };
+                }
+                return null;
+            },
+            'DRAW_NEWS': (bc) => {
+                const idx = this.currentPlayer.deck.findIndex(c => c.type === 'NEWS');
+                if (idx !== -1) {
+                    if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                        this.currentPlayer.drawCard(idx, bc.value || 0);
+                    }
+                    return { type: 'DRAW', cardIndex: idx, count: 1 };
+                } else {
+                    if (typeof logMessage === 'function') logMessage("牌庫中沒有新聞牌了!");
+                    return null;
+                }
+            },
+            'DISCARD_DRAW': (bc) => {
+                const res = this.resolveBattlecry({ type: 'DISCARD_RANDOM', value: bc.discardCount || 1 });
+                return { ...res, type: 'DISCARD_DRAW', drawCount: bc.drawCount || 1 };
+            },
+            'DISCARD_RANDOM': (bc) => {
+                const count = bc.value || 1;
+                const available = Array.from({ length: this.currentPlayer.hand.length }, (_, i) => i);
+                const discardedIndices = [];
+                for (let i = 0; i < count && available.length > 0; i++) {
+                    discardedIndices.push(available.splice(Math.floor(Math.random() * available.length), 1)[0]);
+                }
+                const discardedCards = [];
+                [...discardedIndices].sort((a, b) => b - a).forEach(idx => {
+                    const card = this.currentPlayer.hand.splice(idx, 1)[0];
+                    discardedCards.push(card);
+                    this.handleDiscard(this.currentPlayer, card);
+                });
+                return { type: 'DISCARD', count, indices: discardedIndices, cards: discardedCards };
+            },
+            'DESTROY_ALL_MINIONS': () => {
+                const affected = [];
+                this.players.forEach(p => {
+                    for (let i = p.board.length - 1; i >= 0; i--) {
+                        affected.push({ unit: { ...p.board[i], index: i, side: p.side } });
+                        p.board[i].currentHealth = 0;
+                    }
+                });
+                return { type: 'DESTROY_ALL', affected };
+            },
+            'DESTROY_LOW_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.attack <= bc.value) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
+            'DESTROY_HIGH_ATTACK': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.attack >= bc.value) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
+            'DESTROY_DAMAGED': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.currentHealth < targetUnit.health) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            },
+            'MULTI_DAMAGE': (bc, target) => {
+                const damage = bc.value;
+                const enemies = [this.opponent.hero, ...this.opponent.board];
+                const hits = [];
+
+                for (let i = 0; i < damage; i++) {
+                    if (enemies.length === 0) break;
+                    const randTarget = enemies[Math.floor(Math.random() * enemies.length)];
+                    this.applyDamage(randTarget, 1);
+                    hits.push({ target: JSON.parse(JSON.stringify(randTarget)), value: 1 });
+
+                    if (randTarget.type === 'MINION' && randTarget.currentHealth <= 0) {
+                        const idx = enemies.indexOf(randTarget);
+                        if (idx > -1) enemies.splice(idx, 1);
+                    }
+                }
+                return { type: 'MULTI_DAMAGE', hits };
+            },
+            'FULL_HEAL_AND_DRAW': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    const oldHealth = targetUnit.currentHealth;
+                    targetUnit.currentHealth = targetUnit.health;
+                    this.updateEnrage(targetUnit);
+                    this.currentPlayer.drawCard();
+                    return { type: 'HEAL', target: { ...targetUnit, index: target.index }, value: targetUnit.health - oldHealth, draw: 1 };
+                }
+                return null;
+            },
+            'SET_DEATH_TIMER': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    targetUnit.deathTimer = bc.value || 3;
+                    return { type: 'BUFF', target: { ...targetUnit, index: target.index }, deathTimer: targetUnit.deathTimer };
+                }
+                return null;
+            },
+            'DAMAGE_NON_CATEGORY': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && (!targetUnit.category || !targetUnit.category.includes(bc.target_category))) {
+                    this.applyDamage(targetUnit, bc.value);
+                    return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: bc.value };
+                }
+                return null;
+            },
+            'BOUNCE_RANDOM_ENEMY': (bc) => {
+                const owner = this.opponent;
+                if (owner.board.length > 0) {
+                    const idx = Math.floor(Math.random() * owner.board.length);
+                    const targetUnit = owner.board[idx];
+                    owner.board.splice(idx, 1);
+                    const cardToHand = this._createBounceCard(targetUnit);
+                    if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                    return { type: 'BOUNCE', target: { ...targetUnit, index: idx, side: owner.side } };
+                }
+                return null;
+            },
+            'DESTROY_LOCKED': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (this.debugMode) console.log(`[ENGINE] DESTROY_LOCKED target:`, targetUnit?.name, "lockedTurns:", targetUnit?.lockedTurns);
+                if (targetUnit && targetUnit.type === 'MINION' && targetUnit.lockedTurns > 0) {
+                    targetUnit.currentHealth = 0;
+                    return { type: 'DESTROY', target: { ...targetUnit, index: target.index } };
+                }
+                return null;
+            }
+        };
+    }
+
+    _createBounceCard(minion) {
+        const collection = this.collection || [];
+        const original = collection.find(c => c.id === minion.id) || minion;
+        let card = JSON.parse(JSON.stringify(original));
+
+        // Special Bounce logic (Data-driven bounce bonuses like Han Kuo-yu/Hao Lung-bin)
+        if (minion.hanBounceBonus) card.hanBounceBonus = minion.hanBounceBonus;
+        if (card.bounce_bonus) {
+            card.hanBounceBonus = (card.hanBounceBonus || 0) + card.bounce_bonus;
+        }
+
+        if (card.hanBounceBonus) {
+            card.attack += card.hanBounceBonus;
+            card.health += card.hanBounceBonus;
+        }
+
+        // Carry over side
+        card.side = minion.side;
+
+        delete card.currentHealth;
+        delete card.sleeping;
+        delete card.canAttack;
+        delete card.isEnraged;
+        delete card.tempBuffs;
+        return card;
+    }
+
+
+    get currentPlayer() {
+        return this.players[this.currentPlayerIdx];
+    }
+
+    get opponent() {
+        return this.players[this.currentPlayerIdx === 0 ? 1 : 0];
+    }
+
+    getNewsPower(side) {
+        const player = this.players.find(p => p.side === side);
+        if (!player) return 0;
+        return player.board.reduce((total, m) => {
+            return total + (m.keywords?.newsPower || 0);
+        }, 0);
+    }
+
+    /**
+     * Start a new turn.
+     */
+    startTurn() {
+        this.turnCount++;
+        const player = this.currentPlayer;
+
+        // Execute Turn Start Effects
+        if (player.onTurnStart && player.onTurnStart.length > 0) {
+            const effects = [...player.onTurnStart];
+            player.onTurnStart = [];
+            effects.forEach(effect => {
+                if (effect.type === 'DRAW') {
+                    for (let i = 0; i < effect.count; i++) player.drawCard();
+                }
+            });
+        }
+
+        // Increase Mana
+        if (player.mana.max < 10) {
+            player.mana.max++;
+        }
+        player.mana.current = player.mana.max;
+
+        // Draw a card (Always draw at start of turn)
+        player.drawCard();
+
+        // Decrease Lock Turns for ALL players' minions
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(m => {
+                if (m.lockedTurns > 0) {
+                    m.lockedTurns--;
+                    if (m.lockedTurns === 0) {
+                        m.justUnlocked = true;
+                    }
+                } else {
+                    delete m.justUnlocked;
+                }
+            });
+        });
+
+        // Wake up minions (summoning sickness wears off)
+        player.board.forEach(minion => {
+            minion.canAttack = true;
+            // Re-apply lock if still locked
+            if (minion.lockedTurns > 0) minion.canAttack = false;
+        });
+
+        // Handle Delayed Death (Death Grip) for ALL minions on the board
+        // This makes the timer tick down on every turn start (Player or AI)
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(minion => {
+                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+                    minion.deathTimer--;
+                    if (minion.deathTimer === 0) {
+                        minion.currentHealth = 0;
+                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
+                    }
+                }
+            });
+        });
+
+        // Sleeping minions from last turn wake up (simplified: all board minions can attack unless just summoned)
+        // Actually, logic is: Minions summoned LAST turn can attack THIS turn.
+        // So we set sleeping = false for all.
+        player.board.forEach(m => m.sleeping = false);
+
+        this.updateAuras();
+
+        // resolveDeaths is now removed from startTurn to allow UI to animate turn-start deaths
+        // this.resolveDeaths();
+    }
+
+    /**
+     * End current turn and switch player.
+     */
+    endTurn() {
+        // Quest Logic: Process for ALL minions on BOTH boards at any turn end
+        [this.players[0], this.players[1]].forEach(player => {
+            player.board.forEach(m => {
+                if (m.keywords?.quest) {
+                    m.questTurns = (m.questTurns || 0) + 1;
+                    if (m.questTurns >= m.keywords.quest.turns) {
+                        // Quest completed
+                        if (m.keywords.quest.summonCardId) {
+                            // Summon type quest (e.g., Lan Yi-ming)
+                            m.currentHealth = 0; // Trigger death
+                            m.keywords.deathrattle = {
+                                type: 'SUMMON',
+                                cardId: m.keywords.quest.summonCardId
+                            };
+                        } else if (m.keywords.quest.effect) {
+                            // Effect type quest (e.g., Nuclear Power Plant)
+                            const effect = m.keywords.quest.effect;
+                            if (effect.type === 'DAMAGE_ALL_MINIONS') {
+                                // Collect all minions that will be affected
+                                const affectedMinions = [];
+                                [this.players[0], this.players[1]].forEach(p => {
+                                    p.board.forEach(minion => {
+                                        affectedMinions.push({
+                                            minion: { ...minion },
+                                            side: p.side
+                                        });
+                                    });
+                                });
+
+                                // Add to events for visual trigger
+                                // Frontend will handle damage application and animations
+                                this.questCompletionEvents.push({
+                                    type: 'NUCLEAR_EXPLOSION',
+                                    sourceMinion: { ...m },
+                                    effect: effect,
+                                    affectedMinions: affectedMinions,
+                                    // Flag to indicate backend should apply damage after frontend animations
+                                    needsBackendDamage: true
+                                });
+
+                                // DON'T apply damage here - let frontend handle it with animations
+                                // The damage will be applied after animations complete
+                            }
+                            // Remove quest from minion so it doesn't trigger again
+                            delete m.keywords.quest;
+                            delete m.questTurns;
+                        }
+                    }
+                }
+            });
+        });
+
+        // Cleanup Temporary Buffs for current player
+        this.currentPlayer.board.forEach(m => {
+            if (m.tempBuffs && m.tempBuffs.length > 0) {
+                m.tempBuffs.forEach(buff => {
+                    m.attack -= buff.attack;
+                    m.health -= buff.health;
+                    if (m.currentHealth > m.health) m.currentHealth = m.health;
+                });
+                m.tempBuffs = [];
+            }
+        });
+
+        // Kill Temporary Minions (e.g. from '側翼出動')
+        this.currentPlayer.board.forEach(m => {
+            if (m.isTemporary) {
+                m.currentHealth = 0; // Mark as dead
+            }
+        });
+
+        // resolveDeaths is now removed from endTurn to allow UI to animate end-turn deaths
+        // this.resolveDeaths();
+
+        this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
+        this.startTurn();
+    }
+
+    /**
+     * Calculate the actual cost of a card considering ongoing effects
+     * @param {Object} card The card to calculate cost for
+     * @param {string} side Optional: Force calculation for a specific side (PLAYER/OPPONENT)
+     * @returns {number} The actual cost after reductions
+     */
+    getCardActualCost(card, side = null) {
+        let cost = card.cost;
+        // Use provided side, or the card's own side, or fallback to current player
+        const targetSide = side || card.side || (this.currentPlayer ? this.currentPlayer.side : 'PLAYER');
+        const player = this.players.find(p => p.side === targetSide);
+
+        if (!player) return Math.max(0, cost);
+
+        // Check for REDUCE_NEWS_COST ongoing effects
+        if (card.type === 'NEWS') {
+            player.board.forEach(minion => {
+                // Modular check: any minion with this keyword reduces cost
+                if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
+                    const val = minion.keywords.ongoing.value || 0;
+                    cost -= val;
+                }
+            });
+        }
+
+        const finalCost = Math.max(0, cost);
+        return finalCost;
+    }
+
+    /**
+     * Play a card from hand.
+     * @param {number} cardIndex Index in hand
+     * @param {Object} target Target info { type: 'HERO'|'MINION'|'PLAYER', index: number } (Optional)
+     * @param {number} insertionIndex Preferred index on board (Optional)
+     */
+    canPlayCard(cardIndex) {
+        const player = this.currentPlayer;
+        const card = player.hand[cardIndex];
+        if (!card) return false;
+
+        // Critical Fix: Use getCardActualCost for validation logic too
+        const actualCost = this.getCardActualCost(card);
+
+        if (player.mana.current < actualCost) return false;
+        if (player.board.length >= 7 && card.type === 'MINION') return false;
+
+        // Discard Play Restriction
+        if (card.keywords && card.keywords.battlecry && card.keywords.battlecry.type === 'DISCARD_RANDOM') {
+            const count = card.keywords.battlecry.value || 1;
+            // The card itself is in hand, so we have hand.length cards.
+            // If we have 1 card (this one) and need to discard 1, we can't discard "another" card.
+            // Logic: play card -> remove from hand -> trigger battlecry -> discard from REMAINING hand.
+            // So if hand.length (including self) <= count, we have < count remaining.
+            if (player.hand.length <= count) return false;
+        }
+
+        return true;
+    }
+
+    playMinion(cardIndex, insertionIndex = -1) {
+        return this.playCard(cardIndex, null, insertionIndex);
+    }
+
+    playCard(cardIndex, target = null, insertionIndex = -1, skipBattlecry = false) {
+        const player = this.currentPlayer;
+        const card = player.hand[cardIndex];
+        const actualCost = this.getCardActualCost(card); // Calculate actual cost once
+
+        if (!this.canPlayCard(cardIndex)) {
+            // Re-throw specific errors if needed, or generic
+            if (player.mana.current < actualCost) throw new Error("能量不足!");
+            if (player.board.length >= 7 && card.type === 'MINION') throw new Error("戰場已滿!");
+            if (card.keywords?.battlecry?.type === 'DISCARD_RANDOM') {
+                const count = card.keywords.battlecry.value || 1;
+                if (player.hand.length <= count) {
+                    throw new Error(`至少需要 ${count} 張手牌可以丟棄,無法打出此卡!`);
+                }
+            }
+            throw new Error("無法打出此卡!");
+        }
+
+        // Pay Mana (use actual cost considering ongoing effects)
+        player.mana.current -= actualCost;
+
+        // Remove from hand
+        player.hand.splice(cardIndex, 1);
+
+        let battlecryResult = null;
+
+        if (card.type === 'MINION') {
+            const minion = this.createMinion(card, player.side);
+
+            // Debug log to verify minion state after creation
+            console.log(`[PLAY_MINION] ${minion.name} - canAttack: ${minion.canAttack}, sleeping: ${minion.sleeping}, hasCharge: ${!!minion.keywords?.charge}`);
+
+            if (insertionIndex === -1) {
+                player.board.push(minion);
+            } else {
+                // Ensure insertionIndex is within bounds
+                const actualIndex = Math.min(Math.max(0, insertionIndex), player.board.length);
+                player.board.splice(actualIndex, 0, minion);
+            }
+
+            // Trigger Battlecry
+            if (minion.keywords && minion.keywords.battlecry && !skipBattlecry) {
+                battlecryResult = this.resolveBattlecry(minion.keywords.battlecry, target, minion);
+            }
+        } else if (card.type === 'NEWS') {
+            // Trigger News Effect (Battlecry logic reused for simplicity)
+            // Special Case for S002: Dynamic base damage based on deck
+            if (card.id === 'S002' && card.keywords?.battlecry) {
+                const baseDamage = player.deck.length === 0 ? 20 : 10;
+                card.keywords.battlecry.value = baseDamage;
+            }
+
+            if (card.keywords && card.keywords.battlecry && !skipBattlecry) {
+                // Ensure card.side is available for News Power calculation
+                card.side = player.side;
+                battlecryResult = this.resolveBattlecry(card.keywords.battlecry, target, card);
+            }
+            // Trigger effects that listen for News being played
+            this.handlePlayNews(player);
+        }
+
+        this.updateAuras();
+        return { card, battlecryResult };
+    }
+
+    updateAuras() {
+        this.players.forEach(player => {
+            // 1. Calculate Desired Buffs for all minions
+            const desiredBuffs = new Map(); // minion -> { attack: 0, health: 0 }
+            const desiredTaunt = new Set(); // Minions that should have taunt from aura
+
+            // Iterate sources
+            player.board.forEach((m, i) => {
+                // Initialize entry for every minion to ensure we check everyone
+                if (!desiredBuffs.has(m)) desiredBuffs.set(m, { attack: 0, health: 0 });
+
+                if (m.keywords && m.keywords.ongoing) {
+                    const aura = m.keywords.ongoing;
+
+                    // Basic Adjacent Stats Buff
+                    if (aura.type === 'ADJACENT_BUFF_STATS') {
+                        const val = aura.value || 1;
+                        [i - 1, i + 1].forEach(nid => {
+                            if (nid >= 0 && nid < player.board.length) {
+                                const neighbor = player.board[nid];
+                                if (!desiredBuffs.has(neighbor)) desiredBuffs.set(neighbor, { attack: 0, health: 0 });
+                                const buffs = desiredBuffs.get(neighbor);
+                                buffs.attack += val;
+                                buffs.health += val;
+                            }
+                        });
+                    }
+                    // Adjacent Buff with Category Requirement (Stats + Keyword)
+                    else if (aura.type === 'ADJACENT_BUFF_CATEGORY_ATTRS') {
+                        const cat = aura.target_category;
+                        [i - 1, i + 1].forEach(nid => {
+                            if (nid >= 0 && nid < player.board.length) {
+                                const neighbor = player.board[nid];
+                                if (neighbor.category && neighbor.category.includes(cat)) {
+                                    if (!desiredBuffs.has(neighbor)) desiredBuffs.set(neighbor, { attack: 0, health: 0 });
+                                    const buffs = desiredBuffs.get(neighbor);
+
+                                    if (aura.value) { // Health buff
+                                        buffs.health += aura.value;
+                                    }
+                                    if (aura.attack) { // Attack buff
+                                        buffs.attack += aura.attack;
+                                    }
+                                    if (aura.keyword === 'taunt') {
+                                        desiredTaunt.add(neighbor);
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+            });
+
+            // 2. Apply Diffs
+            player.board.forEach(m => {
+                const current = m.ongoingStats || { attack: 0, health: 0 };
+                const target = desiredBuffs.get(m) || { attack: 0, health: 0 };
+
+                const atkDiff = target.attack - current.attack;
+                const hpDiff = target.health - current.health;
+
+                if (atkDiff !== 0 || hpDiff !== 0) {
+                    m.attack += atkDiff;
+                    m.health += hpDiff;
+
+                    if (hpDiff > 0) {
+                        m.currentHealth += hpDiff;
+                    } else if (hpDiff < 0) {
+                        if (m.currentHealth > m.health) {
+                            m.currentHealth = m.health;
+                        }
+                    }
+                    this.updateEnrage(m);
+
+                    if (target.attack === 0 && target.health === 0) {
+                        m.ongoingStats = null;
+                    } else {
+                        m.ongoingStats = { ...target };
+                    }
+                }
+
+                // Handle Ongoing Taunt
+                if (desiredTaunt.has(m)) {
+                    if (!m.keywords) m.keywords = {};
+                    if (!m.keywords.taunt) {
+                        m.keywords.taunt = true;
+                        m.ongoingTaunt = true; // Mark as granted by aura
+                    } else if (m.keywords.taunt && !m.ongoingTaunt && !m.keywords.baseTaunt) {
+                        // If it has taunt but not marked as ongoing, maybe it was natural?
+                        // For simplicity, if we desire it, we ensure it's there.
+                        // But we track if we added it via 'ongoingTaunt' to remove it later.
+                        m.ongoingTaunt = true;
+                    }
+                } else {
+                    // If we don't desire it, but currently have it AND it was granted by aura, remove it.
+                    if (m.ongoingTaunt) {
+                        m.keywords.taunt = false; // Remove taunt
+                        m.ongoingTaunt = false;
+                    }
+                }
+
+                // Legacy Divine Shield cleanup
+                if (m.ongoingDivineShield) {
+                    m.keywords.divineShield = false;
+                    m.ongoingDivineShield = false;
+                }
+            });
+        });
+    }
+
+    resolveBattlecry(battlecry, target, sourceMinion = null) {
+        if (!battlecry || target === 'PENDING') return null;
+
+        if (this.debugMode) console.log(`[ENGINE] resolveBattlecry: ${battlecry.type}`, target, sourceMinion?.name);
+
+        // Apply News Power bonus if source is a News card
+        // Strictly only for DAMAGE and HEAL types. Exclude DRAW, COST and REDUCE variants.
+        let effectiveBattlecry = battlecry;
+        if (sourceMinion && sourceMinion.type === 'NEWS' && typeof battlecry.value === 'number') {
+            const isDamage = battlecry.type.includes('DAMAGE');
+            const isHeal = battlecry.type.includes('HEAL') || battlecry.type.includes('RECOVER');
+            const isExcluded = battlecry.type.includes('DRAW') || battlecry.type.includes('COST') || battlecry.type.includes('REDUCE');
+
+            if ((isDamage || isHeal) && !isExcluded) {
+                const bonusSide = sourceMinion.side || sourceMinion.ownerSide;
+                const bonus = this.getNewsPower(bonusSide);
+                if (bonus > 0) {
+                    effectiveBattlecry = { ...battlecry, value: battlecry.value + bonus };
+                    if (typeof effectiveBattlecry.bonus_value === 'number') {
+                        effectiveBattlecry.bonus_value += bonus;
+                    }
+                }
+            }
+        }
+
+        const handler = this.battlecryHandlers[effectiveBattlecry.type];
+        if (handler) {
+            const res = handler(effectiveBattlecry, target, sourceMinion);
+            // Post-handler logic for specific types
+            if (effectiveBattlecry.type === 'EAT_FRIENDLY' && res && sourceMinion) {
+                sourceMinion.attack += res.stats.attack;
+                sourceMinion.health += res.stats.health;
+                sourceMinion.currentHealth += res.stats.health;
+            }
+            return res;
+        }
+
+        console.warn("Unhandled Battlecry Type:", effectiveBattlecry.type);
+        return null;
+    }
+
+    handleDiscard(player, discardedCard = null) {
+        // Triggered effects on board
+        player.board.forEach(m => {
+            if (m.keywords && m.keywords.triggered && m.keywords.triggered.type === 'ON_DISCARD') {
+                const val = m.keywords.triggered.value || 2;
+                m.attack += val;
+                m.health += val;
+                m.currentHealth += val;
+                this.updateEnrage(m);
+            }
+        });
+
+        // Triggered effects on the card itself (e.g. summon when discarded)
+        if (discardedCard && discardedCard.keywords && discardedCard.keywords.onDiscard === 'SUMMON') {
+            if (player.board.length < 7) {
+                const minion = this.createMinion(discardedCard, player.side);
+                player.board.push(minion);
+                this.updateAuras();
+            }
+        }
+    }
+
+    handlePlayNews(player) {
+        // Triggered effects on board whenever a News card is played
+        player.board.forEach(m => {
+            if (m.keywords && m.keywords.triggered && m.keywords.triggered.type === 'ON_PLAY_NEWS') {
+                const triggered = m.keywords.triggered;
+
+                // Existing Action: Buff Attack (Default if no action specified)
+                if (!triggered.action || triggered.action === 'BUFF_ATTACK') {
+                    const val = triggered.value || 1;
+                    m.attack += val;
+                }
+
+                // New Action: Heal Self
+                if (triggered.action === 'HEAL') {
+                    const val = triggered.value || 1;
+                    const oldHealth = m.currentHealth;
+                    m.currentHealth = Math.min(m.health, m.currentHealth + val);
+                    const healedAmount = m.currentHealth - oldHealth;
+                    this.updateEnrage(m);
+
+                    // Visualize heal
+                    if (typeof window !== 'undefined' && window.showDamageNumber && healedAmount > 0) {
+                        setTimeout(() => {
+                            const boardId = m.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                            const board = document.getElementById(boardId);
+                            if (board) {
+                                const cards = board.querySelectorAll('.card');
+                                const playerObj = m.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                                const index = playerObj.board.indexOf(m);
+                                if (index >= 0 && cards[index]) {
+                                    window.showDamageNumber(cards[index], healedAmount, 'heal');
+                                }
+                            }
+                        }, 50);
+                    }
+                }
+
+                // Attack increase should be reflected immediately in UI during render
+            }
+        });
+    }
+
+    createMinion(cardData, side) {
+        const minion = {
+            ...cardData,
+            instanceId: `minion_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`, // Unique instance ID
+            currentHealth: cardData.health,
+            side: side,
+            sleeping: true,
+            canAttack: false
+        };
+
+        // Handle Charge keyword - must be set AFTER the base object is created
+        // to ensure these properties aren't overwritten
+        if (minion.keywords && minion.keywords.charge) {
+            minion.sleeping = false;
+            minion.canAttack = true;
+            console.log(`[CHARGE] Minion ${minion.name} created with charge - canAttack: ${minion.canAttack}, sleeping: ${minion.sleeping}`);
+        }
+
+        // Initialize quest turns counter
+        if (minion.keywords && minion.keywords.quest) {
+            minion.questTurns = 0;
+        }
+
+        // Apply '網軍' (TW048) or other specific checks if keywords are missing but required context implies execution (Unlikely if data is correct)
+
+        return minion;
+    }
+
+    getTargetUnit(target) {
+        if (!target || typeof target !== 'object') {
+            console.warn("Invalid target object in getTargetUnit:", target);
+            return null;
+        }
+
+        let targetPlayer = null;
+        if (target.side === 'PLAYER') targetPlayer = this.currentPlayer;
+        else if (target.side === 'OPPONENT') targetPlayer = this.opponent;
+
+        // Final fallback if side mapping fails
+        if (!targetPlayer) {
+            if (target.type === 'HERO') return (target.side === 'OPPONENT' ? this.opponent.hero : this.currentPlayer.hero);
+            return null;
+        }
+
+        if (target.type === 'HERO') return targetPlayer.hero;
+        if (target.type === 'MINION') {
+            const unit = targetPlayer.board[target.index];
+            return unit || null;
+        }
+        return null;
+    }
+
+    applyDamage(unit, amount) {
+        if (!unit) return;
+        const oldHealth = unit.currentHealth !== undefined ? unit.currentHealth : unit.hp;
+
+        if (unit.type === 'MINION' && unit.keywords && unit.keywords.divineShield) {
+            if (amount > 0) {
+                unit.keywords.divineShield = false; // Pop shield
+                // Trigger shield break animation if available
+                if (typeof window !== 'undefined' && window.showDamageNumber) {
+                    setTimeout(() => {
+                        const el = document.querySelector(`[data-minion-id="${unit.instanceId}"]`);
+                        if (el) window.showDamageNumber(el, 0, 'shield');
+                    }, 50);
+                }
+                return; // No damage taken
+            }
+        }
+
+        const newHealth = oldHealth - amount;
+
+        // Update currentHealth (minions)
+        if (unit.currentHealth !== undefined) unit.currentHealth = newHealth;
+        // Update hp (heroes)
+        if (unit.hp !== undefined) unit.hp = newHealth;
+
+        // Trigger damage number animation in browser
+        if (typeof window !== 'undefined' && window.showDamageNumber && amount > 0) {
+            setTimeout(() => {
+                let targetEl = null;
+                if (unit.type === 'HERO') {
+                    targetEl = unit.side === 'PLAYER' ?
+                        document.getElementById('player-hero') :
+                        document.getElementById('opp-hero');
+                } else if (unit.type === 'MINION') {
+                    // Find minion element by its unique instance ID
+                    if (unit.instanceId) {
+                        targetEl = document.querySelector(`[data-minion-id="${unit.instanceId}"]`);
+                    }
+                    // Fallback: try to find by index if instanceId doesn't work
+                    if (!targetEl) {
+                        const boardId = unit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                        const board = document.getElementById(boardId);
+                        if (board) {
+                            const cards = board.querySelectorAll('.card');
+                            const player = unit.side === 'PLAYER' ? this.currentPlayer : this.opponent;
+                            const index = player.board.indexOf(unit);
+                            if (index >= 0 && cards[index]) {
+                                targetEl = cards[index];
+                            }
+                        }
+                    }
+                }
+                if (targetEl) {
+                    window.showDamageNumber(targetEl, amount, 'damage');
+                } else {
+                    console.log('Could not find target element for damage animation:', unit);
+                }
+            }, 50);
+        }
+
+        this.updateEnrage(unit);
+        // Don't resolve deaths here - let app.js handle it with animation
+        // this.resolveDeaths();
+    }
+
+    updateEnrage(unit) {
+        if (!unit || unit.type !== 'MINION' || !unit.keywords || !unit.keywords.enrage) return;
+
+        const isDamaged = unit.currentHealth < unit.health;
+
+        if (isDamaged && !unit.isEnraged) {
+            unit.isEnraged = true;
+            if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                const stat = unit.keywords.enrage.stat;
+                if (stat === 'ATTACK' || stat === '攻擊') {
+                    unit.attack += unit.keywords.enrage.value;
+                }
+            }
+        } else if (!isDamaged && unit.isEnraged) {
+            unit.isEnraged = false;
+            if (unit.keywords.enrage.type === 'BUFF_STAT') {
+                const stat = unit.keywords.enrage.stat;
+                if (stat === 'ATTACK' || stat === '攻擊') {
+                    unit.attack -= unit.keywords.enrage.value;
+                }
+            }
+        }
+    }
+
+    /**
+     * Attack with a minion.
+     * @param {number} minionIndex Attacker index on board
+     * @param {Object} target Target { type: 'HERO'|'MINION', index: number }
+     */
+    attack(minionIndex, target) {
+        const attacker = this.currentPlayer.board[minionIndex];
+        if (!attacker) throw new Error("Attacker not found");
+        if (attacker.sleeping || !attacker.canAttack) throw new Error(UI_TEXT.CANNOT_ATTACK_SLEEPING);
+        if (attacker.lockedTurns > 0) throw new Error(UI_TEXT.LOCKED_CANNOT_ATTACK);
+        if (attacker.attack <= 0) throw new Error(UI_TEXT.ATTACK_ZERO);
+        if (attacker.allowAttackCount <= 0 && attacker.keywords?.windfury !== true) {
+            // Basic check, refined later
+        }
+
+        // Taunt Check
+        const opponentTaunts = this.opponent.board.filter(m => m.keywords && m.keywords.taunt);
+        if (opponentTaunts.length > 0) {
+            const isTargetTaunt = (target.type === 'MINION' && this.opponent.board[target.index]?.keywords?.taunt);
+            if (!isTargetTaunt) throw new Error(UI_TEXT.NEED_TAUNT_TARGET);
+        }
+
+        // Execute Attack
+        let targetUnit = null;
+        if (target.type === 'HERO') {
+            targetUnit = this.opponent.hero;
+        } else if (target.type === 'MINION') {
+            targetUnit = this.opponent.board[target.index];
+        }
+
+        if (!targetUnit) throw new Error("Invalid target");
+
+        // Use applyDamage for proper enrage/death triggers
+        const attackerAtk = attacker.attack;
+        const targetAtk = targetUnit.attack || 0;
+
+        this.applyDamage(targetUnit, attackerAtk);
+        if (target.type === 'MINION') {
+            this.applyDamage(attacker, targetAtk);
+        }
+
+        attacker.canAttack = false;
+        attacker.allowAttackCount = (attacker.allowAttackCount || 1) - 1;
+
+        // Don't resolve deaths here - let app.js handle it with animation
+        // this.resolveDeaths();
+    }
+
+    /**
+     * Check for dead minions without removing them.
+     * Returns array of { side: 'PLAYER'|'OPPONENT', index: number }
+     */
+    checkDeaths() {
+        const dead = [];
+        [this.players[0], this.players[1]].forEach(p => {
+            for (let i = 0; i < p.board.length; i++) {
+                if (p.board[i].currentHealth <= 0) {
+                    dead.push({ side: p.side, index: i });
+                }
+            }
+        });
+        return dead;
+    }
+
+    resolveDeaths() {
+        [this.players[0], this.players[1]].forEach(p => {
+            // Hero Death
+            if (p.hero.hp <= 0) {
+                this.gameOver = true;
+                this.winner = (p === this.players[0] ? 1 : 0);
+            }
+
+            // Minion Death
+            for (let i = p.board.length - 1; i >= 0; i--) {
+                if (p.board[i].currentHealth <= 0) {
+                    const deadMinion = p.board[i];
+                    p.board.splice(i, 1);
+                    // Trigger Deathrattle
+                    if (deadMinion.keywords && deadMinion.keywords.deathrattle) {
+                        this.resolveDeathrattle(p, deadMinion.keywords.deathrattle, deadMinion);
+                    }
+                }
+            }
+        });
+
+        this.updateAuras();
+    }
+
+    resolveDeathrattle(player, deathrattle, deadMinion) {
+        if (deathrattle.type === 'SUMMON') {
+            if (player.board.length < 7) {
+                const cardId = deathrattle.cardId;
+                const collection = this.collection || [];
+                const cardData = collection.find(c => c.id === cardId);
+
+                if (cardData) {
+                    const newMinion = this.createMinion(cardData, player.side);
+                    newMinion.justSummoned = true; // Flag for pop-out animation
+                    player.board.push(newMinion);
+                } else {
+                    // Fallback ghost
+                    const token = { name: "Ghost", attack: 1, health: 1, currentHealth: 1, sleeping: true, canAttack: false };
+                    player.board.push(token);
+                }
+            }
+        } else if (deathrattle.type === 'BOUNCE_SELF') {
+            const collection = this.collection || [];
+            const originalCard = collection.find(c => c.id === deadMinion.id) || deadMinion;
+            let cardToHand = JSON.parse(JSON.stringify(originalCard));
+
+            // Han / Hau bonuses persist if already on the cardToHand (usually they are applied TO the hand version)
+            // But if it's a deathrattle bounce, we just put it back.
+
+            if (player.hand.length < 10) {
+                player.hand.push(cardToHand);
+            }
+        } else if (deathrattle.type === 'DRAW') {
+            for (let i = 0; i < (deathrattle.value || 1); i++) {
+                player.drawCard();
+            }
+        }
+    }
+}
+

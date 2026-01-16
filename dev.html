@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>寶島遊戲王 (Treasure Island Duel)</title>
+    <title>寶島遊戲王 (Dev Mode)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
@@ -12,17 +12,26 @@
         rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 
-    <script src="card_data.js"></script>
-    <script src="default_decks.js"></script>
-    <script src="game_engine.js"></script>
-    <script src="updates.js"></script>
-    <script src="ui_translations.js"></script>
-    <script src="auth_manager.js"></script>
-    <script src="auth_ui.js" defer></script>
-    <script src="app.js" defer></script>
+    <!-- New Modular Entry Point -->
+    <script type="module" src="src/main.js"></script>
 </head>
 
 <body>
+    <!-- Global Error Handler -->
+    <script>
+        window.onerror = function (msg, url, lineNo, columnNo, error) {
+            const errorMsg = `Global Error: ${msg}\nURL: ${url}\nLine: ${lineNo}\nColumn: ${columnNo}\nError: ${error}`;
+            console.error(errorMsg);
+            const logDiv = document.getElementById('message-log');
+            if (logDiv) logDiv.innerHTML += `<div style="color:red;background:black;">${errorMsg}</div>`;
+            return false;
+        };
+        window.onunhandledrejection = function (event) {
+            console.error('Unhandled Promise Rejection:', event.reason);
+        };
+        console.log("Dev Mode: Global error handlers initialized.");
+    </script>
+
     <!-- 16:9 Aspect Ratio Container -->
     <div id="game-container-16-9">
         <!-- Content Scaler Wrapper (1920x1080 base) -->
@@ -47,8 +56,8 @@
                     </div>
                 </div>
                 <div class="menu-content">
-                    <h1 class="game-title">寶島遊戲王</h1>
-                    <div class="game-version">v0.6.0</div>
+                    <h1 class="game-title">寶島遊戲王 (Dev)</h1>
+                    <div class="game-version">v0.7.0-dev</div>
                     <div class="menu-buttons main-nav">
                         <button id="btn-main-battle" class="neon-button">進入戰鬥</button>
                         <button id="btn-main-builder" class="neon-button">牌組組建</button>
@@ -480,25 +489,25 @@
             <!-- Drag Line SVG Layer -->
             <svg id="drag-layer">
                 <defs>
-                    <marker id="arrowhead-damage" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
-                        orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#ff0000" />
+                    <marker id="arrowhead-damage" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                        markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L0,60 L35,30 z" fill="#ff0000" />
                     </marker>
-                    <marker id="arrowhead-heal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
-                        orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#43e97b" />
+                    <marker id="arrowhead-heal" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                        markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L0,60 L35,30 z" fill="#43e97b" />
                     </marker>
-                    <marker id="arrowhead-buff" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
-                        orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#ffa500" />
+                    <marker id="arrowhead-buff" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                        markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L0,60 L35,30 z" fill="#ffa500" />
                     </marker>
-                    <marker id="arrowhead-bounce" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6"
-                        orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#a335ee" />
+                    <marker id="arrowhead-bounce" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                        markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L0,60 L35,30 z" fill="#a335ee" />
                     </marker>
-                    <marker id="arrowhead-destroy" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6"
-                        markerHeight="6" orient="auto">
-                        <path d="M 0 0 L 10 5 L 0 10 z" fill="#000000" />
+                    <marker id="arrowhead-destroy" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                        markerUnits="userSpaceOnUse">
+                        <path d="M0,0 L0,60 L35,30 z" fill="#000000" />
                     </marker>
                 </defs>
                 <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="6" stroke-dasharray="8, 4"
@@ -521,6 +530,5 @@
     </div>
     <!-- End of 16:9 Container -->
 </body>
-
 
 </html>
