@@ -15,9 +15,11 @@ const AuthManager = {
         if (!this.API_URL) return { success: false, message: "API URL 未設定" };
 
         try {
-            // 使用 GET 方式註冊，以此繞過 GAS POST 的 CORS 限制並取得回傳值
             const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-            const response = await fetch(url);
+            const response = await fetch(url, {
+                method: 'GET',
+                redirect: 'follow' // 強制跟隨 GAS 的重導向
+            });
             const result = await response.json();
             return result;
         } catch (error) {
