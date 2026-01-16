@@ -1605,6 +1605,13 @@ body {
     z-index: 10;
 }
 
+/* Player deck moved above MANA */
+.player .deck-pile {
+    left: auto;
+    right: 30px;
+    bottom: 140px;
+}
+
 .opponent .deck-pile {
     bottom: auto;
     top: 20px;
@@ -2397,6 +2404,103 @@ body.dragging-active .player .hand .card:hover {
         transform: scale(1.05);
         opacity: 1;
     }
+}
+
+/* Deck View Modal */
+/* Deck View Modal 調整 */
+#deck-view-modal .modal-content {
+    max-width: 600px !important;
+    width: 85% !important;
+    padding: 30px 20px !important;
+}
+
+.deck-view-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    max-height: 550px;
+    overflow-y: auto;
+    padding: 10px;
+    background: rgba(139, 69, 19, 0.05);
+    /* 淺褐色背景，配合羊皮紙風 */
+    border-radius: 4px;
+    margin-bottom: 20px;
+}
+
+/* 牌組查看清單的滾動條樣式 (同步更新日誌風格) */
+.deck-view-grid::-webkit-scrollbar {
+    width: 12px;
+}
+
+.deck-view-grid::-webkit-scrollbar-track {
+    background: #e6d5b8;
+    border-radius: 10px;
+    border: 1px solid #d2b48c;
+}
+
+.deck-view-grid::-webkit-scrollbar-thumb {
+    background: #8b4513;
+    border-radius: 10px;
+    border: 2px solid #5d2e17;
+}
+
+.deck-view-grid::-webkit-scrollbar-thumb:hover {
+    background: #a0522d;
+}
+
+.deck-view-card {
+    background: rgba(139, 69, 19, 0.08);
+    /* 與更新紀錄一致的淺褐色條目感 */
+    border-left: 12px solid #8b4513;
+    border-radius: 4px;
+    padding: 12px 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.deck-view-card:hover {
+    transform: translateX(10px);
+    background: rgba(139, 69, 19, 0.15);
+    box-shadow: 2px 2px 5px rgba(0, 0, 0, 0.1);
+}
+
+.deck-view-card-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #4a2c1d;
+    /* 深褐色文字，讀感較佳 */
+}
+
+.deck-view-card-count {
+    font-size: 14px;
+    color: #7a4a3a;
+    margin-left: auto;
+    padding-left: 15px;
+}
+
+/* 稀有度邊框顏色 (Bar條) */
+.deck-view-card.COMMON {
+    border-left-color: #ffffff;
+}
+
+.deck-view-card.RARE {
+    border-left-color: #0070dd;
+}
+
+.deck-view-card.EPIC {
+    border-left-color: #a335ee;
+}
+
+.deck-view-card.LEGENDARY {
+    border-left-color: #ffa500;
+}
+
+/* 確保卡牌預覽在所有遮罩之上 */
+#card-preview {
+    z-index: 100000 !important;
 }
 
 /* Composite effect: Divine Shield + Can Attack */
@@ -3903,12 +4007,12 @@ body.dragging-active .player .hand .card:hover {
     transform: translateY(-50%);
     width: 60px;
     height: 400px;
-    background: rgba(15, 15, 15, 0.92);
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.95), rgba(101, 67, 33, 0.95));
     backdrop-filter: blur(15px);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 2px solid #8b4513;
     border-left: none;
     border-radius: 0 12px 12px 0;
-    box-shadow: 5px 0 20px rgba(0, 0, 0, 0.5);
+    box-shadow: 5px 0 20px rgba(0, 0, 0, 0.6), inset 0 0 30px rgba(0, 0, 0, 0.3);
     display: flex;
     overflow: hidden;
     z-index: 30000;
@@ -3926,10 +4030,15 @@ body.dragging-active .player .hand .card:hover {
     align-items: center;
     justify-content: center;
     font-size: 28px;
-    background: rgba(0, 0, 0, 0.3);
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(74, 44, 29, 0.6);
+    border-right: 2px solid rgba(139, 69, 19, 0.5);
     flex-shrink: 0;
     cursor: pointer;
+    transition: background 0.3s;
+}
+
+.history-tab:hover {
+    background: rgba(74, 44, 29, 0.8);
 }
 
 .history-content {
@@ -3949,13 +4058,14 @@ body.dragging-active .player .hand .card:hover {
 .history-header {
     font-size: 16px;
     font-weight: bold;
-    color: #fff;
+    color: #f4e4bc;
     margin-bottom: 12px;
     padding-bottom: 8px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+    border-bottom: 2px solid rgba(139, 69, 19, 0.5);
     text-align: center;
     letter-spacing: 1px;
     white-space: nowrap;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 #history-list {
@@ -3966,23 +4076,24 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .history-item {
-    background: rgba(255, 255, 255, 0.04);
-    border-left: 3px solid #666;
+    background: rgba(74, 44, 29, 0.3);
+    border-left: 3px solid #8b4513;
     border-radius: 0 4px 4px 0;
     padding: 8px 10px;
     margin-bottom: 6px;
     font-size: 12px;
     line-height: 1.4;
-    color: #ccc;
+    color: #e0d0b0;
     transition: all 0.2s;
 }
 
 .history-item:hover {
-    background: rgba(255, 255, 255, 0.08);
+    background: rgba(74, 44, 29, 0.5);
+    transform: translateX(2px);
 }
 
 .history-item b {
-    color: #fff;
+    color: #f4e4bc;
     font-weight: 600;
 }
 
@@ -4037,6 +4148,114 @@ body.dragging-active .player .hand .card:hover {
 #history-list::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 2px;
+}
+
+/* Settings Button & Menu */
+.settings-button {
+    position: fixed;
+    bottom: 30px;
+    left: 30px;
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.95), rgba(101, 67, 33, 0.95));
+    border: 3px solid #8b4513;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 29999;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5), inset 0 0 20px rgba(0, 0, 0, 0.3);
+}
+
+.settings-button:hover {
+    transform: scale(1.1) rotate(90deg);
+    box-shadow: 0 6px 20px rgba(139, 69, 19, 0.6), inset 0 0 20px rgba(0, 0, 0, 0.3);
+    border-color: #d2691e;
+}
+
+.settings-button .gear-icon {
+    font-size: 32px;
+    transition: transform 0.3s;
+}
+
+.settings-menu {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    min-width: 200px;
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.98), rgba(101, 67, 33, 0.98));
+    border: 3px solid #8b4513;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7), inset 0 0 30px rgba(0, 0, 0, 0.3);
+    z-index: 29998;
+    padding: 10px;
+    backdrop-filter: blur(10px);
+    animation: centerFade 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes centerFade {
+    from {
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+
+}
+
+.settings-menu-header {
+    font-size: 16px;
+    font-weight: bold;
+    color: #f4e4bc;
+    padding: 10px 15px;
+    border-bottom: 2px solid rgba(139, 69, 19, 0.5);
+    margin-bottom: 8px;
+    text-align: center;
+    letter-spacing: 1px;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.settings-menu-item {
+    width: 100%;
+    padding: 12px 15px;
+    margin: 5px 0;
+    background: rgba(74, 44, 29, 0.4);
+    border: 2px solid #8b4513;
+    border-radius: 8px;
+    color: #f4e4bc;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    transition: all 0.2s;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.settings-menu-item:hover {
+    background: rgba(74, 44, 29, 0.6);
+    border-color: #d2691e;
+    transform: translateX(5px);
+}
+
+.settings-menu-item.danger {
+    border-color: #9b3a2a;
+}
+
+.settings-menu-item.danger:hover {
+    background: rgba(125, 42, 30, 0.6);
+    border-color: #c04a35;
+}
+
+.settings-menu-item .menu-icon {
+    font-size: 18px;
 }
 
 /* AI Battle Setup Layout */
@@ -4618,4 +4837,67 @@ body.dragging-active .player .hand .card:hover {
     opacity: 1;
     visibility: visible;
     bottom: 80px;
+}
+
+/* Game Result View - Centered */
+.result-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(10px);
+    z-index: 50000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.result-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    animation: resultFadeIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.result-text {
+    font-size: 120px;
+    font-weight: 900;
+    text-align: center;
+    letter-spacing: 20px;
+    text-shadow:
+        0 0 20px currentColor,
+        0 0 40px currentColor,
+        4px 4px 8px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    animation: resultPulse 2s ease-in-out infinite;
+}
+
+@keyframes resultFadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes resultPulse {
+
+    0%,
+    100% {
+        transform: scale(1);
+        opacity: 0.9;
+    }
+
+    50% {
+        transform: scale(1.05);
+        opacity: 1;
+    }
 }

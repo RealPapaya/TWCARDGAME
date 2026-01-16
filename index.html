@@ -283,9 +283,6 @@
                     </div>
 
                     <div class="center-line">
-                        <button id="btn-surrender" class="neon-button danger"
-                            style="padding: 8px 20px; font-size: 16px;">投降</button>
-
                         <!-- Turn Text moved to right side via CSS, but let's keep it here -->
                         <div id="turn-indicator">Turn: 1</div>
 
@@ -295,6 +292,24 @@
                             <button id="end-turn-btn">結束回合</button>
                             <div id="indicator-player" class="turn-light">你的回合</div>
                         </div>
+                    </div>
+
+                    <!-- Settings Button (Bottom Left) -->
+                    <button id="settings-button" class="settings-button" title="設定">
+                        <span class="gear-icon">⚙️</span>
+                    </button>
+
+                    <!-- Settings Menu -->
+                    <div id="settings-menu" class="settings-menu" style="display: none;">
+                        <div class="settings-menu-header">遊戲設定</div>
+                        <button id="btn-view-deck-menu" class="settings-menu-item">
+                            <span class="menu-icon">📋</span>
+                            <span>查看牌組</span>
+                        </button>
+                        <button id="btn-surrender-menu" class="settings-menu-item danger">
+                            <span class="menu-icon">🏳️</span>
+                            <span>投降</span>
+                        </button>
                     </div>
 
                     <!-- Player Area -->
@@ -331,6 +346,19 @@
                     </div>
                 </div>
 
+            </div>
+
+            <!-- Deck View Modal -->
+            <div id="deck-view-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal wide-modal">
+                    <h2 class="medieval-title">我的牌組</h2>
+                    <div id="deck-view-list" class="deck-view-grid">
+                        <!-- 卡牌列表將由 JavaScript 動態生成 -->
+                    </div>
+                    <div class="modal-buttons medieval-button-group">
+                        <button id="btn-deck-view-close" class="medieval-button secondary">關閉</button>
+                    </div>
+                </div>
             </div>
 
             <!-- Generic Custom Modal -->

@@ -465,7 +465,39 @@ document.getElementById('end-turn-btn').addEventListener('click', async () => {
     } catch (e) { logMessage(e.message); }
 });
 
-document.getElementById('btn-surrender').addEventListener('click', () => {
+// Settings Menu Toggle
+document.getElementById('settings-button').addEventListener('click', (e) => {
+    e.stopPropagation();
+    const menu = document.getElementById('settings-menu');
+    if (menu.style.display === 'none' || !menu.style.display) {
+        menu.style.display = 'block';
+    } else {
+        menu.style.display = 'none';
+    }
+});
+
+// Close settings menu when clicking outside
+document.addEventListener('click', (e) => {
+    const menu = document.getElementById('settings-menu');
+    const button = document.getElementById('settings-button');
+    if (menu && button && !menu.contains(e.target) && !button.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
+
+// View Deck button in settings menu
+document.getElementById('btn-view-deck-menu').addEventListener('click', () => {
+    showDeckView();
+    document.getElementById('settings-menu').style.display = 'none';
+});
+
+document.getElementById('btn-deck-view-close')?.addEventListener('click', () => {
+    document.getElementById('deck-view-modal').style.display = 'none';
+});
+
+// Surrender button in settings menu
+document.getElementById('btn-surrender-menu').addEventListener('click', () => {
+    document.getElementById('settings-menu').style.display = 'none';
     document.getElementById('surrender-modal').style.display = 'flex';
 });
 
@@ -554,7 +586,6 @@ document.getElementById('btn-update-log')?.addEventListener('click', () => {
                 // 必須移除內部可能干擾的 transform: none
                 preview.style.transform = 'translate(-50%, -50%)';
                 preview.style.display = 'block';
-                preview.style.zIndex = '20002';
 
                 showPreview(card);
 
@@ -4293,6 +4324,85 @@ function renderAIBattleSetup() {
         document.getElementById('deck-select-title').innerText = '選擇出戰牌組';
         renderDeckSelect();
     };
+}
+
+/**
+ * 顯示當前牌組內容
+ */
+function showDeckView() {
+    if (!gameState) {
+        showToast('目前沒有進行中的遊戲');
+        return;
+    }
+
+    const player = gameState.players[0]; // 玩家永遠是 players[0]
+    const deckIds = player.deck.map(card => card.id);
+
+    // 統計每張卡的數量
+    const cardCounts = {};
+    deckIds.forEach(id => {
+        cardCounts[id] = (cardCounts[id] || 0) + 1;
+    });
+
+    // 取得唯一卡牌並排序（按費用、名稱）
+    const uniqueCards = Object.keys(cardCounts).map(id => {
+        const cardData = CARD_DATA.find(c => c.id === id);
+        return {
+            ...cardData,
+            count: cardCounts[id]
+        };
+    }).sort((a, b) => {
+        if (a.cost !== b.cost) return a.cost - b.cost;
+        return a.name.localeCompare(b.name, 'zh-TW');
+    });
+
+    // 渲染卡牌列表
+    const container = document.getElementById('deck-view-list');
+    container.innerHTML = uniqueCards.map(card => `
+        <div class="deck-view-card ${card.rarity}" data-card-id="${card.id}">
+            <div class="deck-view-card-cost">${card.cost}</div>
+            <div class="deck-view-card-info">
+                <div class="deck-view-card-name">${card.name}</div>
+                <div class="deck-view-card-count">x${card.count}</div>
+            </div>
+        </div>
+    `).join('');
+
+    // 為每張卡片添加懸停預覽
+    container.querySelectorAll('.deck-view-card').forEach(cardEl => {
+        const cardId = cardEl.dataset.cardId;
+        const card = CARD_DATA.find(c => c.id === cardId);
+        if (!card) return;
+
+        cardEl.addEventListener('mouseenter', (e) => {
+            const preview = document.getElementById('card-preview');
+            if (preview) {
+                const rect = cardEl.getBoundingClientRect();
+                preview.style.position = 'fixed';
+                preview.style.left = `${rect.right + 20}px`;
+                preview.style.top = `${Math.min(rect.top, window.innerHeight - 350)}px`;
+                preview.style.display = 'block';
+            }
+            showPreview(card);
+        });
+        cardEl.addEventListener('mouseleave', hidePreview);
+    });
+
+    // 顯示彈出視窗
+    document.getElementById('deck-view-modal').style.display = 'flex';
+}
+
+/**
+ * 取得稀有度文字
+ */
+function getRarityText(rarity) {
+    const rarityMap = {
+        'COMMON': '一般',
+        'RARE': '精良',
+        'EPIC': '史詩',
+        'LEGENDARY': '傳說'
+    };
+    return rarityMap[rarity] || rarity;
 }
 
 function showToast(message) {
