@@ -434,32 +434,14 @@ export async function onDragEnd(e) {
                     window.gameState.playCard(attackerIndex, null); // No target
                 }
 
+                // Show Preview before playing (The "High Sky Landing" effect)
+                // This mimics the original app.js logic which awaited the preview to let the card "slam" visually
+                const targetSlot = document.getElementById('player-board').children[currentInsertionIndex];
+                await showCardPlayPreview(card, false, targetSlot);
+
                 window.render();
                 await window.resolveDeaths();
 
-                // Trigger Post-Play Visuals (Slam & Dust)
-                const boardEl = document.getElementById('player-board');
-                if (boardEl) {
-                    boardEl.classList.remove('board-slam');
-                    void boardEl.offsetWidth; // Force Reflow
-                    boardEl.classList.add('board-slam');
-
-                    // Spawn dust at the insertion point (approximated center of board for now, or use last mouse pos?)
-                    // Better: find the new element in DOM? 
-                    // Since render() happened, the new minion is in DOM.
-                    // We can find it by index. 
-                    const newMinionIndex = (typeof currentInsertionIndex !== 'undefined' && currentInsertionIndex !== -1) ? currentInsertionIndex : boardEl.children.length - 1;
-                    const newMinionEl = boardEl.children[newMinionIndex];
-                    if (newMinionEl) {
-                        // Add Card Slam Animation
-                        newMinionEl.classList.add('slamming');
-                        spawnDustEffect(newMinionEl, 1.5);
-                        setTimeout(() => newMinionEl.classList.remove('slamming'), 500);
-                    } else {
-                        spawnDustEffect(boardEl, 1);
-                    }
-                    setTimeout(() => boardEl.classList.remove('board-slam'), 500);
-                }
 
                 // This logic was in app.js `onDragEnd`... "Phase 2"
                 // If it was a minion with non-targeted battlecry:
@@ -497,10 +479,8 @@ export async function onDragEnd(e) {
 
                 try {
                     const sourceEl = document.getElementById('player-board').children[attackerIndex];
-                    if (sourceEl) await animateAbility(sourceEl, targetData, '#ff0000'); // Attack projectile? 
-                    // Actually `animateAttack` does the slam.
-                    // Wait, `onDragEnd` used `animateAttack`.
-                    // My export says `animateAttack`.
+                    // Arrow removed as per user request (normal attack has no projectile)
+
 
                     // Re-read app.js logic:
                     // It called `animateAttack(sourceEl, targetData)`.

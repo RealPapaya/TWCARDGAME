@@ -603,7 +603,12 @@ export async function triggerRippleDiffusionAnimation(isPlayer = true) {
  * Shows a large 3D preview of the card in the center before it hits the board.
  */
 export async function showCardPlayPreview(card, isAI = false, targetEl = null, gameState = null) {
+    console.log(`[FX] showCardPlayPreview: ${card?.name}, IsAI: ${isAI}, Target:`, targetEl);
     const overlay = document.getElementById('play-preview-overlay');
+    if (!overlay) {
+        console.error("[FX] Overlay #play-preview-overlay not found!");
+        return;
+    }
     if (!overlay) return;
     overlay.innerHTML = '';
     overlay.style.display = 'flex';

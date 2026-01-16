@@ -5129,7 +5129,9 @@ body.dragging-active .player .hand .card:hover {
 
 #btn-logout.settings-menu-item:hover {
     background: #a3333d !important;
-}/* Added for dragging visual consistency */
+}
+
+/* Added for dragging visual consistency */
 .dragging-ghost {
     position: fixed !important;
     z-index: 10000 !important;
