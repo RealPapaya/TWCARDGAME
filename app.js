@@ -623,6 +623,14 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
 document.addEventListener('mousemove', onDragMove);
 document.addEventListener('mouseup', onDragEnd);
 
+// Settings button listener
+document.getElementById('btn-settings')?.addEventListener('click', async () => {
+    const confirmed = await showCustomConfirm('確定要登出嗎？');
+    if (confirmed) {
+        AuthManager.logout();
+    }
+});
+
 // Expose globally for AuthManager/AuthUI
 window.App = {
     showView: showView,
@@ -630,10 +638,15 @@ window.App = {
 };
 
 function onUserLogin(user) {
+    // Load deck data from cloud if available
     if (user.deck_data && user.deck_data.length > 0) {
         userDecks = user.deck_data;
-        localStorage.setItem('userDecks', JSON.stringify(userDecks));
+    } else {
+        // New user - start with empty array (no default decks)
+        userDecks = [];
     }
+    localStorage.setItem('userDecks', JSON.stringify(userDecks));
+
     // Update other stats if we add level/gold UI later
     showView('main-menu');
     showToast(`歡迎回來，${user.username}！`);

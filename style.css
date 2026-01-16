@@ -4985,4 +4985,30 @@ body.dragging-active .player .hand .card:hover {
         transform: scale(1.05);
         opacity: 1;
     }
+}/* Settings Button */
+.settings-btn {
+    position: absolute;
+    top: 20px;
+    right: 30px;
+    width: 50px;
+    height: 50px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 2px solid var(--neon-blue);
+    border-radius: 50%;
+    font-size: 24px;
+    color: var(--neon-blue);
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+    z-index: 100;
+}
+
+.settings-btn:hover {
+    background: rgba(0, 243, 255, 0.1);
+    box-shadow: 0 0 25px rgba(0, 243, 255, 0.6);
+    transform: rotate(90deg);
+}
+
+.settings-btn:active {
+    transform: rotate(90deg) scale(0.95);
 }
