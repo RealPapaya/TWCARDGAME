@@ -1,26 +1,142 @@
-/* Settings - Visibility Fix */
+/* Settings Container & Button (Medieval Hand-Drawn Style) */
 .settings-container {
-    position: fixed !important;
-    top: 20px !important;
-    right: 30px !important;
-    z-index: 9999 !important;
+    position: absolute !important;
+    top: 30px !important;
+    right: 140px !important;
+    z-index: 200 !important;
+    pointer-events: auto !important;
 }
 
 .settings-btn {
-    width: 70px !important;
-    height: 70px !important;
-    background: rgba(139, 69, 19, 0.7) !important;
-    border: 4px solid #a0522d !important;
-    border-radius: 50% !important;
-    font-size: 40px !important;
-    color: #fff !important;
+    width: 110px !important;
+    height: 110px !important;
+    background: #e6ccb2 !important;
+    /* Parchment-like color */
+    background-image: url("https://www.transparenttextures.com/patterns/parchment.png") !important;
+    border: 6px solid #5d2e17 !important;
+    /* Dark wood color */
+    border-radius: 48% 52% 45% 55% / 55% 45% 52% 48% !important;
+    /* More irregular "hand-drawn" circle */
+    font-size: 65px !important;
+    color: #5d2e17 !important;
     cursor: pointer !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6), inset 0 2px 4px rgba(255, 255, 255, 0.2) !important;
-    filter: drop-shadow(0 0 10px rgba(210, 105, 30, 0.9)) !important;
+    transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) !important;
+    box-shadow: none !important;
+    filter: drop-shadow(6px 8px 0px #3d1e0f) !important;
+    /* Premium hand-drawn shadow */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+    text-shadow: none !important;
 }
 
 .settings-btn:hover {
-    background: rgba(160, 82, 45, 0.9) !important;
-    transform: rotate(90deg) scale(1.15) !important;
-    border-color: #d2691e !important;
+    background-color: #ede0d4 !important;
+    transform: rotate(20deg) scale(1.1) !important;
+    border-color: #8b4513 !important;
+    color: #8b4513 !important;
+    filter: drop-shadow(8px 10px 0px #3d1e0f) !important;
+}
+
+.settings-btn:active {
+    transform: rotate(-10deg) scale(0.95) !important;
+    filter: drop-shadow(2px 3px 0px #3d1e0f) !important;
+}
+
+.settings-menu {
+    position: absolute !important;
+    top: 155px !important;
+    right: -65px !important;
+    transition: none !important;
+    min-width: 240px !important;
+    background: #f4e4bc !important;
+    /* Aged parchment */
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
+        url("https://www.transparenttextures.com/patterns/parchment.png") !important;
+    border: 6px solid #5d2e17 !important;
+    border-radius: 4px !important;
+    padding: 24px 20px !important;
+    box-shadow: none !important;
+    filter: drop-shadow(12px 15px 0px rgba(0, 0, 0, 0.6)) !important;
+    display: none;
+    /* Initially hidden */
+    flex-direction: column;
+    gap: 15px;
+    z-index: 201 !important;
+    transform-origin: top right;
+    animation: medievalPopup 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes medievalPopup {
+    from {
+        opacity: 0;
+        transform: scale(0.8) rotate(5deg);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) rotate(0deg);
+    }
+}
+
+/* Medieval arrow for the menu */
+.settings-menu::before {
+    content: '' !important;
+    position: absolute !important;
+    top: -22px !important;
+    right: 50% !important;
+    transform: translateX(50%) !important;
+    width: 0 !important;
+    height: 0 !important;
+    border-left: 16px solid transparent !important;
+    border-right: 16px solid transparent !important;
+    border-bottom: 22px solid #5d2e17 !important;
+}
+
+.settings-menu-item {
+    width: 100% !important;
+    padding: 18px !important;
+    background: #ddb892 !important;
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent) !important;
+    border: 4px solid #5d2e17 !important;
+    border-radius: 4px !important;
+    color: #3d1e0f !important;
+    font-family: 'Noto Serif TC', serif !important;
+    font-size: 24px !important;
+    font-weight: 900 !important;
+    cursor: pointer !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    box-shadow: 4px 6px 0px #3d1e0f !important;
+    text-shadow: 1px 1px 0px rgba(255, 255, 255, 0.2) !important;
+    margin: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    letter-spacing: 2px !important;
+}
+
+.settings-menu-item:hover {
+    background: #b08968 !important;
+    color: #f4e4bc !important;
+    transform: translate(-3px, -3px) !important;
+    box-shadow: 7px 9px 0px #3d1e0f !important;
+}
+
+.settings-menu-item:active {
+    transform: translate(2px, 3px) !important;
+    box-shadow: 2px 2px 0px #3d1e0f !important;
+}
+
+/* Special styling for logout button */
+#btn-logout.settings-menu-item {
+    background: #bc4749 !important;
+    /* Muted medieval red */
+    color: #f4e4bc !important;
+}
+
+#btn-logout.settings-menu-item:hover {
+    background: #a3333d !important;
 }

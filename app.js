@@ -104,15 +104,16 @@ let editingThemeIdx = -1; // -1 means not editing theme
 
 
 
+// Removed: This section caused crashes when userDecks is empty
 // Ensure valid Slot 2 if empty or broken (for testing convenience)
-if (userDecks.length > 1 && userDecks[1].cards && userDecks[1].cards.length === 0) {
-    const defaultDeck = [];
-    const allIds = CARD_DATA.map(c => c.id);
-    for (let i = 0; i < 30; i++) {
-        defaultDeck.push(allIds[i % allIds.length]);
-    }
-    userDecks[1].cards = defaultDeck;
-}
+// if (userDecks.length > 1 && userDecks[1].cards && userDecks[1].cards.length === 0) {
+//     const defaultDeck = [];
+//     const allIds = CARD_DATA.map(c => c.id);
+//     for (let i = 0; i < 30; i++) {
+//         defaultDeck.push(allIds[i % allIds.length]);
+//     }
+//     userDecks[1].cards = defaultDeck;
+// }
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let selectedThemeId = 'dpp'; // Default theme
 let editingDeckIdx = 0;
@@ -619,38 +620,43 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
     showView('main-menu');
 });
 
-// Global drag events
-document.addEventListener('mousemove', onDragMove);
-document.addEventListener('mouseup', onDragEnd);
+// --- Settings & Logout ---
+const settingsBtn = document.getElementById('btn-settings');
+const logoutBtn = document.getElementById('btn-logout');
+const settingsMenu = document.getElementById('settings-menu');
 
-// Settings button listener - toggle menu
-document.getElementById('btn-settings')?.addEventListener('click', () => {
-    const menu = document.getElementById('settings-menu');
-    if (menu.style.display === 'none' || !menu.style.display) {
-        menu.style.display = 'block';
-    } else {
-        menu.style.display = 'none';
-    }
-});
+if (settingsBtn) {
+    settingsBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (settingsMenu.style.display === 'none' || !settingsMenu.style.display) {
+            settingsMenu.style.display = 'flex'; // Use flex for layout
+        } else {
+            settingsMenu.style.display = 'none';
+        }
+    });
+}
 
-// Logout button listener
-document.getElementById('btn-logout')?.addEventListener('click', async () => {
-    const confirmed = await showCustomConfirm('確定要登出嗎？');
-    if (confirmed) {
-        AuthManager.logout();
-    }
-    // Hide menu after action
-    document.getElementById('settings-menu').style.display = 'none';
-});
+if (logoutBtn) {
+    logoutBtn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        const confirmed = await showCustomConfirm('確定要登出嗎？');
+        if (confirmed) {
+            AuthManager.logout();
+        }
+        if (settingsMenu) settingsMenu.style.display = 'none';
+    });
+}
 
 // Close menu when clicking outside
 document.addEventListener('click', (e) => {
-    const settingsContainer = document.querySelector('.settings-container');
-    const menu = document.getElementById('settings-menu');
-    if (menu && !settingsContainer?.contains(e.target)) {
-        menu.style.display = 'none';
+    if (settingsMenu && settingsBtn && !settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
+        settingsMenu.style.display = 'none';
     }
 });
+
+// Global drag events
+document.addEventListener('mousemove', onDragMove);
+document.addEventListener('mouseup', onDragEnd);
 
 // Expose globally for AuthManager/AuthUI
 window.App = {
