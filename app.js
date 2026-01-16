@@ -105,7 +105,7 @@ let editingThemeIdx = -1; // -1 means not editing theme
 
 
 // Ensure valid Slot 2 if empty or broken (for testing convenience)
-if (userDecks[1].cards.length === 0) {
+if (userDecks.length > 1 && userDecks[1].cards && userDecks[1].cards.length === 0) {
     const defaultDeck = [];
     const allIds = CARD_DATA.map(c => c.id);
     for (let i = 0; i < 30; i++) {
