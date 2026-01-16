@@ -87,10 +87,10 @@ body {
     }
 }
 
-/* Content Scaler Wrapper - Fixed 1920x1200 Design Base (adjusted for battle view) */
+/* Content Scaler Wrapper - Fixed 1920x1080 Design Base (16:9 aspect ratio) */
 #game-content-scaler {
     width: 1920px;
-    height: 1200px;
+    height: 1080px;
     transform-origin: top left;
     position: absolute;
     top: 0;
@@ -4245,7 +4245,7 @@ body.dragging-active .player .hand .card:hover {
     transform: translateY(-50%);
 
     /* [長度] 改這裡 (例如 80% 或 px) */
-    height: 90%;
+    height: 100%;
 
     /* [陰影] 改這裡 (x偏移 y偏移 模糊半徑 顏色) */
     filter: drop-shadow(10px 10px 20px rgba(0, 0, 0, 0.8));
@@ -4360,7 +4360,7 @@ body.dragging-active .player .hand .card:hover {
     align-items: center;
     gap: 15px;
     position: absolute;
-    bottom: 110px;
+    bottom: 50px;
     right: 115px;
     z-index: 20;
     pointer-events: auto;
@@ -4446,14 +4446,40 @@ body.dragging-active .player .hand .card:hover {
     }
 }
 
+/* --- Modals & Overlays --- */
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.85);
+    display: none;
+    justify-content: center;
+    align-items: center;
+    z-index: 99999;
+}
+
+.modal-content {
+    background: #f4e4bc;
+    padding: 30px;
+    border-radius: 4px;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+    z-index: 100001;
+    position: relative;
+    border: none;
+}
+
 /* --- Medieval Hand-drawn Style Modals --- */
 .parchment-modal {
-    background: url('img/parchment_bg.png') no-repeat center center !important;
-    background-size: cover !important;
-    border: 15px solid transparent !important;
-    border-image: url('img/wood_frame.png') 30 stretch !important;
-    padding: 40px !important;
-    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.7) !important;
+    background: #f4e4bc !important;
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 100%),
+        repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.02) 0px, rgba(0, 0, 0, 0.02) 2px, transparent 2px, transparent 4px) !important;
+    border: 20px solid transparent !important;
+    border-image: url('img/wood_frame.png') 60 stretch !important;
+    padding: 50px !important;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8) !important;
     color: #4a2c1d !important;
     font-family: 'Noto Serif TC', serif !important;
     position: relative;

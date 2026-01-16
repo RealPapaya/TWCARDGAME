@@ -1,5 +1,5 @@
 // ===== Responsive Scaling System =====
-// Design base: 1920x1200 (adjusted for battle view)
+// Design base: 1920x1080 (adjusted for battle view)
 function updateGameScale() {
     const container = document.getElementById('game-container-16-9');
     const scaler = document.getElementById('game-content-scaler');
@@ -11,7 +11,7 @@ function updateGameScale() {
 
     // Design base dimensions (adjusted to accommodate battle view)
     const baseWidth = 1920;
-    const baseHeight = 1200;
+    const baseHeight = 1080;
 
     // Calculate scale factor (use the smaller scale to fit)
     const scaleX = containerWidth / baseWidth;
