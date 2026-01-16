@@ -16,14 +16,21 @@ const AuthManager = {
 
         try {
             const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            console.log("正在嘗試註冊:", username);
+
             const response = await fetch(url, {
                 method: 'GET',
-                redirect: 'follow' // 強制跟隨 GAS 的重導向
+                mode: 'cors',
+                cache: 'no-cache',
+                redirect: 'follow'
             });
+
+            if (!response.ok) throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+
             const result = await response.json();
             return result;
         } catch (error) {
-            console.error("Register Error:", error);
+            console.error("Register Fetch Error:", error);
             return { success: false, message: "連線失敗，請檢查網路或 API 設定" };
         }
     },
@@ -36,7 +43,17 @@ const AuthManager = {
 
         try {
             const url = `${this.API_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
-            const response = await fetch(url);
+            console.log("正在嘗試登入:", username);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                mode: 'cors',
+                cache: 'no-cache',
+                redirect: 'follow'
+            });
+
+            if (!response.ok) throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
+
             const result = await response.json();
 
             if (result.success) {
