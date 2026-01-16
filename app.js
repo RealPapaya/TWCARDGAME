@@ -623,11 +623,32 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
 document.addEventListener('mousemove', onDragMove);
 document.addEventListener('mouseup', onDragEnd);
 
-// Settings button listener
-document.getElementById('btn-settings')?.addEventListener('click', async () => {
+// Settings button listener - toggle menu
+document.getElementById('btn-settings')?.addEventListener('click', () => {
+    const menu = document.getElementById('settings-menu');
+    if (menu.style.display === 'none' || !menu.style.display) {
+        menu.style.display = 'block';
+    } else {
+        menu.style.display = 'none';
+    }
+});
+
+// Logout button listener
+document.getElementById('btn-logout')?.addEventListener('click', async () => {
     const confirmed = await showCustomConfirm('確定要登出嗎？');
     if (confirmed) {
         AuthManager.logout();
+    }
+    // Hide menu after action
+    document.getElementById('settings-menu').style.display = 'none';
+});
+
+// Close menu when clicking outside
+document.addEventListener('click', (e) => {
+    const settingsContainer = document.querySelector('.settings-container');
+    const menu = document.getElementById('settings-menu');
+    if (menu && !settingsContainer?.contains(e.target)) {
+        menu.style.display = 'none';
     }
 });
 

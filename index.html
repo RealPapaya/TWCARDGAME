@@ -37,7 +37,14 @@
             </svg>
             <!-- Main Menu View -->
             <div id="main-menu" class="view">
-                <button id="btn-settings" class="settings-btn" title="設定">⚙️</button>
+                <!-- Settings Menu -->
+                <div class="settings-container">
+                    <button id="btn-settings" class="settings-btn" title="設定">⚙️</button>
+                    <div id="settings-menu" class="settings-menu" style="display: none;">
+                        <button id="btn-logout" class="settings-menu-item">登出</button>
+                        <!-- 未來可以加其他選項 -->
+                    </div>
+                </div>
                 <div class="menu-content">
                     <h1 class="game-title">寶島遊戲王</h1>
                     <div class="game-version">v0.6.0</div>
