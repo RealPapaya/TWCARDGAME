@@ -2406,6 +2406,91 @@ body.dragging-active .player .hand .card:hover {
     }
 }
 
+/* --- Authentication View Styles --- */
+.auth-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    background: radial-gradient(circle, #1a1a2e 0%, #16213e 100%);
+}
+
+.auth-box {
+    background: rgba(0, 0, 0, 0.8);
+    border: 2px solid #00d2ff;
+    border-radius: 15px;
+    padding: 30px;
+    width: 400px;
+    box-shadow: 0 0 20px rgba(0, 210, 255, 0.3);
+    backdrop-filter: blur(10px);
+}
+
+.auth-tabs {
+    display: flex;
+    margin-bottom: 25px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.auth-tab {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #888;
+    padding: 10px;
+    cursor: pointer;
+    font-size: 18px;
+    transition: all 0.3s ease;
+    font-family: 'Noto Sans TC', sans-serif;
+}
+
+.auth-tab.active {
+    color: #00d2ff;
+    border-bottom: 3px solid #00d2ff;
+}
+
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.input-group label {
+    color: #aaa;
+    font-size: 14px;
+    text-align: left;
+}
+
+.input-group input {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 5px;
+    padding: 12px;
+    color: white;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.3s;
+}
+
+.input-group input:focus {
+    border-color: #00d2ff;
+}
+
+#btn-auth-guest {
+    margin-top: 10px;
+}
+
+.auth-box .neon-button {
+    width: 100%;
+    margin-top: 10px;
+}
+
 /* Deck View Modal */
 /* Deck View Modal 調整 */
 #deck-view-modal .modal-content {

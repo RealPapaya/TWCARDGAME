@@ -16,6 +16,8 @@
     <script src="game_engine.js"></script>
     <script src="updates.js"></script>
     <script src="ui_translations.js"></script>
+    <script src="auth_manager.js"></script>
+    <script src="auth_ui.js" defer></script>
     <script src="app.js" defer></script>
 </head>
 
@@ -49,6 +51,52 @@
                     <div class="version-info">研究用途，請勿轉載發售</div>
                     <button id="btn-update-log" class="update-log-btn neon-button secondary"
                         style="font-size: 14px; padding: 5px 15px;">更新內容</button>
+                </div>
+            </div>
+
+            <!-- Auth (Login/Register) View -->
+            <div id="auth-view" class="view" style="display: none;">
+                <div class="auth-container">
+                    <h1 class="game-title">帳號登入</h1>
+                    <div class="auth-box">
+                        <div class="auth-tabs">
+                            <button id="tab-login" class="auth-tab active">登入</button>
+                            <button id="tab-register" class="auth-tab">註冊</button>
+                        </div>
+
+                        <!-- Login Form -->
+                        <div id="form-login" class="auth-form">
+                            <div class="input-group">
+                                <label>帳號</label>
+                                <input type="text" id="login-username" placeholder="輸入用戶名">
+                            </div>
+                            <div class="input-group">
+                                <label>密碼</label>
+                                <input type="password" id="login-password" placeholder="輸入密碼">
+                            </div>
+                            <button id="btn-do-login" class="neon-button">確定登入</button>
+                        </div>
+
+                        <!-- Register Form -->
+                        <div id="form-register" class="auth-form" style="display: none;">
+                            <div class="input-group">
+                                <label>帳號</label>
+                                <input type="text" id="reg-username" placeholder="設定用戶名">
+                            </div>
+                            <div class="input-group">
+                                <label>密碼</label>
+                                <input type="password" id="reg-password" placeholder="設定密碼">
+                            </div>
+                            <div class="input-group">
+                                <label>確認密碼</label>
+                                <input type="password" id="reg-confirm-password" placeholder="再次輸入密碼">
+                            </div>
+                            <button id="btn-do-register" class="neon-button">建立帳號</button>
+                        </div>
+                    </div>
+                    <div class="menu-buttons" style="margin-top: 30px;">
+                        <button id="btn-auth-guest" class="neon-button secondary">訪客模式 (不存檔)</button>
+                    </div>
                 </div>
             </div>
 

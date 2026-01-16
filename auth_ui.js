@@ -1,0 +1,129 @@
+/**
+ * AuthUI - Handling Login/Register View interactions
+ */
+
+const AuthUI = {
+    init() {
+        this.cacheDOM();
+        this.bindEvents();
+    },
+
+    cacheDOM() {
+        this.view = document.getElementById("auth-view");
+        this.tabLogin = document.getElementById("tab-login");
+        this.tabRegister = document.getElementById("tab-register");
+        this.formLogin = document.getElementById("form-login");
+        this.formRegister = document.getElementById("form-register");
+
+        this.loginUsernameField = document.getElementById("login-username");
+        this.loginPasswordField = document.getElementById("login-password");
+        this.regUsernameField = document.getElementById("reg-username");
+        this.regPasswordField = document.getElementById("reg-password");
+        this.regConfirmField = document.getElementById("reg-confirm-password");
+
+        this.btnLogin = document.getElementById("btn-do-login");
+        this.btnRegister = document.getElementById("btn-do-register");
+        this.btnGuest = document.getElementById("btn-auth-guest");
+    },
+
+    bindEvents() {
+        // Tab switching
+        this.tabLogin.addEventListener("click", () => this.switchTab("login"));
+        this.tabRegister.addEventListener("click", () => this.switchTab("register"));
+
+        // Login Action
+        this.btnLogin.addEventListener("click", () => this.handleLogin());
+
+        // Register Action
+        this.btnRegister.addEventListener("click", () => this.handleRegister());
+
+        // Guest Action
+        this.btnGuest.addEventListener("click", () => {
+            if (window.App && typeof window.App.showView === 'function') {
+                window.App.showView("main-menu");
+            } else {
+                // Fallback if App is not yet initialized or structured differently
+                this.view.style.display = "none";
+                document.getElementById("main-menu").style.display = "flex";
+            }
+        });
+    },
+
+    switchTab(type) {
+        if (type === "login") {
+            this.tabLogin.classList.add("active");
+            this.tabRegister.classList.remove("active");
+            this.formLogin.style.display = "flex";
+            this.formRegister.style.display = "none";
+        } else {
+            this.tabLogin.classList.remove("active");
+            this.tabRegister.classList.add("active");
+            this.formLogin.style.display = "none";
+            this.formRegister.style.display = "flex";
+        }
+    },
+
+    async handleLogin() {
+        const username = this.loginUsernameField.value.trim();
+        const password = this.loginPasswordField.value.trim();
+
+        if (!username || !password) {
+            alert("請輸入帳號與密碼");
+            return;
+        }
+
+        this.btnLogin.disabled = true;
+        this.btnLogin.innerText = "登入中...";
+
+        const result = await AuthManager.login(username, password);
+
+        if (result.success) {
+            alert("登入成功！");
+            // 載入使用者資料後導向主選單
+            if (window.App) {
+                window.App.onUserLogin(result.user);
+            }
+        } else {
+            alert("登入失敗: " + result.message);
+        }
+
+        this.btnLogin.disabled = false;
+        this.btnLogin.innerText = "確定登入";
+    },
+
+    async handleRegister() {
+        const username = this.regUsernameField.value.trim();
+        const password = this.regPasswordField.value.trim();
+        const confirm = this.regConfirmField.value.trim();
+
+        if (!username || !password) {
+            alert("請填寫所有欄位");
+            return;
+        }
+
+        if (password !== confirm) {
+            alert("兩次輸入的密碼不一致");
+            return;
+        }
+
+        this.btnRegister.disabled = true;
+        this.btnRegister.innerText = "註冊中...";
+
+        const result = await AuthManager.register(username, password);
+
+        if (result.success) {
+            alert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
+            this.switchTab("login");
+        } else {
+            alert("註冊失敗: " + result.message);
+        }
+
+        this.btnRegister.disabled = false;
+        this.btnRegister.innerText = "建立帳號";
+    }
+};
+
+// Initialize on load
+document.addEventListener("DOMContentLoaded", () => {
+    AuthUI.init();
+});

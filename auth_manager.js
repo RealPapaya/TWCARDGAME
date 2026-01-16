@@ -1,0 +1,110 @@
+/**
+ * AuthManager - Handling Account, Login, and Data Persistence via Google Sheets
+ */
+
+const AuthManager = {
+    // 這裡填入部署後的 Google Apps Script 網址
+    API_URL: "https://script.google.com/macros/s/AKfycbxGj_BFidlGuXkMYuAbQeHdwhqXWvyJPMRiwJF9eztAQY6cUrXyVK-fASDYA4UIIsERcg/exec",
+
+    currentUser: null,
+
+    /**
+     * 註冊新帳號
+     */
+    async register(username, password) {
+        if (!this.API_URL) return { success: false, message: "API URL 未設定" };
+
+        try {
+            // 使用 GET 方式註冊，以此繞過 GAS POST 的 CORS 限制並取得回傳值
+            const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const response = await fetch(url);
+            const result = await response.json();
+            return result;
+        } catch (error) {
+            console.error("Register Error:", error);
+            return { success: false, message: "連線失敗，請檢查網路或 API 設定" };
+        }
+    },
+
+    /**
+     * 登入
+     */
+    async login(username, password) {
+        if (!this.API_URL) return { success: false, message: "API URL 未設定" };
+
+        try {
+            const url = `${this.API_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result.success) {
+                this.currentUser = result.data;
+                // 處理可能為 null 或字串的 deck_data
+                if (typeof result.data.deck_data === 'string') {
+                    try {
+                        this.currentUser.deck_data = JSON.parse(result.data.deck_data || "[]");
+                    } catch (e) {
+                        this.currentUser.deck_data = [];
+                    }
+                }
+                localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                return { success: true, user: this.currentUser };
+            } else {
+                return { success: false, message: result.message };
+            }
+        } catch (error) {
+            console.error("Login Error:", error);
+            return { success: false, message: "登入失敗，伺服器無回應" };
+        }
+    },
+
+    /**
+     * 儲存資料
+     */
+    async saveData() {
+        if (!this.currentUser || !this.API_URL) return;
+
+        try {
+            // POST 由於 GAS 的重定向機制，使用 no-cors 雖然看不到回傳，但能確保資料送達
+            await fetch(this.API_URL, {
+                method: "POST",
+                mode: "no-cors",
+                headers: {
+                    "Content-Type": "text/plain", // 避免 OPTIONS 預檢請求
+                },
+                body: JSON.stringify({
+                    action: "update",
+                    username: this.currentUser.username,
+                    level: this.currentUser.level,
+                    gold: this.currentUser.gold,
+                    deck_data: JSON.stringify(this.currentUser.deck_data)
+                })
+            });
+            console.log("資料已同步至雲端");
+        } catch (error) {
+            console.error("Save Error:", error);
+        }
+    },
+
+    logout() {
+        this.currentUser = null;
+        localStorage.removeItem("tw_card_game_user");
+        location.reload();
+    },
+
+    checkAuth() {
+        const savedUser = localStorage.getItem("tw_card_game_user");
+        if (savedUser) {
+            try {
+                this.currentUser = JSON.parse(savedUser);
+                return this.currentUser;
+            } catch (e) {
+                return null;
+            }
+        }
+        return null;
+    }
+};
+
+// 為了方便 Debug，掛載到 window
+window.AuthManager = AuthManager;

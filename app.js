@@ -377,6 +377,12 @@ function init() {
             userDecks[editingDeckIdx] = JSON.parse(JSON.stringify(tempDeck));
             localStorage.setItem('userDecks', JSON.stringify(userDecks));
             showToast("保存成功！");
+
+            // 同步至雲端
+            if (AuthManager.currentUser) {
+                AuthManager.currentUser.deck_data = userDecks;
+                AuthManager.saveData();
+            }
         }
         renderDeckBuilder();
     });
@@ -617,9 +623,21 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
 document.addEventListener('mousemove', onDragMove);
 document.addEventListener('mouseup', onDragEnd);
 
-// Initial view
-showView('main-menu');
+// Expose globally for AuthManager/AuthUI
+window.App = {
+    showView: showView,
+    onUserLogin: onUserLogin
+};
 
+function onUserLogin(user) {
+    if (user.deck_data && user.deck_data.length > 0) {
+        userDecks = user.deck_data;
+        localStorage.setItem('userDecks', JSON.stringify(userDecks));
+    }
+    // Update other stats if we add level/gold UI later
+    showView('main-menu');
+    showToast(`歡迎回來，${user.username}！`);
+}
 
 function renderThemeSelection(isEditMode = false) {
     const container = document.getElementById('theme-cards-container');
@@ -769,6 +787,13 @@ function renderDeckSelect() {
                 userDecks.splice(deck.originalIdx, 1);
                 if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
                 localStorage.setItem('userDecks', JSON.stringify(userDecks));
+
+                // 同步至雲端
+                if (AuthManager.currentUser) {
+                    AuthManager.currentUser.deck_data = userDecks;
+                    AuthManager.saveData();
+                }
+
                 renderDeckSelect();
             }
         });
@@ -810,6 +835,13 @@ function addNewPlayerDeck(cardIds = null, themeName = null) {
     if (isDebugMode) newDeck.isTest = true;
     userDecks.push(newDeck);
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
+
+    // 同步至雲端
+    if (AuthManager.currentUser) {
+        AuthManager.currentUser.deck_data = userDecks;
+        AuthManager.saveData();
+    }
+
     selectedDeckIdx = userDecks.length - 1;
     renderDeckSelect();
 }
@@ -4419,3 +4451,16 @@ function showToast(message) {
         toast.className = 'medieval-toast';
     }, 3000);
 }
+
+// Start Game
+document.addEventListener('DOMContentLoaded', () => {
+    init(); // Initialize listeners and engine
+
+    // Check Auth
+    const user = AuthManager.checkAuth();
+    if (user) {
+        onUserLogin(user);
+    } else {
+        showView('auth-view');
+    }
+});
