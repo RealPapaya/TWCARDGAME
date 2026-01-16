@@ -685,8 +685,16 @@ export async function showCardPlayPreview(card, isAI = false, targetEl = null, g
 }
 
 export function animateCardFromDeck(cardObj, initialCardEl, gameState, renderCallback) {
+    console.log(`[FX] animateCardFromDeck called for ${cardObj.name}`);
     const deckEl = document.getElementById('player-deck');
-    if (!deckEl) return;
+    if (!deckEl) {
+        console.warn("[ANIM_FAIL] No deck element found (player-deck)");
+        return;
+    }
+
+    // Check visibility/layout of deck
+    const dr = deckEl.getBoundingClientRect();
+    if (dr.width === 0) console.warn("[FX] Deck element has width 0! Is it visible?");
 
     animatingDrawCards.add(cardObj);
     if (initialCardEl) initialCardEl.style.opacity = '0';
@@ -696,6 +704,7 @@ export function animateCardFromDeck(cardObj, initialCardEl, gameState, renderCal
             if (!gameState || !gameState.players[0]) return;
             const idx = gameState.players[0].hand.indexOf(cardObj);
             if (idx === -1) {
+                console.warn("[ANIM_FAIL] Card not found in hand index");
                 animatingDrawCards.delete(cardObj);
                 return;
             }
@@ -704,6 +713,7 @@ export function animateCardFromDeck(cardObj, initialCardEl, gameState, renderCal
             const targetEl = handEl ? handEl.children[idx] : null;
 
             if (!targetEl) {
+                console.warn("[ANIM_FAIL] Target DOM element missing for index " + idx);
                 animatingDrawCards.delete(cardObj);
                 if (renderCallback) renderCallback();
                 return;
@@ -711,12 +721,16 @@ export function animateCardFromDeck(cardObj, initialCardEl, gameState, renderCal
 
             const deckRect = deckEl.getBoundingClientRect();
             const cardRect = targetEl.getBoundingClientRect();
+            console.log(`[FX] Coords: Deck(${deckRect.left}, ${deckRect.top}), Card(${cardRect.left}, ${cardRect.top})`);
+
 
             if (cardRect.width === 0) {
+                console.warn("[ANIM_FAIL] Card width is 0. Visible?", targetEl.offsetParent !== null);
                 animatingDrawCards.delete(cardObj);
                 if (renderCallback) renderCallback();
                 return;
             }
+
 
             const clone = targetEl.cloneNode(true);
             clone.style.position = 'fixed';

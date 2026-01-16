@@ -208,10 +208,12 @@ export function onDragMove(e) {
                 currentInsertionIndex = insertIdx;
                 // Add GAP Visual
                 // Remove existing gaps
-                document.querySelectorAll('.board-gap').forEach(el => el.remove());
+                document.querySelectorAll('.placement-indicator').forEach(el => el.remove());
+
 
                 const gap = document.createElement('div');
-                gap.className = 'board-gap';
+                gap.className = 'placement-indicator';
+
                 // Insert gap
                 if (insertIdx >= minions.length) {
                     boardEl.appendChild(gap);
@@ -222,7 +224,8 @@ export function onDragMove(e) {
 
         } else {
             // Remove gap if outside board
-            document.querySelectorAll('.board-gap').forEach(el => el.remove());
+            document.querySelectorAll('.placement-indicator').forEach(el => el.remove());
+
             currentInsertionIndex = -1;
         }
 
@@ -448,7 +451,10 @@ export async function onDragEnd(e) {
                     const newMinionIndex = (typeof currentInsertionIndex !== 'undefined' && currentInsertionIndex !== -1) ? currentInsertionIndex : boardEl.children.length - 1;
                     const newMinionEl = boardEl.children[newMinionIndex];
                     if (newMinionEl) {
+                        // Add Card Slam Animation
+                        newMinionEl.classList.add('slamming');
                         spawnDustEffect(newMinionEl, 1.5);
+                        setTimeout(() => newMinionEl.classList.remove('slamming'), 500);
                     } else {
                         spawnDustEffect(boardEl, 1);
                     }

@@ -1606,10 +1606,17 @@ function renderHands(p1, p2) {
         const newCount = p1.hand.length - previousPlayerHandSize;
         const children = handEl.children;
         if (newCount > 0 && newCount < 15) {
+            console.log(`[APP] renderHands: Hand grew from ${previousPlayerHandSize} to ${p1.hand.length}. Triggering ${newCount} animations.`);
             for (let i = Math.max(0, children.length - newCount); i < children.length; i++) {
                 if (children[i]) {
                     const cardObj = p1.hand[i];
-                    animateCardFromDeck(cardObj, children[i]);
+                    console.log(`[APP] Scheduling animation for card index ${i}: ${cardObj.name}`);
+                    // Stagger animations to prevent layout trashing and improve feel
+                    // Also ensures the 3rd card (which might be wrapping or transforming) is ready
+                    setTimeout(() => {
+                        console.log(`[APP] Firing animateCardFromDeck for ${cardObj.name}`);
+                        animateCardFromDeck(cardObj, children[i], gameState, render);
+                    }, (i - (children.length - newCount)) * 300); // 300ms delay per new card
                 }
             }
         }
