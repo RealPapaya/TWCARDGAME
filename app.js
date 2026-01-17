@@ -472,10 +472,10 @@ document.getElementById('end-turn-btn').addEventListener('click', async () => {
     } catch (e) { logMessage(e.message); }
 });
 
-// Settings Menu Toggle
+// Settings Menu Toggle (Battle View)
 document.getElementById('settings-button').addEventListener('click', (e) => {
     e.stopPropagation();
-    const menu = document.getElementById('settings-menu');
+    const menu = document.getElementById('settings-menu-battle');
     if (menu.style.display === 'none' || !menu.style.display) {
         menu.style.display = 'block';
     } else {
@@ -495,7 +495,7 @@ document.addEventListener('click', (e) => {
 // View Deck button in settings menu
 document.getElementById('btn-view-deck-menu').addEventListener('click', () => {
     showDeckView();
-    document.getElementById('settings-menu').style.display = 'none';
+    document.getElementById('settings-menu-battle').style.display = 'none';
 });
 
 document.getElementById('btn-deck-view-close')?.addEventListener('click', () => {
@@ -504,7 +504,7 @@ document.getElementById('btn-deck-view-close')?.addEventListener('click', () => 
 
 // Surrender button in settings menu
 document.getElementById('btn-surrender-menu').addEventListener('click', () => {
-    document.getElementById('settings-menu').style.display = 'none';
+    document.getElementById('settings-menu-battle').style.display = 'none';
     document.getElementById('surrender-modal').style.display = 'flex';
 });
 
@@ -620,10 +620,10 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
     showView('main-menu');
 });
 
-// --- Settings & Logout ---
-const settingsBtn = document.getElementById('btn-settings');
-const logoutBtn = document.getElementById('btn-logout');
-const settingsMenu = document.getElementById('settings-menu');
+// --- Settings & Logout (Main Menu) ---
+const settingsBtn = document.getElementById('btn-settings-main');
+const logoutBtn = document.getElementById('btn-logout-main');
+const settingsMenu = document.getElementById('settings-menu-main');
 
 if (settingsBtn) {
     settingsBtn.addEventListener('click', (e) => {
@@ -642,13 +642,21 @@ if (logoutBtn) {
         const confirmed = await showCustomConfirm('確定要登出嗎？');
         if (confirmed) {
             AuthManager.logout();
+            showView('auth-view');
+            if (window.AuthUI) AuthUI.reset();
         }
         if (settingsMenu) settingsMenu.style.display = 'none';
     });
 }
 
-// Close menu when clicking outside
+// Close menus when clicking outside
 document.addEventListener('click', (e) => {
+    const battleMenu = document.getElementById('settings-menu-battle');
+    const battleBtn = document.getElementById('settings-button');
+    if (battleMenu && battleBtn && !battleMenu.contains(e.target) && !battleBtn.contains(e.target)) {
+        battleMenu.style.display = 'none';
+    }
+
     if (settingsMenu && settingsBtn && !settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
         settingsMenu.style.display = 'none';
     }

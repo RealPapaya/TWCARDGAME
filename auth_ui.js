@@ -120,8 +120,19 @@ const AuthUI = {
 
         this.btnRegister.disabled = false;
         this.btnRegister.innerText = "建立帳號";
+    },
+
+    reset() {
+        if (this.loginUsernameField) this.loginUsernameField.value = "";
+        if (this.loginPasswordField) this.loginPasswordField.value = "";
+        if (this.regUsernameField) this.regUsernameField.value = "";
+        if (this.regPasswordField) this.regPasswordField.value = "";
+        if (this.regConfirmField) this.regConfirmField.value = "";
+        this.switchTab("login");
     }
 };
+
+window.AuthUI = AuthUI;
 
 // Initialize on load
 document.addEventListener("DOMContentLoaded", () => {

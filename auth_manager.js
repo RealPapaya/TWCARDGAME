@@ -108,7 +108,6 @@ const AuthManager = {
     logout() {
         this.currentUser = null;
         localStorage.removeItem("tw_card_game_user");
-        location.reload();
     },
 
     checkAuth() {
@@ -127,3 +126,4 @@ const AuthManager = {
 
 // 為了方便 Debug，掛載到 window
 window.AuthManager = AuthManager;
+// 123

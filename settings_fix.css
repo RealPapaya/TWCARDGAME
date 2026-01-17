@@ -2,7 +2,7 @@
 .settings-container {
     position: absolute !important;
     top: 30px !important;
-    right: 140px !important;
+    right: 120px !important;
     z-index: 200 !important;
     pointer-events: auto !important;
 }
@@ -48,7 +48,8 @@
 .settings-menu {
     position: absolute !important;
     top: 155px !important;
-    right: -65px !important;
+    right: -92px !important;
+    left: auto !important;
     transition: none !important;
     min-width: 240px !important;
     background: #f4e4bc !important;
@@ -66,8 +67,9 @@
     flex-direction: column;
     gap: 15px;
     z-index: 201 !important;
-    transform-origin: top right;
-    animation: medievalPopup 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform: none !important;
+    animation: none !important;
+    opacity: 1 !important;
 }
 
 @keyframes medievalPopup {
@@ -131,12 +133,12 @@
 }
 
 /* Special styling for logout button */
-#btn-logout.settings-menu-item {
+#btn-logout-main.settings-menu-item {
     background: #bc4749 !important;
     /* Muted medieval red */
     color: #f4e4bc !important;
 }
 
-#btn-logout.settings-menu-item:hover {
+#btn-logout-main.settings-menu-item:hover {
     background: #a3333d !important;
 }
