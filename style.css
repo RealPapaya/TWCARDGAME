@@ -2427,7 +2427,7 @@ body.dragging-active .player .hand .card:hover {
     align-items: center;
     justify-content: center;
     height: 100%;
-    background: radial-gradient(circle, #1a1a2e 0%, #16213e 100%);
+    background: none;
 }
 
 .auth-box {
