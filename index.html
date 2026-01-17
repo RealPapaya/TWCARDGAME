@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="auth_style.css">
     <link rel="stylesheet" href="player_info.css">
     <link rel="stylesheet" href="selection_modals.css">
+    <link rel="stylesheet" href="profile_page.css">
     <script src="card_data.js"></script>
     <script src="default_decks.js"></script>
     <script src="game_engine.js"></script>
@@ -64,6 +65,7 @@
                     <h1 class="game-title">寶島遊戲王</h1>
                     <div class="game-version">v0.6.0</div>
                     <div class="menu-buttons main-nav">
+                        <button id="btn-main-profile" class="neon-button">個人頁面</button>
                         <button id="btn-main-battle" class="neon-button">進入戰鬥</button>
                         <button id="btn-main-builder" class="neon-button">牌組組建</button>
                         <button id="btn-main-test" class="neon-button secondary" style="margin-top: 15px;">測試模式 (Test
@@ -119,6 +121,86 @@
                     </div>
                     <div class="menu-buttons" style="margin-top: 30px;">
                         <button id="btn-auth-guest" class="neon-button secondary">訪客模式 (不存檔)</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 個人頁面 -->
+            <div id="profile-view" class="view" style="display: none;">
+                <!-- 返回按鈕 -->
+                <button id="btn-profile-back" class="back-button">← 返回</button>
+
+                <div class="profile-container">
+                    <!-- 單一大卡片 -->
+                    <div class="profile-main-card">
+                        <!-- 上方：玩家資訊橫向 -->
+                        <div class="profile-header">
+                            <div class="profile-avatar-section">
+                                <div id="profile-avatar" class="profile-avatar clickable">
+                                    👤
+                                </div>
+                                <div class="edit-hint">點擊編輯</div>
+                            </div>
+
+                            <div class="profile-info">
+                                <div id="profile-username" class="profile-username">玩家名稱</div>
+                                <div id="profile-title" class="profile-player-title clickable">
+                                    #玩家稱號 ✏️
+                                </div>
+                                <div id="profile-join-date" class="profile-join-date">
+                                    加入時間：2026-01-01
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 分隔線 -->
+                        <div class="profile-divider"></div>
+
+                        <!-- 下方：左右分欄 -->
+                        <div class="profile-bottom-section">
+                            <!-- 左：遊戲統計 -->
+                            <div class="profile-stats">
+                                <h3 class="stats-title">遊戲統計</h3>
+                                <div class="stats-list">
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">勝場數 / 總場次</div>
+                                        <div class="stat-row-value" id="stat-wins-total">0 / 0</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">總勝率</div>
+                                        <div class="stat-row-value" id="stat-total-winrate">0%</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">勝場數 / 總場次 (普通)</div>
+                                        <div class="stat-row-value" id="stat-normal-wins">0 / 0</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">勝場數 / 總場次 (專家)</div>
+                                        <div class="stat-row-value" id="stat-expert-wins">0 / 0</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">勝場數 / 總場次 (大師)</div>
+                                        <div class="stat-row-value" id="stat-master-wins">0 / 0</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">擁有卡牌</div>
+                                        <div class="stat-row-value" id="stat-owned-cards">0</div>
+                                    </div>
+                                    <div class="stat-row">
+                                        <div class="stat-row-label">牌組數量</div>
+                                        <div class="stat-row-value" id="stat-total-decks">0</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 右：牌組管理 -->
+                            <div class="deck-management">
+                                <h3 class="deck-management-title">牌組管理</h3>
+                                <div id="profile-deck-list" class="profile-deck-list">
+                                    <!-- 由 JS 動態生成 -->
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>

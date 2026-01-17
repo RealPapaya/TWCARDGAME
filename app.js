@@ -758,21 +758,18 @@ function updatePlayerInfo() {
  * 初始化玩家資訊卡片的點擊事件
  */
 function initPlayerInfoEvents() {
-    const avatarEl = document.getElementById('player-avatar');
-    const titleEl = document.getElementById('player-title');
+    const playerCard = document.getElementById('player-info-card');
 
-    // 頭像點擊事件 - 編輯頭像
-    if (avatarEl) {
-        avatarEl.addEventListener('click', () => {
-            showAvatarSelectionModal();
+    // 整個卡片點擊跳轉到個人頁面
+    if (playerCard) {
+        playerCard.addEventListener('click', () => {
+            if (AuthManager.currentUser) {
+                showProfilePage();
+            }
         });
-    }
 
-    // 稱號點擊事件 - 選擇稱號
-    if (titleEl) {
-        titleEl.addEventListener('click', () => {
-            showTitleSelectionModal();
-        });
+        // 加上 cursor pointer
+        playerCard.style.cursor = 'pointer';
     }
 }
 
@@ -856,7 +853,248 @@ function selectPlayerAvatar(avatarId) {
         AuthManager.currentUser.selectedAvatar = avatarId;
         localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
         updatePlayerInfo();
+        updateProfilePage(); // 同時更新個人頁面
         showToast('頭像已更換');
+    }
+}
+
+/**
+ * 選擇玩家稱號
+ */
+function selectPlayerTitle(title) {
+    if (AuthManager.currentUser) {
+        AuthManager.currentUser.selectedTitle = title;
+        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
+        updatePlayerInfo();
+        updateProfilePage(); // 同時更新個人頁面
+        showToast(`稱號已更換為：#${title}`);
+    }
+}
+
+/**
+ * 顯示個人頁面
+ */
+function showProfilePage() {
+    if (!AuthManager.currentUser) {
+        showToast('請先登入');
+        showView('auth-view');
+        return;
+    }
+
+    showView('profile-view');
+    updateProfilePage();
+}
+
+/**
+ * 更新個人頁面資料
+ */
+function updateProfilePage() {
+    const user = AuthManager.currentUser;
+    if (!user) return;
+
+    // 更新頭像
+    const avatarEl = document.getElementById('profile-avatar');
+    if (avatarEl) {
+        if (user.selectedAvatar) {
+            const avatar = AVAILABLE_AVATARS.find(a => a.id === user.selectedAvatar);
+            if (avatar) {
+                avatarEl.style.backgroundImage = `url('${avatar.path}')`;
+                avatarEl.style.backgroundSize = 'cover';
+                avatarEl.style.backgroundPosition = 'center';
+                avatarEl.textContent = '';
+            }
+        } else {
+            avatarEl.style.backgroundImage = '';
+            avatarEl.textContent = user.username.charAt(0) || '👤';
+        }
+    }
+
+    // 更新名稱和稱號
+    const usernameEl = document.getElementById('profile-username');
+    const titleEl = document.getElementById('profile-title');
+    if (usernameEl) usernameEl.textContent = user.username;
+    const title = user.selectedTitle || '玩家稱號';
+    if (titleEl) titleEl.textContent = `#${title} ✏️`;
+
+    // 更新加入時間
+    const joinDateEl = document.getElementById('profile-join-date');
+    if (joinDateEl) {
+        if (user.createdAt) {
+            const date = new Date(user.createdAt);
+            const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+            joinDateEl.textContent = `加入時間：${formattedDate}`;
+        } else {
+            joinDateEl.textContent = '加入時間：未知';
+        }
+    }
+
+    // 更新統計數據 - 按難度分類
+    const stats = user.stats || {
+        totalGames: 0,
+        totalWins: 0,
+        normalWins: 0,
+        normalGames: 0,
+        expertWins: 0,
+        expertGames: 0,
+        masterWins: 0,
+        masterGames: 0,
+        ownedCards: []
+    };
+
+    // 勝場數 / 總場次
+    const winsTotalEl = document.getElementById('stat-wins-total');
+    if (winsTotalEl) {
+        winsTotalEl.textContent = `${stats.totalWins || 0} / ${stats.totalGames || 0}`;
+    }
+
+    // 總勝率
+    const totalWinRate = stats.totalGames > 0
+        ? Math.round((stats.totalWins / stats.totalGames) * 100)
+        : 0;
+    const totalWinrateEl = document.getElementById('stat-total-winrate');
+    if (totalWinrateEl) totalWinrateEl.textContent = `${totalWinRate}%`;
+
+    // 普通難度
+    const normalWinsEl = document.getElementById('stat-normal-wins');
+    if (normalWinsEl) {
+        normalWinsEl.textContent = `${stats.normalWins || 0} / ${stats.normalGames || 0}`;
+    }
+
+    // 專家難度
+    const expertWinsEl = document.getElementById('stat-expert-wins');
+    if (expertWinsEl) {
+        expertWinsEl.textContent = `${stats.expertWins || 0} / ${stats.expertGames || 0}`;
+    }
+
+    // 大師難度
+    const masterWinsEl = document.getElementById('stat-master-wins');
+    if (masterWinsEl) {
+        masterWinsEl.textContent = `${stats.masterWins || 0} / ${stats.masterGames || 0}`;
+    }
+
+    // 擁有卡牌
+    const ownedCardsCount = stats.ownedCards ? stats.ownedCards.length : 0;
+    const ownedCardsEl = document.getElementById('stat-owned-cards');
+    if (ownedCardsEl) ownedCardsEl.textContent = ownedCardsCount;
+
+    // 牌組數量
+    const totalDecks = userDecks ? userDecks.length : 0;
+    const totalDecksEl = document.getElementById('stat-total-decks');
+    if (totalDecksEl) totalDecksEl.textContent = totalDecks;
+
+    // 更新牌組列表
+    renderProfileDeckList();
+}
+
+/**
+ * 渲染卡牌收藏
+ */
+// 渲染個人頁面牌組列表
+function renderProfileDeckList() {
+    const container = document.getElementById('profile-deck-list');
+    if (!container) return;
+
+    if (!userDecks || userDecks.length === 0) {
+        container.innerHTML = '<div class="empty-decks">尚無牌組</div>';
+        return;
+    }
+
+    container.innerHTML = '';
+
+    // 顯示所有牌組
+    userDecks.forEach((deck, idx) => {
+        const item = document.createElement('div');
+        item.className = `profile-deck-item ${idx === selectedDeckIdx ? 'selected' : ''}`;
+
+        const isDeckIncomplete = deck.cards.length !== 30;
+        const countClass = isDeckIncomplete ? 'incomplete' : '';
+        const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
+
+        item.innerHTML = `
+            <div class="deck-item-header">
+                <div class="deck-item-name">${deck.name}</div>
+                <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length} / 30</div>
+            </div>
+            <div class="deck-item-actions">
+                <button class="btn-deck-action btn-deck-edit" data-idx="${idx}">✏️ 編輯</button>
+                <button class="btn-deck-action btn-deck-copy" data-idx="${idx}">📋 複製</button>
+                <button class="btn-deck-action btn-deck-delete" data-idx="${idx}">🗑️ 刪除</button>
+            </div>
+        `;
+
+        // 點擊卡片選擇牌組
+        item.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('btn-deck-action')) {
+                selectedDeckIdx = idx;
+                localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+                renderProfileDeckList();
+            }
+        });
+
+        // 編輯按鈕
+        item.querySelector('.btn-deck-edit').addEventListener('click', (e) => {
+            e.stopPropagation();
+            editingDeckIdx = idx;
+            tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
+            showView('deck-builder');
+            renderDeckBuilder();
+        });
+
+        // 複製按鈕
+        item.querySelector('.btn-deck-copy').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (userDecks.length >= 10) {
+                await showCustomAlert('已達牌組數量上限（10個）');
+                return;
+            }
+            const copiedDeck = JSON.parse(JSON.stringify(deck));
+            copiedDeck.name = `${deck.name} (副本)`;
+            userDecks.push(copiedDeck);
+            localStorage.setItem('userDecks', JSON.stringify(userDecks));
+            if (AuthManager.currentUser) {
+                AuthManager.currentUser.deck_data = userDecks;
+                AuthManager.saveData();
+            }
+            showToast('牌組已複製');
+            renderProfileDeckList();
+        });
+
+        // 刪除按鈕
+        item.querySelector('.btn-deck-delete').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (userDecks.length <= 1) {
+                await showCustomAlert('至少需保留一個牌組！');
+                return;
+            }
+            const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
+            if (confirmed) {
+                userDecks.splice(idx, 1);
+                if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
+                localStorage.setItem('userDecks', JSON.stringify(userDecks));
+                if (AuthManager.currentUser) {
+                    AuthManager.currentUser.deck_data = userDecks;
+                    AuthManager.saveData();
+                }
+                showToast('牌組已刪除');
+                renderProfileDeckList();
+            }
+        });
+
+        container.appendChild(item);
+    });
+
+    // 新增牌組按鈕
+    if (userDecks.length < 10) {
+        const addItem = document.createElement('div');
+        addItem.className = 'add-deck-item';
+        addItem.innerHTML = `
+            <div class="add-deck-icon">+</div>
+            <div class="add-deck-text">建立新牌組</div>
+        `;
+        addItem.addEventListener('click', () => {
+            showDeckCreationOptions();
+        });
+        container.appendChild(addItem);
     }
 }
 
@@ -4698,5 +4936,27 @@ document.addEventListener('DOMContentLoaded', () => {
     // 頭像選擇取消按鈕
     document.getElementById('btn-avatar-cancel')?.addEventListener('click', () => {
         document.getElementById('avatar-selection-modal').style.display = 'none';
+    });
+
+    // 個人頁面按鈕
+    document.getElementById('btn-main-profile')?.addEventListener('click', () => {
+        showProfilePage();
+    });
+
+    // 個人頁面返回按鈕
+    document.getElementById('btn-profile-back')?.addEventListener('click', () => {
+        showView('main-menu');
+    });
+
+    // 個人頁面 - 頭像編輯
+    document.getElementById('profile-avatar')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showAvatarSelectionModal();
+    });
+
+    // 個人頁面 - 稱號編輯
+    document.getElementById('profile-title')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        showTitleSelectionModal();
     });
 });
