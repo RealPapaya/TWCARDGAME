@@ -433,9 +433,6 @@
                         </div>
 
                         <div class="board" id="opp-board"></div>
-                        <!-- Opponent Deck moved to Top Right -->
-                        <div class="deck-pile" id="opp-deck" style="left: auto; right: 30px;">Deck <span
-                                class="count-badge">0</span></div>
                     </div>
 
                     <div class="center-line">
@@ -445,27 +442,29 @@
                         <!-- End Turn Group -->
                         <div class="end-turn-group">
                             <div id="indicator-opp" class="turn-light">對方回合</div>
+                            <div class="deck-pile" id="opp-deck">Deck <span class="count-badge">0</span></div>
                             <button id="end-turn-btn">結束回合</button>
+                            <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
                             <div id="indicator-player" class="turn-light">你的回合</div>
                         </div>
                     </div>
 
-                    <!-- Settings Button (Bottom Left) -->
-                    <button id="settings-button" class="settings-button" title="設定">
-                        <span class="gear-icon">⚙️</span>
-                    </button>
-
-                    <!-- Battle Settings Menu -->
-                    <div id="settings-menu-battle" class="settings-menu" style="display: none;">
-                        <div class="settings-menu-header">遊戲設定</div>
-                        <button id="btn-view-deck-menu" class="settings-menu-item">
-                            <span class="menu-icon">📋</span>
-                            <span>查看牌組</span>
-                        </button>
-                        <button id="btn-surrender-menu" class="settings-menu-item danger">
-                            <span class="menu-icon">🏳️</span>
-                            <span>投降</span>
-                        </button>
+                    <!-- Battle Settings -->
+                    <div class="settings-container">
+                        <button id="settings-button" class="settings-btn" title="設定">⚙️</button>
+                        <div id="settings-menu-battle" class="settings-menu" style="display: none;">
+                            <div class="settings-menu-header"
+                                style="color: #5d2e17; font-family: 'Noto Serif TC', serif; font-size: 20px; font-weight: 900; margin-bottom: 15px; text-align: center;">
+                                遊戲設定</div>
+                            <button id="btn-view-deck-menu" class="settings-menu-item">
+                                <span class="menu-icon" style="margin-right: 10px;">📋</span>
+                                <span>查看牌組</span>
+                            </button>
+                            <button id="btn-surrender-menu" class="settings-menu-item danger">
+                                <span class="menu-icon" style="margin-right: 10px;">🏳️</span>
+                                <span>投降</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Player Area -->
@@ -478,15 +477,23 @@
 
                         <div class="hand" id="player-hand"></div>
 
-                        <div class="deck-pile" id="player-deck">Deck <span class="count-badge">0</span></div>
-                        <!-- Discard Pile Removed -->
-
                         <!-- New Status Cluster in Bottom Right -->
                         <div id="player-status-cluster" class="status-cluster">
                             <div id="player-mana-text" class="mana-text">0/0</div>
                             <div id="player-mana-container" class="mana-container frame-style">
                                 <!-- Mana Text will be injected by JS -->
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- Player Info Card (Moved to game-container for better visibility) -->
+                    <div class="player-info-card" id="battle-player-info">
+                        <div class="player-avatar-frame">
+                            <div class="player-avatar" id="battle-player-avatar">👤</div>
+                        </div>
+                        <div class="player-details">
+                            <div class="player-username" id="battle-player-username">玩家</div>
+                            <div class="player-title" id="battle-player-title">無稱號</div>
                         </div>
                     </div>
                 </div>
@@ -645,7 +652,6 @@
     </svg>
 
     <div id="card-preview" style="z-index: 10000;"></div>
-    <div id="message-log" style="z-index: 10001;"></div>
 </body>
 
 

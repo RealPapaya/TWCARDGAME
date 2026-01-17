@@ -1814,7 +1814,8 @@ async function aiTurn() {
                         const destName = getUnitName(destSide, action.target.index, action.target.type);
 
                         const isAiNews = card.type === 'NEWS';
-                        const aiValue = card.keywords?.battlecry?.value || card.keywords?.battlecry?.bonus_value || 0;
+                        const bonus = isAiNews ? (gameState.getNewsPower(card.side || 'OPPONENT') || 0) : 0;
+                        const aiValue = (card.keywords?.battlecry?.value || card.keywords?.battlecry?.bonus_value || 0) + bonus;
 
                         if (effectType === 'HEAL') {
                             const eventType = isAiNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
@@ -1962,6 +1963,62 @@ function renderGameUI(p1, p2) {
 
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
     document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+
+    // Update Battle Player Info Card
+    const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
+    const authUser = JSON.parse(localStorage.getItem('tw_card_game_user'));
+
+    const battleUsername = document.getElementById('battle-player-username');
+    const battleTitle = document.getElementById('battle-player-title');
+    const battleAvatar = document.getElementById('battle-player-avatar');
+
+    // Also update main hero avatar if available
+    const mainHeroAvatar = document.querySelector('#player-hero .avatar');
+
+    // 優先顯示登入的用戶名
+    const displayUsername = (authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家');
+
+    if (battleUsername) {
+        battleUsername.innerText = displayUsername;
+    }
+    if (battleTitle) {
+        // 如果有登入，也許未來可以從 authUser 獲取稱號 (目前暫時使用本地設定)
+        const titleObj = AVAILABLE_TITLES.find(t => t.id === playerInfo.selectedTitle);
+        battleTitle.innerText = titleObj ? titleObj.name : '無稱號';
+    }
+    if (battleAvatar) {
+        const avatarObj = AVAILABLE_AVATARS.find(a => a.id === playerInfo.selectedAvatar);
+        if (avatarObj && avatarObj.path) {
+            const url = `url('${avatarObj.path}')`;
+            // Info Card Avatar
+            battleAvatar.style.backgroundImage = url;
+            battleAvatar.style.backgroundSize = 'cover';
+            battleAvatar.style.backgroundPosition = 'center';
+            battleAvatar.innerText = '';
+
+            // Sync Main Hero Avatar
+            if (mainHeroAvatar) {
+                mainHeroAvatar.style.backgroundImage = url;
+                mainHeroAvatar.style.backgroundSize = 'cover';
+                mainHeroAvatar.style.backgroundPosition = 'center';
+            }
+        } else {
+            // 使用顯示名稱的首字
+            const initial = displayUsername.charAt(0).toUpperCase();
+            battleAvatar.innerText = initial;
+            battleAvatar.style.backgroundImage = 'none';
+            // Main hero fallback - use a default image to ensure something is shown
+            if (mainHeroAvatar) {
+                // Use a default hero image if no custom avatar is set
+                // You might want to replace this with a specific default hero asset path if available
+                const defaultHeroImg = 'url("img/avatars/avatar1.jpg")'; // Using avatar1 as a safe default
+                mainHeroAvatar.style.backgroundImage = defaultHeroImg;
+                mainHeroAvatar.style.backgroundSize = 'cover';
+                mainHeroAvatar.style.backgroundPosition = 'center';
+                mainHeroAvatar.innerText = ''; // Clear text
+            }
+        }
+    }
 
     // Check for Win/Loss
     if (gameState.winner !== null) {
@@ -3439,7 +3496,8 @@ async function onDragEnd(e) {
 
                 // 區分新聞牌和隨從
                 const isNews = battlecrySourceType === 'NEWS';
-                const value = battlecryTargetRule?.value || battlecryTargetRule?.bonus_value || 0;
+                const bonus = isNews ? (gameState.getNewsPower(gameState.currentPlayer.side || 'PLAYER') || 0) : 0;
+                const value = (battlecryTargetRule?.value || battlecryTargetRule?.bonus_value || 0) + bonus;
 
                 console.log('[TARGETED BATTLECRY] isNews:', isNews, 'value:', value);
 
