@@ -443,20 +443,31 @@ function init() {
         });
     }
 
+
     // --- Deck Creation Modal Listeners ---
+    // 防止重複建立牌組的旗標
+    let deckCreationInProgress = false;
     document.getElementById('btn-create-custom')?.addEventListener('click', () => {
+        if (deckCreationInProgress) return;
+        deckCreationInProgress = true;
         document.getElementById('deck-creation-modal').style.display = 'none';
         addNewPlayerDeck(null); // Create empty deck
+        // 讓旗標在下一個事件循環重置，避免影響其他操作
+        setTimeout(() => { deckCreationInProgress = false; }, 0);
     });
 
     document.getElementById('btn-create-theme')?.addEventListener('click', () => {
+        if (deckCreationInProgress) return;
+        deckCreationInProgress = true;
         document.getElementById('deck-creation-modal').style.display = 'none';
         showPlayerThemeSelection();
+        setTimeout(() => { deckCreationInProgress = false; }, 0);
     });
 
     document.getElementById('btn-create-cancel')?.addEventListener('click', () => {
         document.getElementById('deck-creation-modal').style.display = 'none';
     });
+
 
     console.log("Game initialized.");
 }
@@ -858,6 +869,12 @@ function selectPlayerAvatar(avatarId) {
     if (AuthManager.currentUser) {
         AuthManager.currentUser.selectedAvatar = avatarId;
         localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
+
+        // 同時更新 playerInfo,確保戰場內的頭像也會同步
+        const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
+        playerInfo.selectedAvatar = avatarId;
+        localStorage.setItem('playerInfo', JSON.stringify(playerInfo));
+
         updatePlayerInfo();
         updateProfilePage(); // 同時更新個人頁面
         showToast('頭像已更換');
@@ -997,14 +1014,21 @@ function updateProfilePage() {
  */
 // 渲染個人頁面牌組列表
 function renderProfileDeckList() {
+    console.log('[RENDER] ===== 開始渲染牌組列表 =====');
     const container = document.getElementById('profile-deck-list');
-    if (!container) return;
+    if (!container) {
+        console.error('[RENDER] 錯誤：找不到 profile-deck-list 容器！');
+        return;
+    }
+    console.log('[RENDER] 容器找到:', container);
 
     if (!userDecks || userDecks.length === 0) {
+        console.log('[RENDER] 無牌組資料，顯示空狀態');
         container.innerHTML = '<div class="empty-decks">尚無牌組</div>';
         return;
     }
 
+    console.log('[RENDER] 準備渲染', userDecks.length, '個牌組');
     container.innerHTML = '';
 
     // 顯示所有牌組
@@ -1081,6 +1105,97 @@ function renderProfileDeckList() {
         container.appendChild(addItem);
     }
 }
+
+// 顯示牌組創建選項模態視窗
+function showDeckCreationOptions() {
+    console.log('[DECK] 顯示牌組創建選項模態視窗');
+    const modal = document.getElementById('deck-creation-modal');
+    if (modal) {
+        console.log('[DECK] 模態視窗找到，顯示中...');
+        modal.style.display = 'flex';
+    } else {
+        console.error('[DECK] 錯誤：找不到 deck-creation-modal 元素！');
+    }
+}
+
+// 創建新的玩家牌組
+function addNewPlayerDeck(themeCards = null) {
+    console.log('[DECK] ===== 開始創建新牌組 =====');
+    console.log('[DECK] 當前牌組數量:', userDecks.length);
+    console.log('[DECK] 主題卡牌:', themeCards ? `${themeCards.length} 張` : '無（自由組建）');
+
+    const newDeck = {
+        name: `牌組 ${userDecks.length + 1}`,
+        cards: themeCards || []
+    };
+    console.log('[DECK] 新牌組名稱:', newDeck.name);
+
+    userDecks.push(newDeck);
+    selectedDeckIdx = userDecks.length - 1;
+    editingDeckIdx = selectedDeckIdx;
+    console.log('[DECK] 牌組已加入陣列，新數量:', userDecks.length);
+    console.log('[DECK] 選中索引:', selectedDeckIdx);
+
+    // 保存到 localStorage
+    localStorage.setItem('userDecks', JSON.stringify(userDecks));
+    localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+    console.log('[DECK] ✓ 已保存到 localStorage');
+
+    // 同步到雲端
+    if (AuthManager.currentUser) {
+        console.log('[DECK] 當前用戶:', AuthManager.currentUser.username);
+        AuthManager.currentUser.deck_data = userDecks;
+        AuthManager.saveData();
+        console.log('[DECK] ✓ 已同步到雲端資料庫');
+    } else {
+        console.warn('[DECK] ⚠ 未登入，無法同步到雲端');
+    }
+
+    // 立即更新顯示 - 這是關鍵！
+    console.log('[DECK] 呼叫 renderProfileDeckList() 更新顯示...');
+    renderProfileDeckList();
+
+    // 進入編輯模式
+    tempDeck = JSON.parse(JSON.stringify(newDeck));
+    console.log('[DECK] 進入編輯模式，跳轉到牌組編輯器');
+    showView('deck-builder');
+    renderDeckBuilder();
+    console.log('[DECK] ===== 創建流程完成 =====');
+}
+
+// 顯示玩家主題牌組選擇
+function showPlayerThemeSelection() {
+    const modal = document.getElementById('player-theme-selection-modal');
+    if (!modal) return;
+
+    const container = document.getElementById('player-theme-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    // 渲染每個主題牌組
+    aiThemeDecks.forEach((theme, idx) => {
+        const themeItem = document.createElement('div');
+        themeItem.className = 'medieval-theme-item';
+        themeItem.innerHTML = `
+            <div class="theme-item-image" style="background-image: url('${theme.image}'); background-size: cover; background-position: center;"></div>
+            <div class="theme-item-info">
+                <div class="theme-item-name">${theme.name}</div>
+                <div class="theme-item-count">${theme.cards.length} 張卡</div>
+            </div>
+        `;
+
+        themeItem.addEventListener('click', () => {
+            modal.style.display = 'none';
+            addNewPlayerDeck(JSON.parse(JSON.stringify(theme.cards)));
+        });
+
+        container.appendChild(themeItem);
+    });
+
+    modal.style.display = 'flex';
+}
+
 
 function renderThemeSelection(isEditMode = false) {
     const container = document.getElementById('theme-cards-container');
@@ -1271,22 +1386,47 @@ function showDeckCreationOptions() {
 }
 
 function addNewPlayerDeck(cardIds = null, themeName = null) {
+    console.log('[DECK] ===== 開始創建新牌組 =====');
+    console.log('[DECK] 當前牌組數量:', userDecks.length);
+    console.log('[DECK] 卡牌:', cardIds ? `${cardIds.length} 張` : '無（空牌組）');
+
     const newDeck = {
         name: themeName || (isDebugMode ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
         cards: cardIds ? [...cardIds] : []
     };
     if (isDebugMode) newDeck.isTest = true;
+
+    console.log('[DECK] 新牌組名稱:', newDeck.name);
     userDecks.push(newDeck);
+    console.log('[DECK] 牌組已加入，新數量:', userDecks.length);
+
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
     // 同步至雲端
     if (AuthManager.currentUser) {
+        console.log('[DECK] 同步到雲端:', AuthManager.currentUser.username);
         AuthManager.currentUser.deck_data = userDecks;
         AuthManager.saveData();
     }
 
     selectedDeckIdx = userDecks.length - 1;
-    renderDeckSelect();
+    editingDeckIdx = selectedDeckIdx;
+
+    // 更新個人頁面列表（如果在個人頁面）
+    if (document.getElementById('profile-view').style.display !== 'none') {
+        console.log('[DECK] 更新個人頁面列表');
+        renderProfileDeckList();
+    } else {
+        // 更新牌組選擇頁面（如果在牌組選擇）
+        renderDeckSelect();
+    }
+
+    // 立即進入編輯模式
+    tempDeck = JSON.parse(JSON.stringify(newDeck));
+    console.log('[DECK] 進入編輯模式');
+    showView('deck-builder');
+    renderDeckBuilder();
+    console.log('[DECK] ===== 創建完成 =====');
 }
 
 function showPlayerThemeSelection() {
@@ -1814,7 +1954,8 @@ async function aiTurn() {
                         const destName = getUnitName(destSide, action.target.index, action.target.type);
 
                         const isAiNews = card.type === 'NEWS';
-                        const aiValue = card.keywords?.battlecry?.value || card.keywords?.battlecry?.bonus_value || 0;
+                        const bonus = isAiNews ? (gameState.getNewsPower(card.side || 'OPPONENT') || 0) : 0;
+                        const aiValue = (card.keywords?.battlecry?.value || card.keywords?.battlecry?.bonus_value || 0) + bonus;
 
                         if (effectType === 'HEAL') {
                             const eventType = isAiNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
@@ -1962,6 +2103,62 @@ function renderGameUI(p1, p2) {
 
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
     document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+
+    // Update Battle Player Info Card
+    const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
+    const authUser = JSON.parse(localStorage.getItem('tw_card_game_user'));
+
+    const battleUsername = document.getElementById('battle-player-username');
+    const battleTitle = document.getElementById('battle-player-title');
+    const battleAvatar = document.getElementById('battle-player-avatar');
+
+    // Also update main hero avatar if available
+    const mainHeroAvatar = document.querySelector('#player-hero .avatar');
+
+    // 優先顯示登入的用戶名
+    const displayUsername = (authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家');
+
+    if (battleUsername) {
+        battleUsername.innerText = displayUsername;
+    }
+    if (battleTitle) {
+        // 如果有登入，也許未來可以從 authUser 獲取稱號 (目前暫時使用本地設定)
+        const titleObj = AVAILABLE_TITLES.find(t => t.id === playerInfo.selectedTitle);
+        battleTitle.innerText = titleObj ? titleObj.name : '無稱號';
+    }
+    if (battleAvatar) {
+        const avatarObj = AVAILABLE_AVATARS.find(a => a.id === playerInfo.selectedAvatar);
+        if (avatarObj && avatarObj.path) {
+            const url = `url('${avatarObj.path}')`;
+            // Info Card Avatar
+            battleAvatar.style.backgroundImage = url;
+            battleAvatar.style.backgroundSize = 'cover';
+            battleAvatar.style.backgroundPosition = 'center';
+            battleAvatar.innerText = '';
+
+            // Sync Main Hero Avatar
+            if (mainHeroAvatar) {
+                mainHeroAvatar.style.backgroundImage = url;
+                mainHeroAvatar.style.backgroundSize = 'cover';
+                mainHeroAvatar.style.backgroundPosition = 'center';
+            }
+        } else {
+            // 使用顯示名稱的首字
+            const initial = displayUsername.charAt(0).toUpperCase();
+            battleAvatar.innerText = initial;
+            battleAvatar.style.backgroundImage = 'none';
+            // Main hero fallback - use a default image to ensure something is shown
+            if (mainHeroAvatar) {
+                // Use a default hero image if no custom avatar is set
+                // You might want to replace this with a specific default hero asset path if available
+                const defaultHeroImg = 'url("img/avatars/avatar1.jpg")'; // Using avatar1 as a safe default
+                mainHeroAvatar.style.backgroundImage = defaultHeroImg;
+                mainHeroAvatar.style.backgroundSize = 'cover';
+                mainHeroAvatar.style.backgroundPosition = 'center';
+                mainHeroAvatar.innerText = ''; // Clear text
+            }
+        }
+    }
 
     // Check for Win/Loss
     if (gameState.winner !== null) {
@@ -3439,7 +3636,8 @@ async function onDragEnd(e) {
 
                 // 區分新聞牌和隨從
                 const isNews = battlecrySourceType === 'NEWS';
-                const value = battlecryTargetRule?.value || battlecryTargetRule?.bonus_value || 0;
+                const bonus = isNews ? (gameState.getNewsPower(gameState.currentPlayer.side || 'PLAYER') || 0) : 0;
+                const value = (battlecryTargetRule?.value || battlecryTargetRule?.bonus_value || 0) + bonus;
 
                 console.log('[TARGETED BATTLECRY] isNews:', isNews, 'value:', value);
 
