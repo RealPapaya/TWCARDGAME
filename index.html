@@ -13,6 +13,8 @@
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="settings_fix.css">
     <link rel="stylesheet" href="auth_style.css">
+    <link rel="stylesheet" href="player_info.css">
+    <link rel="stylesheet" href="selection_modals.css">
     <script src="card_data.js"></script>
     <script src="default_decks.js"></script>
     <script src="game_engine.js"></script>
@@ -46,6 +48,18 @@
                         <button id="btn-logout-main" class="settings-menu-item">登出</button>
                     </div>
                 </div>
+
+                <!-- 玩家資訊卡片 (左下角) -->
+                <div id="player-info-card" class="player-info-card" style="display: none;">
+                    <div class="player-avatar-frame">
+                        <div id="player-avatar" class="player-avatar clickable">👤</div>
+                    </div>
+                    <div class="player-details">
+                        <div id="player-username" class="player-username">訪客</div>
+                        <div id="player-title" class="player-title clickable">#玩家稱號</div>
+                    </div>
+                </div>
+
                 <div class="menu-content">
                     <h1 class="game-title">寶島遊戲王</h1>
                     <div class="game-version">v0.6.0</div>
@@ -520,6 +534,32 @@
         <div id="play-preview-overlay"></div>
     </div>
     <!-- End of 16:9 Container -->
+
+    <!-- 稱號選擇彈窗 -->
+    <div id="title-selection-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal">
+            <h2 class="medieval-title">選擇稱號</h2>
+            <div id="title-options" class="title-grid">
+                <!-- 由 JS 動態生成 -->
+            </div>
+            <div class="modal-buttons">
+                <button id="btn-title-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 頭像選擇彈窗 -->
+    <div id="avatar-selection-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal wide-modal">
+            <h2 class="medieval-title">選擇頭像</h2>
+            <div id="avatar-options" class="avatar-grid">
+                <!-- 由 JS 動態生成 -->
+            </div>
+            <div class="modal-buttons">
+                <button id="btn-avatar-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
 </body>
 
 

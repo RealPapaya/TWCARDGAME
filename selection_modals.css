@@ -1,0 +1,259 @@
+/* Medieval Selection Modals (Title & Avatar) */
+
+/* 彈窗基礎樣式 */
+.parchment-modal {
+    background: var(--parchment-light);
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
+        url("https://www.transparenttextures.com/patterns/parchment.png");
+    border: 8px solid var(--wood-dark);
+    border-radius: 16px;
+    padding: 40px 30px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 20px 40px rgba(0, 0, 0, 0.7);
+}
+
+.parchment-modal.wide-modal {
+    max-width: 1000px;
+}
+
+.medieval-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 36px;
+    font-weight: 900;
+    color: var(--text-primary);
+    text-align: center;
+    margin-bottom: 10px;
+    text-shadow:
+        0 2px 0 rgba(255, 255, 255, 0.3),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+    letter-spacing: 3px;
+}
+
+/* 稱號選擇網格 */
+.title-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    padding: 30px 20px;
+}
+
+.title-option {
+    padding: 20px 25px;
+    background: var(--parchment-dark);
+    background-image: linear-gradient(to bottom, rgba(255, 255, 255, 0.1), transparent);
+    border: 4px solid var(--wood-medium);
+    border-radius: 8px;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    text-align: center;
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 4px 6px rgba(0, 0, 0, 0.2);
+    position: relative;
+    overflow: hidden;
+}
+
+.title-option::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(90deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 0, 0, 0.03) 2px,
+            rgba(0, 0, 0, 0.03) 4px);
+    pointer-events: none;
+}
+
+.title-option:hover {
+    transform: translateY(-5px);
+    border-color: var(--wood-dark);
+    box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.2),
+        0 8px 15px rgba(0, 0, 0, 0.4);
+}
+
+.title-option:active {
+    transform: translateY(-2px);
+}
+
+.title-option.selected {
+    background: linear-gradient(to bottom, var(--gold), var(--gold-dark));
+    border-color: var(--wood-dark);
+    box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.3),
+        0 0 20px rgba(212, 175, 55, 0.5),
+        0 8px 15px rgba(0, 0, 0, 0.4);
+    color: var(--ink-dark);
+}
+
+/* 頭像選擇網格 */
+.avatar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    padding: 30px 20px;
+}
+
+.avatar-option {
+    position: relative;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.avatar-option img {
+    width: 100%;
+    aspect-ratio: 1;
+    object-fit: cover;
+    border-radius: 12px;
+    border: 6px solid var(--wood-medium);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 4px 10px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    display: block;
+}
+
+.avatar-option:hover {
+    transform: translateY(-10px);
+}
+
+.avatar-option:hover img {
+    border-color: var(--wood-dark);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.avatar-option.selected img {
+    border-color: var(--gold);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 0 25px rgba(212, 175, 55, 0.6),
+        0 8px 20px rgba(0, 0, 0, 0.5);
+}
+
+.avatar-option.selected::after {
+    content: '✓';
+    position: absolute;
+    top: -15px;
+    right: -15px;
+    width: 50px;
+    height: 50px;
+    background: linear-gradient(135deg, var(--gold), var(--gold-dark));
+    border: 4px solid var(--wood-dark);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+    font-weight: 900;
+    color: var(--ink-dark);
+    box-shadow:
+        inset 0 2px 4px rgba(255, 255, 255, 0.3),
+        0 4px 10px rgba(0, 0, 0, 0.5);
+    animation: checkmarkPop 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+@keyframes checkmarkPop {
+    0% {
+        transform: scale(0) rotate(-45deg);
+    }
+
+    50% {
+        transform: scale(1.2);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}
+
+/* 彈窗按鈕 */
+.modal-buttons {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.medieval-button {
+    padding: 15px 35px;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 20px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    border: 5px solid var(--wood-dark);
+    background: linear-gradient(to bottom, var(--wood-medium), var(--wood-dark));
+    color: var(--text-light);
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.2),
+        0 6px 0 var(--ink-dark),
+        0 8px 15px rgba(0, 0, 0, 0.6);
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8);
+}
+
+.medieval-button:hover {
+    transform: translateY(-3px);
+    box-shadow:
+        inset 0 2px 0 rgba(255, 255, 255, 0.3),
+        0 9px 0 var(--ink-dark),
+        0 12px 20px rgba(0, 0, 0, 0.7);
+}
+
+.medieval-button:active {
+    transform: translateY(3px);
+    box-shadow:
+        inset 0 2px 5px rgba(0, 0, 0, 0.5),
+        0 3px 0 var(--ink-dark),
+        0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.medieval-button.secondary {
+    background: linear-gradient(to bottom, var(--parchment-dark), #c19a6b);
+    color: var(--text-primary);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* 響應式設計 */
+@media (max-width: 768px) {
+    .title-grid {
+        grid-template-columns: 1fr;
+        gap: 15px;
+    }
+
+    .avatar-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 20px;
+    }
+
+    .parchment-modal {
+        padding: 30px 20px;
+    }
+
+    .medieval-title {
+        font-size: 28px;
+    }
+}
+
+@media (max-width: 480px) {
+    .avatar-grid {
+        grid-template-columns: 1fr;
+    }
+}

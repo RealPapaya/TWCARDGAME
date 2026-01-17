@@ -1,0 +1,181 @@
+/* Medieval Player Info Card Styling */
+
+/* 玩家資訊卡片容器 */
+.player-info-card {
+    position: absolute;
+    bottom: 40px;
+    left: 40px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 20px 25px;
+    background: var(--parchment-light);
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
+        url("https://www.transparenttextures.com/patterns/parchment.png");
+    border: 6px solid var(--wood-dark);
+    border-radius: 12px;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 8px 20px rgba(0, 0, 0, 0.6);
+    z-index: 100;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.player-info-card:hover {
+    transform: translateY(-5px);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 12px 25px rgba(0, 0, 0, 0.7);
+}
+
+/* 裝飾邊角 */
+.player-info-card::before {
+    content: '';
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 30px;
+    height: 30px;
+    border-top: 3px solid var(--gold);
+    border-left: 3px solid var(--gold);
+}
+
+.player-info-card::after {
+    content: '';
+    position: absolute;
+    bottom: -4px;
+    right: -4px;
+    width: 30px;
+    height: 30px;
+    border-bottom: 3px solid var(--gold);
+    border-right: 3px solid var(--gold);
+}
+
+/* 頭像框架 */
+.player-avatar-frame {
+    position: relative;
+    width: 80px;
+    height: 80px;
+    flex-shrink: 0;
+}
+
+.player-avatar {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--parchment-dark), #c19a6b);
+    border: 5px solid var(--wood-medium);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: 900;
+    font-family: 'Noto Serif TC', serif;
+    color: var(--text-primary);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 0 2px var(--wood-dark),
+        0 4px 8px rgba(0, 0, 0, 0.3);
+    position: relative;
+    overflow: hidden;
+}
+
+/* 頭像發光效果 */
+.player-avatar::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.player-info-card:hover .player-avatar::before {
+    opacity: 1;
+}
+
+/* 玩家詳細資訊 */
+.player-details {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    min-width: 120px;
+}
+
+.player-username {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 22px;
+    font-weight: 900;
+    color: var(--text-primary);
+    text-shadow:
+        0 1px 0 rgba(255, 255, 255, 0.4),
+        0 2px 4px rgba(0, 0, 0, 0.3);
+    letter-spacing: 1px;
+    line-height: 1.2;
+}
+
+.player-title {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    color: var(--text-secondary);
+    opacity: 0.8;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    padding: 4px 8px;
+    border-radius: 4px;
+    margin-left: -8px;
+}
+
+.player-title:hover {
+    opacity: 1;
+    background: rgba(139, 69, 19, 0.1);
+    transform: translateX(3px);
+}
+
+/* 可點擊元素通用樣式 */
+.clickable {
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.player-avatar.clickable:hover {
+    transform: scale(1.05);
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.2),
+        0 0 0 2px var(--wood-dark),
+        0 4px 12px rgba(0, 0, 0, 0.4),
+        0 0 15px rgba(212, 175, 55, 0.3);
+}
+
+/* 響應式：小螢幕調整 */
+@media (max-width: 768px) {
+    .player-info-card {
+        bottom: 20px;
+        left: 20px;
+        padding: 15px 20px;
+    }
+
+    .player-avatar-frame {
+        width: 60px;
+        height: 60px;
+    }
+
+    .player-avatar {
+        font-size: 28px;
+        border-width: 4px;
+    }
+
+    .player-username {
+        font-size: 18px;
+    }
+
+    .player-status {
+        font-size: 12px;
+    }
+}

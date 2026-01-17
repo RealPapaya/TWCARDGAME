@@ -59,6 +59,21 @@ let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
 ];
 let tempDeck = null; // Temporary deck for editing
 
+// 可用稱號列表
+const AVAILABLE_TITLES = [
+    { id: 'salary_thief', name: '薪水小偷' },
+    { id: 'monument_smoker', name: '古蹟抽菸' },
+    { id: 'busy_worker', name: '活網仔' },
+    { id: 'corporate_dog', name: '社畜小狗' }
+];
+
+// 可用頭像列表
+const AVAILABLE_AVATARS = [
+    { id: 'avatar1', path: 'img/avatars/avatar1.jpg', name: '中世紀學者' },
+    { id: 'avatar2', path: 'img/avatars/avatar2.jpg', name: '中世紀貴族' },
+    { id: 'avatar3', path: 'img/avatars/avatar3.jpg', name: '中世紀修士' }
+];
+
 // AI Theme Decks - loaded from default_decks.js
 // DEFAULT_THEME_DECKS is available globally via window.DEFAULT_THEME_DECKS
 
@@ -644,6 +659,9 @@ if (logoutBtn) {
             AuthManager.logout();
             showView('auth-view');
             if (window.AuthUI) AuthUI.reset();
+
+            // 清除玩家資訊
+            updatePlayerInfo();
         }
         if (settingsMenu) settingsMenu.style.display = 'none';
     });
@@ -685,6 +703,161 @@ function onUserLogin(user) {
     // Update other stats if we add level/gold UI later
     showView('main-menu');
     showToast(`歡迎回來，${user.username}！`);
+
+    // 更新玩家資訊顯示
+    updatePlayerInfo();
+}
+
+/**
+ * 更新主選單的玩家資訊顯示
+ */
+function updatePlayerInfo() {
+    const playerCard = document.getElementById('player-info-card');
+    const usernameEl = document.getElementById('player-username');
+    const avatarEl = document.getElementById('player-avatar');
+    const titleEl = document.getElementById('player-title');
+
+    if (!playerCard) return;
+
+    if (AuthManager.currentUser) {
+        // 已登入：顯示玩家資訊
+        playerCard.style.display = 'flex';
+        usernameEl.textContent = AuthManager.currentUser.username;
+
+        // 頭像：使用選擇的頭像或名稱第一個字
+        const selectedAvatar = AuthManager.currentUser.selectedAvatar;
+        if (selectedAvatar) {
+            const avatar = AVAILABLE_AVATARS.find(a => a.id === selectedAvatar);
+            if (avatar) {
+                avatarEl.style.backgroundImage = `url('${avatar.path}')`;
+                avatarEl.style.backgroundSize = 'cover';
+                avatarEl.style.backgroundPosition = 'center';
+                avatarEl.textContent = '';
+            }
+        } else {
+            // 沒有選擇頭像，使用名稱第一個字
+            avatarEl.style.backgroundImage = '';
+            const firstChar = AuthManager.currentUser.username.charAt(0);
+            avatarEl.textContent = firstChar || '👤';
+        }
+
+        // 稱號
+        const title = AuthManager.currentUser.selectedTitle || '玩家稱號';
+        if (titleEl) titleEl.textContent = `#${title}`;
+    } else {
+        // 訪客模式：顯示訪客資訊
+        playerCard.style.display = 'flex';
+        usernameEl.textContent = '訪客模式';
+        avatarEl.style.backgroundImage = '';
+        avatarEl.textContent = '👤';
+        if (titleEl) titleEl.textContent = '#玩家稱號';
+    }
+}
+
+/**
+ * 初始化玩家資訊卡片的點擊事件
+ */
+function initPlayerInfoEvents() {
+    const avatarEl = document.getElementById('player-avatar');
+    const titleEl = document.getElementById('player-title');
+
+    // 頭像點擊事件 - 編輯頭像
+    if (avatarEl) {
+        avatarEl.addEventListener('click', () => {
+            showAvatarSelectionModal();
+        });
+    }
+
+    // 稱號點擊事件 - 選擇稱號
+    if (titleEl) {
+        titleEl.addEventListener('click', () => {
+            showTitleSelectionModal();
+        });
+    }
+}
+
+/**
+ * 顯示稱號選擇彈窗
+ */
+function showTitleSelectionModal() {
+    const modal = document.getElementById('title-selection-modal');
+    const container = document.getElementById('title-options');
+
+    // 獲取當前稱號
+    const currentTitle = AuthManager.currentUser?.selectedTitle || AVAILABLE_TITLES[0].name;
+
+    // 渲染稱號選項
+    container.innerHTML = AVAILABLE_TITLES.map(title => `
+        <div class="title-option ${title.name === currentTitle ? 'selected' : ''}" 
+             data-title="${title.name}">
+            #${title.name}
+        </div>
+    `).join('');
+
+    // 綁定點擊事件
+    container.querySelectorAll('.title-option').forEach(option => {
+        option.addEventListener('click', () => {
+            const selectedTitle = option.dataset.title;
+            selectPlayerTitle(selectedTitle);
+            modal.style.display = 'none';
+        });
+    });
+
+    modal.style.display = 'flex';
+}
+
+/**
+ * 選擇玩家稱號
+ */
+function selectPlayerTitle(title) {
+    if (AuthManager.currentUser) {
+        AuthManager.currentUser.selectedTitle = title;
+        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
+        updatePlayerInfo();
+        showToast(`稱號已更換為：#${title}`);
+    }
+}
+
+/**
+ * 顯示頭像選擇彈窗
+ */
+function showAvatarSelectionModal() {
+    const modal = document.getElementById('avatar-selection-modal');
+    const container = document.getElementById('avatar-options');
+
+    // 獲取當前頭像
+    const currentAvatar = AuthManager.currentUser?.selectedAvatar || 'avatar1';
+
+    // 渲染頭像選項
+    container.innerHTML = AVAILABLE_AVATARS.map(avatar => `
+        <div class="avatar-option ${avatar.id === currentAvatar ? 'selected' : ''}" 
+             data-avatar="${avatar.id}">
+            <img src="${avatar.path}" alt="${avatar.name}">
+        </div>
+    `).join('');
+
+    // 綁定點擊事件
+    container.querySelectorAll('.avatar-option').forEach(option => {
+        option.addEventListener('click', () => {
+            const selectedAvatar = option.dataset.avatar;
+            selectPlayerAvatar(selectedAvatar);
+            modal.style.display = 'none';
+        });
+    });
+
+    modal.style.display = 'flex';
+}
+
+/**
+ * 選擇玩家頭像
+ */
+function selectPlayerAvatar(avatarId) {
+    if (AuthManager.currentUser) {
+        AuthManager.currentUser.selectedAvatar = avatarId;
+        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
+        updatePlayerInfo();
+        showToast('頭像已更換');
+    }
 }
 
 function renderThemeSelection(isEditMode = false) {
@@ -4511,4 +4684,19 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
         showView('auth-view');
     }
+
+    // 初始化玩家資訊顯示
+    updatePlayerInfo();
+    // 初始化玩家資訊卡片的點擊事件
+    initPlayerInfoEvents();
+
+    // 稱號選擇取消按鈕
+    document.getElementById('btn-title-cancel')?.addEventListener('click', () => {
+        document.getElementById('title-selection-modal').style.display = 'none';
+    });
+
+    // 頭像選擇取消按鈕
+    document.getElementById('btn-avatar-cancel')?.addEventListener('click', () => {
+        document.getElementById('avatar-selection-modal').style.display = 'none';
+    });
 });
