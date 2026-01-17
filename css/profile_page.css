@@ -36,10 +36,11 @@
 }
 
 .profile-container {
-    max-width: 85%;
-    width: 100%;
-    margin: 50px auto 0;
-    height: calc(100vh - 0px);
+    width: 1560px;
+    /* Base width for 1920x1080 design */
+    margin: 50px auto;
+    height: 980px;
+    /* Fixed height relative to 1080px design height */
     display: flex;
     flex-direction: column;
     overflow: hidden;
