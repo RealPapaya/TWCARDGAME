@@ -89,7 +89,7 @@
     background: var(--parchment-dark);
     border: 4px solid var(--wood-medium);
     border-radius: 8px 8px 0 0;
-    color: var(--text-secondary);
+    color: var(--ink-medium);
     font-family: 'Noto Serif TC', serif;
     font-size: 20px;
     font-weight: 700;
@@ -148,9 +148,9 @@
     font-family: 'Noto Serif TC', serif;
     font-size: 18px;
     font-weight: 700;
-    color: var(--text-primary);
+    color: var(--wood-dark);
     letter-spacing: 1px;
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
 }
 
 .input-group input {
@@ -160,7 +160,7 @@
     border-radius: 6px;
     font-size: 16px;
     font-family: 'Noto Sans TC', sans-serif;
-    color: var(--text-primary);
+    color: var(--ink-dark);
     transition: all 0.3s;
     box-shadow:
         inset 0 2px 4px rgba(0, 0, 0, 0.1),
@@ -255,7 +255,7 @@
 #btn-auth-guest {
     background: linear-gradient(to bottom, var(--parchment-dark), #c19a6b);
     border-color: var(--wood-medium);
-    color: var(--text-primary);
+    color: var(--ink-dark);
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
 }
 

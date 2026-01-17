@@ -1227,8 +1227,8 @@ body {
 
 /* Hero Section */
 .hero {
-    width: 80px;
-    height: 80px;
+    width: 120px;
+    height: 120px;
     border-radius: 50%;
     background: var(--bg-panel);
     border: 3px solid var(--neon-yellow);
@@ -1244,6 +1244,11 @@ body {
 .opponent-hero {
     margin-top: -10px;
     margin-bottom: 20px;
+}
+
+.opponent-hero .avatar {
+    background: url('../assets/images/avatars/ai_default.png') no-repeat center;
+    background-size: cover;
 }
 
 .player-hero {
@@ -1285,10 +1290,10 @@ body {
 }
 
 .avatar {
-    width: 70px;
-    height: 70px;
+    width: 110px;
+    height: 110px;
     border-radius: 50%;
-    background: url('https://placehold.co/70x70/222/FFF?text=Hero') no-repeat center;
+    background: url('../assets/images/avatars/avatar1.jpg') no-repeat center;
     background-size: cover;
     border: 2px solid rgba(255, 255, 255, 0.1);
     pointer-events: none;
@@ -1699,6 +1704,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
+    overflow: hidden;
+    /* Contain all child elements within card boundaries during animations */
 }
 
 /* Hover effect for PLAYER cards only */
@@ -1909,6 +1916,7 @@ body.dragging-active .player .hand .card:hover {
     justify-content: space-between;
     margin-top: auto;
     background: transparent;
+    /* Prevent stats from escaping card boundaries during animations */
 }
 
 .stat-atk,

@@ -77,7 +77,8 @@ const AVAILABLE_TITLES = [
 const AVAILABLE_AVATARS = [
     { id: 'avatar1', path: 'assets/images/avatars/avatar1.jpg', name: '中世紀學者' },
     { id: 'avatar2', path: 'assets/images/avatars/avatar2.jpg', name: '中世紀貴族' },
-    { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '中世紀修士' }
+    { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '中世紀修士' },
+    { id: 'avatar4', path: 'assets/images/avatars/avatar4.png', name: '中世紀屠夫' }
 ];
 
 // AI Theme Decks - loaded from default_decks.js
@@ -1100,71 +1101,71 @@ function renderProfileDeckList() {
     if (!userDecks || userDecks.length === 0) {
         console.log('[RENDER] 無牌組資料，顯示空狀態');
         container.innerHTML = '<div class="empty-decks">尚無牌組</div>';
-        return;
-    }
+        // 不再 return，繼續往下渲染「新增牌組」按鈕
+    } else {
+        console.log('[RENDER] 準備渲染', userDecks.length, '個牌組');
+        container.innerHTML = '';
 
-    console.log('[RENDER] 準備渲染', userDecks.length, '個牌組');
-    container.innerHTML = '';
+        // 顯示所有牌組
+        userDecks.forEach((deck, idx) => {
+            const item = document.createElement('div');
+            item.className = `profile-deck-item ${idx === selectedDeckIdx ? 'selected' : ''}`;
 
-    // 顯示所有牌組
-    userDecks.forEach((deck, idx) => {
-        const item = document.createElement('div');
-        item.className = `profile-deck-item ${idx === selectedDeckIdx ? 'selected' : ''}`;
+            const isDeckIncomplete = deck.cards.length !== 30;
+            const countClass = isDeckIncomplete ? 'incomplete' : '';
+            const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
 
-        const isDeckIncomplete = deck.cards.length !== 30;
-        const countClass = isDeckIncomplete ? 'incomplete' : '';
-        const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
+            item.innerHTML = `
+                <div class="deck-item-name">${deck.name}</div>
+                <div class="deck-item-right">
+                    <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length}/30</div>
+                    <button class="btn-deck-icon btn-deck-edit" data-idx="${idx}" title="編輯">✏️</button>
+                    <button class="btn-deck-icon btn-deck-delete" data-idx="${idx}" title="刪除">🗑️</button>
+                </div>
+            `;
 
-        item.innerHTML = `
-            <div class="deck-item-name">${deck.name}</div>
-            <div class="deck-item-right">
-                <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length}/30</div>
-                <button class="btn-deck-icon btn-deck-edit" data-idx="${idx}" title="編輯">✏️</button>
-                <button class="btn-deck-icon btn-deck-delete" data-idx="${idx}" title="刪除">🗑️</button>
-            </div>
-        `;
-
-        // 點擊卡片選擇牌組
-        item.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('btn-deck-icon')) {
-                selectedDeckIdx = idx;
-                localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-                renderProfileDeckList();
-            }
-        });
-
-        // 編輯按鈕
-        item.querySelector('.btn-deck-edit').addEventListener('click', (e) => {
-            e.stopPropagation();
-            editingDeckIdx = idx;
-            tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
-            showView('deck-builder');
-            renderDeckBuilder();
-        });
-
-        // 刪除按鈕
-        item.querySelector('.btn-deck-delete').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (userDecks.length <= 1) {
-                await showCustomAlert('至少需保留一個牌組！');
-                return;
-            }
-            const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
-            if (confirmed) {
-                userDecks.splice(idx, 1);
-                if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
-                localStorage.setItem('userDecks', JSON.stringify(userDecks));
-                if (AuthManager.currentUser) {
-                    AuthManager.currentUser.deck_data = userDecks;
-                    AuthManager.saveData();
+            // 點擊卡片選擇牌組
+            item.addEventListener('click', (e) => {
+                if (!e.target.classList.contains('btn-deck-icon')) {
+                    selectedDeckIdx = idx;
+                    localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+                    renderProfileDeckList();
                 }
-                showToast('牌組已刪除');
-                renderProfileDeckList();
-            }
-        });
+            });
 
-        container.appendChild(item);
-    });
+            // 編輯按鈕
+            item.querySelector('.btn-deck-edit').addEventListener('click', (e) => {
+                e.stopPropagation();
+                editingDeckIdx = idx;
+                tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
+                showView('deck-builder');
+                renderDeckBuilder();
+            });
+
+            // 刪除按鈕
+            item.querySelector('.btn-deck-delete').addEventListener('click', async (e) => {
+                e.stopPropagation();
+                if (userDecks.length <= 1) {
+                    await showCustomAlert('至少需保留一個牌組！');
+                    return;
+                }
+                const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
+                if (confirmed) {
+                    userDecks.splice(idx, 1);
+                    if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
+                    localStorage.setItem('userDecks', JSON.stringify(userDecks));
+                    if (AuthManager.currentUser) {
+                        AuthManager.currentUser.deck_data = userDecks;
+                        AuthManager.saveData();
+                    }
+                    showToast('牌組已刪除');
+                    renderProfileDeckList();
+                }
+            });
+
+            container.appendChild(item);
+        });
+    }
 
     // 新增牌組按鈕
     if (userDecks.length < 10) {
