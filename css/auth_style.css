@@ -1,7 +1,7 @@
 /* Medieval Hand-Drawn Auth (Login/Register) Page Styling */
 
 #auth-view {
-    background: url('img/main_menu_bg.jpg') no-repeat center center;
+    background: url('../img/main_menu_bg.jpg') no-repeat center center;
     background-size: cover;
     position: relative;
 }
@@ -30,7 +30,12 @@
     letter-spacing: 8px;
 }
 
-/* Auth Box - Medieval Parchment Style */
+/**
+ * auth_style.css
+ * 檔案用途: 登入與註冊頁面的專屬樣式，處理羊皮紙表單與中世紀按鈕
+ * 調用者: index.html
+ */
+/* Auth Views Styles */
 .auth-box {
     width: 100%;
     background: var(--parchment-light);

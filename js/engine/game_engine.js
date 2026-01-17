@@ -1,3 +1,9 @@
+/**
+ * game_engine.js
+ * 檔案用途: 遊戲核心引擎，處理對戰邏輯、狀態管理及 AI 決策
+ * 相依性: card_data.js (引用原始卡牌資料)
+ * 調用者: app.js (主要的遊戲控制器)
+ */
 // GameEngine - Shared Logic (Node & Browser)
 
 class GameEngine {

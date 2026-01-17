@@ -1,6 +1,12 @@
 // Default AI Theme Decks for Taiwan Card Game
 // This file contains the pre-configured decks for AI opponents
 
+/**
+ * default_decks.js
+ * 檔案用途: 定義玩家初次進入或 AI 使用的預設牌組配置
+ * 相依性: card_data.js (引用卡牌 ID)
+ * 調用者: app.js (初始化用戶資料), game_engine.js
+ */
 const DEFAULT_THEME_DECKS = {
     dpp: [
         // 民進黨核心卡牌

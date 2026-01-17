@@ -1,3 +1,8 @@
+/**
+ * profile_page.css
+ * 檔案用途: 個人資料頁面的專用樣式，包含統計數據與牌組列表
+ * 調用者: index.html
+ */
 /* 個人頁面容器 */
 #profile-view {
     padding: 0;

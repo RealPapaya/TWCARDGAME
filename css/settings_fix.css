@@ -1,3 +1,8 @@
+/**
+ * settings_fix.css
+ * 檔案用途: 修正並統一設定齒輪按鈕與下拉選單的樣式
+ * 調用者: index.html
+ */
 /* Settings Container & Button (Medieval Hand-Drawn Style) */
 .settings-container {
     position: absolute !important;

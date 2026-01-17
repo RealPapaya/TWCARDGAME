@@ -2,6 +2,12 @@
  * AuthManager - Handling Account, Login, and Data Persistence via Google Sheets
  */
 
+/**
+ * auth_manager.js
+ * 檔案用途: 處理用戶認證、API 通訊及本地儲存 (LocalStorage) 管理
+ * 相依性: 無 (使用原生 fetch)
+ * 調用者: auth_ui.js (按鈕點擊後的行為), app.js (獲取用戶狀態)
+ */
 const AuthManager = {
     // 這裡填入部署後的 Google Apps Script 網址
     API_URL: "https://script.google.com/macros/s/AKfycbxGj_BFidlGuXkMYuAbQeHdwhqXWvyJPMRiwJF9eztAQY6cUrXyVK-fASDYA4UIIsERcg/exec",

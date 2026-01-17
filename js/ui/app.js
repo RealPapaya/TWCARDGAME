@@ -1,3 +1,9 @@
+/**
+ * app.js
+ * 檔案用途: 遊戲的主要 UI 控制器與進入點，負責視圖切換、對戰渲染及交互
+ * 相依性: game_engine.js, auth_manager.js, card_data.js, updates.js, ui_translations.js
+ * 調用者: index.html (透過 script 標籤載入)
+ */
 // ===== Responsive Scaling System =====
 // Design base: 1920x1080 (adjusted for battle view)
 function updateGameScale() {
@@ -1427,6 +1433,15 @@ function initManaContainers(id) {
     }
 }
 
+function shakeManaContainer(isPlayer = true) {
+    const id = isPlayer ? 'player-mana-container' : 'opp-mana-container';
+    const el = document.getElementById(id);
+    if (!el) return;
+
+    el.classList.add('shake-mana');
+    setTimeout(() => el.classList.remove('shake-mana'), 500);
+}
+
 function renderDeckBuilder() {
     // Use tempDeck for rendering during edit
     const deck = tempDeck || userDecks[editingDeckIdx];
@@ -2534,7 +2549,8 @@ function createMinionEl(minion, index, isPlayer) {
 
     const canActuallyAttack = minion.canAttack && minion.attack > 0;
     const showCanAttack = canActuallyAttack && isPlayer && gameState.currentPlayerIdx === 0;
-    el.className = `minion ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}${summonClass}`;
+    const rarityClass = minion.rarity ? minion.rarity.toLowerCase() : 'common';
+    el.className = `minion rarity-${rarityClass} ${minion.keywords?.taunt ? 'taunt' : ''} ${minion.sleeping ? 'sleeping' : ''} ${showCanAttack ? 'can-attack' : ''}${dsClass}${enrageClass}${lockedClass}${unlockClass}${summonClass}`;
     const imageStyle = minion.image ? `background: url('${minion.image}') no-repeat center; background-size: cover;` : '';
     const base = CARD_DATA.find(c => c.id === minion.id) || minion;
     const effectiveBaseAttack = minion.baseAttackOverride !== undefined ? minion.baseAttackOverride : base.attack;

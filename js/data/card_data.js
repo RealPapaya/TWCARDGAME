@@ -1,6 +1,12 @@
 // Card Data for Taiwan Card Game
 // This file contains all card definitions used in the game
 
+/**
+ * card_data.js
+ * 檔案用途: 定義遊戲中所有的卡牌資料庫（Minions 與 News）
+ * 相依性: 無
+ * 調用者: game_engine.js (讀取資料), app.js (渲染 UI)
+ */
 const CARD_DATA = [
     // --- 民進黨 (DPP) ---
     { "id": "TW010", "name": "謝長廷", "category": "民進黨政治人物", "cost": 3, "attack": 3, "health": 3, "type": "MINION", "rarity": "EPIC", "description": "戰吼: 對一個非民進黨政治人物造成3點傷害", "keywords": { "battlecry": { "type": "DAMAGE_NON_CATEGORY", "value": 3, "target": { "side": "ALL", "type": "MINION" }, "target_category": "民進黨政治人物" } }, "image": "img/tw011.jpg" },

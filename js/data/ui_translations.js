@@ -1,7 +1,10 @@
 /**
- * 戰鬥提示詞集中管理
+ * ui_translations.js
+ * 檔案用途: 處理 UI 介面文字的語言譯文映射
+ * 相依性: 無
+ * 調用者: app.js
  */
-window.UI_TEXT = {
+const UI_TEXT = {
     // 資源類
     INSUFFICIENT_MANA: "法力值不足！",
 
@@ -44,3 +47,8 @@ window.UI_TEXT = {
     HISTORY_NEWS_DESTROY: "<b>{source}</b> 擊殺了 <b>{target}</b>",
     HISTORY_DEATH: "<b>{unit}</b> 已死亡"
 };
+
+// Export for browser
+if (typeof window !== 'undefined') {
+    window.UI_TEXT = UI_TEXT;
+}

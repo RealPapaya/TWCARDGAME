@@ -10,20 +10,20 @@
     <link
         href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap"
         rel="stylesheet">
-    <link rel="stylesheet" href="style.css">
-    <link rel="stylesheet" href="settings_fix.css">
-    <link rel="stylesheet" href="auth_style.css">
-    <link rel="stylesheet" href="player_info.css">
-    <link rel="stylesheet" href="selection_modals.css">
-    <link rel="stylesheet" href="profile_page.css">
-    <script src="card_data.js"></script>
-    <script src="default_decks.js"></script>
-    <script src="game_engine.js"></script>
-    <script src="updates.js"></script>
-    <script src="ui_translations.js"></script>
-    <script src="auth_manager.js"></script>
-    <script src="auth_ui.js" defer></script>
-    <script src="app.js" defer></script>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/settings_fix.css">
+    <link rel="stylesheet" href="css/auth_style.css">
+    <link rel="stylesheet" href="css/player_info.css">
+    <link rel="stylesheet" href="css/selection_modals.css">
+    <link rel="stylesheet" href="css/profile_page.css">
+    <script src="js/data/card_data.js"></script>
+    <script src="js/data/default_decks.js"></script>
+    <script src="js/engine/game_engine.js"></script>
+    <script src="js/data/updates.js"></script>
+    <script src="js/data/ui_translations.js"></script>
+    <script src="js/auth/auth_manager.js"></script>
+    <script src="js/auth/auth_ui.js" defer></script>
+    <script src="js/ui/app.js" defer></script>
 </head>
 
 <body>
@@ -576,36 +576,7 @@
                 </div>
             </div>
 
-            <!-- Drag Line SVG Layer -->
-            <svg id="drag-layer">
-                <defs>
-                    <marker id="arrowhead-damage" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
-                        markerUnits="userSpaceOnUse">
-                        <path d="M0,0 L0,60 L35,30 z" fill="#ff0000" />
-                    </marker>
-                    <marker id="arrowhead-heal" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
-                        markerUnits="userSpaceOnUse">
-                        <path d="M0,0 L0,60 L35,30 z" fill="#43e97b" />
-                    </marker>
-                    <marker id="arrowhead-buff" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
-                        markerUnits="userSpaceOnUse">
-                        <path d="M0,0 L0,60 L35,30 z" fill="#ffa500" />
-                    </marker>
-                    <marker id="arrowhead-bounce" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
-                        markerUnits="userSpaceOnUse">
-                        <path d="M0,0 L0,60 L35,30 z" fill="#a335ee" />
-                    </marker>
-                    <marker id="arrowhead-destroy" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
-                        markerUnits="userSpaceOnUse">
-                        <path d="M0,0 L0,60 L35,30 z" fill="#000000" />
-                    </marker>
-                </defs>
-                <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="6" stroke-dasharray="8, 4"
-                    style="display:none; pointer-events: none;" />
-            </svg>
 
-            <div id="card-preview"></div>
-            <div id="message-log"></div>
 
             <!-- Turn Announcement Overlay -->
             <div id="turn-announcement-overlay" class="turn-overlay" style="display: none;">
@@ -645,6 +616,36 @@
             </div>
         </div>
     </div>
+    <!-- Drag Line SVG Layer (Moved outside scaler for correct coordinates) -->
+    <svg id="drag-layer">
+        <defs>
+            <marker id="arrowhead-damage" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L0,60 L35,30 z" fill="#ff0000" />
+            </marker>
+            <marker id="arrowhead-heal" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L0,60 L35,30 z" fill="#43e97b" />
+            </marker>
+            <marker id="arrowhead-buff" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L0,60 L35,30 z" fill="#ffa500" />
+            </marker>
+            <marker id="arrowhead-bounce" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L0,60 L35,30 z" fill="#a335ee" />
+            </marker>
+            <marker id="arrowhead-destroy" markerWidth="35" markerHeight="60" refX="2" refY="30" orient="auto"
+                markerUnits="userSpaceOnUse">
+                <path d="M0,0 L0,60 L35,30 z" fill="#000000" />
+            </marker>
+        </defs>
+        <line id="drag-line" x1="0" y1="0" x2="0" y2="0" stroke="red" stroke-width="6" stroke-dasharray="8, 4"
+            style="display:none; pointer-events: none;" />
+    </svg>
+
+    <div id="card-preview" style="z-index: 10000;"></div>
+    <div id="message-log" style="z-index: 10001;"></div>
 </body>
 
 

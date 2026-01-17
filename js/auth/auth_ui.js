@@ -2,6 +2,12 @@
  * AuthUI - Handling Login/Register View interactions
  */
 
+/**
+ * auth_ui.js
+ * 檔案用途: 管理登入、註冊及登出介面的 DOM 互動
+ * 相依性: auth_manager.js (執行身份證驗邏輯)
+ * 調用者: index.html (透過 script 標籤載入)
+ */
 const AuthUI = {
     init() {
         this.cacheDOM();
