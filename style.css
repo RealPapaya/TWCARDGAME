@@ -1,19 +1,33 @@
-﻿/* Taiwan Retro / Cyberpunk Style Refined */
-@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+﻿/* Hand-Drawn Medieval Style Theme */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap');
 
 :root {
-    --bg-dark: #121214;
-    --bg-panel: #1e1e24;
-    --neon-blue: #00f3ff;
-    --neon-pink: #ff00de;
-    --neon-yellow: #fff200;
-    --neon-lime: #39FF14;
-    --card-bg: #1a1a1a;
-    --text-primary: #ffffff;
-    --text-secondary: #b3b3b3;
-    --card-frame: #2c2c35;
-    --card-inner: #3a3a45;
-    --card-border-radius: 12px;
+    /* Medieval Color Palette */
+    --parchment-light: #f4e4bc;
+    --parchment-dark: #e6ccb2;
+    --wood-dark: #5d2e17;
+    --wood-medium: #8b4513;
+    --wood-light: #d2691e;
+    --ink-dark: #3d1e0f;
+    --ink-medium: #4a2c1d;
+    --gold: #d4af37;
+    --gold-dark: #b8860b;
+    --red-medieval: #bc4749;
+    --red-dark: #a3333d;
+
+    /* Text Colors */
+    --text-primary: #3d1e0f;
+    --text-secondary: #5d2e17;
+    --text-light: #f4e4bc;
+
+    /* Background */
+    --bg-main: #2a1d14;
+    --bg-panel: #3a2820;
+
+    /* Card Styling */
+    --card-bg: #f4e4bc;
+    --card-frame: #8b4513;
+    --card-border-radius: 8px;
 }
 
 /* Custom Cursor Theme */
