@@ -44,7 +44,7 @@
 /* Custom Cursor Theme */
 body,
 * {
-    cursor: url('../img/cursor_default.png') 0 0, auto !important;
+    cursor: url('../assets/images/cursors/cursor_default.png') 0 0, auto !important;
 }
 
 
@@ -248,7 +248,7 @@ body {
 #main-menu {
     justify-content: center;
     align-items: center;
-    background: url('../img/main_menu_bg.jpg') no-repeat center center;
+    background: url('../assets/images/backgrounds/main_menu_bg.jpg') no-repeat center center;
     background-size: cover;
     position: relative;
     pointer-events: auto;
@@ -325,7 +325,7 @@ body {
 }
 
 .deck-slot {
-    background: url('../img/deck_slot_bg.png') no-repeat center center;
+    background: url('../assets/images/ui/deck_slot_bg.png') no-repeat center center;
     background-size: 100% 100%;
     border: none !important;
     outline: none !important;
@@ -984,7 +984,7 @@ body {
 #deck-builder {
     padding: 20px;
     box-sizing: border-box;
-    background: url('../img/forge_bg.png') no-repeat center center;
+    background: url('../assets/images/backgrounds/forge_bg.png') no-repeat center center;
     background-size: 100% 100%;
     position: relative;
 }
@@ -1137,7 +1137,7 @@ body {
     flex-direction: column;
     width: 100%;
     height: 100%;
-    background: url('../img/arena_bg.png') no-repeat center center;
+    background: url('../assets/images/backgrounds/arena_bg.png') no-repeat center center;
     background-size: cover;
     box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
 }
@@ -1630,7 +1630,7 @@ body {
 .deck-pile {
     width: 60px;
     height: 85px;
-    background: url('../img/card_back.png') no-repeat center center;
+    background: url('../assets/images/ui/card_back.png') no-repeat center center;
     background-size: 100% 100%;
     border-radius: 6px;
     border: 2px solid #444;
@@ -2024,7 +2024,7 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .opponent .hand .card {
-    background: url('../img/card_back.png') no-repeat center center;
+    background: url('../assets/images/ui/card_back.png') no-repeat center center;
     background-size: 100% 100%;
     border: 2px solid #444;
     /* Opponent: Mirror rotation */
@@ -3030,7 +3030,7 @@ body.dragging-active .player .hand .card:hover {
 /* Updated Mana Container Style */
 .mana-container.frame-style {
     position: relative;
-    background: url('../img/mana_frame.png') no-repeat center center;
+    background: url('../assets/images/ui/mana_frame.png') no-repeat center center;
     background-size: 100% 100%;
     border: none;
     border-radius: 0;
@@ -4305,7 +4305,7 @@ body.dragging-active .player .hand .card:hover {
 /* AI Battle Setup Layout */
 #ai-battle-setup,
 #deck-selection {
-    background: url('../img/deck_selection_bg.jpg') no-repeat center center;
+    background: url('../assets/images/backgrounds/deck_selection_bg.jpg') no-repeat center center;
     background-size: 100% 100% !important;
 }
 
@@ -4343,7 +4343,7 @@ body.dragging-active .player .hand .card:hover {
     content: '';
     position: absolute;
     inset: -5px;
-    background: url('../img/wood_frame.png') no-repeat center center;
+    background: url('../assets/images/ui/wood_frame.png') no-repeat center center;
     /* 保�??�景置中，用 transform 移�??�個�?較直觀 */
     background-size: 65% 65%;
     mix-blend-mode: multiply;
@@ -4740,7 +4740,7 @@ body.dragging-active .player .hand .card:hover {
         radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 100%),
         repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.02) 0px, rgba(0, 0, 0, 0.02) 2px, transparent 2px, transparent 4px) !important;
     border: 20px solid transparent !important;
-    border-image: url('../img/wood_frame.png') 60 stretch !important;
+    border-image: url('../assets/images/ui/wood_frame.png') 60 stretch !important;
     padding: 50px !important;
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8) !important;
     color: #4a2c1d !important;
