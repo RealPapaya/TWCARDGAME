@@ -1011,20 +1011,17 @@ function renderProfileDeckList() {
         const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
 
         item.innerHTML = `
-            <div class="deck-item-header">
-                <div class="deck-item-name">${deck.name}</div>
-                <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length} / 30</div>
-            </div>
-            <div class="deck-item-actions">
-                <button class="btn-deck-action btn-deck-edit" data-idx="${idx}">✏️ 編輯</button>
-                <button class="btn-deck-action btn-deck-copy" data-idx="${idx}">📋 複製</button>
-                <button class="btn-deck-action btn-deck-delete" data-idx="${idx}">🗑️ 刪除</button>
+            <div class="deck-item-name">${deck.name}</div>
+            <div class="deck-item-right">
+                <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length}/30</div>
+                <button class="btn-deck-icon btn-deck-edit" data-idx="${idx}" title="編輯">✏️</button>
+                <button class="btn-deck-icon btn-deck-delete" data-idx="${idx}" title="刪除">🗑️</button>
             </div>
         `;
 
         // 點擊卡片選擇牌組
         item.addEventListener('click', (e) => {
-            if (!e.target.classList.contains('btn-deck-action')) {
+            if (!e.target.classList.contains('btn-deck-icon')) {
                 selectedDeckIdx = idx;
                 localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
                 renderProfileDeckList();
@@ -1038,25 +1035,6 @@ function renderProfileDeckList() {
             tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
             showView('deck-builder');
             renderDeckBuilder();
-        });
-
-        // 複製按鈕
-        item.querySelector('.btn-deck-copy').addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (userDecks.length >= 10) {
-                await showCustomAlert('已達牌組數量上限（10個）');
-                return;
-            }
-            const copiedDeck = JSON.parse(JSON.stringify(deck));
-            copiedDeck.name = `${deck.name} (副本)`;
-            userDecks.push(copiedDeck);
-            localStorage.setItem('userDecks', JSON.stringify(userDecks));
-            if (AuthManager.currentUser) {
-                AuthManager.currentUser.deck_data = userDecks;
-                AuthManager.saveData();
-            }
-            showToast('牌組已複製');
-            renderProfileDeckList();
         });
 
         // 刪除按鈕
