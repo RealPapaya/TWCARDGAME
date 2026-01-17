@@ -75,9 +75,9 @@ const AVAILABLE_TITLES = [
 
 // 可用頭像列表
 const AVAILABLE_AVATARS = [
-    { id: 'avatar1', path: 'img/avatars/avatar1.jpg', name: '中世紀學者' },
-    { id: 'avatar2', path: 'img/avatars/avatar2.jpg', name: '中世紀貴族' },
-    { id: 'avatar3', path: 'img/avatars/avatar3.jpg', name: '中世紀修士' }
+    { id: 'avatar1', path: 'assets/images/avatars/avatar1.jpg', name: '中世紀學者' },
+    { id: 'avatar2', path: 'assets/images/avatars/avatar2.jpg', name: '中世紀貴族' },
+    { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '中世紀修士' }
 ];
 
 // AI Theme Decks - loaded from default_decks.js
@@ -91,11 +91,11 @@ function generateDefaultDeck() {
 }
 
 const defaultAIThemes = [
-    { id: 'dpp', name: '賴清德-新聞湧動', image: 'img/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
-    { id: 'dpp2', name: '蔡英文-無限回溯', image: 'img/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
-    { id: 'kmt', name: '韓國瑜-政壇輪迴', image: 'img/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
-    { id: 'kmt2', name: '傅崑萁-江湖棄殺', image: 'img/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
-    { id: 'tpp', name: '柯文哲-台大醫科', image: 'img/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
+    { id: 'dpp', name: '賴清德-新聞湧動', image: 'assets/images/illustrations/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'dpp2', name: '蔡英文-無限回溯', image: 'assets/images/illustrations/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
+    { id: 'kmt', name: '韓國瑜-政壇輪迴', image: 'assets/images/illustrations/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'kmt2', name: '傅崑萁-江湖棄殺', image: 'assets/images/illustrations/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
+    { id: 'tpp', name: '柯文哲-台大醫科', image: 'assets/images/illustrations/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
 ];
 
 let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || defaultAIThemes;
@@ -2233,7 +2233,7 @@ function renderGameUI(p1, p2) {
             if (mainHeroAvatar) {
                 // Use a default hero image if no custom avatar is set
                 // You might want to replace this with a specific default hero asset path if available
-                const defaultHeroImg = 'url("img/avatars/avatar1.jpg")'; // Using avatar1 as a safe default
+                const defaultHeroImg = 'url("assets/images/avatars/avatar1.jpg")'; // Using avatar1 as a safe default
                 mainHeroAvatar.style.backgroundImage = defaultHeroImg;
                 mainHeroAvatar.style.backgroundSize = 'cover';
                 mainHeroAvatar.style.backgroundPosition = 'center';
