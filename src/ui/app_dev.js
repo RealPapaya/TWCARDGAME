@@ -1,3 +1,6 @@
+// ===== Imports (Legacy Mode: Globals provided by bridge.js) =====
+// import { GameEngine, GameState } from '../logic/GameEngine.js'; // REMOVED: Loaded via script tag
+
 // ===== Responsive Scaling System =====
 // Design base: 1920x1080 (adjusted for battle view)
 function updateGameScale() {
@@ -43,8 +46,20 @@ window.addEventListener('orientationchange', () => {
 });
 
 // ===== Game Engine & State =====
+// Make these accessible globally debugging/console usage, 
+// matching the behavior of the non-module version.
+window.gameEngine = null;
+// window.gameState is already managed by the proxy in dev.html, 
+// so we just declare the local variable references to write to it.
 let gameEngine;
 let gameState;
+
+// Sync local usage to global for the proxy to catch it
+function setGameState(newState) {
+    gameState = newState;
+    window.gameState = newState;
+}
+
 // Card data is now loaded from card_data.js
 // CARD_DATA is available globally via window.CARD_DATA
 
@@ -237,11 +252,24 @@ function getUnitName(side, index, type) {
     return minion.name;
 }
 
-function init() {
-    // Initialize drag line element
+// Initialize drag line element
+function init(retryCount = 0) {
+    if (!window.GameEngine) {
+        if (retryCount < 20) {
+            console.warn(`[App] GameEngine not ready, retrying... (${retryCount + 1}/20)`);
+            setTimeout(() => init(retryCount + 1), 100);
+            return;
+        } else {
+            console.error("[App] Fatal Error: GameEngine failed to load after 2 seconds.");
+            showToast("錯誤：遊戲引擎載入失敗，請檢查控制台");
+            return;
+        }
+    }
+
     dragLine = document.getElementById('drag-line');
 
     gameEngine = new GameEngine(CARD_DATA);
+    window.gameEngine = gameEngine;
 
     // --- Main Menu Listeners ---
     document.getElementById('btn-main-battle').addEventListener('click', () => {
@@ -983,7 +1011,11 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
     }
 
     try {
-        gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
+        const newState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
+        setGameState(newState);
+
+        // Legacy support: ensure window.gameState is synced for other scripts
+        // (createGame returns a new GameState instance)
         showView('battle-view');
     } catch (e) {
         logMessage(e.message);
@@ -2040,8 +2072,8 @@ function createCardEl(card, index) {
     // Actually, let's keep top alignment for consistency, but if image is small, the contain handles it.
     // Making background transparent so no "black bars" visible, just card background.
     const artHtml = card.image ?
-        `<div class="card-art-box" style="width: 100%; height: 85px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;"></div>` :
-        `<div class="card-art-box placeholder" style="width: 100%; height: 60px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
+        `<div class="card-art-box" style="width: 100%; height: 55px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;"></div>` :
+        `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
 
     const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
 
@@ -2766,24 +2798,83 @@ async function onDragEnd(e) {
                                 previousPlayerHandSize = gameState.currentPlayer.hand.length;
                             } else if (result.type === 'ADD_CARD') {
                                 // Cards added to hand (e.g., 高端疫苗 from 陳時中)
-                                // Suppress deck animation in renderHands
                                 previousPlayerHandSize = gameState.currentPlayer.hand.length;
 
-                                // Render to create the card elements (they will be visible but we'll apply pop-in)
+                                // 1. Render to create the card elements in Hand
                                 render();
 
-                                // Get hand and apply sequential pop-in
+                                // 2. Identify Source Element for Fly-out
+                                let sourceRect = null;
+                                if (result.source) {
+                                    const sideId = result.source.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                                    const boardEl = document.getElementById(sideId);
+                                    // Try to find by instanceId first (most robust)
+                                    let sourceEl = boardEl.querySelector(`[data-minion-id="${result.source.instanceId}"]`);
+                                    if (!sourceEl && result.source.index !== undefined) {
+                                        sourceEl = boardEl.children[result.source.index];
+                                    }
+                                    if (sourceEl) {
+                                        sourceRect = sourceEl.getBoundingClientRect();
+                                    }
+                                }
+                                // Fallback to Deck if no source (or bottom right/left)
+                                if (!sourceRect) {
+                                    const deckEl = document.getElementById('player-deck');
+                                    if (deckEl) sourceRect = deckEl.getBoundingClientRect();
+                                }
+
                                 const handEl = document.getElementById('player-hand');
                                 const newCount = result.count || 1;
+
+                                // 3. Animate each new card
                                 for (let i = 0; i < newCount; i++) {
                                     const cardIdx = handEl.children.length - newCount + i;
-                                    const el = handEl.children[cardIdx];
-                                    if (el) {
-                                        el.classList.add('pop-in');
-                                        // Auto-cleanup after animation
-                                        setTimeout(() => el.classList.remove('pop-in'), 600);
-                                        // Small delay for sequential appearance
-                                        await new Promise(r => setTimeout(r, 200));
+                                    const targetCardEl = handEl.children[cardIdx];
+
+                                    if (targetCardEl && sourceRect) {
+                                        // Hide real card
+                                        targetCardEl.style.opacity = '0';
+
+                                        // Create Ghost
+                                        const ghost = targetCardEl.cloneNode(true);
+                                        // Clean up ghost IDs or specific bindings ?? No need, just visual
+                                        ghost.id = '';
+                                        ghost.style.position = 'fixed';
+                                        // Start at center of source
+                                        const startX = sourceRect.left + (sourceRect.width / 2) - 60; // 60 is approx half card width
+                                        const startY = sourceRect.top + (sourceRect.height / 2) - 85;
+
+                                        ghost.style.left = `${startX}px`;
+                                        ghost.style.top = `${startY}px`;
+                                        ghost.style.width = '120px'; // Approx hand card width
+                                        ghost.style.transform = 'scale(0.1)';
+                                        ghost.style.zIndex = '5000';
+                                        ghost.style.transition = 'all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1)';
+                                        ghost.style.opacity = '0.5';
+                                        ghost.style.pointerEvents = 'none';
+                                        ghost.classList.remove('pop-in');
+
+                                        document.body.appendChild(ghost);
+
+                                        // Force reflow
+                                        ghost.offsetHeight;
+
+                                        // Calculate target position
+                                        const targetRect = targetCardEl.getBoundingClientRect();
+                                        ghost.style.left = `${targetRect.left}px`;
+                                        ghost.style.top = `${targetRect.top}px`;
+                                        ghost.style.transform = 'scale(1)';
+                                        ghost.style.opacity = '1';
+
+                                        // Cleanup
+                                        setTimeout(() => {
+                                            ghost.remove();
+                                            targetCardEl.style.opacity = '1';
+                                            targetCardEl.classList.add('pop-in');
+                                        }, 600);
+
+                                        // Stagger next card
+                                        await new Promise(r => setTimeout(r, 150));
                                     }
                                 }
                             } else if (result.type === 'SUMMON_MULTIPLE') {
@@ -3970,6 +4061,61 @@ async function triggerFullBoardBounceAnimation(isPlayer) {
 
         document.body.appendChild(p);
         setTimeout(() => p.remove(), 2500);
+    }
+}
+
+/**
+ * Spawns dust particles at the target element's location (e.g. minion landing).
+ * @param {HTMLElement} element The element landing on board.
+ * @param {number} intensity 1 = Normal, 2 = Heavy
+ */
+function spawnDustEffect(element, intensity = 1) {
+    if (!element) return;
+
+    // Board Slam Shake
+    const board = element.closest('.board');
+    if (board) {
+        board.classList.remove('board-slam');
+        void board.offsetWidth;
+        board.classList.add('board-slam');
+        setTimeout(() => board.classList.remove('board-slam'), 300);
+    }
+
+    const rect = element.getBoundingClientRect();
+    const particleCount = 8 * intensity;
+
+    for (let i = 0; i < particleCount; i++) {
+        const p = document.createElement('div');
+        p.className = 'dust-particle';
+
+        // Random placement near the bottom of the element
+        const x = rect.left + Math.random() * rect.width;
+        const y = rect.bottom - 10 + Math.random() * 20;
+
+        p.style.left = `${x}px`;
+        p.style.top = `${y}px`;
+
+        // Random trajectory
+        const angle = Math.random() * Math.PI; // Upwards semi-circle
+        const velocity = 20 + Math.random() * 30;
+        const vx = Math.cos(angle) * velocity;
+        const vy = -Math.sin(angle) * velocity;
+
+        p.style.setProperty('--vx', `${vx}px`);
+        p.style.setProperty('--vy', `${vy}px`);
+
+        document.body.appendChild(p);
+
+        // Animation handled by CSS (if exists) or we set it here
+        // Let's rely on inline styles for simple physics simulation if CSS is missing
+        // But better to add a generic animation class
+        p.animate([
+            { transform: 'translate(0, 0) scale(1)', opacity: 0.8 },
+            { transform: `translate(${vx * 2}px, ${vy * 2}px) scale(0)`, opacity: 0 }
+        ], {
+            duration: 500 + Math.random() * 300,
+            easing: 'ease-out'
+        }).onfinish = () => p.remove();
     }
 }
 

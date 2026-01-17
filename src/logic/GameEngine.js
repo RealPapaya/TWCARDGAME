@@ -1,21 +1,9 @@
-
-/**
- * GameEngine.js
- * 
- * 用途: 遊戲的核心進入點，負責驗證牌組、與建立全新的遊戲局 (GameState)。
- * 提供牌組檢查規則與初始設置邏輯。
- * 
- * 會被誰應用:
- * - src/legacy/app.js (遊戲啟動時建立引擎實例)
- * 
- * 又會用到誰:
- * - src/logic/GameState.js (產生的遊戲狀態實例)
- * - src/logic/Player.js (建立玩家物件)
- * - src/logic/AIEngine.js (建立 AI 對手)
- */
+import { AIEngine } from './AIEngine.js';
 import { Player } from './Player.js';
 import { GameState } from './GameState.js';
-import { AIEngine } from './AIEngine.js';
+
+// Re-export GameState so other modules (app_dev.js, bridge.js) can import it from here
+export { GameState };
 
 export class GameEngine {
     constructor(cardDB) {

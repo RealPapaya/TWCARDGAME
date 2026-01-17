@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap');
+
+:root {
+    /* Medieval / Parchment Theme Palette */
+    --bg-dark: #1a0f0a;
+    /* Dark wood/leather */
+    --bg-panel: #2a1d14;
+    /* Panel background */
+    --gold-primary: #daa520;
+    /* GoldenRod - replaces neon yellow */
+    --gold-highlight: #ffd700;
+    /* Gold */
+    --crimson-red: #8b0000;
+    /* Dark Red - replaces neon pink */
+    --royal-blue: #191970;
+    /* Midnight Blue - replaces neon blue */
+    --magic-blue: #4169e1;
+    /* Royal Blue for magic effects */
+    --parchment: #f4e4bc;
+    /* Main parchment color */
+    --parchment-dark: #d2b48c;
+    /* Darker parchment/tan */
+    --ink-black: #2b2b2b;
+    /* Ink color */
+
+    /* Mappings for legacy variables to maintain compatibility */
+    --neon-blue: var(--magic-blue);
+    --neon-pink: var(--crimson-red);
+    --neon-yellow: var(--gold-primary);
+    --neon-lime: #228b22;
+    /* Forest Green */
+
+    --card-bg: #f4e4bc;
+    --text-primary: #f4e4bc;
+    --text-secondary: #d2b48c;
+    --card-frame: #4a3728;
+    --card-inner: #3e2723;
+    --card-border-radius: 8px;
+    /* Slightly sharper corners */
+}
+
+/* Custom Cursor Theme */
+body,
+* {
+    cursor: url('../../img/cursor_default.png') 0 0, auto !important;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Noto Serif TC', 'Noto Sans TC', serif;
+    /* Serif priority */
+    background: #000;
+    color: var(--parchment);
+    overflow: hidden;
+    user-select: none;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* 16:9 Aspect Ratio Container */
+#game-container-16-9 {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    max-width: calc(100vh * 16 / 9);
+    max-height: calc(100vw * 9 / 16);
+    aspect-ratio: 16 / 9;
+    background: #000;
+    overflow: hidden;
+    box-shadow: 0 0 50px rgba(0, 0, 0, 0.8);
+}
+
+/* Base Scaler */
+#game-content-scaler {
+    width: 1920px;
+    height: 1080px;
+    transform-origin: top left;
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+/* Layers */
+#drag-layer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    z-index: 9999;
+}
+
+#play-preview-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    pointer-events: none;
+    background: rgba(0, 0, 0, 0.5);
+    display: none;
+    z-index: 4000;
+}

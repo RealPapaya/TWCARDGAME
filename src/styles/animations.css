@@ -1,0 +1,91 @@
+/* Animations & Effects */
+
+/* Board Slam Shake */
+@keyframes boardSlam {
+    0% {
+        transform: translateY(0);
+    }
+
+    25% {
+        transform: translateY(10px);
+    }
+
+    50% {
+        transform: translateY(-5px);
+    }
+
+    75% {
+        transform: translateY(2px);
+    }
+
+    100% {
+        transform: translateY(0);
+    }
+}
+
+.board-slam {
+    animation: boardSlam 0.3s ease-out;
+}
+
+/* Dust Particle */
+.dust-particle {
+    position: fixed;
+    width: 6px;
+    height: 6px;
+    background-color: #8b7d6b;
+    /* Dust color */
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Pop In Animation (Card Spawn) */
+@keyframes popIn {
+    0% {
+        transform: scale(0);
+        opacity: 0;
+    }
+
+    70% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+
+    100% {
+        transform: scale(1);
+        opacity: 1;
+    }
+}
+
+.pop-in {
+    animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+/* Ripple for Water Check */
+.ripple-wave {
+    position: fixed;
+    border: 4px solid #00f3ff;
+    border-radius: 50%;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 8000;
+    transform: translate(-50%, -50%);
+    animation: rippleExpand 1.5s ease-out forwards;
+}
+
+@keyframes rippleExpand {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 0.8;
+        border-width: 10px;
+    }
+
+    100% {
+        width: 600px;
+        height: 600px;
+        opacity: 0;
+        border-width: 0;
+    }
+}
