@@ -4284,6 +4284,8 @@ body.dragging-active .player .hand .card:hover {
 #battle-view .settings-btn {
     width: 60px !important;
     height: 60px !important;
+    aspect-ratio: 1 / 1 !important;
+    flex-shrink: 0 !important;
     font-size: 35px !important;
     border-width: 4px !important;
 }
@@ -4970,6 +4972,8 @@ body.dragging-active .player .hand .card:hover {
 .settings-btn {
     width: 60px;
     height: 60px;
+    aspect-ratio: 1 / 1;
+    flex-shrink: 0;
     background: rgba(139, 69, 19, 0.3);
     border: 3px solid #8b4513;
     border-radius: 50%;
@@ -4983,6 +4987,8 @@ body.dragging-active .player .hand .card:hover {
     display: flex;
     justify-content: center;
     align-items: center;
+    padding: 0;
+    line-height: 1;
 }
 
 .settings-btn:hover {

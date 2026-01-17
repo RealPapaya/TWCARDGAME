@@ -62,9 +62,9 @@
     font-family: 'Noto Serif TC', serif;
     font-size: 36px;
     font-weight: 900;
-    color: var(--wood-dark);
-    text-shadow:
-        0 1px 0 rgba(255, 255, 255, 0.4);
+    color: #f1e4d1;
+    /* Light parchment color */
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(212, 175, 55, 0.4);
     letter-spacing: 6px;
     margin: 0;
     margin-right: 100px;
