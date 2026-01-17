@@ -58,6 +58,28 @@ body,
     z-index: 9999;
 }
 
+.ui-tooltip {
+    position: fixed;
+    background: rgba(30, 20, 10, 0.95);
+    color: #f1e4d1;
+    padding: 10px 15px;
+    border: 2px solid #d4af37;
+    border-radius: 8px;
+    font-size: 14px;
+    font-family: 'Noto Sans TC', sans-serif;
+    pointer-events: none;
+    z-index: 12000;
+    box-shadow:
+        0 4px 12px rgba(0, 0, 0, 0.6),
+        0 0 0 1px #5d2e17;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.2s;
+    user-select: none;
+    transform: translate(10px, 10px);
+    /* Offset from cursor */
+}
+
 #play-preview-overlay {
     position: fixed;
     top: 0;

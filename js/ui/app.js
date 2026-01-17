@@ -259,6 +259,14 @@ function getUnitName(side, index, type) {
 }
 
 function init() {
+    // [新增] 防止 init 被重複呼叫導致事件重複綁定
+    if (window.isGameInitialized) {
+        console.warn('[INIT] 偵測到重複初始化，已跳過');
+        return;
+    }
+    window.isGameInitialized = true;
+    console.log('[INIT] 遊戲正在初始化...');
+
     // Initialize drag line element
     dragLine = document.getElementById('drag-line');
 
@@ -268,14 +276,6 @@ function init() {
     document.getElementById('btn-main-battle').addEventListener('click', () => {
         isDebugMode = false;
         showView('mode-selection');
-    });
-
-    document.getElementById('btn-main-builder').addEventListener('click', () => {
-        isDebugMode = false;
-        pendingViewMode = 'BUILDER';
-        showView('deck-selection');
-        document.getElementById('deck-select-title').innerText = '選擇要編修的牌組';
-        renderDeckSelect();
     });
 
     document.getElementById('btn-main-test').addEventListener('click', () => {
@@ -337,8 +337,6 @@ function init() {
                 const title = document.getElementById('deck-select-title').innerText;
                 if (title.includes('測試')) {
                     showView('test-mode-selection');
-                } else if (pendingViewMode === 'BUILDER') {
-                    showView('main-menu');
                 } else {
                     showView('ai-battle-setup');
                 }
@@ -362,7 +360,7 @@ function init() {
                 editingThemeIdx = -1;
                 showView('test-mode-selection');
             } else {
-                // Editing player deck
+                // Editing player deck - 返回個人頁面而非牌組選擇
                 const original = userDecks[editingDeckIdx];
                 const tempStr = JSON.stringify({ name: tempDeck.name, cards: tempDeck.cards });
                 const origStr = JSON.stringify({ name: original.name, cards: original.cards });
@@ -372,12 +370,13 @@ function init() {
                     if (!confirmed) return;
                 }
                 tempDeck = null;
-                showView('deck-selection');
-                renderDeckSelect();
+                showView('profile-view');
+                updateProfilePage();
             }
         } else {
-            showView('deck-selection');
-            renderDeckSelect();
+            // 無編輯中的牌組，也返回個人頁面
+            showView('profile-view');
+            updateProfilePage();
         }
     });
 
@@ -451,7 +450,7 @@ function init() {
         if (deckCreationInProgress) return;
         deckCreationInProgress = true;
         document.getElementById('deck-creation-modal').style.display = 'none';
-        addNewPlayerDeck(null); // Create empty deck
+        addNewPlayerDeck(null, null, false); // 明確指定為一般牌組，非測試牌組
         // 讓旗標在下一個事件循環重置，避免影響其他操作
         setTimeout(() => { deckCreationInProgress = false; }, 0);
     });
@@ -697,9 +696,62 @@ document.addEventListener('click', (e) => {
     }
 });
 
+
 // Global drag events
-document.addEventListener('mousemove', onDragMove);
+document.addEventListener('mousemove', (e) => {
+    onDragMove(e);
+
+    // Update tooltip position if visible
+    const tooltip = document.getElementById('ui-tooltip');
+    if (tooltip && tooltip.style.opacity === '1') {
+        const x = e.clientX;
+        const y = e.clientY;
+
+        // Prevent tooltip from going off screen
+        const rect = tooltip.getBoundingClientRect();
+        let left = x + 15;
+        let top = y + 15;
+
+        if (left + rect.width > window.innerWidth) {
+            left = x - rect.width - 5;
+        }
+        if (top + rect.height > window.innerHeight) {
+            top = y - rect.height - 5;
+        }
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+    }
+});
 document.addEventListener('mouseup', onDragEnd);
+
+// Global Tooltip Delegation
+document.addEventListener('mouseover', (e) => {
+    const target = e.target.closest('[data-hover]');
+    if (target) {
+        const text = target.getAttribute('data-hover');
+        if (text) {
+            const tooltip = document.getElementById('ui-tooltip');
+            if (tooltip) {
+                tooltip.textContent = text;
+                tooltip.style.opacity = '1';
+                // Initial positioning
+                tooltip.style.left = `${e.clientX + 15}px`;
+                tooltip.style.top = `${e.clientY + 15}px`;
+            }
+        }
+    }
+});
+
+document.addEventListener('mouseout', (e) => {
+    const target = e.target.closest('[data-hover]');
+    if (target) {
+        const tooltip = document.getElementById('ui-tooltip');
+        if (tooltip) {
+            tooltip.style.opacity = '0';
+        }
+    }
+});
 
 // Expose globally for AuthManager/AuthUI
 window.App = {
@@ -828,6 +880,7 @@ function selectPlayerTitle(title) {
         AuthManager.currentUser.selectedTitle = title;
         localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
         updatePlayerInfo();
+        AuthManager.saveData(); // Sync to cloud
         showToast(`稱號已更換為：#${title}`);
     }
 }
@@ -877,6 +930,7 @@ function selectPlayerAvatar(avatarId) {
 
         updatePlayerInfo();
         updateProfilePage(); // 同時更新個人頁面
+        AuthManager.saveData(); // Sync to cloud
         showToast('頭像已更換');
     }
 }
@@ -942,68 +996,89 @@ function updateProfilePage() {
     // 更新加入時間
     const joinDateEl = document.getElementById('profile-join-date');
     if (joinDateEl) {
-        if (user.createdAt) {
-            const date = new Date(user.createdAt);
-            const formattedDate = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-            joinDateEl.textContent = `加入時間：${formattedDate}`;
-        } else {
-            joinDateEl.textContent = '加入時間：未知';
+        let dateStr = '未知';
+        // Debug: Check what fields we actually have
+        console.log('[Profile Debug] Current User Object:', user);
+        console.log('[Profile Debug] created_at:', user.created_at);
+        console.log('[Profile Debug] createdAt:', user.createdAt);
+
+        // Check both created_at (DB column) and createdAt (camelCase convention)
+        const dateValue = user.created_at || user.createdAt;
+        if (dateValue) {
+            const date = new Date(dateValue);
+            console.log('[Profile Debug] Parsed Date:', date);
+            if (!isNaN(date.getTime())) {
+                dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+            }
         }
+        joinDateEl.textContent = `加入時間：${dateStr}`;
     }
 
     // 更新統計數據 - 按難度分類
-    const stats = user.stats || {
-        totalGames: 0,
+    // 確保 stats 物件存在且有預設值
+    const defaultStats = {
         totalWins: 0,
-        normalWins: 0,
-        normalGames: 0,
-        expertWins: 0,
-        expertGames: 0,
-        masterWins: 0,
-        masterGames: 0,
+        pvpWins: 0, pvpGames: 0,
+        normalWins: 0, normalGames: 0,
+        hardWins: 0, hardGames: 0, // Expert
+        hellWins: 0, hellGames: 0, // Master
         ownedCards: []
     };
+    const stats = { ...defaultStats, ...(user.stats || {}) };
 
-    // 勝場數 / 總場次
-    const winsTotalEl = document.getElementById('stat-wins-total');
+    // 1. 總勝場
+    // 如果 totalWins 沒紀錄，嘗試從各難度加總
+    const calcTotalWins = stats.totalWins || (stats.normalWins + stats.hardWins + stats.hellWins + stats.pvpWins);
+    const winsTotalEl = document.getElementById('stat-total-wins');
     if (winsTotalEl) {
-        winsTotalEl.textContent = `${stats.totalWins || 0} / ${stats.totalGames || 0}`;
+        winsTotalEl.textContent = calcTotalWins;
     }
 
-    // 總勝率
-    const totalWinRate = stats.totalGames > 0
-        ? Math.round((stats.totalWins / stats.totalGames) * 100)
+    // 2. 對戰勝率(與玩家)
+    const pvpWinRate = stats.pvpGames > 0
+        ? Math.round((stats.pvpWins / stats.pvpGames) * 100)
         : 0;
-    const totalWinrateEl = document.getElementById('stat-total-winrate');
-    if (totalWinrateEl) totalWinrateEl.textContent = `${totalWinRate}%`;
+    const pvpWinrateEl = document.getElementById('stat-pvp-winrate');
+    if (pvpWinrateEl) {
+        pvpWinrateEl.textContent = `${pvpWinRate}%`;
+        pvpWinrateEl.setAttribute('data-hover', `勝場: ${stats.pvpWins} 總場次: ${stats.pvpGames}`);
+    }
 
-    // 普通難度
-    const normalWinsEl = document.getElementById('stat-normal-wins');
+    // 3. 對戰電腦勝率(普通)
+    const normalWinRate = stats.normalGames > 0
+        ? Math.round((stats.normalWins / stats.normalGames) * 100)
+        : 0;
+    const normalWinsEl = document.getElementById('stat-ai-normal');
     if (normalWinsEl) {
-        normalWinsEl.textContent = `${stats.normalWins || 0} / ${stats.normalGames || 0}`;
+        normalWinsEl.textContent = `${normalWinRate}%`;
+        normalWinsEl.setAttribute('data-hover', `勝場: ${stats.normalWins} 總場次: ${stats.normalGames}`);
     }
 
-    // 專家難度
-    const expertWinsEl = document.getElementById('stat-expert-wins');
+    // 4. 對戰電腦勝率(專家)
+    const hardWinRate = stats.hardGames > 0
+        ? Math.round((stats.hardWins / stats.hardGames) * 100)
+        : 0;
+    const expertWinsEl = document.getElementById('stat-ai-expert');
     if (expertWinsEl) {
-        expertWinsEl.textContent = `${stats.expertWins || 0} / ${stats.expertGames || 0}`;
+        expertWinsEl.textContent = `${hardWinRate}%`;
+        expertWinsEl.setAttribute('data-hover', `勝場: ${stats.hardWins} 總場次: ${stats.hardGames}`);
     }
 
-    // 大師難度
-    const masterWinsEl = document.getElementById('stat-master-wins');
+    // 5. 對戰電腦勝率(大師)
+    const hellWinRate = stats.hellGames > 0
+        ? Math.round((stats.hellWins / stats.hellGames) * 100)
+        : 0;
+    const masterWinsEl = document.getElementById('stat-ai-master');
     if (masterWinsEl) {
-        masterWinsEl.textContent = `${stats.masterWins || 0} / ${stats.masterGames || 0}`;
+        masterWinsEl.textContent = `${hellWinRate}%`;
+        masterWinsEl.setAttribute('data-hover', `勝場: ${stats.hellWins} 總場次: ${stats.hellGames}`);
     }
 
-    // 擁有卡牌
+
+    // 6. 擁有卡牌
     const ownedCardsCount = stats.ownedCards ? stats.ownedCards.length : 0;
     const ownedCardsEl = document.getElementById('stat-owned-cards');
     if (ownedCardsEl) ownedCardsEl.textContent = ownedCardsCount;
-
-    // 牌組數量
-    const totalDecks = userDecks ? userDecks.length : 0;
-    const totalDecksEl = document.getElementById('stat-total-decks');
-    if (totalDecksEl) totalDecksEl.textContent = totalDecks;
 
     // 更新牌組列表
     renderProfileDeckList();
@@ -1375,7 +1450,13 @@ function renderDeckSelect() {
             <div>建立${isDebugMode ? '測試' : '新'}牌組</div>
         `;
         addSlot.onclick = () => {
-            showDeckCreationOptions();
+            if (isDebugMode) {
+                // 測試模式：直接創建測試牌組
+                addNewPlayerDeck(null, null, true); // isTestDeck=true
+            } else {
+                // 一般模式：顯示選項
+                showDeckCreationOptions();
+            }
         };
         container.appendChild(addSlot);
     }
@@ -1385,16 +1466,17 @@ function showDeckCreationOptions() {
     document.getElementById('deck-creation-modal').style.display = 'flex';
 }
 
-function addNewPlayerDeck(cardIds = null, themeName = null) {
+function addNewPlayerDeck(cardIds = null, themeName = null, isTestDeck = false) {
     console.log('[DECK] ===== 開始創建新牌組 =====');
     console.log('[DECK] 當前牌組數量:', userDecks.length);
     console.log('[DECK] 卡牌:', cardIds ? `${cardIds.length} 張` : '無（空牌組）');
+    console.log('[DECK] 是否為測試牌組:', isTestDeck);
 
     const newDeck = {
-        name: themeName || (isDebugMode ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
+        name: themeName || (isTestDeck ? '測試牌組 ' : '自定義牌組 ') + (userDecks.length + 1),
         cards: cardIds ? [...cardIds] : []
     };
-    if (isDebugMode) newDeck.isTest = true;
+    if (isTestDeck) newDeck.isTest = true;
 
     console.log('[DECK] 新牌組名稱:', newDeck.name);
     userDecks.push(newDeck);
@@ -2308,6 +2390,55 @@ function endGame(result) {
 
     resultText.innerText = result === 'VICTORY' ? '勝利' : '敗北';
     resultText.className = `result-text ${result === 'VICTORY' ? 'victory-text' : 'defeat-text'}`;
+
+    // 更新統計數據 (僅在非除錯模式且已登入時)
+    if (!isDebugMode && AuthManager.currentUser) {
+        // 初始化 stats
+        if (!AuthManager.currentUser.stats) {
+            AuthManager.currentUser.stats = {
+                totalWins: 0,
+                pvpWins: 0, pvpGames: 0,
+                normalWins: 0, normalGames: 0,
+                hardWins: 0, hardGames: 0,
+                hellWins: 0, hellGames: 0,
+                ownedCards: []
+            };
+        }
+        const stats = AuthManager.currentUser.stats;
+
+        // 確保所有欄位都存在 (防止舊資料導致 NaN)
+        stats.totalWins = stats.totalWins || 0;
+        stats.normalWins = stats.normalWins || 0;
+        stats.normalGames = stats.normalGames || 0;
+        stats.hardWins = stats.hardWins || 0;
+        stats.hardGames = stats.hardGames || 0;
+        stats.hellWins = stats.hellWins || 0;
+        stats.hellGames = stats.hellGames || 0;
+
+        // 根據難度更新
+        const isWin = result === 'VICTORY';
+        if (isWin) stats.totalWins++;
+
+        switch (currentDifficulty) {
+            case 'NORMAL':
+                stats.normalGames++;
+                if (isWin) stats.normalWins++;
+                break;
+            case 'HARD': // Expert
+                stats.hardGames++;
+                if (isWin) stats.hardWins++;
+                break;
+            case 'HELL': // Master
+                stats.hellGames++;
+                if (isWin) stats.hellWins++;
+                break;
+        }
+
+        // 保存並更新顯示
+        AuthManager.saveData();
+        updateProfilePage();
+        console.log("Stats updated:", stats);
+    }
 
     showView('game-result-view');
     document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex

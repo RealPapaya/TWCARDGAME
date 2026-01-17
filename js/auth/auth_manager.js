@@ -10,7 +10,7 @@
  */
 const AuthManager = {
     // 這裡填入部署後的 Google Apps Script 網址
-    API_URL: "https://script.google.com/macros/s/AKfycbxGj_BFidlGuXkMYuAbQeHdwhqXWvyJPMRiwJF9eztAQY6cUrXyVK-fASDYA4UIIsERcg/exec",
+    API_URL: "https://script.google.com/macros/s/AKfycbxgyK3pOaHPtWkHaw1oIbc-RRM-rUiZKyMbOul6mgDNV9ELd9spyMB11kmq7j8NTY6R6A/exec",
 
     currentUser: null,
 
@@ -72,6 +72,16 @@ const AuthManager = {
                         this.currentUser.deck_data = [];
                     }
                 }
+                // 處理 stats
+                if (typeof result.data.stats === 'string') {
+                    try {
+                        this.currentUser.stats = JSON.parse(result.data.stats || "{}");
+                    } catch (e) {
+                        this.currentUser.stats = {};
+                    }
+                } else {
+                    this.currentUser.stats = result.data.stats || {};
+                }
                 localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
                 return { success: true, user: this.currentUser };
             } else {
@@ -102,7 +112,10 @@ const AuthManager = {
                     username: this.currentUser.username,
                     level: this.currentUser.level,
                     gold: this.currentUser.gold,
-                    deck_data: JSON.stringify(this.currentUser.deck_data)
+                    deck_data: JSON.stringify(this.currentUser.deck_data),
+                    selectedAvatar: this.currentUser.selectedAvatar,
+                    selectedTitle: this.currentUser.selectedTitle,
+                    stats: JSON.stringify(this.currentUser.stats || {})
                 })
             });
             console.log("資料已同步至雲端");

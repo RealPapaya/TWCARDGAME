@@ -334,6 +334,33 @@
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
+/* Tooltip logic for stats */
+.stat-row-value[data-hover] {
+    position: relative;
+    cursor: help;
+}
+
+.stat-row-value[data-hover]:hover::after {
+    content: attr(data-hover);
+    position: absolute;
+    bottom: 100%;
+    right: 0;
+    transform: translateY(-5px);
+    background: rgba(30, 20, 10, 0.95);
+    color: var(--text-light);
+    padding: 8px 12px;
+    border-radius: 6px;
+    white-space: nowrap;
+    font-size: 14px;
+    font-family: 'Noto Sans TC', sans-serif;
+    pointer-events: none;
+    z-index: 100;
+    box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.5),
+        0 0 0 1px var(--gold);
+    border: 1px solid var(--wood-medium);
+}
+
 /* 牌組管理 */
 .deck-management {
     overflow: hidden;

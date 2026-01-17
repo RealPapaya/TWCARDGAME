@@ -67,7 +67,6 @@
                     <div class="menu-buttons main-nav">
                         <button id="btn-main-profile" class="neon-button">個人頁面</button>
                         <button id="btn-main-battle" class="neon-button">進入戰鬥</button>
-                        <button id="btn-main-builder" class="neon-button">牌組組建</button>
                         <button id="btn-main-test" class="neon-button secondary" style="margin-top: 15px;">測試模式 (Test
                             Mode)</button>
                     </div>
@@ -166,32 +165,28 @@
                                 <h3 class="stats-title">遊戲統計</h3>
                                 <div class="stats-list">
                                     <div class="stat-row">
-                                        <div class="stat-row-label">勝場數 / 總場次</div>
-                                        <div class="stat-row-value" id="stat-wins-total">0 / 0</div>
+                                        <div class="stat-row-label">總勝場</div>
+                                        <div class="stat-row-value" id="stat-total-wins">0</div>
                                     </div>
                                     <div class="stat-row">
-                                        <div class="stat-row-label">總勝率</div>
-                                        <div class="stat-row-value" id="stat-total-winrate">0%</div>
+                                        <div class="stat-row-label">對戰勝率(與玩家)</div>
+                                        <div class="stat-row-value" id="stat-pvp-winrate">0%</div>
                                     </div>
                                     <div class="stat-row">
-                                        <div class="stat-row-label">勝場數 / 總場次 (普通)</div>
-                                        <div class="stat-row-value" id="stat-normal-wins">0 / 0</div>
+                                        <div class="stat-row-label">對戰電腦勝率(普通)</div>
+                                        <div class="stat-row-value" id="stat-ai-normal">勝場: 0 總場次: 0</div>
                                     </div>
                                     <div class="stat-row">
-                                        <div class="stat-row-label">勝場數 / 總場次 (專家)</div>
-                                        <div class="stat-row-value" id="stat-expert-wins">0 / 0</div>
+                                        <div class="stat-row-label">對戰電腦勝率(專家)</div>
+                                        <div class="stat-row-value" id="stat-ai-expert">勝場: 0 總場次: 0</div>
                                     </div>
                                     <div class="stat-row">
-                                        <div class="stat-row-label">勝場數 / 總場次 (大師)</div>
-                                        <div class="stat-row-value" id="stat-master-wins">0 / 0</div>
+                                        <div class="stat-row-label">對戰電腦勝率(大師)</div>
+                                        <div class="stat-row-value" id="stat-ai-master">勝場: 0 總場次: 0</div>
                                     </div>
                                     <div class="stat-row">
                                         <div class="stat-row-label">擁有卡牌</div>
                                         <div class="stat-row-value" id="stat-owned-cards">0</div>
-                                    </div>
-                                    <div class="stat-row">
-                                        <div class="stat-row-label">牌組數量</div>
-                                        <div class="stat-row-value" id="stat-total-decks">0</div>
                                     </div>
                                 </div>
                             </div>
@@ -652,6 +647,7 @@
     </svg>
 
     <div id="card-preview" style="z-index: 10000;"></div>
+    <div id="ui-tooltip" class="ui-tooltip"></div>
 </body>
 
 
