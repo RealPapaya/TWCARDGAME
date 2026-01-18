@@ -1737,6 +1737,11 @@ function showView(viewId) {
         transitionTimeout = null;
     }, 800); // Reduced from 1600ms for snappier transition and less black flash risk
 
+    // --- Update Cloud Visibility ---
+    if (window.cloudManager) {
+        window.cloudManager.updateView(viewId);
+    }
+
     // --- Original Logic for UI Elements ---
     const log = document.getElementById('message-log');
     if (log) {
@@ -2662,12 +2667,17 @@ function formatDesc(text, newsBonus = 0, isNews = false) {
 function renderMana(containerId, mana) {
     const container = document.getElementById(containerId);
     const textEl = document.getElementById(containerId === 'player-mana-container' ? 'player-mana-text' : 'opp-mana-text');
+    const isPlayer = containerId === 'player-mana-container';
 
     container.innerHTML = '';
 
     for (let i = 0; i < 10; i++) {
         const crystal = document.createElement('div');
         crystal.className = 'mana-crystal';
+
+        // Add player or opponent specific class
+        crystal.classList.add(isPlayer ? 'player-crystal' : 'opponent-crystal');
+
         if (i < mana.current) {
             crystal.classList.add('active');
         } else if (i < mana.max) {

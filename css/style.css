@@ -251,7 +251,39 @@ body {
 
 
 
-/* Main Menu Styles */
+/* Cloud Animation Styles */
+#cloud-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 50%;
+    /* Only upper half */
+    pointer-events: none;
+    z-index: 1;
+    /* Above view background, below view content */
+    overflow: hidden;
+}
+
+.cloud {
+    position: absolute;
+    height: auto;
+    pointer-events: none;
+    opacity: 1;
+    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.2));
+    will-change: transform;
+}
+
+@keyframes cloud-move {
+    from {
+        transform: translateX(110vw);
+    }
+
+    to {
+        transform: translateX(-110vw);
+    }
+}
+
 #main-menu {
     justify-content: center;
     align-items: center;
@@ -265,8 +297,8 @@ body {
 
 #main-menu .menu-content {
     position: relative;
-    z-index: 101;
-    /* Above footer */
+    z-index: 10;
+    /* Above clouds */
 }
 
 .game-title {
@@ -1325,22 +1357,33 @@ body {
 /* Mana Container & Crystals */
 .mana-container {
     display: flex;
-    gap: 4px;
-    padding: 5px 10px;
+    gap: 8px;
+    padding: 10px 15px;
     background: rgba(0, 0, 0, 0.4);
-    border-radius: 10px;
-    border: 1px solid rgba(0, 243, 255, 0.2);
+    border-radius: 12px;
+    border: 2px solid rgba(0, 243, 255, 0.2);
     margin: 5px;
+    min-width: 480px;
+    /* Fixed width for 10 crystals + gaps */
+    height: 60px;
+    align-items: center;
+    justify-content: flex-start;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.5);
 }
 
 .mana-crystal {
-    width: 28px;
-    height: 28px;
-    background: #1a1a1a;
-    /* Diamond shape */
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    background-size: contain;
+    background-repeat: no-repeat;
+    background-position: center;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transform: rotate(45deg);
     border: none;
+    pointer-events: none;
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.8));
+    flex-shrink: 0;
 }
 
 .mana-container.shake-error {
@@ -1372,15 +1415,38 @@ body {
     }
 }
 
-.mana-crystal.active {
-    background: var(--neon-blue);
-    box-shadow: 0 0 15px var(--neon-blue), inset 0 0 10px rgba(255, 255, 255, 0.5);
-    transform: scale(1.1);
+.mana-crystal.player-crystal.active {
+    background-image: url('../assets/images/mana/player-crystal.png');
+    filter: brightness(1.2) drop-shadow(0 0 12px rgba(0, 243, 255, 0.9));
+    transform: rotate(45deg) scale(1.1);
+}
+
+.mana-crystal.opponent-crystal.active {
+    background-image: url('../assets/images/mana/opponent-crystal.png');
+    filter: brightness(1.2) drop-shadow(0 0 12px rgba(255, 51, 51, 0.9));
+    transform: rotate(45deg) scale(1.1);
 }
 
 .mana-crystal.spent {
-    background: rgba(0, 243, 255, 0.15);
-    opacity: 0.5;
+    background-image: none;
+    background-color: rgba(255, 255, 255, 0.15);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    opacity: 0.4;
+    width: 32px;
+    /* Visual inner diamond size */
+    height: 32px;
+    margin: 5px;
+    /* (42 - 32) / 2 = 5 to keep alignment */
+}
+
+.mana-crystal.locked {
+    background: rgba(0, 0, 0, 0.7);
+    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    width: 20px;
+    height: 20px;
+    margin: 11px;
+    /* (42 - 20) / 2 = 11 to keep alignment */
+    opacity: 0.6;
 }
 
 /* Dust Effect */
@@ -3112,14 +3178,7 @@ body.dragging-active .player .hand .card:hover {
     filter: sepia(0.3) hue-rotate(-10deg) brightness(0.9) drop-shadow(0 4px 4px rgba(0, 0, 0, 0.5));
 }
 
-.player-area.opponent .mana-crystal.active {
-    background: #ff3333;
-    box-shadow: 0 0 15px #ff3333, inset 0 0 10px rgba(255, 255, 255, 0.5);
-}
-
-.player-area.opponent .mana-crystal.spent {
-    background: rgba(255, 51, 51, 0.15);
-}
+/* Opponent mana styling now handled by .opponent-crystal classes */
 
 /* Filter Selects */
 .filter-select {
