@@ -88,7 +88,8 @@ class GameEngine {
         for (let i = 0; i < p1Draws; i++) p1.drawCard();
         for (let i = 0; i < p2Draws; i++) p2.drawCard();
 
-        state.startTurn();
+        // Mulligan Phase: startTurn() will be called AFTER mulligan完成
+        // state.startTurn();
         return state;
     }
 }
@@ -2023,6 +2024,41 @@ class AIEngine {
         }
 
         return null;
+    }
+
+    /**
+     * Mulligan Handler: 處理起手換牌邏輯
+     * @param {number} playerIdx - 玩家索引 (0 or 1)
+     * @param {Array<number>} selectedIndices - 要替換的手牌索引陣列
+     * @returns {Array} 被替換的卡牌列表
+     */
+    performMulligan(playerIdx, selectedIndices) {
+        const player = this.players[playerIdx];
+        if (!player) return [];
+
+        const replacedCards = [];
+
+        // 從手牌中移除選中的卡並放回牌組底部
+        selectedIndices.sort((a, b) => b - a).forEach(idx => {
+            if (idx >= 0 && idx < player.hand.length) {
+                const card = player.hand.splice(idx, 1)[0];
+                player.deck.push(card);
+                replacedCards.push(card);
+            }
+        });
+
+        // 洗牌 (Fisher-Yates shuffle)
+        for (let i = player.deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [player.deck[i], player.deck[j]] = [player.deck[j], player.deck[i]];
+        }
+
+        // 重抽等量的牌
+        for (let i = 0; i < selectedIndices.length; i++) {
+            player.drawCard();
+        }
+
+        return replacedCards;
     }
 }
 // Export for Node.js

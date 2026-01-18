@@ -1,0 +1,231 @@
+/* ===== Mulligan (起手換牌) Styles ===== */
+
+/* 確保整個 Modal 容器是全螢幕且居中 */
+#mulligan-modal {
+    background: rgba(0, 0, 0, 0.7) !important;
+    /* 半透明黑色背景遮罩, 讓戰場變暗 */
+    display: none;
+    /* 預設隱藏 */
+    justify-content: center;
+    align-items: center;
+    z-index: 20000;
+    /* 高於一切 */
+}
+
+/* 內容容器 - 完全透明, 無邊框 */
+.mulligan-content {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0;
+    width: 100%;
+    max-width: 1200px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+
+/* 標題樣式 - 確保在戰場背景上清晰可見 */
+.mulligan-content h2 {
+    font-size: 56px;
+    margin-bottom: 10px;
+    color: #fff !important;
+    text-shadow: 0 0 10px #000, 0 0 20px #000, 0 4px 4px rgba(0, 0, 0, 0.8);
+    font-family: 'Microsoft JhengHei', serif;
+    font-weight: 900;
+    letter-spacing: 5px;
+}
+
+.mulligan-content p {
+    color: #e0e0e0 !important;
+    font-size: 24px;
+    text-shadow: 0 0 5px #000, 0 2px 2px rgba(0, 0, 0, 0.8);
+    margin-bottom: 40px;
+    font-weight: bold;
+    letter-spacing: 2px;
+}
+
+/* 隱藏裝飾用的分隔線 (如果有的話) */
+.mulligan-content hr {
+    display: none;
+}
+
+.mulligan-card-area {
+    display: flex;
+    flex-direction: row;
+    justify-content: center;
+    align-items: center;
+    gap: 40px;
+    /* 增加卡片間距 */
+    padding: 20px 0;
+    min-height: 350px;
+    perspective: 1000px;
+}
+
+/* 詳細卡牌樣式 - 暗色風格 */
+.mulligan-card.detailed-card {
+    width: 240px !important;
+    /* 稍微加大 */
+    height: 350px !important;
+    cursor: pointer !important;
+    transition: all 0.4s cubic-bezier(0.25, 0.8, 0.25, 1);
+    position: relative;
+
+    /* 暗色背景 */
+    background: #151515 !important;
+    background-image: linear-gradient(135deg, #1f1f1f 0%, #0a0a0a 100%) !important;
+
+    /* 邊框 */
+    border: 2px solid #444 !important;
+    border-radius: 12px !important;
+    box-shadow: 0 15px 35px rgba(0, 0, 0, 0.6) !important;
+
+    display: flex !important;
+    flex-direction: column !important;
+    padding: 14px !important;
+    box-sizing: border-box !important;
+
+    color: #e0e0e0 !important;
+    font-family: 'Microsoft JhengHei', sans-serif;
+}
+
+/* 懸浮效果 */
+.mulligan-card:hover {
+    transform: translateY(-20px) scale(1.1);
+    z-index: 100;
+    box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8), 0 0 20px rgba(100, 200, 255, 0.2) !important;
+    border-color: #777 !important;
+}
+
+/* 選中狀態 (紅色 X) */
+.mulligan-card.selected {
+    border-color: #ff3333 !important;
+    box-shadow: 0 0 30px rgba(255, 0, 0, 0.3) !important;
+    transform: translateY(-10px);
+}
+
+.mulligan-card.selected .card-art {
+    filter: grayscale(100%) contrast(120%);
+}
+
+.mulligan-card.selected::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 10px;
+    z-index: 20;
+    pointer-events: none;
+}
+
+.mulligan-card.selected::after {
+    content: '✕';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 140px;
+    color: #ff3333;
+    font-weight: 900;
+    text-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+    z-index: 21;
+    pointer-events: none;
+}
+
+/* 替換標籤 */
+.mulligan-replace-tag {
+    position: absolute;
+    bottom: -20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #cc0000;
+    color: white;
+    padding: 6px 20px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: bold;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.6);
+    z-index: 25;
+    pointer-events: none;
+    letter-spacing: 2px;
+    border: 2px solid #ff5555;
+}
+
+/* 內部元素樣式覆蓋 */
+.mulligan-card .card-name {
+    color: #ffd700 !important;
+    font-size: 20px !important;
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.8) !important;
+    margin-top: 15px !important;
+}
+
+.mulligan-card .card-description {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-radius: 4px;
+    padding: 8px !important;
+    margin-top: 5px;
+    color: #ccc !important;
+    font-size: 14px !important;
+    line-height: 1.5 !important;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mulligan-card .card-category {
+    background: #333 !important;
+    color: #aaa !important;
+    border: 1px solid #444;
+}
+
+/* 費用水晶 */
+.mulligan-card .card-cost {
+    top: -12px !important;
+    left: -12px !important;
+    width: 50px !important;
+    height: 50px !important;
+    line-height: 50px !important;
+    font-size: 24px !important;
+    filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.8));
+}
+
+/* 攻血數值 */
+.mulligan-card .minion-stats span {
+    text-shadow: 3px 3px 0 #000, -1px -1px 0 #000;
+    font-weight: 900 !important;
+}
+
+/* 按鈕樣式優化 */
+#btn-mulligan-confirm {
+    background: linear-gradient(to bottom, #d4a04d, #8b4513);
+    border: 2px solid #5e2f0d;
+    color: #fff;
+    font-size: 24px;
+    padding: 12px 60px;
+    border-radius: 30px;
+    cursor: pointer;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    text-shadow: 0 2px 2px rgba(0, 0, 0, 0.5);
+    font-weight: bold;
+    margin-top: 30px;
+    transition: all 0.2s;
+}
+
+#btn-mulligan-confirm:hover {
+    transform: scale(1.05);
+    box-shadow: 0 15px 30px rgba(0, 0, 0, 0.6);
+    background: linear-gradient(to bottom, #e5b364, #a0522d);
+}
+
+#btn-mulligan-confirm:active {
+    transform: scale(0.95);
+    box-shadow: 0 5px 10px rgba(0, 0, 0, 0.4);
+}
+
+/* 隱藏捲軸 */
+.mulligan-content::-webkit-scrollbar {
+    display: none;
+}

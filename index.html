@@ -17,14 +17,15 @@
     <link rel="stylesheet" href="css/player_info.css">
     <link rel="stylesheet" href="css/selection_modals.css">
     <link rel="stylesheet" href="css/profile_page.css">
+    <link rel="stylesheet" href="css/style_mulligan.css">
     <script src="js/data/card_data.js"></script>
     <script src="js/data/default_decks.js"></script>
-    <script src="js/engine/game_engine.js"></script>
+    <script src="js/engine/game_engine.js?v=1.1"></script>
     <script src="js/data/updates.js"></script>
     <script src="js/data/ui_translations.js"></script>
     <script src="js/auth/auth_manager.js"></script>
     <script src="js/auth/auth_ui.js" defer></script>
-    <script src="js/ui/app.js" defer></script>
+    <script src="js/ui/app.js?v=1.1" defer></script>
 </head>
 
 <body>
@@ -589,6 +590,17 @@
             </div>
 
 
+            <!-- Mulligan Modal -->
+            <div id="mulligan-modal" class="modal-overlay" style="display: none;">
+                <div class="mulligan-content parchment-modal">
+                    <h2 class="mulligan-title medieval-title">起手的手牌</h2>
+                    <p class="mulligan-subtitle medieval-subtitle">保留或更換卡牌</p>
+                    <div id="mulligan-hand" class="mulligan-card-area"></div>
+                    <div class="modal-buttons medieval-button-group" style="margin-top: 30px;">
+                        <button id="btn-mulligan-confirm" class="medieval-button">確定</button>
+                    </div>
+                </div>
+            </div>
 
             <!-- Turn Announcement Overlay -->
             <div id="turn-announcement-overlay" class="turn-overlay" style="display: none;">

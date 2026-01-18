@@ -163,6 +163,11 @@ let currentInsertionIndex = -1;
 let dragLine = null; // Will be initialized in init()
 let animatingDrawCards = new Set(); // Track cards currently in draw animation
 
+// Mulligan Phase Variables
+let mulliganPhase = false;
+let mulliganCurrentPlayer = 0; // 0 = PLAYER, 1 = AI
+let selectedMulliganCards = [];
+
 /**
  * 對戰歷史紀錄管理器
  */
@@ -273,6 +278,40 @@ function init() {
     dragLine = document.getElementById('drag-line');
 
     gameEngine = new GameEngine(CARD_DATA);
+
+    // WORKAROUND: 手動添加 performMulligan 方法到 GameState.prototype
+    // 因為瀏覽器快取問題可能導致舊版 game_engine.js 被載入
+    if (typeof GameState !== 'undefined' && !GameState.prototype.performMulligan) {
+        console.warn('[INIT] 手動添加 performMulligan 方法到 GameState.prototype');
+        GameState.prototype.performMulligan = function (playerIdx, selectedIndices) {
+            const player = this.players[playerIdx];
+            if (!player) return [];
+
+            const replacedCards = [];
+
+            // 從手牌中移除選中的卡並放回牌組底部
+            selectedIndices.sort((a, b) => b - a).forEach(idx => {
+                if (idx >= 0 && idx < player.hand.length) {
+                    const card = player.hand.splice(idx, 1)[0];
+                    player.deck.push(card);
+                    replacedCards.push(card);
+                }
+            });
+
+            // 洗牌 (Fisher-Yates shuffle)
+            for (let i = player.deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [player.deck[i], player.deck[j]] = [player.deck[j], player.deck[i]];
+            }
+
+            // 重抽等量的牌
+            for (let i = 0; i < selectedIndices.length; i++) {
+                player.drawCard();
+            }
+
+            return replacedCards;
+        };
+    }
 
     // --- Main Menu Listeners ---
     document.getElementById('btn-main-battle').addEventListener('click', () => {
@@ -646,6 +685,11 @@ document.getElementById('btn-update-log-close')?.addEventListener('click', () =>
 
 document.getElementById('btn-player-theme-cancel')?.addEventListener('click', () => {
     document.getElementById('player-theme-selection-modal').style.display = 'none';
+});
+
+// Mulligan Confirm Button
+document.getElementById('btn-mulligan-confirm')?.addEventListener('click', () => {
+    confirmMulligan();
 });
 
 // --- Result View Listeners ---
@@ -1613,12 +1657,20 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
         // Only call showView ONCE
         showView('battle-view');
+
+        // 啟動 Mulligan Phase (起手換牌)
+        showMulliganPhase();
+
+        // render() 將在 Mulligan 完成後由 confirmMulligan() 呼叫
+        // 不要在這裡呼叫 render(), 因為遊戲尚未開始 (startTurn 被延遲)
     } catch (e) {
         logMessage(e.message);
         return;
     }
 
-    // Initial Draw Sequence Logic
+    // ===== 初始抽牌動畫已註解 - Mulligan Phase 會處理起手牌 =====
+    // Initial Draw Sequence Logic - DISABLED for Mulligan
+    /*
     const initialHand = [...gameState.players[0].hand];
     gameState.players[0].hand = [];
     previousPlayerHandSize = 0;
@@ -1639,11 +1691,13 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
 
     // If opponent starts, trigger AI
     if (gameState.currentPlayerIdx === 1) {
-        setTimeout(aiTurn, 1000);
-    } else {
-        // Player starts
-        setTimeout(() => showTurnAnnouncement("你的回合"), 500);
+        setTimeout(() => {
+            aiTurn();
+        }, 1000);
     }
+    */
+
+    // Mulligan 會在玩家選擇完後自動呼叫 render() 和 startTurn()
 }
 
 function initManaContainers(id) {
@@ -2514,55 +2568,7 @@ function showPreview(card) {
     const preview = document.getElementById('card-preview');
     const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
 
-    const base = CARD_DATA.find(c => c.id === card.id) || card;
-    let statsHtml = '';
-    if (card.attack !== undefined && card.health !== undefined && card.type !== 'NEWS') {
-        const effectiveBaseAttack = card.baseAttackOverride !== undefined ? card.baseAttackOverride : base.attack;
-        const atkClass = card.attack > effectiveBaseAttack ? 'stat-buffed' : (card.attack < effectiveBaseAttack ? 'stat-damaged' : '');
-        const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
-        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
-
-        // 屬性在最下方 (Stats at bottom) - Revised padding for more description space
-        statsHtml = `
-        <div class="minion-stats" style="margin-top: auto; padding: 5px 20px 10px 20px; display: flex; justify-content: space-between; width: 100%;">
-            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span>${card.attack}</span></span>
-            <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
-        </div>`;
-    }
-    // height: 140px; 圖片高度
-    const artHtml = card.image ?
-        `<div class="card-art" style="width: 100%; height: 140px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
-        `<div class="card-art" style="width: 100%; height: 140px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
-
-    const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
-
-    // Calculate actual cost for preview
-    let actualCost = card.cost;
-    if (gameState && card.type === 'NEWS' && gameState.players && gameState.players[0]) {
-        // Use the same logic as createCardEl for consistency
-        const player = gameState.players[0];
-        player.board.forEach(minion => {
-            if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
-                actualCost -= minion.keywords.ongoing.value;
-            }
-        });
-        actualCost = Math.max(0, actualCost);
-    } else if (gameState && typeof gameState.getCardActualCost === 'function') {
-        actualCost = gameState.getCardActualCost(card);
-    }
-
-    const isReduced = actualCost < baseCard.cost || card.isReduced;
-    const costClass = isReduced ? 'cost-reduced' : '';
-
-    const bonus = (gameState && card.id) ? (gameState.getNewsPower(card.side || 'PLAYER') || 0) : 0;
-    const isNews = card.type === 'NEWS';
-    const bcType = card.keywords?.battlecry?.type || '';
-
-    // Strict rules: Only DAMAGE and HEAL related effects get bonus
-    const isDamage = bcType.includes('DAMAGE');
-    const isHeal = bcType.includes('HEAL') || bcType.includes('RECOVER');
-    const isExcluded = bcType.includes('DRAW') || bcType.includes('COST') || bcType.includes('REDUCE');
-    const effectiveBonus = (isNews && (isDamage || isHeal) && !isExcluded) ? bonus : 0;
+    // Logic moved to generateCardInnerHTML
 
     // Generate Keyword Tooltips
     let keywordHtml = '';
@@ -2652,18 +2658,7 @@ function showPreview(card) {
     preview.innerHTML = `
         <div style="display: flex; flex-direction: ${flexDirection}; align-items: flex-start; pointer-events: none;">
             <div class="card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}" style="width:220px; height:320px; transform:none !important; display: flex; flex-direction: column; justify-content: flex-start; padding: 8px; flex-shrink: 0;">
-                <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 4px; height: 30px;">
-                    <div class="card-cost ${costClass}" style="position: relative; width:24px; height:24px; font-size:13px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 4px;"><span>${actualCost ?? 0}</span></div>
-                    <div class="card-title" style="font-size:20px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
-                </div>
-                
-                ${artHtml}
-                
-                <div class="card-category" style="font-size:12px; padding: 1px 4px; margin-bottom: 4px; text-align:center; color:#aaa;">${card.category || ""}</div>
-                
-                <div class="card-desc" style="font-size:13px; padding: 0 8px; line-height: 1.3; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formatDesc(card.description || "", effectiveBonus, isNews)}</div>
-                
-                ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;').replace(/width: 70px; height: 70px; font-size: 32px;/g, 'width: 50px; height: 50px; font-size: 24px;') : ''}
+                ${generateCardInnerHTML(card, gameState)}
             </div>
             ${keywordHtml}
         </div>
@@ -5301,3 +5296,257 @@ document.addEventListener('DOMContentLoaded', () => {
         showTitleSelectionModal();
     });
 });
+
+
+// ===== Mulligan Phase Functions =====
+
+/**
+ * 顯示 Mulligan 視窗並渲染起手牌
+ */
+function showMulliganPhase() {
+    mulliganPhase = true;
+    mulliganCurrentPlayer = 0; // 從玩家開始
+    selectedMulliganCards = [];
+
+    const modal = document.getElementById('mulligan-modal');
+    modal.style.display = 'flex';
+
+    renderMulliganHand();
+}
+
+/**
+ * 渲染當前玩家的起手牌
+ */
+function renderMulliganHand() {
+    const handContainer = document.getElementById('mulligan-hand');
+    if (!handContainer) return;
+
+    handContainer.innerHTML = '';
+
+    const player = gameState.players[mulliganCurrentPlayer];
+    if (!player || !player.hand) return;
+
+    player.hand.forEach((card, index) => {
+        // 使用新的詳細卡牌創建函數
+        const cardEl = createDetailedCardEl(card, index);
+        cardEl.classList.add('mulligan-card');
+        cardEl.dataset.index = index;
+        cardEl.draggable = false;
+
+        // 點擊事件: toggle選中狀態
+        cardEl.addEventListener('click', (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            const idx = parseInt(cardEl.dataset.index);
+            const selectedIdx = selectedMulliganCards.indexOf(idx);
+
+            if (selectedIdx > -1) {
+                // 取消選中
+                selectedMulliganCards.splice(selectedIdx, 1);
+                cardEl.classList.remove('selected');
+                // 移除「替換」標籤
+                const tag = cardEl.querySelector('.mulligan-replace-tag');
+                if (tag) tag.remove();
+            } else {
+                // 選中
+                selectedMulliganCards.push(idx);
+                cardEl.classList.add('selected');
+                // 新增「替換」標籤
+                const tag = document.createElement('div');
+                tag.className = 'mulligan-replace-tag';
+                tag.textContent = '替換';
+                cardEl.appendChild(tag);
+            }
+        });
+
+        handContainer.appendChild(cardEl);
+    });
+}
+
+/**
+ * 確認 Mulligan 選擇
+ */
+async function confirmMulligan() {
+    console.log('[DEBUG] confirmMulligan called');
+
+    // 檢查 gameState 是否存在並且有 performMulligan 方法
+    if (!gameState) {
+        console.error('[ERROR] gameState 不存在!');
+        alert('遊戲狀態錯誤,請重新開始遊戲');
+        return;
+    }
+
+    if (typeof gameState.performMulligan !== 'function') {
+        console.error('[ERROR] gameState.performMulligan 不是一個函數!');
+        alert('遊戲引擎載入錯誤,請重新整理頁面 (Ctrl+Shift+R)');
+        return;
+    }
+
+    // 執行 Mulligan logic
+    const replaced = gameState.performMulligan(mulliganCurrentPlayer, selectedMulliganCards);
+    console.log(`[Mulligan] Player ${mulliganCurrentPlayer} 替換了 ${replaced.length} 張牌`);
+
+    if (mulliganCurrentPlayer === 0) {
+        // 玩家完成, 輪到AI
+        mulliganCurrentPlayer = 1;
+        selectedMulliganCards = []; // Clear selection
+
+        // AI 自動處理: 隨機選擇 0-3 張換牌
+        const aiPlayer = gameState.players[1];
+        const numToReplace = Math.floor(Math.random() * Math.min(4, aiPlayer.hand.length + 1));
+        const aiIndices = [];
+        for (let i = 0; i < numToReplace; i++) {
+            aiIndices.push(Math.floor(Math.random() * aiPlayer.hand.length));
+        }
+        const uniqueAiIndices = [...new Set(aiIndices)];
+        gameState.performMulligan(1, uniqueAiIndices);
+        console.log(`[Mulligan] AI 替換了 ${uniqueAiIndices.length} 張牌`);
+
+        // 兩邊都完成, 隱藏 Modal
+        mulliganPhase = false;
+        const modal = document.getElementById('mulligan-modal');
+        modal.style.display = 'none';
+
+        // ===== 抽牌動畫 (Sequential Draw Animation) =====
+        // 為了優雅地顯示決定後的手牌, 我們先清空手牌介面, 然後一張一張加回去
+        const player0 = gameState.players[0];
+        const initialHand = [...player0.hand];
+        player0.hand = []; // 暫時清空手牌數據以清空 UI
+
+        // 渲染空手牌
+        render();
+
+        // 逐張顯示手牌
+        for (const card of initialHand) {
+            await new Promise(r => setTimeout(r, 400)); // 每張牌延遲 400ms
+            player0.hand.push(card);
+            // 可以在此處加入抽牌音效
+            render();
+        }
+
+        await new Promise(r => setTimeout(r, 400)); // 最後一張牌出來後稍作停頓
+
+        // 開始第一回合 (這會觸發首回合抽牌)
+        gameState.startTurn();
+        render();
+
+        // 如果是AI先手, 觸發AI回合
+        if (gameState.currentPlayerIdx === 1) {
+            setTimeout(aiTurn, 1000);
+        }
+    } else {
+        // AI 完成 (這段理論上不會被執行到, 因為AI是自動處理)
+        mulliganPhase = false;
+        const modal = document.getElementById('mulligan-modal');
+        modal.style.display = 'none';
+        gameState.startTurn();
+        render();
+    }
+}
+
+/**
+ * 生成卡牌內部的 HTML (用於 showPreview 和 createDetailedCardEl)
+ * 確保兩者顯示完全一致
+ */
+function generateCardInnerHTML(card, currentGameState) {
+    const base = CARD_DATA.find(c => c.id === card.id) || card;
+    let statsHtml = '';
+
+    // 生成屬性 HTML
+    if (card.attack !== undefined && card.health !== undefined && card.type !== 'NEWS') {
+        const effectiveBaseAttack = card.baseAttackOverride !== undefined ? card.baseAttackOverride : base.attack;
+        const atkClass = card.attack > effectiveBaseAttack ? 'stat-buffed' : (card.attack < effectiveBaseAttack ? 'stat-damaged' : '');
+        const hpClass = (card.currentHealth !== undefined && card.currentHealth < card.health) ? 'stat-damaged' : (card.health > base.health ? 'stat-buffed' : '');
+        const hpValue = card.currentHealth !== undefined ? card.currentHealth : card.health;
+
+        // 屬性在最下方
+        statsHtml = `
+        <div class="minion-stats" style="margin-top: auto; padding: 5px 20px 10px 20px; display: flex; justify-content: space-between; width: 100%;">
+            <span class="stat-atk ${atkClass}" style="width: 70px; height: 70px; font-size: 32px;"><span>${card.attack}</span></span>
+            <span class="stat-hp ${hpClass}" style="width: 70px; height: 70px; font-size: 32px;">${hpValue}</span>
+        </div>`;
+    }
+
+    // 生成圖片 HTML
+    const artHtml = card.image ?
+        `<div class="card-art" style="width: 100%; height: 140px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 10px auto 5px auto; border: 1px solid rgba(255,255,255,0.2);"></div>` :
+        `<div class="card-art" style="width: 100%; height: 140px; background: #333; margin: 10px auto 5px auto; border-radius: 4px;"></div>`;
+
+    // 計算費用
+    let actualCost = card.cost;
+    const state = currentGameState || (typeof gameState !== 'undefined' ? gameState : null);
+
+    if (state && card.type === 'NEWS' && state.players && state.players[0]) {
+        const player = state.players[0];
+        player.board.forEach(minion => {
+            if (minion.keywords?.ongoing?.type === 'REDUCE_NEWS_COST') {
+                actualCost -= minion.keywords.ongoing.value;
+            }
+        });
+        actualCost = Math.max(0, actualCost);
+    } else if (state && typeof state.getCardActualCost === 'function') {
+        actualCost = state.getCardActualCost(card);
+    }
+
+    const baseCard = CARD_DATA.find(c => c.id === card.id) || card;
+    const isReduced = actualCost < baseCard.cost || card.isReduced;
+    const costClass = isReduced ? 'cost-reduced' : '';
+
+    // 計算 Bonus
+    const bonus = (state && card.id) ? (state.getNewsPower(card.side || 'PLAYER') || 0) : 0;
+    const isNews = card.type === 'NEWS';
+    const bcType = card.keywords?.battlecry?.type || '';
+    const isDamage = bcType.includes('DAMAGE');
+    const isHeal = bcType.includes('HEAL') || bcType.includes('RECOVER');
+    const isExcluded = bcType.includes('DRAW') || bcType.includes('COST') || bcType.includes('REDUCE');
+    const effectiveBonus = (isNews && (isDamage || isHeal) && !isExcluded) ? bonus : 0;
+
+    // 格式化描述
+    const formattedDesc = (typeof formatDesc === 'function') ?
+        formatDesc(card.description || "", effectiveBonus, isNews) :
+        (card.description || "");
+
+    return `
+        <div style="position: relative; display: flex; align-items: center; width: 100%; margin-bottom: 4px; height: 30px;">
+            <div class="card-cost ${costClass}" style="position: relative; width:24px; height:24px; font-size:13px; flex-shrink: 0; z-index: 10; transform: rotate(45deg); margin-left: 4px;"><span>${actualCost ?? 0}</span></div>
+            <div class="card-title" style="font-size:20px; position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); margin: 0; text-align: center; text-shadow: 0 0 5px black; z-index: 5;">${card.name || "未知卡片"}</div>
+        </div>
+        
+        ${artHtml}
+        
+        <div class="card-category" style="font-size:12px; padding: 1px 4px; margin-bottom: 4px; text-align:center; color:#aaa;">${card.category || ""}</div>
+        
+        <div class="card-desc" style="font-size:13px; padding: 0 8px; line-height: 1.3; height: auto; flex-grow: 1; overflow: hidden; text-align: center; white-space: pre-wrap;">${formattedDesc}</div>
+        
+        ${statsHtml ? statsHtml.replace(/margin-top: auto;/, 'margin-top: auto; display: flex;').replace(/width: 70px; height: 70px; font-size: 32px;/g, 'width: 50px; height: 50px; font-size: 24px;') : ''}
+    `;
+}
+
+/**
+ * 創建詳細卡牌元素 (用於 Mulligan 顯示) - 完整還原預覽樣式
+ */
+function createDetailedCardEl(card, index) {
+    const el = document.createElement('div');
+    const rarityClass = card.rarity ? card.rarity.toLowerCase() : 'common';
+
+    // 使用詳細卡牌樣式
+    el.className = `card detailed-card rarity-${rarityClass} ${card.type === 'NEWS' ? 'news-card' : ''}`;
+    el.dataset.index = index;
+    el.draggable = false;
+
+    // 與 showPreview 使用相同的樣式設定
+    el.style.width = '240px';
+    el.style.height = '350px';
+    el.style.transform = 'none !important';
+    el.style.display = 'flex';
+    el.style.flexDirection = 'column';
+    el.style.justifyContent = 'flex-start';
+    el.style.padding = '8px';
+    el.style.flexShrink = '0';
+
+    // 直接調用共用函數生成內容
+    // 注意: 在 Mulligan 階段, gameState 可能尚未完全初始化, 但我們盡量使用
+    el.innerHTML = generateCardInnerHTML(card, typeof gameState !== 'undefined' ? gameState : null);
+
+    return el;
+}
