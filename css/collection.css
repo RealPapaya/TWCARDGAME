@@ -208,22 +208,22 @@
 }
 
 .card-rarity.COMMON {
-    background: #6c757d;
+    background: #888888;
     color: #fff;
 }
 
 .card-rarity.RARE {
-    background: #4169e1;
+    background: #0070dd;
     color: #fff;
 }
 
 .card-rarity.EPIC {
-    background: #9370db;
+    background: #a335ee;
     color: #fff;
 }
 
 .card-rarity.LEGENDARY {
-    background: #ff4500;
+    background: #ff8000;
     color: #fff;
 }
 

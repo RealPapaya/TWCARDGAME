@@ -2319,21 +2319,17 @@ body.dragging-active .player .hand .card:hover {
 
 .card.rarity-rare {
     border-color: #0070dd;
-    box-shadow: 0 0 5px #0070dd;
+    box-shadow: 0 0 10px rgba(0, 112, 221, 0.6);
 }
 
 .card.rarity-epic {
     border-color: #a335ee;
-    box-shadow: 0 0 5px #a335ee;
+    box-shadow: 0 0 12px rgba(163, 53, 238, 0.7);
 }
 
 .card.rarity-legendary {
     border-color: #ff8000;
-    box-shadow: 0 0 8px #ff8000;
-}
-
-.card.rarity-legendary .card-title {
-    color: #ff8000;
+    box-shadow: 0 0 15px rgba(255, 128, 0, 0.8);
 }
 
 /* News Cards */
