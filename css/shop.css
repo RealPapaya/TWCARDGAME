@@ -119,9 +119,11 @@
 }
 
 .collection-entrance-btn .collection-icon {
-    font-size: 60px;
-    color: var(--wood-dark);
-    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    width: 120px;
+    height: 120px;
+    object-fit: contain;
+    filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.6));
+    transform: translateY(10px);
 }
 
 .collection-entrance-btn span:not(.collection-icon) {
