@@ -430,18 +430,18 @@
 }
 
 .reward-item.LEGENDARY {
-    border-color: #ff4500;
-    box-shadow: 0 0 20px rgba(255, 69, 0, 0.6);
+    border-color: #ff8000;
+    box-shadow: 0 0 20px rgba(255, 128, 0, 0.6);
 }
 
 .reward-item.EPIC {
-    border-color: #9370db;
-    box-shadow: 0 0 15px rgba(147, 112, 219, 0.5);
+    border-color: #a335ee;
+    box-shadow: 0 0 15px rgba(163, 53, 238, 0.5);
 }
 
 .reward-item.RARE {
-    border-color: #4169e1;
-    box-shadow: 0 0 10px rgba(65, 105, 225, 0.4);
+    border-color: #0070dd;
+    box-shadow: 0 0 10px rgba(0, 112, 221, 0.4);
 }
 
 .reward-item-name {
@@ -472,18 +472,170 @@
 }
 
 /* ===== 動畫 ===== */
-@keyframes pack-shake {
+/* ===== 互動式開包動畫 ===== */
+.pack-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.75);
+    z-index: 20000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    backdrop-filter: blur(5px);
+}
 
-    0%,
+.pack-cards-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 30px;
+    width: 100%;
+    max-width: 1600px;
+    perspective: 2000px;
+    margin-bottom: 50px;
+}
+
+.pack-card-wrapper {
+    width: 210px;
+    height: 300px;
+    position: relative;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+}
+
+.pack-card-wrapper:hover {
+    transform: none;
+    /* 移除所有懸停位移與縮放 */
+}
+
+.pack-card-inner {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    text-align: center;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    transform-style: preserve-3d;
+}
+
+.pack-card-wrapper.flipped .pack-card-inner {
+    transform: rotateY(180deg);
+}
+
+.pack-card-front,
+.pack-card-back {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
+    border-radius: 15px;
+}
+
+.pack-card-back {
+    background-image: url('../assets/images/card_back.png');
+    background-size: cover;
+    background-position: center;
+    background-color: #2c3e50;
+    border-radius: 15px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transform: rotateY(0deg);
+    position: relative;
+    overflow: hidden;
+}
+
+.pack-card-front {
+    transform: rotateY(180deg);
+    background: transparent;
+    overflow: visible;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+/* 確保卡牌內容有標準尺寸並透過 scale 放大，以此維持完美內部比例 */
+.pack-card-front .card {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 140px !important;
+    height: 200px !important;
+    margin: 0 !important;
+    padding: 2px !important;
+    /* 強制居中並放大 1.5 倍，確保零位移 */
+    transform: translate(-50%, -50%) scale(1.5) !important;
+    transform-origin: center center !important;
+    flex-shrink: 0;
+    pointer-events: none;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+
+/* 翻開後的稀有度光暈 - 改為套用在縮放後的卡牌上 */
+.pack-card-wrapper.flipped.COMMON .pack-card-front .card {
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.3), 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.pack-card-wrapper.flipped.RARE .pack-card-front .card {
+    box-shadow: 0 0 30px rgba(0, 112, 221, 0.8), 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 2px solid #0070dd;
+}
+
+.pack-card-wrapper.flipped.EPIC .pack-card-front .card {
+    box-shadow: 0 0 40px rgba(163, 53, 238, 0.9), 0 10px 30px rgba(0, 0, 0, 0.5);
+    border: 2px solid #a335ee;
+}
+
+.pack-card-wrapper.flipped.LEGENDARY .pack-card-front .card {
+    border: 3px solid #ff8000;
+    /* 使用用戶指定的橘色邊框 */
+    animation: legendary-pulse 1.2s infinite alternate ease-in-out;
+}
+
+@keyframes legendary-pulse {
+    0% {
+        box-shadow: 0 0 30px rgba(255, 128, 0, 0.6), 0 10px 30px rgba(0, 0, 0, 0.5);
+        filter: brightness(1);
+    }
+
     100% {
-        transform: translateX(0) rotate(0deg);
+        box-shadow: 0 0 120px rgba(255, 128, 0, 1), 0 0 40px rgba(255, 165, 0, 0.8), 0 10px 30px rgba(0, 0, 0, 0.5);
+        filter: brightness(1.2);
     }
+}
 
-    25% {
-        transform: translateX(-10px) rotate(-5deg);
-    }
+#btn-pack-done {
+    background: linear-gradient(to bottom, var(--gold), #b8860b);
+    border: 3px solid var(--wood-dark);
+    border-radius: 12px;
+    padding: 15px 60px;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--wood-dark);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.5);
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+}
 
-    75% {
-        transform: translateX(10px) rotate(5deg);
-    }
+#btn-pack-done.visible {
+    opacity: 1;
+    transform: translateY(0);
+    pointer-events: all;
+}
+
+#btn-pack-done:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 30px rgba(255, 215, 0, 0.6);
 }

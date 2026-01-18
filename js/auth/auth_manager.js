@@ -34,10 +34,12 @@ const AuthManager = {
             if (!response.ok) throw new Error(`HTTP 錯誤! 狀態碼: ${response.status}`);
 
             const result = await response.json();
+            console.log("註冊回應內容:", result);
             return result;
         } catch (error) {
             console.error("Register Fetch Error:", error);
-            return { success: false, message: "連線失敗，請檢查網路或 API 設定" };
+            // 檢查是否為 CORS 或是 404 等問題
+            return { success: false, message: "連線失敗，請確認 API URL 是否正確，且 GAS 已部署為「所有人」皆可存取的網頁應用程式。" };
         }
     },
 

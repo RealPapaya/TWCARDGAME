@@ -29,8 +29,9 @@ const PackOpener = {
      */
     openCardPack(count) {
         const cards = this.generateRandomCards(count);
-        this.showPackAnimation('card', cards);
         this.addCardsToCollection(cards);
+        // 使新的互動式開包動畫
+        this.showInteractivePackOpening(cards);
     },
 
     /**
@@ -72,12 +73,102 @@ const PackOpener = {
     },
 
     /**
-     * 開啟酷炫包
+     * 互動式開包動畫 (Hearthstone Style)
+     */
+    showInteractivePackOpening(cards) {
+        // 創建全螢幕遮罩
+        const overlay = document.createElement('div');
+        overlay.className = 'pack-overlay';
+        overlay.id = 'pack-opening-overlay';
+
+        // 卡牌容器
+        const container = document.createElement('div');
+        container.className = 'pack-cards-container';
+
+        let flippedCount = 0;
+        const totalCards = cards.length;
+
+        // 完成按鈕
+        const doneBtn = document.createElement('button');
+        doneBtn.id = 'btn-pack-done';
+        doneBtn.textContent = '完成';
+        doneBtn.onclick = () => {
+            document.body.removeChild(overlay);
+        };
+
+        // 創建每張卡牌
+        cards.forEach((card, index) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = `pack-card-wrapper ${card.rarity}`;
+
+            // 錯開初始動畫時間
+            wrapper.style.animation = `deal-card 0.5s ease-out ${index * 0.1}s backwards`;
+
+            const inner = document.createElement('div');
+            inner.className = 'pack-card-inner';
+
+            // 背面
+            const back = document.createElement('div');
+            back.className = 'pack-card-back';
+
+            // 正面 (使用 CardRenderer)
+            const front = document.createElement('div');
+            front.className = 'pack-card-front';
+
+            // 使用 CardRenderer 生成卡牌 HTML
+            // 注意：CardRenderer 可能生成的是字串或元素，這裡假設是 HTML 字串，如果沒有 CardRenderer 則手動生成
+            if (window.CardRenderer) {
+                front.innerHTML = window.CardRenderer.createHTML(card);
+            } else {
+                front.innerHTML = `<div class="card-name">${card.name}</div>`;
+            }
+
+            inner.appendChild(back);
+            inner.appendChild(front);
+            wrapper.appendChild(inner);
+
+            // 翻牌點擊事件
+            wrapper.addEventListener('click', () => {
+                if (wrapper.classList.contains('flipped')) return;
+
+                wrapper.classList.add('flipped');
+                // 播放翻牌音效 (如果有的話)
+                // AudioController.play('card_flip'); 
+
+                flippedCount++;
+                if (flippedCount === totalCards) {
+                    doneBtn.classList.add('visible');
+                }
+            });
+
+            container.appendChild(wrapper);
+        });
+
+        overlay.appendChild(container);
+        overlay.appendChild(doneBtn);
+        document.body.appendChild(overlay);
+
+        // 添加發牌動畫 keyframes (如果 CSS 中沒有)
+        if (!document.getElementById('pack-keyframes')) {
+            const style = document.createElement('style');
+            style.id = 'pack-keyframes';
+            style.textContent = `
+                @keyframes deal-card {
+                    from { opacity: 0; transform: translateY(-100vh) rotate(180deg); }
+                    to { opacity: 1; transform: translateY(0) rotate(0); }
+                }
+            `;
+            document.head.appendChild(style);
+        }
+    },
+
+    /**
+     * 開啟酷炫包 (維持舊版動畫或簡單顯示)
      */
     openCosmeticPack(count) {
         const items = this.generateRandomCosmetics(count);
-        this.showPackAnimation('cosmetic', items);
         this.unlockCosmetics(items);
+        this.showPackAnimation('cosmetic', items); // 酷炫包暫時維持舊動畫，或需要另外實作
     },
 
     /**
@@ -114,10 +205,15 @@ const PackOpener = {
     },
 
     /**
-     * 顯示開包動畫與獎勵
+     * 顯示開包動畫與獎勵 (酷炫包用)
      */
     showPackAnimation(packType, rewards) {
         const modal = document.getElementById('pack-opening-modal');
+        if (!modal) {
+            console.warn('pack-opening-modal not found');
+            return;
+        }
+
         const animation = document.getElementById('pack-animation');
         const rewardsContainer = document.getElementById('pack-rewards');
 
@@ -126,7 +222,6 @@ const PackOpener = {
 
         // 簡單的開包動畫
         animation.innerHTML = packType === 'card' ? '🎴' : '✨';
-        animation.style.animation = 'pack-shake 0.5s ease-in-out 3';
 
         // 等待動畫完成後顯示獎勵
         setTimeout(() => {
