@@ -556,6 +556,54 @@ function init() {
         });
     }
 
+    // SFX Volume Slider Control
+    const sfxVolumeSlider = document.getElementById('sfx-volume-slider');
+    const sfxVolumeValue = document.getElementById('sfx-volume-value');
+    const sfxMuteBtn = document.getElementById('sfx-mute-btn');
+
+    if (sfxVolumeSlider && sfxVolumeValue && audioManager) {
+        // Initialize slider with saved volume
+        const savedSFXVolume = audioManager.getSFXVolume() * 100;
+        sfxVolumeSlider.value = savedSFXVolume;
+        sfxVolumeValue.textContent = Math.round(savedSFXVolume) + '%';
+
+        sfxVolumeSlider.addEventListener('input', (e) => {
+            const volume = e.target.value / 100;
+            audioManager.setSFXVolume(volume);
+            sfxVolumeValue.textContent = e.target.value + '%';
+
+            // Update mute button icon
+            if (sfxMuteBtn) {
+                sfxMuteBtn.textContent = volume === 0 ? '🔇' : '🔊';
+            }
+        });
+    }
+
+    // SFX Mute Button Control
+    if (sfxMuteBtn && audioManager) {
+        sfxMuteBtn.addEventListener('click', () => {
+            const currentVolume = audioManager.getSFXVolume();
+            if (currentVolume > 0) {
+                sfxMuteBtn.dataset.previousVolume = currentVolume;
+                audioManager.setSFXVolume(0);
+                sfxMuteBtn.textContent = '🔇';
+                if (sfxVolumeSlider && sfxVolumeValue) {
+                    sfxVolumeSlider.value = 0;
+                    sfxVolumeValue.textContent = '0%';
+                }
+            } else {
+                const restoreVolume = parseFloat(sfxMuteBtn.dataset.previousVolume) || 0.5;
+                audioManager.setSFXVolume(restoreVolume);
+                sfxMuteBtn.textContent = '🔊';
+                if (sfxVolumeSlider && sfxVolumeValue) {
+                    const vol = restoreVolume * 100;
+                    sfxVolumeSlider.value = vol;
+                    sfxVolumeValue.textContent = Math.round(vol) + '%';
+                }
+            }
+        });
+    }
+
     console.log("Game initialized.");
 }
 
@@ -4284,6 +4332,11 @@ function animateCardFromDeck(cardObj, initialCardEl) {
 
     // Track this card as animating
     animatingDrawCards.add(cardObj);
+
+    // Play card draw sound effect (only for player)
+    if (window.audioManager) {
+        audioManager.playSFX('assets/audio/sfx/card-draw.mp3');
+    }
 
     // Initial hide of the destination element if it exists
     if (initialCardEl) initialCardEl.style.opacity = '0';

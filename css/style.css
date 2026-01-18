@@ -5152,7 +5152,8 @@ body.dragging-active .player .hand .card:hover {
     gap: 10px;
 }
 
-#volume-slider {
+#volume-slider,
+#sfx-volume-slider {
     flex: 1;
     height: 6px;
     border-radius: 3px;
@@ -5162,7 +5163,8 @@ body.dragging-active .player .hand .card:hover {
     -webkit-appearance: none;
 }
 
-#volume-slider::-webkit-slider-thumb {
+#volume-slider::-webkit-slider-thumb,
+#sfx-volume-slider::-webkit-slider-thumb {
     appearance: none;
     -webkit-appearance: none;
     appearance: none;
@@ -5174,7 +5176,8 @@ body.dragging-active .player .hand .card:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-#volume-slider::-moz-range-thumb {
+#volume-slider::-moz-range-thumb,
+#sfx-volume-slider::-moz-range-thumb {
     width: 16px;
     height: 16px;
     border-radius: 50%;
@@ -5184,7 +5187,8 @@ body.dragging-active .player .hand .card:hover {
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
-#volume-value {
+#volume-value,
+#sfx-volume-value {
     font-family: 'Noto Serif TC', serif;
     color: #5d2e17;
     font-size: 13px;

@@ -22,6 +22,11 @@ document.addEventListener('click', function (e) {
     const x = e.clientX;
     const y = e.clientY;
 
+    // 播放點擊音效
+    if (window.audioManager) {
+        audioManager.playSFX('assets/audio/sfx/heavy_sandstone_click.mp3');
+    }
+
     // 產生 8-12 個微粒 (增加數量以形成"一團"的感覺)
     const count = 15 + Math.floor(Math.random() * 5);
 

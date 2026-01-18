@@ -100,7 +100,7 @@ class AudioManager {
     }
 
     /**
-     * 播放音效 (預留給未來使用)
+     * 播放音效
      * @param {string} path - 音效檔案路徑
      */
     playSFX(path) {
@@ -109,6 +109,23 @@ class AudioManager {
         sfx.play().catch(err => {
             console.warn('[AudioManager] 無法播放音效:', err);
         });
+    }
+
+    /**
+     * 設定音效音量
+     * @param {number} value - 音量 (0-1)
+     */
+    setSFXVolume(value) {
+        this.sfxVolume = Math.max(0, Math.min(1, value));
+        localStorage.setItem('sfxVolume', this.sfxVolume);
+    }
+
+    /**
+     * 獲取當前音效音量
+     * @returns {number} 音量 (0-1)
+     */
+    getSFXVolume() {
+        return this.sfxVolume;
     }
 }
 
