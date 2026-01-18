@@ -23,7 +23,7 @@ const ShopManager = {
     /**
      * 購買商品
      */
-    buyProduct(productId) {
+    async buyProduct(productId) {
         const product = this.products[productId];
         const user = AuthManager.currentUser;
 
@@ -41,7 +41,7 @@ const ShopManager = {
         // 扣除金幣
         user.gold -= product.price;
         this.updateGoldDisplay();
-        AuthManager.saveData();
+        await AuthManager.saveData(); // 確保金幣扣除已真正存檔
 
         // 開包
         PackOpener.open(product);

@@ -13,6 +13,8 @@ const AuthManager = {
     API_URL: "https://script.google.com/macros/s/AKfycbxgyK3pOaHPtWkHaw1oIbc-RRM-rUiZKyMbOul6mgDNV9ELd9spyMB11kmq7j8NTY6R6A/exec",
 
     currentUser: null,
+    isSaving: false,
+    saveQueue: [],
 
     /**
      * 註冊新帳號
@@ -21,7 +23,7 @@ const AuthManager = {
         if (!this.API_URL) return { success: false, message: "API URL 未設定" };
 
         try {
-            const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&_t=${Date.now()}`;
             console.log("正在嘗試註冊:", username);
 
             const response = await fetch(url, {
@@ -50,7 +52,7 @@ const AuthManager = {
         if (!this.API_URL) return { success: false, message: "API URL 未設定" };
 
         try {
-            const url = `${this.API_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}`;
+            const url = `${this.API_URL}?action=login&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&_t=${Date.now()}`;
             console.log("正在嘗試登入:", username);
 
             const response = await fetch(url, {
@@ -65,42 +67,16 @@ const AuthManager = {
             const result = await response.json();
 
             if (result.success) {
-                this.currentUser = result.data;
-                // 處理可能為 null 或字串的 deck_data
-                if (typeof result.data.deck_data === 'string') {
-                    try {
-                        this.currentUser.deck_data = JSON.parse(result.data.deck_data || "[]");
-                    } catch (e) {
-                        this.currentUser.deck_data = [];
-                    }
-                }
-                // 處理 stats
-                if (typeof result.data.stats === 'string') {
-                    try {
-                        this.currentUser.stats = JSON.parse(result.data.stats || "{}");
-                    } catch (e) {
-                        this.currentUser.stats = {};
-                    }
+                // [修正] 比對時間戳，防止雲端舊資料覆寫本地新資料
+                const cloudLastSaved = parseInt(result.data.lastsaved || 0);
+                const localUser = this.checkAuth();
+                const localLastSaved = localUser ? parseInt(localUser.lastsaved || 0) : 0;
+
+                if (localUser && localLastSaved > cloudLastSaved) {
+                    console.warn(`[Auth] 雲端資料較舊 (${cloudLastSaved})，已保留本地最新狀態 (${localLastSaved})`);
+                    this.currentUser = localUser;
                 } else {
-                    this.currentUser.stats = result.data.stats || {};
-                }
-
-                // 設定金幣 (如果是新帳號或沒有值，預設給 100)
-                if (this.currentUser.gold === undefined || this.currentUser.gold === null) {
-                    this.currentUser.gold = 100;
-                }
-
-                // 初始化卡牌收藏 (如果是新帳號或沒有卡牌)
-                if (!this.currentUser.ownedCards || Object.keys(this.currentUser.ownedCards).length === 0) {
-                    this.currentUser.ownedCards = this.generateStarterCollection();
-                    this.saveData(); // 立刻同步到雲端
-                } else if (typeof this.currentUser.ownedCards === 'string') {
-                    // 處理從雲端讀取的 JSON 字串
-                    try {
-                        this.currentUser.ownedCards = JSON.parse(this.currentUser.ownedCards);
-                    } catch (e) {
-                        this.currentUser.ownedCards = this.generateStarterCollection();
-                    }
+                    this.currentUser = this.parseUserData(result.data);
                 }
 
                 localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
@@ -120,13 +96,30 @@ const AuthManager = {
     async saveData() {
         if (!this.currentUser || !this.API_URL) return;
 
+        // [關鍵修復] 如果正在存檔，回傳一個 Promise 讓呼叫者能真正 await 排隊的結果
+        if (this.isSaving) {
+            console.log("[Auth] 正在存檔中，將此請求排入序列等待...");
+            return new Promise(resolve => {
+                this.saveQueue.push(resolve);
+            });
+        }
+
+        this.isSaving = true;
+
         try {
-            // POST 由於 GAS 的重定向機制，使用 no-cors 雖然看不到回傳，但能確保資料送達
+            // [關鍵] 更新時間戳，讓系統知道這是最新的版本
+            this.currentUser.lastsaved = Date.now();
+
+            // 同步更新本地儲存
+            localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+
+            // [關鍵] 使用 keepalive 確保 F5 時請求仍能完成
             await fetch(this.API_URL, {
                 method: "POST",
                 mode: "no-cors",
+                keepalive: true,
                 headers: {
-                    "Content-Type": "text/plain", // 避免 OPTIONS 預檢請求
+                    "Content-Type": "text/plain",
                 },
                 body: JSON.stringify({
                     action: "update",
@@ -134,15 +127,26 @@ const AuthManager = {
                     level: this.currentUser.level,
                     gold: this.currentUser.gold,
                     deck_data: JSON.stringify(this.currentUser.deck_data),
-                    selectedAvatar: this.currentUser.selectedAvatar,
-                    selectedTitle: this.currentUser.selectedTitle,
+                    selectedavatar: this.currentUser.selectedAvatar,
+                    selectedtitle: this.currentUser.selectedTitle,
                     stats: JSON.stringify(this.currentUser.stats || {}),
-                    ownedCards: JSON.stringify(this.currentUser.ownedCards || {})
+                    ownedcards: JSON.stringify(this.currentUser.ownedCards || {}),
+                    lastsaved: this.currentUser.lastsaved
                 })
             });
-            console.log("資料已同步至雲端");
+            console.log(`資料已同步至本地與雲端 (${this.currentUser.lastsaved})`);
         } catch (error) {
             console.error("Save Error:", error);
+        } finally {
+            this.isSaving = false;
+            // 如果佇列中有待處理的存檔，執行一次最新的即可
+            if (this.saveQueue.length > 0) {
+                const resolvers = [...this.saveQueue];
+                this.saveQueue = [];
+                console.log("[Auth] 執行佇列中的最新存檔請求...");
+                const result = await this.saveData();
+                resolvers.forEach(resolve => resolve(result));
+            }
         }
     },
 
@@ -155,16 +159,57 @@ const AuthManager = {
         const savedUser = localStorage.getItem("tw_card_game_user");
         if (savedUser) {
             try {
-                this.currentUser = JSON.parse(savedUser);
-                if (this.currentUser.gold === undefined) {
-                    this.currentUser.gold = 100;
-                }
-                return this.currentUser;
+                const user = JSON.parse(savedUser);
+                this.currentUser = user;
+                return user;
             } catch (e) {
                 return null;
             }
         }
         return null;
+    },
+
+    /**
+     * 解析從雲端讀取的原始資料 (確保格式一致)
+     */
+    parseUserData(rawData) {
+        // [重要] 將 GAS 回傳的所有小寫鍵名對應回前端預期的名稱
+        const user = {
+            username: rawData.username,
+            password: rawData.password,
+            level: parseInt(rawData.level || 1),
+            gold: parseInt(rawData.gold || 100),
+            deck_data: rawData.deck_data || rawData.deck_data,
+            selectedAvatar: rawData.selectedavatar || rawData.selectedAvatar || "avatar1",
+            selectedTitle: rawData.selectedtitle || rawData.selectedTitle || "新手玩家",
+            stats: rawData.stats || "{}",
+            ownedCards: rawData.ownedcards || rawData.ownedCards || "{}",
+            lastsaved: parseInt(rawData.lastsaved || 0)
+        };
+
+        // 處理 deck_data
+        if (typeof user.deck_data === 'string') {
+            try { user.deck_data = JSON.parse(user.deck_data || "[]"); }
+            catch (e) { user.deck_data = []; }
+        }
+
+        // 處理 stats
+        if (typeof user.stats === 'string') {
+            try { user.stats = JSON.parse(user.stats || "{}"); }
+            catch (e) { user.stats = {}; }
+        }
+
+        // 處理 ownedCards
+        if (typeof user.ownedCards === 'string') {
+            try { user.ownedCards = JSON.parse(user.ownedCards || "{}"); }
+            catch (e) { user.ownedCards = this.generateStarterCollection(); }
+        }
+
+        // 確保基本數值存在
+        if (user.gold === undefined || user.gold === null) user.gold = 100;
+        if (user.level === undefined || user.level === null) user.level = 1;
+
+        return user;
     },
 
     /**
@@ -208,4 +253,3 @@ const AuthManager = {
 
 // 為了方便 Debug，掛載到 window
 window.AuthManager = AuthManager;
-// 123

@@ -16,20 +16,20 @@ const PackOpener = {
     /**
      * 開包主函數
      */
-    open(product) {
+    async open(product) {
         if (product.type === 'CARDS') {
-            this.openCardPack(product.rewards.cardCount);
+            await this.openCardPack(product.rewards.cardCount);
         } else if (product.type === 'COSMETICS') {
-            this.openCosmeticPack(product.rewards.itemCount);
+            await this.openCosmeticPack(product.rewards.itemCount);
         }
     },
 
     /**
      * 開啟卡牌包
      */
-    openCardPack(count) {
+    async openCardPack(count) {
         const cards = this.generateRandomCards(count);
-        this.addCardsToCollection(cards);
+        await this.addCardsToCollection(cards);
         // 使新的互動式開包動畫
         this.showInteractivePackOpening(cards);
     },
@@ -257,7 +257,7 @@ const PackOpener = {
     /**
      * 將卡牌加入玩家收藏
      */
-    addCardsToCollection(cards) {
+    async addCardsToCollection(cards) {
         const user = AuthManager.currentUser;
         if (!user) return;
 
@@ -272,7 +272,7 @@ const PackOpener = {
             user.ownedCards[card.id]++;
         });
 
-        AuthManager.saveData();
+        await AuthManager.saveData();
     },
 
     /**

@@ -57,13 +57,9 @@ let gameState;
 
 let cardDB = [];
 
-// Load cards manually (modified for local file access)
-// Game state for deck builder
-let userDecks = JSON.parse(localStorage.getItem('userDecks')) || [
-    { name: "預設牌組 1", cards: [] },
-    { name: "預設牌組 2", cards: [] },
-    { name: "預設牌組 3", cards: [] }
-];
+// [修正] 不再直接從 localStorage 讀取 userDecks，而是等 AuthManager 初始化後從 currentUser 讀取
+let userDecks = [];
+
 let tempDeck = null; // Temporary deck for editing
 
 // 可用稱號列表
@@ -441,14 +437,12 @@ function init() {
             // Saving player deck
             tempDeck.name = nameInput.value || `牌組 ${editingDeckIdx + 1}`;
             userDecks[editingDeckIdx] = JSON.parse(JSON.stringify(tempDeck));
-            localStorage.setItem('userDecks', JSON.stringify(userDecks));
-            showToast("保存成功！");
-
-            // 同步至雲端
+            // 同步至本地與雲端
             if (AuthManager.currentUser) {
                 AuthManager.currentUser.deck_data = userDecks;
                 AuthManager.saveData();
             }
+            showToast("保存成功！");
         }
         renderDeckBuilder();
     });
@@ -911,20 +905,23 @@ window.App = {
 };
 
 function onUserLogin(user) {
+    // [重要] 解析資料確保 JSON 欄位正確 (例如 deck_data, ownedCards)
+    const processedUser = AuthManager.parseUserData(user);
+    AuthManager.currentUser = processedUser;
+
     // Load deck data from cloud if available
-    if (user.deck_data && user.deck_data.length > 0) {
-        userDecks = user.deck_data;
+    if (processedUser.deck_data && processedUser.deck_data.length > 0) {
+        userDecks = processedUser.deck_data;
     } else {
-        // New user - start with empty array (no default decks)
         userDecks = [];
     }
+
+    // 更新本地快取，確保兩邊一致
+    localStorage.setItem('tw_card_game_user', JSON.stringify(processedUser));
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
-    // Update other stats if we add level/gold UI later
     showView('main-menu');
-    showToast(`歡迎回來，${user.username}！`);
-
-    // 更新玩家資訊顯示
+    showToast(`歡迎回來，${processedUser.username}！`);
     updatePlayerInfo();
 }
 
@@ -1029,9 +1026,8 @@ function showTitleSelectionModal() {
 function selectPlayerTitle(title) {
     if (AuthManager.currentUser) {
         AuthManager.currentUser.selectedTitle = title;
-        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
         updatePlayerInfo();
-        AuthManager.saveData(); // Sync to cloud
+        AuthManager.saveData(); // 現在此方法會同時更新 LocalStorage 與雲端
         showToast(`稱號已更換為：#${title}`);
     }
 }
@@ -1072,16 +1068,9 @@ function showAvatarSelectionModal() {
 function selectPlayerAvatar(avatarId) {
     if (AuthManager.currentUser) {
         AuthManager.currentUser.selectedAvatar = avatarId;
-        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
-
-        // 同時更新 playerInfo,確保戰場內的頭像也會同步
-        const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
-        playerInfo.selectedAvatar = avatarId;
-        localStorage.setItem('playerInfo', JSON.stringify(playerInfo));
-
         updatePlayerInfo();
-        updateProfilePage(); // 同時更新個人頁面
-        AuthManager.saveData(); // Sync to cloud
+        updateProfilePage();
+        AuthManager.saveData();
         showToast('頭像已更換');
     }
 }
@@ -1092,9 +1081,9 @@ function selectPlayerAvatar(avatarId) {
 function selectPlayerTitle(title) {
     if (AuthManager.currentUser) {
         AuthManager.currentUser.selectedTitle = title;
-        localStorage.setItem('tw_card_game_user', JSON.stringify(AuthManager.currentUser));
         updatePlayerInfo();
-        updateProfilePage(); // 同時更新個人頁面
+        updateProfilePage();
+        AuthManager.saveData();
         showToast(`稱號已更換為：#${title}`);
     }
 }
@@ -1309,7 +1298,6 @@ function renderProfileDeckList() {
                 if (confirmed) {
                     userDecks.splice(idx, 1);
                     if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
-                    localStorage.setItem('userDecks', JSON.stringify(userDecks));
                     if (AuthManager.currentUser) {
                         AuthManager.currentUser.deck_data = userDecks;
                         AuthManager.saveData();
@@ -1460,17 +1448,12 @@ function addNewPlayerDeck(themeCards = null) {
     console.log('[DECK] 牌組已加入陣列，新數量:', userDecks.length);
     console.log('[DECK] 選中索引:', selectedDeckIdx);
 
-    // 保存到 localStorage
-    localStorage.setItem('userDecks', JSON.stringify(userDecks));
-    localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-    console.log('[DECK] ✓ 已保存到 localStorage');
-
-    // 同步到雲端
+    // 同步到本地與雲端
     if (AuthManager.currentUser) {
         console.log('[DECK] 當前用戶:', AuthManager.currentUser.username);
         AuthManager.currentUser.deck_data = userDecks;
         AuthManager.saveData();
-        console.log('[DECK] ✓ 已同步到雲端資料庫');
+        console.log('[DECK] ✓ 已同步到本地與雲端資料庫');
     } else {
         console.warn('[DECK] ⚠ 未登入，無法同步到雲端');
     }
@@ -1710,9 +1693,7 @@ function renderDeckSelect() {
             if (confirmed) {
                 userDecks.splice(deck.originalIdx, 1);
                 if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
-                localStorage.setItem('userDecks', JSON.stringify(userDecks));
-
-                // 同步至雲端
+                // 同步至本地與雲端
                 if (AuthManager.currentUser) {
                     AuthManager.currentUser.deck_data = userDecks;
                     AuthManager.saveData();
@@ -1773,9 +1754,7 @@ function addNewPlayerDeck(cardIds = null, themeName = null, isTestDeck = false) 
     userDecks.push(newDeck);
     console.log('[DECK] 牌組已加入，新數量:', userDecks.length);
 
-    localStorage.setItem('userDecks', JSON.stringify(userDecks));
-
-    // 同步至雲端
+    // 同步至本地與雲端
     if (AuthManager.currentUser) {
         console.log('[DECK] 同步到雲端:', AuthManager.currentUser.username);
         AuthManager.currentUser.deck_data = userDecks;
@@ -5574,9 +5553,19 @@ document.addEventListener('DOMContentLoaded', () => {
     init(); // Initialize listeners and engine
 
     // Check Auth
-    const user = AuthManager.checkAuth();
-    if (user) {
-        onUserLogin(user);
+    const cachedUser = AuthManager.checkAuth();
+    if (cachedUser && cachedUser.username && cachedUser.password) {
+        // [靜默登入] 雖然有快取，但還是去背景抓一次最新資料覆蓋
+        console.log('[Auth] 偵測到登入狀態，執行靜默同步...');
+        AuthManager.login(cachedUser.username, cachedUser.password).then(result => {
+            if (result.success) {
+                onUserLogin(result.user);
+                console.log('[Auth] 雲端同步完成');
+            } else {
+                // 如果密碼被改了或 API 故障，則退回登入介面
+                showView('auth-view');
+            }
+        });
     } else {
         showView('auth-view');
     }
@@ -5872,3 +5861,13 @@ function createDetailedCardEl(card, index) {
 
     return el;
 }
+
+// ===== 離開頁面保護 =====
+window.addEventListener('beforeunload', (e) => {
+    if (window.AuthManager && AuthManager.isSaving) {
+        // 標準做法：設定 returnValue 以觸發瀏覽器對話框
+        e.preventDefault();
+        e.returnValue = '資料正在儲存中，確定要離開嗎？';
+        return e.returnValue;
+    }
+});
