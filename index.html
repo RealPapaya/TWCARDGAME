@@ -17,6 +17,7 @@
     <link rel="stylesheet" href="css/player_info.css">
     <link rel="stylesheet" href="css/selection_modals.css">
     <link rel="stylesheet" href="css/profile_page.css">
+    <link rel="stylesheet" href="css/shop.css">
     <link rel="stylesheet" href="css/style_mulligan.css">
     <script src="js/data/card_data.js"></script>
     <script src="js/data/default_decks.js"></script>
@@ -25,6 +26,9 @@
     <script src="js/data/ui_translations.js"></script>
     <script src="js/auth/auth_manager.js"></script>
     <script src="js/auth/auth_ui.js" defer></script>
+    <script src="js/shop/shop_manager.js"></script>
+    <script src="js/shop/pack_opener.js"></script>
+    <script src="js/shop/shop_events.js" defer></script>
     <script src="js/audio/audio_manager.js"></script>
     <script src="js/ui/app.js?v=1.1" defer></script>
     <script src="js/ui/clouds.js" defer></script>
@@ -85,6 +89,13 @@
                             Mode)</button>
                     </div>
                 </div>
+
+                <!-- 商店入口按鈕 (右下角) -->
+                <button id="btn-shop" class="shop-entrance-btn">
+                    <span class="shop-icon">🛒</span>
+                    <span>商店</span>
+                </button>
+
                 <div class="home-footer">
                     <div class="version-info">研究用途，請勿轉載發售</div>
                     <button id="btn-update-log" class="update-log-btn neon-button secondary"
@@ -167,6 +178,11 @@
                                     加入時間：2026-01-01
                                 </div>
                             </div>
+
+                            <div class="profile-gold-display" title="持有金幣">
+                                <img class="gold-icon" src="assets/images/ui/gold_coin.png" alt="Gold">
+                                <span id="profile-gold-amount">100</span>
+                            </div>
                         </div>
 
                         <!-- 分隔線 -->
@@ -214,6 +230,57 @@
                             </div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- 商店視圖 -->
+            <div id="shop-view" class="view" style="display: none;">
+                <div class="shop-container">
+                    <!-- 商店標題欄 -->
+                    <div class="shop-header">
+                        <button id="btn-shop-back" class="back-button">← 返回</button>
+                        <h1 class="shop-title">商店</h1>
+                        <div class="shop-gold-display">
+                            <img class="gold-icon" src="assets/images/ui/gold_coin.png" alt="Gold">
+                            <span id="shop-gold-amount">100</span>
+                        </div>
+                    </div>
+
+                    <!-- 商品展示區 -->
+                    <div class="shop-products">
+                        <!-- 卡牌包 -->
+                        <div class="product-card" data-product="card-pack" data-price="100">
+                            <div class="product-image">🎴</div>
+                            <h3>卡牌包</h3>
+                            <p class="product-desc">包含 5 張隨機卡牌</p>
+                            <div class="product-price">
+                                <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
+                                <span>100</span>
+                            </div>
+                            <button class="btn-buy">購買</button>
+                        </div>
+
+                        <!-- 酷炫包 -->
+                        <div class="product-card" data-product="cosmetic-pack" data-price="150">
+                            <div class="product-image">✨</div>
+                            <h3>酷炫包</h3>
+                            <p class="product-desc">隨機獲得頭像或稱號</p>
+                            <div class="product-price">
+                                <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
+                                <span>150</span>
+                            </div>
+                            <button class="btn-buy">購買</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 開包 Modal -->
+            <div id="pack-opening-modal" class="modal" style="display: none;">
+                <div class="pack-opening-content">
+                    <div id="pack-animation">🎴</div>
+                    <div id="pack-rewards"></div>
+                    <button id="btn-close-pack" class="neon-button">確定</button>
                 </div>
             </div>
 

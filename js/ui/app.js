@@ -1144,6 +1144,12 @@ function updateProfilePage() {
     const title = user.selectedTitle || '玩家稱號';
     if (titleEl) titleEl.textContent = `#${title} ✏️`;
 
+    // 更新金幣
+    const goldEl = document.getElementById('profile-gold-amount');
+    if (goldEl) {
+        goldEl.textContent = user.gold !== undefined ? user.gold : 100;
+    }
+
     // 更新加入時間
     const joinDateEl = document.getElementById('profile-join-date');
     if (joinDateEl) {

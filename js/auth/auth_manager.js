@@ -82,6 +82,11 @@ const AuthManager = {
                 } else {
                     this.currentUser.stats = result.data.stats || {};
                 }
+
+                // 設定金幣 (如果是新帳號或沒有值，預設給 100)
+                if (this.currentUser.gold === undefined || this.currentUser.gold === null) {
+                    this.currentUser.gold = 100;
+                }
                 localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
                 return { success: true, user: this.currentUser };
             } else {
@@ -134,6 +139,9 @@ const AuthManager = {
         if (savedUser) {
             try {
                 this.currentUser = JSON.parse(savedUser);
+                if (this.currentUser.gold === undefined) {
+                    this.currentUser.gold = 100;
+                }
                 return this.currentUser;
             } catch (e) {
                 return null;
