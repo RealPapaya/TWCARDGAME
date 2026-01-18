@@ -27,7 +27,7 @@ document.addEventListener('click', function (e) {
 
     for (let i = 0; i < count; i++) {
         const p = document.createElement('div');
-        p.className = 'dust-particle';
+        p.className = 'click-dust-particle';
 
         // 設定初始位置 (微調偏移量，讓特效出現在滑鼠尖端右下方一點)
         p.style.left = (x + 10) + 'px';

@@ -48,6 +48,9 @@ TWCARDGAME/
 ├── utils/                   # 工具函數
 │   └── helpers.js          # 輔助函數
 ├── assets/                  # 資源文件
+│   ├── audio/              # 音效資源
+│   │   ├── bgm/            # 背景音樂
+│   │   └── sfx/            # 音效
 │   └── images/             # 圖片資源
 │       ├── avatars/        # 頭像
 │       ├── backgrounds/    # 背景圖

@@ -5098,7 +5098,7 @@ body.dragging-active .player .hand .card:hover {
 }
 
 /* Click Dust Effect */
-.dust-particle {
+.click-dust-particle {
     position: absolute;
     background: #e6dac3;
     /* 米色/灰塵色 (Beige) */
@@ -5108,10 +5108,10 @@ body.dragging-active .player .hand .card:hover {
     z-index: 100000;
     opacity: 0;
     /* Init hidden then fade in/out */
-    animation: dust-anim 0.6s ease-out forwards;
+    animation: click-dust-anim 0.6s ease-out forwards;
 }
 
-@keyframes dust-anim {
+@keyframes click-dust-anim {
     0% {
         opacity: 0.8;
         transform: translate(-50%, -50%) scale(0.5);
@@ -5127,4 +5127,86 @@ body.dragging-active .player .hand .card:hover {
         transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty) + 10px)) scale(0.8);
         /* Add slight gravity (+10px ty) */
     }
+}
+
+/* Volume Control in Settings Menu */
+.volume-control-section {
+    padding: 15px 20px;
+    border-top: 1px solid #c19a6b;
+    border-bottom: 1px solid #c19a6b;
+    margin: 5px 0;
+}
+
+.volume-label {
+    font-family: 'Noto Serif TC', serif;
+    color: #5d2e17;
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.volume-slider-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+#volume-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: linear-gradient(to right, #8b4513 0%, #c19a6b 100%);
+    outline: none;
+    cursor: pointer;
+    -webkit-appearance: none;
+}
+
+#volume-slider::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #5d2e17;
+    cursor: pointer;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#volume-slider::-moz-range-thumb {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #5d2e17;
+    cursor: pointer;
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#volume-value {
+    font-family: 'Noto Serif TC', serif;
+    color: #5d2e17;
+    font-size: 13px;
+    font-weight: 600;
+    min-width: 40px;
+    text-align: right;
+}
+
+.mute-button {
+    background: none;
+    border: none;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+    margin-right: 8px;
+    transition: transform 0.2s ease;
+}
+
+.mute-button:hover {
+    transform: scale(1.1);
+}
+
+.mute-button:active {
+    transform: scale(0.95);
 }

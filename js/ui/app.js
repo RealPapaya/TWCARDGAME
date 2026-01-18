@@ -279,6 +279,10 @@ function init() {
 
     gameEngine = new GameEngine(CARD_DATA);
 
+    // Initialize AudioManager
+    window.audioManager = new AudioManager();
+    audioManager.loadBGM('assets/audio/bgm/Earthbound Ember.mp3');
+
     // WORKAROUND: 手動添加 performMulligan 方法到 GameState.prototype
     // 因為瀏覽器快取問題可能導致舊版 game_engine.js 被載入
     if (typeof GameState !== 'undefined' && !GameState.prototype.performMulligan) {
@@ -508,6 +512,49 @@ function init() {
         document.getElementById('deck-creation-modal').style.display = 'none';
     });
 
+    // Volume Slider Control
+    const volumeSlider = document.getElementById('volume-slider');
+    const volumeValue = document.getElementById('volume-value');
+    const muteBtn = document.getElementById('mute-btn');
+
+    if (volumeSlider && volumeValue && audioManager) {
+        // Initialize slider with saved volume
+        const savedVolume = audioManager.getBGMVolume() * 100;
+        volumeSlider.value = savedVolume;
+        volumeValue.textContent = Math.round(savedVolume) + '%';
+
+        volumeSlider.addEventListener('input', (e) => {
+            const volume = e.target.value / 100;
+            audioManager.setBGMVolume(volume);
+            volumeValue.textContent = e.target.value + '%';
+
+            // Update mute button icon
+            if (muteBtn) {
+                muteBtn.textContent = volume === 0 ? '🔇' : '🔊';
+            }
+        });
+    }
+
+    // Mute Button Control
+    if (muteBtn && audioManager) {
+        muteBtn.addEventListener('click', () => {
+            audioManager.toggleMute();
+            const isMuted = audioManager.isMuted();
+            muteBtn.textContent = isMuted ? '🔇' : '🔊';
+
+            // Update slider to reflect mute state
+            if (volumeSlider && volumeValue) {
+                if (isMuted) {
+                    volumeSlider.value = 0;
+                    volumeValue.textContent = '0%';
+                } else {
+                    const currentVolume = audioManager.getBGMVolume() * 100;
+                    volumeSlider.value = currentVolume;
+                    volumeValue.textContent = Math.round(currentVolume) + '%';
+                }
+            }
+        });
+    }
 
     console.log("Game initialized.");
 }
@@ -568,6 +615,16 @@ document.addEventListener('click', (e) => {
 document.getElementById('btn-view-deck-menu').addEventListener('click', () => {
     showDeckView();
     document.getElementById('settings-menu-battle').style.display = 'none';
+});
+
+// Audio Settings button in settings menu
+document.getElementById('btn-audio-settings')?.addEventListener('click', () => {
+    document.getElementById('audio-settings-modal').style.display = 'flex';
+    document.getElementById('settings-menu-battle').style.display = 'none';
+});
+
+document.getElementById('btn-audio-close')?.addEventListener('click', () => {
+    document.getElementById('audio-settings-modal').style.display = 'none';
 });
 
 document.getElementById('btn-deck-view-close')?.addEventListener('click', () => {
@@ -1637,6 +1694,15 @@ function showView(viewId) {
     if (log) {
         log.style.display = (viewId === 'battle-view') ? 'flex' : 'none';
     }
+
+    // Control BGM based on view
+    if (audioManager) {
+        if (viewId === 'battle-view') {
+            audioManager.play();
+        } else if (currentViewId === 'battle-view' && viewId !== 'battle-view') {
+            audioManager.pause();
+        }
+    }
 }
 
 let previousPlayerHandSize = 0;
@@ -1657,6 +1723,11 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
         // Only call showView ONCE
         showView('battle-view');
+
+        // Play battle BGM
+        if (audioManager) {
+            audioManager.play();
+        }
 
         // 啟動 Mulligan Phase (起手換牌)
         showMulliganPhase();

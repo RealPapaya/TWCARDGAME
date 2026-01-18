@@ -25,6 +25,7 @@
     <script src="js/data/ui_translations.js"></script>
     <script src="js/auth/auth_manager.js"></script>
     <script src="js/auth/auth_ui.js" defer></script>
+    <script src="js/audio/audio_manager.js"></script>
     <script src="js/ui/app.js?v=1.1" defer></script>
     <script src="js/ui/click_effect.js" defer></script>
 </head>
@@ -467,6 +468,10 @@
                                 <span class="menu-icon" style="margin-right: 10px;">📋</span>
                                 <span>查看牌組</span>
                             </button>
+                            <button id="btn-audio-settings" class="settings-menu-item">
+                                <span class="menu-icon" style="margin-right: 10px;">🔊</span>
+                                <span>音效選項</span>
+                            </button>
                             <button id="btn-surrender-menu" class="settings-menu-item danger">
                                 <span class="menu-icon" style="margin-right: 10px;">🏳️</span>
                                 <span>投降</span>
@@ -638,6 +643,24 @@
             </div>
             <div class="modal-buttons">
                 <button id="btn-avatar-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 音效設定彈窗 -->
+    <div id="audio-settings-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal">
+            <h2 class="medieval-title">音效設定</h2>
+            <div class="volume-control-section">
+                <div class="volume-label">音樂音量</div>
+                <div class="volume-slider-container">
+                    <button id="mute-btn" class="mute-button" title="靜音/取消靜音">🔊</button>
+                    <input type="range" id="volume-slider" min="0" max="100" value="50">
+                    <span id="volume-value">50%</span>
+                </div>
+            </div>
+            <div class="modal-buttons">
+                <button id="btn-audio-close" class="medieval-button">確定</button>
             </div>
         </div>
     </div>
