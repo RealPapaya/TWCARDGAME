@@ -44,6 +44,24 @@
                 modal.style.display = 'none';
             });
         }
+
+        // 卡牌庫入口按鈕 (主選單)
+        const btnCollection = document.getElementById('btn-collection');
+        if (btnCollection) {
+            btnCollection.addEventListener('click', () => {
+                showView('collection-view');
+                CollectionManager.renderCollection('all');
+                CollectionManager.setupFilters();
+            });
+        }
+
+        // 圖鑑返回按鈕
+        const btnCollectionBack = document.getElementById('btn-collection-back');
+        if (btnCollectionBack) {
+            btnCollectionBack.addEventListener('click', () => {
+                showView('main-menu');
+            });
+        }
     }
 
     // 初始化

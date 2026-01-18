@@ -1,0 +1,239 @@
+/**
+ * collection.css
+ * 檔案用途: 卡牌圖鑑系統專用樣式
+ * 調用者: index.html
+ */
+
+/* ===== 卡牌圖鑑視圖 ===== */
+#collection-view {
+    background-image: url('../assets/images/backgrounds/profile_bg.jpg');
+    background-size: cover;
+    background-position: center;
+    position: relative;
+}
+
+#collection-view::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 8, 0, 0.45);
+    backdrop-filter: blur(3px);
+    z-index: 0;
+}
+
+.collection-container {
+    position: relative;
+    z-index: 1;
+    width: 1560px;
+    margin: 50px auto;
+    height: 980px;
+    display: flex;
+    flex-direction: column;
+}
+
+/* ===== 標題欄 ===== */
+.collection-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
+.collection-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 42px;
+    font-weight: 900;
+    color: #f1e4d1;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(212, 175, 55, 0.4);
+    letter-spacing: 8px;
+    margin: 0;
+    flex: 1;
+    text-align: center;
+}
+
+.collection-stats {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--gold);
+    background: rgba(0, 0, 0, 0.6);
+    border: 3px solid var(--gold);
+    border-radius: 30px;
+    padding: 8px 20px;
+    text-shadow: 2px 2px 0 #000;
+}
+
+/* ===== 篩選器 ===== */
+.collection-filters {
+    display: flex;
+    gap: 15px;
+    margin-bottom: 20px;
+    justify-content: center;
+}
+
+.filter-btn {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 10px 30px;
+    background: linear-gradient(to bottom, var(--wood-medium), var(--wood-dark));
+    border: 3px solid var(--wood-dark);
+    border-radius: 30px;
+    color: var(--text-light);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+.filter-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+}
+
+.filter-btn.active {
+    background: linear-gradient(to bottom, var(--gold), #b8860b);
+    border-color: var(--gold);
+    color: var(--wood-dark);
+    box-shadow: 0 6px 12px rgba(212, 175, 55, 0.6);
+}
+
+/* ===== 卡牌網格 ===== */
+.collection-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 60px;
+    padding: 40px;
+    flex: 1;
+    overflow-y: auto;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+}
+
+.collection-card {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 140 / 200;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    cursor: pointer;
+    transition: transform 0.3s ease;
+    /* 移除原本的卡片背景樣式，因為現在內部有真正的 .card */
+    background: transparent;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+}
+
+.collection-card:hover {
+    transform: translateY(-10px) scale(1.05);
+    z-index: 10;
+}
+
+/* 內部的真實卡牌樣式調整 */
+.collection-card .card {
+    /* 繼承 style.css 的 .card 樣式 (140x200) */
+    /* 這裡我們可以稍微放大一點以適應圖鑑 */
+    transform: scale(1.1);
+    margin: 0;
+    pointer-events: none;
+    /* 讓點擊事件穿透到 collection-card */
+}
+
+/* 已擁有狀態 (外框光暈由 .card 內部的 border 處理，這裡可以加強) */
+.collection-card.owned .card {
+    box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+}
+
+.collection-card.owned:hover .card {
+    box-shadow: 0 0 25px rgba(212, 175, 55, 0.8);
+}
+
+/* 未擁有狀態 (灰階 + 半透明) */
+.collection-card.missing .card {
+    filter: grayscale(100%);
+    opacity: 0.6;
+}
+
+.collection-card.missing:hover .card {
+    opacity: 0.8;
+}
+
+/* 卡牌數量標籤 */
+.card-count-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: #000;
+    border: 2px solid var(--gold);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--gold);
+    text-shadow: 1px 1px 0 #000;
+    z-index: 2;
+}
+
+/* 卡牌預覽 */
+.card-preview-mini {
+    text-align: center;
+    z-index: 1;
+}
+
+.card-name {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    font-weight: 900;
+    color: var(--text-light);
+    text-shadow: 2px 2px 0 #000;
+    margin-bottom: 10px;
+}
+
+.card-rarity {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 4px 12px;
+    border-radius: 20px;
+    display: inline-block;
+}
+
+.card-rarity.COMMON {
+    background: #6c757d;
+    color: #fff;
+}
+
+.card-rarity.RARE {
+    background: #4169e1;
+    color: #fff;
+}
+
+.card-rarity.EPIC {
+    background: #9370db;
+    color: #fff;
+}
+
+.card-rarity.LEGENDARY {
+    background: #ff4500;
+    color: #fff;
+}
+
+/* ===== 商店底部按鈕 ===== */
+.shop-footer {
+    margin-top: 30px;
+    text-align: center;
+}
+
+#btn-view-collection {
+    font-size: 20px;
+    padding: 15px 50px;
+}

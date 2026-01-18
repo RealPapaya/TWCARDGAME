@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="css/selection_modals.css">
     <link rel="stylesheet" href="css/profile_page.css">
     <link rel="stylesheet" href="css/shop.css">
+    <link rel="stylesheet" href="css/collection.css">
     <link rel="stylesheet" href="css/style_mulligan.css">
     <script src="js/data/card_data.js"></script>
     <script src="js/data/default_decks.js"></script>
@@ -28,8 +29,10 @@
     <script src="js/auth/auth_ui.js" defer></script>
     <script src="js/shop/shop_manager.js"></script>
     <script src="js/shop/pack_opener.js"></script>
+    <script src="js/shop/collection_manager.js"></script>
     <script src="js/shop/shop_events.js" defer></script>
     <script src="js/audio/audio_manager.js"></script>
+    <script src="js/ui/card_renderer.js"></script>
     <script src="js/ui/app.js?v=1.1" defer></script>
     <script src="js/ui/clouds.js" defer></script>
     <script src="js/ui/click_effect.js" defer></script>
@@ -92,8 +95,14 @@
 
                 <!-- 商店入口按鈕 (右下角) -->
                 <button id="btn-shop" class="shop-entrance-btn">
-                    <span class="shop-icon">🛒</span>
+                    <img src="assets/images/ui/shop_logo.png" class="shop-icon" alt="Shop">
                     <span>商店</span>
+                </button>
+
+                <!-- 卡牌庫入口按鈕 (右下角左側) -->
+                <button id="btn-collection" class="collection-entrance-btn">
+                    <span class="collection-icon">📚</span>
+                    <span>卡牌庫</span>
                 </button>
 
                 <div class="home-footer">
@@ -272,6 +281,13 @@
                             <button class="btn-buy">購買</button>
                         </div>
                     </div>
+
+                    <!-- 商店底部按鈕 -->
+                    <div class="shop-footer">
+                        <button id="btn-view-collection" class="neon-button secondary">
+                            📚 查看所有卡牌
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -281,6 +297,32 @@
                     <div id="pack-animation">🎴</div>
                     <div id="pack-rewards"></div>
                     <button id="btn-close-pack" class="neon-button">確定</button>
+                </div>
+            </div>
+
+            <!-- 卡牌圖鑑視圖 -->
+            <div id="collection-view" class="view" style="display: none;">
+                <div class="collection-container">
+                    <!-- 標題欄 -->
+                    <div class="collection-header">
+                        <button id="btn-collection-back" class="back-button">← 返回</button>
+                        <h1 class="collection-title">卡牌圖鑑</h1>
+                        <div class="collection-stats">
+                            <span id="collection-progress">0/150</span>
+                        </div>
+                    </div>
+
+                    <!-- 篩選器 -->
+                    <div class="collection-filters">
+                        <button class="filter-btn active" data-filter="all">全部</button>
+                        <button class="filter-btn" data-filter="owned">已擁有</button>
+                        <button class="filter-btn" data-filter="missing">未擁有</button>
+                    </div>
+
+                    <!-- 卡牌網格 -->
+                    <div id="collection-grid" class="collection-grid">
+                        <!-- 由 JS 動態生成 -->
+                    </div>
                 </div>
             </div>
 

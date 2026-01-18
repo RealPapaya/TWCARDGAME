@@ -87,6 +87,20 @@ const AuthManager = {
                 if (this.currentUser.gold === undefined || this.currentUser.gold === null) {
                     this.currentUser.gold = 100;
                 }
+
+                // 初始化卡牌收藏 (如果是新帳號或沒有卡牌)
+                if (!this.currentUser.ownedCards || Object.keys(this.currentUser.ownedCards).length === 0) {
+                    this.currentUser.ownedCards = this.generateStarterCollection();
+                    this.saveData(); // 立刻同步到雲端
+                } else if (typeof this.currentUser.ownedCards === 'string') {
+                    // 處理從雲端讀取的 JSON 字串
+                    try {
+                        this.currentUser.ownedCards = JSON.parse(this.currentUser.ownedCards);
+                    } catch (e) {
+                        this.currentUser.ownedCards = this.generateStarterCollection();
+                    }
+                }
+
                 localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
                 return { success: true, user: this.currentUser };
             } else {
@@ -120,7 +134,8 @@ const AuthManager = {
                     deck_data: JSON.stringify(this.currentUser.deck_data),
                     selectedAvatar: this.currentUser.selectedAvatar,
                     selectedTitle: this.currentUser.selectedTitle,
-                    stats: JSON.stringify(this.currentUser.stats || {})
+                    stats: JSON.stringify(this.currentUser.stats || {}),
+                    ownedCards: JSON.stringify(this.currentUser.ownedCards || {})
                 })
             });
             console.log("資料已同步至雲端");
@@ -148,6 +163,44 @@ const AuthManager = {
             }
         }
         return null;
+    },
+
+    /**
+     * 生成初始卡牌收藏 (20 種卡 x 2 張)
+     */
+    generateStarterCollection() {
+        // 精選 20 種 COMMON/RARE 卡牌，費用 1-5 並包含各陣營
+        const starterCardIds = [
+            'TW001', // 窮酸大學生 1/2
+            'TW003', // 大樓保全 1/2 嘲諷
+            'TW004', // 條碼師 1/4
+            'TW005', // 水電徒弟 2/3
+            'TW030', // 朱立倫 1/1 戰吼
+            'TW053', // 老鳥中年 1/3 戰吼抽新聞
+            'TW006', // 廟口管委 3/2
+            'TW007', // 外送師 3/1 衝鋒
+            'TW008', // 手搖員工 2/2 戰吼回血
+            'TW013', // 水電師傅 3/5 嘲諷
+            'TW012', // 四叉貓 1/1 戰吼+1生命
+            'TW017', // 勞工局 0/5 戰吼勞工+2血
+            'S006',
+            'S009',
+            'S016',
+            'S022',
+            'S026',
+            'TW068',
+            'TW027',
+            'TW017',
+            'TW028'
+        ];
+
+        const collection = {};
+        starterCardIds.forEach(cardId => {
+            collection[cardId] = 2; // 每種給 2 張
+        });
+
+        console.log('[AuthManager] 發放初始卡牌：', collection);
+        return collection;
     }
 };
 

@@ -62,3 +62,6 @@
     - `DAMAGE_ALL_NON_CATEGORIES`: 對所有非指定類別列表的單位造成傷害
     - `BUFF_CATEGORY`: 強化指定類別的單位
 
+發放初始卡牌窮鬼包
+user.ownedCards = AuthManager.generateStarterCollection();
+console.log("新生成的卡牌:", user.ownedCards);
