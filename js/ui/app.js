@@ -1350,6 +1350,98 @@ function showDeckCreationOptions() {
     }
 }
 
+/**
+ * 檢查主題牌組中缺少的卡牌
+ * @param {string[]} themeCards - 主題牌組的卡牌 ID 陣列
+ * @param {Object} ownedCards - 玩家擁有的卡牌 { cardId: count }
+ * @returns {Object} { missing: [], owned: [], missingCount: 0, totalCount: 0 }
+ */
+function checkMissingCards(themeCards, ownedCards) {
+    const missingCards = [];
+    const ownedInTheme = [];
+
+    // 統計每種卡牌在牌組中出現的次數
+    const themeCardCounts = {};
+    themeCards.forEach(cardId => {
+        themeCardCounts[cardId] = (themeCardCounts[cardId] || 0) + 1;
+    });
+
+    // 檢查每種卡牌的擁有狀況
+    Object.keys(themeCardCounts).forEach(cardId => {
+        const needed = themeCardCounts[cardId];
+        const owned = ownedCards[cardId] || 0;
+
+        if (owned < needed) {
+            // 缺卡
+            const card = CARD_DATA.find(c => c.id === cardId);
+            missingCards.push({
+                id: cardId,
+                name: card?.name || cardId,
+                needed: needed,
+                owned: owned,
+                missing: needed - owned
+            });
+        } else {
+            // 足夠
+            ownedInTheme.push(cardId);
+        }
+    });
+
+    return {
+        missing: missingCards,
+        owned: ownedInTheme,
+        missingCount: missingCards.reduce((sum, c) => sum + c.missing, 0),
+        totalCount: themeCards.length
+    };
+}
+
+/**
+ * 顯示缺卡提示視窗
+ * @param {Object} missingInfo - checkMissingCards 的回傳結果
+ * @param {string} themeName - 主題牌組名稱
+ * @param {Function} onConfirm - 確認回調（建立不完整牌組）
+ * @param {Function} onCancel - 取消回調
+ */
+async function showMissingCardsAlert(missingInfo, themeName, onConfirm, onCancel) {
+    const { missing, missingCount, totalCount } = missingInfo;
+
+    // 生成缺卡清單 HTML
+    const missingListHtml = missing.map(card => `
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid rgba(139, 69, 19, 0.15);">
+            <span style="font-weight: bold; color: var(--wood-dark); font-size: 1.1em; font-family: 'Noto Serif TC', serif;">${card.name}</span>
+            <span style="color: #c0392b; font-weight: bold;">缺 ${card.missing} <span style="color: #666; font-weight: normal; font-size: 0.9em;">(有 ${card.owned}/${card.needed})</span></span>
+        </li>
+    `).join('');
+
+    const message = `
+        <div style="text-align: left; max-width: 500px; font-family: 'Noto Sans TC', sans-serif; color: #3d1e0f;">
+            <h3 style="color: var(--red-medieval); margin-bottom: 10px; font-size: 1.4em; border-bottom: 2px solid var(--wood-medium); padding-bottom: 10px; font-family: 'Noto Serif TC', serif; font-weight: 900;">
+                ⚠️ 缺少卡牌
+            </h3>
+            
+            <p style="margin-bottom: 10px; font-size: 1.1em; line-height: 1.5; font-weight: bold;">
+                <span style="color: var(--wood-dark);">「${themeName}」</span>缺 <span style="color: #c0392b; font-size: 1.25em;">${missingCount}</span> 張卡：
+            </p>
+            
+            <ul style="list-style: none; padding: 0; background: rgba(255, 255, 255, 0.4); border: 2px solid var(--wood-light); border-radius: 8px; margin: 10px 0; max-height: 200px; overflow-y: auto; box-shadow: inset 0 0 10px rgba(0,0,0,0.05);">
+                ${missingListHtml}
+            </ul>
+            
+            <p style="margin-top: 15px; font-size: 1em; color: #555; font-style: italic; text-align: center;">
+                (確定後將會建立一個不完整的牌組 目前擁有 ${totalCount - missingCount}/${totalCount} 張)
+            </p>
+        </div>
+    `;
+
+    const confirmed = await showCustomConfirm(message);
+
+    if (confirmed) {
+        onConfirm();
+    } else {
+        if (onCancel) onCancel();
+    }
+}
+
 // 創建新的玩家牌組
 function addNewPlayerDeck(themeCards = null) {
     console.log('[DECK] ===== 開始創建新牌組 =====');
@@ -1417,9 +1509,51 @@ function showPlayerThemeSelection() {
             </div>
         `;
 
-        themeItem.addEventListener('click', () => {
+        themeItem.addEventListener('click', async () => {
             modal.style.display = 'none';
-            addNewPlayerDeck(JSON.parse(JSON.stringify(theme.cards)));
+
+            // 檢查缺卡
+            const ownedCards = AuthManager.currentUser?.ownedCards || {};
+            const missingInfo = checkMissingCards(theme.cards, ownedCards);
+
+            if (missingInfo.missingCount > 0) {
+                // 有缺卡，顯示提示
+                await showMissingCardsAlert(
+                    missingInfo,
+                    theme.name,
+                    () => {
+                        // 確認：僅用擁有的卡牌建立
+                        const ownedThemeCards = [];
+                        const cardCounts = {};
+
+                        // 統計每種卡牌需要的數量
+                        theme.cards.forEach(cardId => {
+                            cardCounts[cardId] = (cardCounts[cardId] || 0) + 1;
+                        });
+
+                        // 只加入擁有的卡牌（最多到需要的數量）
+                        Object.keys(cardCounts).forEach(cardId => {
+                            const needed = cardCounts[cardId];
+                            const owned = ownedCards[cardId] || 0;
+                            const toAdd = Math.min(needed, owned);
+
+                            for (let i = 0; i < toAdd; i++) {
+                                ownedThemeCards.push(cardId);
+                            }
+                        });
+
+                        addNewPlayerDeck(ownedThemeCards);
+                        showToast(`已建立不完整的「${theme.name}」牌組 (${ownedThemeCards.length}/${theme.cards.length} 張)`);
+                    },
+                    () => {
+                        // 取消：不做任何事
+                        showToast('已取消建立牌組');
+                    }
+                );
+            } else {
+                // 沒有缺卡，直接建立
+                addNewPlayerDeck(JSON.parse(JSON.stringify(theme.cards)));
+            }
         });
 
         container.appendChild(themeItem);
@@ -1685,10 +1819,52 @@ function renderPlayerThemeList() {
             <h3>${theme.name}</h3>
             <div class="deck-size">${theme.cards.length} 張卡片</div>
         `;
-        card.onclick = () => {
+        card.onclick = async () => {
             document.getElementById('player-theme-selection-modal').style.display = 'none';
-            addNewPlayerDeck(theme.cards, theme.name);
-            showToast(`已匯入${theme.name}`);
+
+            // 檢查缺卡
+            const ownedCards = AuthManager.currentUser?.ownedCards || {};
+            const missingInfo = checkMissingCards(theme.cards, ownedCards);
+
+            if (missingInfo.missingCount > 0) {
+                // 有缺卡，顯示提示
+                await showMissingCardsAlert(
+                    missingInfo,
+                    theme.name,
+                    () => {
+                        // 確認：僅用擁有的卡牌建立
+                        const ownedThemeCards = [];
+                        const cardCounts = {};
+
+                        // 統計每種卡牌需要的數量
+                        theme.cards.forEach(cardId => {
+                            cardCounts[cardId] = (cardCounts[cardId] || 0) + 1;
+                        });
+
+                        // 只加入擁有的卡牌（最多到需要的數量）
+                        Object.keys(cardCounts).forEach(cardId => {
+                            const needed = cardCounts[cardId];
+                            const owned = ownedCards[cardId] || 0;
+                            const toAdd = Math.min(needed, owned);
+
+                            for (let i = 0; i < toAdd; i++) {
+                                ownedThemeCards.push(cardId);
+                            }
+                        });
+
+                        addNewPlayerDeck(ownedThemeCards, theme.name);
+                        showToast(`已建立不完整的「${theme.name}」牌組 (${ownedThemeCards.length}/${theme.cards.length} 張)`);
+                    },
+                    () => {
+                        // 取消：不做任何事
+                        showToast('已取消建立牌組');
+                    }
+                );
+            } else {
+                // 沒有缺卡，直接建立
+                addNewPlayerDeck(theme.cards, theme.name);
+                showToast(`已匯入${theme.name}`);
+            }
         };
         container.appendChild(card);
     });
@@ -1881,6 +2057,9 @@ function renderDeckBuilder() {
         }
     });
 
+    // 取得玩家擁有的卡牌
+    const ownedCards = AuthManager.currentUser?.ownedCards || {};
+
     CARD_DATA.filter(card => {
         const matchSearch = card.name.toLowerCase().includes(searchTerm) || (card.description && card.description.toLowerCase().includes(searchTerm));
         const matchCat = catFilter === 'ALL' || (card.category || '一般') === catFilter;
@@ -1892,7 +2071,10 @@ function renderDeckBuilder() {
             else matchCost = card.cost === parseInt(costFilter);
         }
 
-        return matchSearch && matchCat && matchRarity && matchCost;
+        // 只顯示擁有的卡牌
+        const matchOwned = ownedCards[card.id] && ownedCards[card.id] > 0;
+
+        return matchSearch && matchCat && matchRarity && matchCost && matchOwned;
     }).sort((a, b) => {
         const dir = currentSort.direction === 'asc' ? 1 : -1;
         let valA, valB;
@@ -4785,7 +4967,7 @@ function showCustomConfirm(message) {
         const confirmBtn = document.getElementById('btn-custom-confirm');
         const cancelBtn = document.getElementById('btn-custom-cancel');
 
-        msgEl.innerText = message;
+        msgEl.innerHTML = message;
         cancelBtn.style.display = 'inline-block'; // Confirm has Cancel
         modal.style.display = 'flex';
 
