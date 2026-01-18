@@ -48,9 +48,13 @@ TWCARDGAME/
 ├── utils/                   # 工具函數
 │   └── helpers.js          # 輔助函數
 ├── assets/                  # 資源文件
-│   ├── images/             # 圖片
-│   ├── sounds/             # 音效
-│   └── cursors/            # 游標
+│   └── images/             # 圖片資源
+│       ├── avatars/        # 頭像
+│       ├── backgrounds/    # 背景圖
+│       ├── cards/          # 卡牌圖
+│       ├── cursors/        # 游標圖
+│       ├── illustrations/  # 插畫
+│       └── ui/             # UI 介面圖
 └── styles/                  # 樣式文件
     ├── style.css           # 主樣式
     └── components/         # 組件樣式

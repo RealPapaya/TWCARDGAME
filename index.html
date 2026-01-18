@@ -3,7 +3,8 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport"
+        content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>寶島遊戲王 (Treasure Island Duel)</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +28,15 @@
 </head>
 
 <body>
+    <!-- Orientation Warning Overlay -->
+    <div id="orientation-warning">
+        <div class="warning-content">
+            <div class="phone-icon">📱</div>
+            <h2>請旋轉裝置</h2>
+            <p>為了獲得最佳遊戲體驗，請將手機橫向放置</p>
+        </div>
+    </div>
+
     <!-- 16:9 Aspect Ratio Container -->
     <div id="game-container-16-9">
         <!-- Content Scaler Wrapper (1920x1080 base) -->
@@ -648,6 +658,94 @@
 
     <div id="card-preview" style="z-index: 10000;"></div>
     <div id="ui-tooltip" class="ui-tooltip"></div>
+
+    <style>
+        /* Mobile Orientation Warning */
+        #orientation-warning {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #1a120c;
+            color: #f1e4d1;
+            display: none;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 20000;
+            text-align: center;
+            font-family: 'Noto Serif TC', serif;
+        }
+
+        .warning-content {
+            padding: 20px;
+        }
+
+        .phone-icon {
+            font-size: 80px;
+            margin-bottom: 20px;
+            animation: rotatePhone 2s ease-in-out infinite;
+        }
+
+        @keyframes rotatePhone {
+            0% {
+                transform: rotate(0deg);
+            }
+
+            50% {
+                transform: rotate(90deg);
+            }
+
+            100% {
+                transform: rotate(90deg);
+            }
+        }
+
+        /* Show warning only on mobile portrait */
+        @media screen and (max-width: 1024px) and (orientation: portrait) {
+            #orientation-warning {
+                display: flex;
+            }
+        }
+
+        /* Essential RWD Scroll Overrides */
+        .cards-grid,
+        .deck-list,
+        .options-scroll-area,
+        .deck-view-grid,
+        #history-list,
+        .avatar-grid,
+        .title-grid {
+            touch-action: pan-y !important;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* Optimize buttons for touch */
+        @media (pointer: coarse) {
+
+            .neon-button,
+            .settings-btn,
+            .back-button,
+            .medieval-button {
+                min-height: 44px;
+                min-width: 44px;
+            }
+
+            /* Increase hit area for small icons */
+            .settings-btn,
+            .history-tab {
+                padding: 10px;
+            }
+        }
+
+        /* Fix for mobile notches */
+        @supports (padding: env(safe-area-inset-top)) {
+            body {
+                padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+            }
+        }
+    </style>
 </body>
 
 

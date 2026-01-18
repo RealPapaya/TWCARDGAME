@@ -12,14 +12,15 @@ function updateGameScale() {
 
     if (!container || !scaler) return;
 
-    const containerWidth = container.offsetWidth;
-    const containerHeight = container.offsetHeight;
+    // Use current window size for better responsiveness on mobile
+    const containerWidth = container.clientWidth;
+    const containerHeight = container.clientHeight;
 
-    // Design base dimensions (adjusted to accommodate battle view)
+    // Design base dimensions
     const baseWidth = 1920;
     const baseHeight = 1080;
 
-    // Calculate scale factor (use the smaller scale to fit)
+    // Calculate scale factor (fit within container)
     const scaleX = containerWidth / baseWidth;
     const scaleY = containerHeight / baseHeight;
     const scale = Math.min(scaleX, scaleY);
@@ -699,7 +700,7 @@ document.addEventListener('click', (e) => {
 
 
 // Global drag events
-document.addEventListener('mousemove', (e) => {
+document.addEventListener('pointermove', (e) => {
     onDragMove(e);
 
     // Update tooltip position if visible
@@ -724,10 +725,10 @@ document.addEventListener('mousemove', (e) => {
         tooltip.style.top = `${top}px`;
     }
 });
-document.addEventListener('mouseup', onDragEnd);
+document.addEventListener('pointerup', onDragEnd);
 
 // Global Tooltip Delegation
-document.addEventListener('mouseover', (e) => {
+document.addEventListener('pointerover', (e) => {
     const target = e.target.closest('[data-hover]');
     if (target) {
         const text = target.getAttribute('data-hover');
@@ -744,7 +745,7 @@ document.addEventListener('mouseover', (e) => {
     }
 });
 
-document.addEventListener('mouseout', (e) => {
+document.addEventListener('pointerout', (e) => {
     const target = e.target.closest('[data-hover]');
     if (target) {
         const tooltip = document.getElementById('ui-tooltip');

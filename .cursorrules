@@ -1,0 +1,4 @@
+# Project Rules
+
+1. **Always Read Development Guidelines**: Before starting any task, you MUST read the file `.agent/skills/tw-card-game-dev/SKILL.md` to understand the project's strict development standards and architecture requirements.
+2. **Strict Adherence**: All code changes must verify against the rules in `SKILL.md`.

@@ -104,6 +104,13 @@ body {
     justify-content: center;
     align-items: center;
     min-height: 100vh;
+    min-height: 100dvh;
+    /* Prevent any system-level scrolling/bouncing */
+    touch-action: none;
+    overscroll-behavior: none;
+    position: fixed;
+    width: 100%;
+    -webkit-tap-highlight-color: transparent;
 }
 
 /* 16:9 Aspect Ratio Container */
@@ -322,6 +329,8 @@ body {
     flex-grow: 1;
     overflow-y: auto;
     margin-bottom: 20px;
+    /* Restore touch scroll ONLY for this vertical list */
+    touch-action: pan-y;
 }
 
 .deck-slot {
