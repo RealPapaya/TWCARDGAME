@@ -7,6 +7,24 @@
 // 以後版本資訊都要新增再此 UPDATE_LOGS 陣列的最前方
 var UPDATE_LOGS = [
     {
+        version: "v0.7.0",
+        date: "2026-01-18",
+        items: [
+            {
+                title: "[新增] 帳號創建系統",
+                desc: "新增帳號密碼，玩家可以儲存自己的牌組、頭像等等"
+            },
+            {
+                title: "[新功能] Mulligan",
+                desc: "新增mulligan功能，玩家可以重新洗牌"
+            },
+            {
+                title: "[架構] 程式碼重構",
+                desc: "重構代碼結構，使代碼更易於維護和擴展"
+            }
+        ]
+    },
+    {
         version: "v0.6.1",
         date: "2026-01-15",
         items: [
