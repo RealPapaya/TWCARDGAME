@@ -1713,8 +1713,7 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    overflow: hidden;
-    /* Contain all child elements within card boundaries during animations */
+    /* overflow: hidden; Removed to allow stats to hang off bottom */
 }
 
 /* Hover effect for PLAYER cards only */
@@ -1759,6 +1758,7 @@ body.dragging-active .player .hand .card:hover {
     display: flex;
     flex-direction: column;
     align-items: center;
+    /* Prevent stats or art from overflowing boundaries */
 }
 
 .minion:hover {
@@ -1768,8 +1768,8 @@ body.dragging-active .player .hand .card:hover {
 
 .minion-art {
     width: 94%;
-    height: 85px;
-    /* Increased height for bigger image */
+    height: 75px;
+    /* Reduced from 85px to provide space for stats */
     background-color: #555;
     background-size: cover;
     background-position: center top;
@@ -1918,14 +1918,18 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .minion-stats {
+    position: absolute;
+    bottom: -6px;
+    /* Allow slight overlap for Hearthstone-like aesthetic */
+    left: 0;
     width: 100%;
-    padding: 8px;
+    padding: 0 5px;
     box-sizing: border-box;
     display: flex;
     justify-content: space-between;
-    margin-top: auto;
+    z-index: 20;
+    pointer-events: none;
     background: transparent;
-    /* Prevent stats from escaping card boundaries during animations */
 }
 
 .stat-atk,
@@ -1994,7 +1998,8 @@ body.dragging-active .player .hand .card:hover {
     }
 
     50% {
-        transform: scale(1.3);
+        transform: scale(1.15);
+        /* Reduced from 1.3 to avoid clipping under overflow: hidden */
     }
 
     100% {
@@ -2026,7 +2031,7 @@ body.dragging-active .player .hand .card:hover {
     padding-bottom: 10px;
     perspective: 1000px;
     position: relative;
-    z-index: 5;
+    z-index: 50;
 }
 
 .player .hand {
@@ -2329,7 +2334,7 @@ body.dragging-active .player .hand .card:hover {
     bottom: 150px;
     width: 340px;
     height: 500px;
-    z-index: 1000;
+    z-index: 30000 !important;
     pointer-events: none;
     display: none;
     transform-origin: bottom right;

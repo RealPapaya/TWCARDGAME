@@ -1586,7 +1586,7 @@ function showView(viewId) {
         });
         nextView.classList.remove('enter-active');
         transitionTimeout = null;
-    }, 1600);
+    }, 800); // Reduced from 1600ms for snappier transition and less black flash risk
 
     // --- Original Logic for UI Elements ---
     const log = document.getElementById('message-log');
@@ -1611,6 +1611,7 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
 
     try {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
+        // Only call showView ONCE
         showView('battle-view');
     } catch (e) {
         logMessage(e.message);
@@ -1626,7 +1627,6 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
     initManaContainers('player-mana-container');
     initManaContainers('opp-mana-container');
 
-    showView('battle-view');
     render();
 
     // Animate sorting out cards one by one
@@ -2854,7 +2854,10 @@ function createCardEl(card, index) {
 
     // Play Card Interaction (Now Drag instead of Click)
     if (index !== -1) { // Only add drag for cards in hand, not in deck builder
-        el.addEventListener('mousedown', (e) => onDragStart(e, index, true));
+        el.addEventListener('pointerdown', (e) => {
+            el.setPointerCapture(e.pointerId);
+            onDragStart(e, index, true);
+        });
     }
 
     return el;
@@ -2922,6 +2925,9 @@ function createMinionEl(minion, index, isPlayer) {
     let previewTimeout = null;
 
     el.addEventListener('mouseenter', () => {
+        // Don't show preview if dragging or targeting
+        if (dragging || isBattlecryTargeting) return;
+
         previewTimeout = setTimeout(() => {
             showPreview(minion);
             positionPreviewNearElement(el);
@@ -2938,7 +2944,10 @@ function createMinionEl(minion, index, isPlayer) {
 
     // Attack Drag Start
     if (isPlayer && canActuallyAttack && gameState.currentPlayerIdx === 0) {
-        el.addEventListener('mousedown', (e) => onDragStart(e, index));
+        el.addEventListener('pointerdown', (e) => {
+            el.setPointerCapture(e.pointerId);
+            onDragStart(e, index);
+        });
     }
 
     // Target Drop Data (Needed for both enemy attacks AND friendly buffs)
@@ -2978,6 +2987,9 @@ function onDragStart(e, index, fromHand = false) {
     attackerIndex = index;
     draggingFromHand = fromHand;
     draggingMode = 'DAMAGE'; // Reset to default
+
+    // Hide any active preview immediately
+    hidePreview();
 
     dragLine.classList.remove('battlecry-line', 'heal-line', 'buff-line', 'bounce-line', 'destroy-line');
     dragLine.setAttribute('x1', e.clientX);
@@ -4122,6 +4134,10 @@ function animateAttack(fromEl, toEl) {
         clone.classList.remove('can-attack');
         clone.classList.remove('divine-shield'); // Fix: Remove shield visual during flight
         clone.style.borderRadius = '12px'; // Standard shape for attack flight
+
+        // Remove stat-pop animation classes to keep stats stable during attack
+        const statElements = clone.querySelectorAll('.stat-atk, .stat-hp');
+        statElements.forEach(stat => stat.classList.remove('stat-pop'));
 
         // Initial Position
         clone.style.top = `${rectFrom.top}px`;
