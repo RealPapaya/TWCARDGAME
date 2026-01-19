@@ -134,6 +134,7 @@ const AuthManager = {
                     stats: JSON.stringify(this.currentUser.stats || {}),
                     owned_cards: JSON.stringify(this.currentUser.ownedCards || {}),
                     vouchers: this.currentUser.vouchers || 0,
+                    defeated_ai: JSON.stringify(this.currentUser.defeatedAI || []),
                     last_saved: this.currentUser.lastsaved
                 })
             });
@@ -190,6 +191,7 @@ const AuthManager = {
             stats: rawData.stats || "{}",
             ownedCards: rawData.owned_cards || rawData.ownedcards || rawData.ownedCards || "{}",
             vouchers: parseInt(rawData.vouchers || 0),
+            defeatedAI: rawData.defeated_ai || rawData.defeatedAI || rawData.defeatedai || "[]",
             lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0)
         };
 
@@ -227,6 +229,12 @@ const AuthManager = {
         if (typeof user.ownedTitles === 'string') {
             try { user.ownedTitles = JSON.parse(user.ownedTitles || "[\"beginner\"]"); }
             catch (e) { user.ownedTitles = ["beginner"]; }
+        }
+
+        // 處理 defeatedAI
+        if (typeof user.defeatedAI === 'string') {
+            try { user.defeatedAI = JSON.parse(user.defeatedAI || "[]"); }
+            catch (e) { user.defeatedAI = []; }
         }
 
         // 確保基本數值存在

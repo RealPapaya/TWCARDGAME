@@ -134,6 +134,7 @@ function isAdmin() {
 }
 window.isAdmin = isAdmin;
 let currentDifficulty = 'NORMAL';
+let currentOpponentDeckId = null; // 記錄當前對戰的AI牌組ID
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
 // UI Transition state
@@ -2822,8 +2823,61 @@ function endGame(result) {
         console.log("Stats updated:", stats);
     }
 
+    // 首次擊敗獎勵檢測與金幣發放
+    let firstVictoryReward = 0;
+    if (!isDebugMode && AuthManager.currentUser && result === 'VICTORY' && currentDifficulty && currentOpponentDeckId) {
+        // 初始化 defeatedAI 陣列
+        if (!AuthManager.currentUser.defeatedAI) {
+            AuthManager.currentUser.defeatedAI = [];
+        }
+
+        // 使用「牌組ID-難度」組合鍵 (例如: "dpp-NORMAL", "kmt-HARD")
+        const challengeKey = `${currentOpponentDeckId}-${currentDifficulty}`;
+
+        // 檢查是否首次擊敗此組合
+        if (!AuthManager.currentUser.defeatedAI.includes(challengeKey)) {
+            // 添加到已擊敗列表
+            AuthManager.currentUser.defeatedAI.push(challengeKey);
+
+            // 發放金幣獎勵
+            const rewards = {
+                'NORMAL': 100,
+                'HARD': 200,
+                'HELL': 300
+            };
+            firstVictoryReward = rewards[currentDifficulty] || 0;
+
+            if (firstVictoryReward > 0) {
+                AuthManager.currentUser.gold += firstVictoryReward;
+
+                // 更新金幣顯示
+                if (window.ShopManager && typeof ShopManager.updateGoldDisplay === 'function') {
+                    ShopManager.updateGoldDisplay();
+                }
+
+                // 保存數據
+                AuthManager.saveData();
+                console.log(`首次擊敗 ${challengeKey}，獲得 ${firstVictoryReward} 金幣`);
+            }
+        }
+    }
+
+    // 顯示結果畫面
     showView('game-result-view');
     document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex
+
+    // 如果有首次擊敗獎勵，在勝利文字下方顯示
+    if (firstVictoryReward > 0) {
+        // 延遲顯示toast，讓勝利畫面先出現
+        setTimeout(() => {
+            const difficultyNames = {
+                'NORMAL': '普通級',
+                'HARD': '專家級',
+                'HELL': '大師級'
+            };
+            showToast(`🎉 首次擊敗${difficultyNames[currentDifficulty]}！獲得 ${firstVictoryReward} 金幣 🪙`);
+        }, 500);
+    }
 }
 
 function formatDesc(text, newsBonus = 0, isNews = false) {
@@ -5391,11 +5445,40 @@ function renderAIBattleSetup() {
     startBtnWrapper.style.opacity = '0.5';
     startBtnWrapper.style.pointerEvents = 'none';
 
+    // 獲取已擊敗AI列表
+    const defeatedAI = AuthManager.currentUser?.defeatedAI || [];
+    const difficultyRewards = {
+        'NORMAL': 100,
+        'HARD': 200,
+        'HELL': 300
+    };
+    const difficultyLabels = {
+        'NORMAL': '普通級',
+        'HARD': '專家級',
+        'HELL': '大師級'
+    };
+
     aiThemeDecks.forEach(theme => {
         const group = document.createElement('div');
         group.className = 'deck-option-group';
 
         const emojis = { 'dpp': '🟢', 'kmt': '🔵', 'tpp': '🟡' };
+
+        // 為每個難度生成狀態標記
+        const difficultyHTML = Object.keys(difficultyLabels).map(diff => {
+            // 使用「牌組ID-難度」組合鍵檢查是否已通關
+            const challengeKey = `${theme.id}-${diff}`;
+            const isDefeated = defeatedAI.includes(challengeKey);
+
+            const label = difficultyLabels[diff];
+            const reward = difficultyRewards[diff];
+            const statusText = isDefeated
+                ? '<span style="color: #4ade80; margin-left: 8px;">✓ 已通關</span>'
+                : `<span style="color: #fcd34d; margin-left: 8px;">🪙 ${reward}</span>`;
+
+            return `<div class="sub-difficulty-btn" data-value="${diff}">${label}${statusText}</div>`;
+        }).join('');
+
         group.innerHTML = `
             <div class="option-item" data-deck-id="${theme.id}" data-image="${theme.image}" data-desc="${deckDescriptions[theme.id] || '請輸入描述...'}">
                 <span class="option-icon">${emojis[theme.id] || '🎴'}</span>
@@ -5403,9 +5486,7 @@ function renderAIBattleSetup() {
                 <span class="expand-arrow">▶</span>
             </div>
             <div class="difficulty-options">
-                <div class="sub-difficulty-btn" data-value="NORMAL">普通級</div>
-                <div class="sub-difficulty-btn" data-value="HARD">專家級</div>
-                <div class="sub-difficulty-btn" data-value="HELL">大師級</div>
+                ${difficultyHTML}
             </div>
         `;
 
@@ -5481,6 +5562,7 @@ function renderAIBattleSetup() {
         if (!selectedDeck || !selectedDifficulty) return;
 
         currentDifficulty = selectedDifficulty;
+        currentOpponentDeckId = selectedDeck; // 記錄對戰的AI牌組ID
         selectedThemeId = selectedDeck;
         pendingViewMode = 'BATTLE';
         showView('deck-selection');
