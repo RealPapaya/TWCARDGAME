@@ -1483,28 +1483,28 @@ async function showMissingCardsAlert(missingInfo, themeName, onConfirm, onCancel
 
     // 生成缺卡清單 HTML
     const missingListHtml = missing.map(card => `
-        <li style="display: flex; justify-content: space-between; align-items: center; padding: 10px 15px; border-bottom: 1px solid rgba(139, 69, 19, 0.15);">
-            <span style="font-weight: bold; color: var(--wood-dark); font-size: 1.1em; font-family: 'Noto Serif TC', serif;">${card.name}</span>
-            <span style="color: #c0392b; font-weight: bold;">缺 ${card.missing} <span style="color: #666; font-weight: normal; font-size: 0.9em;">(有 ${card.owned}/${card.needed})</span></span>
+        <li style="display: flex; justify-content: space-between; align-items: center; padding: 6px 12px; border-bottom: 1px solid rgba(139, 69, 19, 0.1);">
+            <span style="font-weight: bold; color: var(--wood-dark); font-size: 1em; font-family: 'Noto Serif TC', serif;">${card.name}</span>
+            <span style="color: #c0392b; font-weight: bold; font-size: 0.9em;">缺 ${card.missing} <span style="color: #666; font-weight: normal; font-size: 0.85em;">(有 ${card.owned}/${card.needed})</span></span>
         </li>
     `).join('');
 
     const message = `
-        <div style="text-align: left; max-width: 500px; font-family: 'Noto Sans TC', sans-serif; color: #3d1e0f;">
-            <h3 style="color: var(--red-medieval); margin-bottom: 10px; font-size: 1.4em; border-bottom: 2px solid var(--wood-medium); padding-bottom: 10px; font-family: 'Noto Serif TC', serif; font-weight: 900;">
+        <div style="text-align: center; max-width: 480px; font-family: 'Noto Sans TC', sans-serif; color: #3d1e0f; margin: 0 auto;">
+            <h3 style="color: var(--red-medieval); margin-bottom: 8px; font-size: 1.25em; border-bottom: 2px solid var(--wood-medium); padding-bottom: 8px; font-family: 'Noto Serif TC', serif; font-weight: 900;">
                 ⚠️ 缺少卡牌
             </h3>
             
-            <p style="margin-bottom: 10px; font-size: 1.1em; line-height: 1.5; font-weight: bold;">
-                <span style="color: var(--wood-dark);">「${themeName}」</span>缺 <span style="color: #c0392b; font-size: 1.25em;">${missingCount}</span> 張卡：
+            <p style="margin-bottom: 8px; font-size: 0.95em; line-height: 1.4; font-weight: bold;">
+                <span style="color: var(--wood-dark);">「${themeName}」</span>缺 <span style="color: #c0392b; font-size: 1.15em;">${missingCount}</span> 張卡：
             </p>
             
-            <ul style="list-style: none; padding: 0; background: rgba(255, 255, 255, 0.4); border: 2px solid var(--wood-light); border-radius: 8px; margin: 10px 0; max-height: 200px; overflow-y: auto; box-shadow: inset 0 0 10px rgba(0,0,0,0.05);">
+            <ul style="list-style: none; padding: 0; background: rgba(255, 255, 255, 0.4); border: 1px solid var(--wood-light); border-radius: 8px; margin: 8px auto; box-shadow: inset 0 0 8px rgba(0,0,0,0.03); text-align: left;">
                 ${missingListHtml}
             </ul>
             
-            <p style="margin-top: 15px; font-size: 1em; color: #555; font-style: italic; text-align: center;">
-                (確定後將會建立一個不完整的牌組 目前擁有 ${totalCount - missingCount}/${totalCount} 張)
+            <p style="margin-top: 10px; font-size: 0.85em; color: #666; font-style: italic; line-height: 1.3;">
+                (確定後將會建立一個不完整的牌組<br>目前擁有 ${totalCount - missingCount}/${totalCount} 張)
             </p>
         </div>
     `;
