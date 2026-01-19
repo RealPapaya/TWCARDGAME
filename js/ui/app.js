@@ -4027,11 +4027,21 @@ async function onDragEnd(e) {
                     // 2. Render to show the minion LANDING on the board
                     render();
 
-                    // 3. Trigger Dust at newly played minion (Capture from fresh DOM)
+                    // 3. Trigger Dust and Sound at newly played minion (Capture from fresh DOM)
                     const boardEl = document.getElementById('player-board');
                     const newMinionEl = boardEl.children[currentInsertionIndex];
                     if (newMinionEl && playedCard.type === 'MINION') {
-                        spawnDustEffect(newMinionEl, playedCard.cost >= 7 ? 2 : 1);
+                        const intensity = playedCard.cost >= 7 ? 2 : 1;
+                        spawnDustEffect(newMinionEl, intensity);
+
+                        // Play landing sound
+                        if (window.audioManager) {
+                            const isHighCost = playedCard.cost >= 8;
+                            const sfxPath = isHighCost
+                                ? 'assets/audio/sfx/HighCostMionion.mp3'
+                                : 'assets/audio/sfx/LowCostMionion.mp3';
+                            audioManager.playSFX(sfxPath, isHighCost ? 5.0 : 1.0);
+                        }
                     }
 
                     // 4. WAIT 0.5s (as requested)
@@ -5054,6 +5064,16 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
                 const intensity = card.cost >= 7 ? 2.5 : 1;
                 const smokeAnchor = targetEl || boardEl || cardEl;
                 spawnDustEffect(smokeAnchor, intensity);
+
+                // Play landing sound
+                if (window.audioManager) {
+                    const isHighCost = card.cost >= 8;
+                    const sfxPath = isHighCost
+                        ? 'assets/audio/sfx/HighCostMionion.mp3'
+                        : 'assets/audio/sfx/LowCostMionion.mp3';
+                    audioManager.playSFX(sfxPath, isHighCost ? 1.5 : 1.0);
+                }
+
                 setTimeout(() => boardEl.classList.remove('board-slam'), 500);
             }, 300); // Wait for card to hit the board
         }

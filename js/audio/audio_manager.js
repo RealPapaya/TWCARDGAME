@@ -102,10 +102,11 @@ class AudioManager {
     /**
      * 播放音效
      * @param {string} path - 音效檔案路徑
+     * @param {number} volumeMultiplier - 音量倍率 (預設 1.0)
      */
-    playSFX(path) {
+    playSFX(path, volumeMultiplier = 1.0) {
         const sfx = new Audio(path);
-        sfx.volume = this.sfxVolume;
+        sfx.volume = Math.min(1, this.sfxVolume * volumeMultiplier);
         sfx.play().catch(err => {
             console.warn('[AudioManager] 無法播放音效:', err);
         });
