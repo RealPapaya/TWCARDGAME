@@ -14,9 +14,9 @@ const ShopManager = {
         },
         'cosmetic-pack': {
             name: '酷炫包',
-            price: 150,
+            price: 75,
             type: 'COSMETICS',
-            rewards: { itemCount: 2 }
+            rewards: { itemCount: 1 }
         }
     },
 

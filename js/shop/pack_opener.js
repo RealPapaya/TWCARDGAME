@@ -176,27 +176,34 @@ const PackOpener = {
      */
     generateRandomCosmetics(count) {
         const items = [];
+        const avatarPool = window.PROFILE_DATA?.AVATAR_DATA || [];
+        const titlePool = window.PROFILE_DATA?.TITLE_DATA || [];
+        const user = AuthManager.currentUser;
+
+        // 目前已擁有的清單
+        const ownedAvatars = user?.ownedAvatars || ['avatar1'];
+        const ownedTitles = user?.ownedTitles || ['beginner'];
 
         for (let i = 0; i < count; i++) {
             const type = Math.random() > 0.5 ? 'avatar' : 'title';
 
             if (type === 'avatar') {
-                // 隨機選擇未解鎖的頭像
-                const unlockedAvatars = AuthManager.currentUser?.unlockedAvatars || [];
-                const availableAvatars = AVAILABLE_AVATARS.filter(a => !unlockedAvatars.includes(a.id));
-
+                const availableAvatars = avatarPool.filter(a => !ownedAvatars.includes(a.id));
                 if (availableAvatars.length > 0) {
                     const randomAvatar = availableAvatars[Math.floor(Math.random() * availableAvatars.length)];
                     items.push({ type: 'avatar', data: randomAvatar });
+                } else {
+                    // 已集齊所有頭像 -> 補償消費券
+                    items.push({ type: 'voucher', amount: 50, name: '頭像重複補償' });
                 }
             } else {
-                // 隨機選擇未解鎖的稱號
-                const unlockedTitles = AuthManager.currentUser?.unlockedTitles || [];
-                const availableTitles = AVAILABLE_TITLES.filter(t => !unlockedTitles.includes(t.name));
-
+                const availableTitles = titlePool.filter(t => !ownedTitles.includes(t.id));
                 if (availableTitles.length > 0) {
                     const randomTitle = availableTitles[Math.floor(Math.random() * availableTitles.length)];
                     items.push({ type: 'title', data: randomTitle });
+                } else {
+                    // 已集齊所有稱號 -> 補償消費券
+                    items.push({ type: 'voucher', amount: 30, name: '稱號重複補償' });
                 }
             }
         }
@@ -242,11 +249,29 @@ const PackOpener = {
                 rewards.forEach(item => {
                     const rewardEl = document.createElement('div');
                     rewardEl.className = 'reward-item';
-                    const icon = item.type === 'avatar' ? '👤' : '🏷️';
-                    const name = item.type === 'avatar' ? item.data.name : item.data.name;
+
+                    let icon = '🎁';
+                    let name = '未知獎勵';
+                    let subText = '外觀物品';
+
+                    if (item.type === 'avatar') {
+                        icon = '👤';
+                        name = item.data.name;
+                        subText = '新頭像';
+                    } else if (item.type === 'title') {
+                        icon = '🏷️';
+                        name = '#' + item.data.name;
+                        subText = '新稱號';
+                    } else if (item.type === 'voucher') {
+                        icon = '🎟️';
+                        name = item.amount;
+                        subText = item.name;
+                    }
+
                     rewardEl.innerHTML = `
                         <div style="font-size: 40px;">${icon}</div>
                         <div class="reward-item-name">${name}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary);">${subText}</div>
                     `;
                     rewardsContainer.appendChild(rewardEl);
                 });
@@ -282,22 +307,32 @@ const PackOpener = {
         const user = AuthManager.currentUser;
         if (!user) return;
 
-        if (!user.unlockedAvatars) user.unlockedAvatars = [];
-        if (!user.unlockedTitles) user.unlockedTitles = [];
+        if (!user.ownedAvatars) user.ownedAvatars = ['avatar1'];
+        if (!user.ownedTitles) user.ownedTitles = ['beginner'];
+        if (user.vouchers === undefined) user.vouchers = 0;
+
+        let changed = false;
 
         items.forEach(item => {
             if (item.type === 'avatar') {
-                if (!user.unlockedAvatars.includes(item.data.id)) {
-                    user.unlockedAvatars.push(item.data.id);
+                if (!user.ownedAvatars.includes(item.data.id)) {
+                    user.ownedAvatars.push(item.data.id);
+                    changed = true;
                 }
             } else if (item.type === 'title') {
-                if (!user.unlockedTitles.includes(item.data.name)) {
-                    user.unlockedTitles.push(item.data.name);
+                if (!user.ownedTitles.includes(item.data.id)) {
+                    user.ownedTitles.push(item.data.id);
+                    changed = true;
                 }
+            } else if (item.type === 'voucher') {
+                user.vouchers += item.amount;
+                changed = true;
             }
         });
 
-        AuthManager.saveData();
+        if (changed) {
+            AuthManager.saveData();
+        }
     },
 
     /**

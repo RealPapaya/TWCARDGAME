@@ -25,6 +25,7 @@
     <script src="js/engine/game_engine.js?v=1.1"></script>
     <script src="js/data/updates.js"></script>
     <script src="js/data/ui_translations.js"></script>
+    <script src="js/data/profile_data.js"></script>
     <script src="js/auth/auth_manager.js"></script>
     <script src="js/auth/auth_ui.js" defer></script>
     <script src="js/shop/shop_manager.js"></script>
@@ -266,35 +267,62 @@
                     <div class="shop-products">
                         <!-- 卡牌包 -->
                         <div class="product-card" data-product="card-pack" data-price="100">
-                            <div class="product-image">
-                                <img src="assets/images/card_pack_book.png" alt="卡牌包"
-                                    style="width: 90%; height: 90%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));">
+                            <div class="product-top-row">
+                                <div class="product-image">
+                                    <img src="assets/images/card_pack_book.png" alt="卡牌包"
+                                        style="width: 95%; height: 95%; object-fit: contain; filter: drop-shadow(0 4px 6px rgba(0,0,0,0.4));">
+                                </div>
+                                <h3 class="product-title">卡牌包</h3>
                             </div>
-                            <h3>卡牌包</h3>
-                            <p class="product-desc">包含 5 張隨機卡牌</p>
-                            <div class="product-drop-rates">
-                                <div>普通: 60%</div>
-                                <div>稀有: 26%</div>
-                                <div>史詩: 10%</div>
-                                <div>傳說: 4%</div>
+                            <div class="product-details-bottom">
+                                <div class="product-info-side">
+                                    <p class="product-desc">包含 5 張隨機卡牌</p>
+                                    <div class="product-price">
+                                        <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
+                                        <span>100</span>
+                                    </div>
+                                    <button class="btn-buy">購買</button>
+                                </div>
+                                <div class="product-rates-side">
+                                    <div class="rates-title">獲得機率</div>
+                                    <div class="product-drop-rates">
+                                        <div class="rate-row common"><span>普通</span> <span class="rate-val">60%</span>
+                                        </div>
+                                        <div class="rate-row rare"><span>精良</span> <span class="rate-val">26%</span>
+                                        </div>
+                                        <div class="rate-row epic"><span>史詩</span> <span class="rate-val">10%</span>
+                                        </div>
+                                        <div class="rate-row legendary"><span>傳說</span> <span class="rate-val">4%</span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="product-price">
-                                <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
-                                <span>100</span>
-                            </div>
-                            <button class="btn-buy">購買</button>
                         </div>
 
                         <!-- 酷炫包 -->
-                        <div class="product-card" data-product="cosmetic-pack" data-price="150">
-                            <div class="product-image">✨</div>
-                            <h3>酷炫包</h3>
-                            <p class="product-desc">隨機獲得頭像或稱號</p>
-                            <div class="product-price">
-                                <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
-                                <span>150</span>
+                        <div class="product-card" data-product="cosmetic-pack" data-price="75">
+                            <div class="product-top-row">
+                                <div class="product-image">✨</div>
+                                <h3 class="product-title">酷炫包</h3>
                             </div>
-                            <button class="btn-buy">購買</button>
+                            <div class="product-details-bottom">
+                                <div class="product-info-side">
+                                    <p class="product-desc">獲得稀有頭像或稱號</p>
+                                    <div class="product-price">
+                                        <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
+                                        <span>75</span>
+                                    </div>
+                                    <button class="btn-buy">購買</button>
+                                </div>
+                                <div class="product-rates-side">
+                                    <div class="rates-title">內容機率</div>
+                                    <div class="product-drop-rates">
+                                        <div class="rate-row"><span>個人頭像</span> <span class="rate-val">50%</span></div>
+                                        <div class="rate-row"><span>專屬稱號</span> <span class="rate-val">50%</span></div>
+                                    </div>
+                                    <div class="cosmetic-note">※ 內容均為隨機抽取</div>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -305,12 +333,19 @@
                 </div>
             </div>
 
-            <!-- 開包 Modal -->
-            <div id="pack-opening-modal" class="modal" style="display: none;">
-                <div class="pack-opening-content">
-                    <div id="pack-animation">🎴</div>
-                    <div id="pack-rewards"></div>
-                    <button id="btn-close-pack" class="neon-button">確定</button>
+            <!-- 開包結果彈窗 (酷炫包專用) -->
+            <div id="pack-opening-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 class="medieval-title">開包結果</h2>
+                    <div id="pack-animation" class="pack-opening-animation">
+                        <!-- 由 JS 動態顯示圖示 -->
+                    </div>
+                    <div id="pack-rewards" class="pack-rewards-grid">
+                        <!-- 由 JS 注入獎勵列表 -->
+                    </div>
+                    <div class="modal-buttons">
+                        <button id="btn-close-pack" class="medieval-button">領取獎勵</button>
+                    </div>
                 </div>
             </div>
 
@@ -374,8 +409,11 @@
                             </div>
                             <div class="modal-buttons medieval-button-group vertical-group">
                                 <button id="btn-card-disenchant" class="medieval-button danger">分解
-                                    (+<span>0</span>)</button>
-                                <button id="btn-card-craft" class="medieval-button">合成 (-<span>0</span>)</button>
+                                    (+<span>0</span><img src="assets/images/ui/voucher.png"
+                                        class="btn-voucher-icon">)</button>
+                                <button id="btn-card-craft" class="medieval-button">合成
+                                    (-<span>0</span><img src="assets/images/ui/voucher.png"
+                                        class="btn-voucher-icon">)</button>
                                 <button id="btn-card-op-close" class="medieval-button secondary">關閉</button>
                             </div>
                         </div>
@@ -839,6 +877,8 @@
             </div>
         </div>
     </div>
+
+
     <!-- Drag Line SVG Layer (Moved outside scaler for correct coordinates) -->
     <svg id="drag-layer">
         <defs>

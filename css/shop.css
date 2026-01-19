@@ -249,7 +249,7 @@
     background-image: url("https://www.transparenttextures.com/patterns/parchment.png");
     border: 6px solid var(--wood-dark);
     border-radius: 16px;
-    padding: 30px;
+    padding: 20px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -258,12 +258,128 @@
     cursor: pointer;
     position: relative;
     box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
+    width: 550px;
+    height: auto;
+    /* Remove min-height to fix empty space */
+}
+
+.product-top-row {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    width: 100%;
+    margin-bottom: 5px;
 }
 
 .product-card:hover {
-    transform: translateY(-10px) scale(1.02);
+    transform: translateY(-5px);
     box-shadow: 0 12px 30px rgba(212, 175, 55, 0.4);
     border-color: var(--gold);
+}
+
+/* 下方：細節容器 (左右分欄) */
+.product-details-bottom {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    border-top: 2px solid var(--wood-medium);
+    padding-top: 15px;
+    gap: 20px;
+    min-height: 215px;
+}
+
+/* 下方左側：商品名稱、金額與購買 */
+.product-info-side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    border-right: 2px dashed rgba(139, 69, 19, 0.3);
+    padding-right: 15px;
+}
+
+/* 下方右側：機率顯示 */
+.product-rates-side {
+    flex: 1.2;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+}
+
+.rates-title {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 18px;
+    font-weight: 900;
+    color: #3d1e0f;
+    /* Deep Ink */
+    margin-bottom: 12px;
+    text-align: center;
+    border-bottom: 2px solid var(--wood-medium);
+    padding-bottom: 5px;
+}
+
+.product-drop-rates {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+
+.rate-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.6);
+    /* Lighter bg for better contrast with dark text */
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    border-radius: 4px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 14px;
+    font-weight: 800;
+    /* Extra bold */
+    color: #3d1e0f;
+    /* Deep Ink */
+}
+
+.rate-val {
+    font-size: 18px;
+    color: #e67e22;
+    /* 預設深橘色 */
+    text-shadow: 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+/* 不同稀有度的突出顏色 */
+.rate-row.common .rate-val {
+    color: #555;
+}
+
+.rate-row.rare .rate-val {
+    color: #0070dd;
+    text-shadow: 0 0 10px rgba(0, 112, 221, 0.2);
+}
+
+.rate-row.epic .rate-val {
+    color: #a335ee;
+    text-shadow: 0 0 10px rgba(163, 53, 238, 0.2);
+}
+
+.rate-row.legendary .rate-val {
+    color: #ff8000;
+    font-size: 20px;
+    text-shadow: 0 0 15px rgba(255, 128, 0, 0.3);
+}
+
+.cosmetic-note {
+    font-size: 12px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+    text-align: center;
+    font-style: italic;
 }
 
 .product-card::before,
@@ -304,9 +420,10 @@
 
 .product-card h3 {
     font-family: 'Noto Serif TC', serif;
-    font-size: 28px;
+    font-size: 26px;
     font-weight: 900;
-    color: var(--wood-dark);
+    color: #3d1e0f;
+    /* Deep Ink for maximum visibility */
     margin: 0;
     text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
 }
@@ -314,38 +431,22 @@
 .product-desc {
     font-family: 'Noto Sans TC', sans-serif;
     font-size: 15px;
-    color: var(--text-secondary);
+    color: #3d1e0f;
+    /* Deep Ink */
     text-align: center;
     margin: 0;
-    opacity: 0.8;
-}
-
-.product-drop-rates {
-    font-family: 'Noto Sans TC', sans-serif;
-    font-size: 13px;
-    color: var(--wood-dark);
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 8px;
-    padding: 8px 15px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 5px;
-    width: 100%;
-    margin-bottom: 5px;
-    border: 1px dashed var(--wood-medium);
-}
-
-.product-drop-rates div {
-    text-align: left;
-    font-weight: 500;
+    font-weight: 700;
+    /* Bold */
+    opacity: 1;
+    /* Fully opaque */
 }
 
 .product-price {
     display: flex;
     align-items: center;
-    gap: 10px;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 10px 20px;
+    gap: 8px;
+    background: rgba(0, 0, 0, 0.35);
+    padding: 8px 15px;
     border-radius: 30px;
     border: 2px solid var(--gold);
 }
