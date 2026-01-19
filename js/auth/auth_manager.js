@@ -135,6 +135,7 @@ const AuthManager = {
                     owned_cards: JSON.stringify(this.currentUser.ownedCards || {}),
                     vouchers: this.currentUser.vouchers || 0,
                     defeated_ai: JSON.stringify(this.currentUser.defeatedAI || []),
+                    current_xp: this.currentUser.currentXP || 0,
                     last_saved: this.currentUser.lastsaved
                 })
             });
@@ -192,6 +193,7 @@ const AuthManager = {
             ownedCards: rawData.owned_cards || rawData.ownedcards || rawData.ownedCards || "{}",
             vouchers: parseInt(rawData.vouchers || 0),
             defeatedAI: rawData.defeated_ai || rawData.defeatedAI || rawData.defeatedai || "[]",
+            currentXP: parseInt(rawData.current_xp || rawData.currentXP || rawData.currentxp || 0) || 0,
             lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0)
         };
 

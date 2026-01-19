@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="css/settings_fix.css">
     <link rel="stylesheet" href="css/auth_style.css">
     <link rel="stylesheet" href="css/player_info.css">
+    <link rel="stylesheet" href="css/level_display.css">
     <link rel="stylesheet" href="css/selection_modals.css">
     <link rel="stylesheet" href="css/profile_page.css">
     <link rel="stylesheet" href="css/shop.css">
@@ -92,6 +93,20 @@
                         <button id="btn-main-test" class="neon-button secondary"
                             style="margin-top: 15px; display: none;">測試模式 (Test
                             Mode)</button>
+                    </div>
+                </div>
+
+                <!-- 等級顯示 (左下角) -->
+                <div id="level-display" class="level-display" style="display: none;">
+                    <div class="level-badge">
+                        <span class="level-text">Lv.</span>
+                        <span id="player-level">1</span>
+                    </div>
+                    <div class="xp-bar-container">
+                        <div id="xp-bar" class="xp-bar"></div>
+                        <div class="xp-text">
+                            <span id="current-xp">0</span> / <span id="required-xp">20</span> XP
+                        </div>
                     </div>
                 </div>
 

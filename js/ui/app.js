@@ -922,6 +922,7 @@ function onUserLogin(user) {
     showView('main-menu');
     showToast(`歡迎回來，${processedUser.username}！`);
     updatePlayerInfo(); // 登入後確保更新按鈕可見性
+    updateLevelDisplay(); // 更新等級和經驗條顯示
 }
 
 /**
@@ -1950,6 +1951,11 @@ function showView(viewId) {
             audioManager.pause();
         }
     }
+
+    // --- 確保回主選單時更新等級與經驗條 ---
+    if (viewId === 'main-menu') {
+        updateLevelDisplay();
+    }
 }
 
 let previousPlayerHandSize = 0;
@@ -1992,13 +1998,13 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
     const initialHand = [...gameState.players[0].hand];
     gameState.players[0].hand = [];
     previousPlayerHandSize = 0;
-
+ 
     // Init Mana Containers for the new game view
     initManaContainers('player-mana-container');
     initManaContainers('opp-mana-container');
-
+ 
     render();
-
+ 
     // Animate sorting out cards one by one
     // We don't block the UI thread completely, just delay the appearance
     for (const card of initialHand) {
@@ -2006,7 +2012,7 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
         gameState.players[0].hand.push(card);
         render();
     }
-
+ 
     // If opponent starts, trigger AI
     if (gameState.currentPlayerIdx === 1) {
         setTimeout(() => {
@@ -2767,6 +2773,39 @@ async function resolveDeaths() {
     render();
 }
 
+/**
+ * 計算升級到下一級所需的經驗值
+ * @param {number} level - 當前等級
+ * @returns {number} 升級所需經驗值
+ */
+function getXPRequiredForLevel(level) {
+    if (level < 1) return 0;
+    if (level === 1) return 20;  // 1→2: 20
+    if (level <= 9) return (level + 1) * 10; // 2→3: 30, 3→4: 40, ..., 9→10: 100
+    if (level <= 19) return 100 + (level - 9) * 20; // 10→11: 120, 11→12: 140, ..., 19→20: 300
+    if (level <= 29) return 300 + (level - 19) * 30; // 20→21: 330, ..., 29→30: 600
+    if (level <= 39) return 600 + (level - 29) * 40; // 30→31: 640, ..., 39→40: 1000
+    if (level <= 49) return 1000 + (level - 39) * 50; // 40→41: 1050, ..., 49→50: 1500
+    return 1500; // 50級封頂
+}
+
+/**
+ * 計算擊敗AI獲得的經驗值
+ * @param {string} difficulty - 難度 (NORMAL/HARD/HELL)
+ * @param {boolean} isFirstVictory - 是否首次擊敗
+ * @returns {number} 獲得的經驗值
+ */
+function getXPReward(difficulty, isFirstVictory) {
+    const rewards = {
+        'NORMAL': { first: 50, repeat: 8 },
+        'HARD': { first: 100, repeat: 14 },
+        'HELL': { first: 150, repeat: 25 }
+    };
+
+    const reward = rewards[difficulty] || rewards['NORMAL'];
+    return isFirstVictory ? reward.first : reward.repeat;
+}
+
 function endGame(result) {
     const resultView = document.getElementById('game-result-view');
     const resultText = document.getElementById('result-status-text');
@@ -2862,13 +2901,59 @@ function endGame(result) {
         }
     }
 
+    // 經驗值和升級處理
+    let gainedXP = 0;
+    let leveledUp = false;
+    let levelsGained = 0;
+
+    if (!isDebugMode && AuthManager.currentUser && result === 'VICTORY' && currentDifficulty && currentOpponentDeckId) {
+        const challengeKey = `${currentOpponentDeckId}-${currentDifficulty}`;
+        const isFirstVictory = firstVictoryReward > 0;
+
+        gainedXP = getXPReward(currentDifficulty, isFirstVictory);
+        AuthManager.currentUser.currentXP = (AuthManager.currentUser.currentXP || 0) + gainedXP;
+
+        while (AuthManager.currentUser.level < 50) {
+            const xpRequired = getXPRequiredForLevel(AuthManager.currentUser.level);
+
+            if (AuthManager.currentUser.currentXP >= xpRequired) {
+                AuthManager.currentUser.currentXP -= xpRequired;
+                AuthManager.currentUser.level++;
+                levelsGained++;
+                AuthManager.currentUser.gold += 100;
+            } else {
+                break;
+            }
+        }
+
+        if (levelsGained > 0) {
+            leveledUp = true;
+            ShopManager.updateGoldDisplay();
+        }
+
+        AuthManager.saveData();
+    }
+
     // 顯示結果畫面
     showView('game-result-view');
     document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex
 
+
+    // 顯示經驗值和升級信息
+    if (gainedXP > 0) {
+        setTimeout(() => {
+            showToast(`⭐ 獲得 ${gainedXP} 經驗值`);
+        }, 500);
+
+        if (leveledUp) {
+            setTimeout(() => {
+                showToast(`🎉 升級到 Lv.${AuthManager.currentUser.level}！獲得 ${levelsGained * 100} 金幣`);
+            }, 1500);
+        }
+    }
+
     // 如果有首次擊敗獎勵，在勝利文字下方顯示
     if (firstVictoryReward > 0) {
-        // 延遲顯示toast，讓勝利畫面先出現
         setTimeout(() => {
             const difficultyNames = {
                 'NORMAL': '普通級',
@@ -2876,7 +2961,48 @@ function endGame(result) {
                 'HELL': '大師級'
             };
             showToast(`🎉 首次擊敗${difficultyNames[currentDifficulty]}！獲得 ${firstVictoryReward} 金幣 🪙`);
-        }, 500);
+        }, gainedXP > 0 ? 2500 : 500);
+    }
+
+    // 更新等級與經驗條顯示
+    updateLevelDisplay();
+}
+
+/**
+ * 更新首頁的等級和經驗條顯示
+ */
+function updateLevelDisplay() {
+    const user = AuthManager.currentUser;
+    if (!user) {
+        // 未登入時隱藏等級顯示
+        const levelDisplay = document.getElementById('level-display');
+        if (levelDisplay) levelDisplay.style.display = 'none';
+        return;
+    }
+
+    const currentLevel = user.level || 1;
+    const currentXP = user.currentXP || 0;
+    const requiredXP = getXPRequiredForLevel(currentLevel);
+
+    // 顯示等級顯示區塊
+    const levelDisplay = document.getElementById('level-display');
+    if (levelDisplay) levelDisplay.style.display = 'flex';
+
+    // 更新等級數字
+    const levelEl = document.getElementById('player-level');
+    if (levelEl) levelEl.textContent = currentLevel;
+
+    // 更新經驗值文字
+    const currentXPEl = document.getElementById('current-xp');
+    const requiredXPEl = document.getElementById('required-xp');
+    if (currentXPEl) currentXPEl.textContent = currentXP;
+    if (requiredXPEl) requiredXPEl.textContent = requiredXP;
+
+    // 更新經驗條進度
+    const xpBar = document.getElementById('xp-bar');
+    if (xpBar) {
+        const percentage = Math.min((currentXP / requiredXP) * 100, 100);
+        xpBar.style.width = `${percentage}%`;
     }
 }
 
@@ -5691,6 +5817,9 @@ document.addEventListener('DOMContentLoaded', () => {
     updatePlayerInfo();
     // 初始化玩家資訊卡片的點擊事件
     initPlayerInfoEvents();
+
+    // 初始化等級與經驗條顯示 (確保從快取讀取後能立即顯示)
+    updateLevelDisplay();
 
     // 稱號選擇取消按鈕
     document.getElementById('btn-title-cancel')?.addEventListener('click', () => {
