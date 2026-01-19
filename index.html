@@ -81,6 +81,20 @@
                     <div class="player-details">
                         <div id="player-username" class="player-username">訪客</div>
                         <div id="player-title" class="player-title clickable">#玩家稱號</div>
+
+                        <!-- Integated Level Display -->
+                        <div id="level-display" class="player-level-info" style="display: none;">
+                            <div class="level-badge-inline">
+                                <span class="level-label">Lv.</span>
+                                <span id="player-level">1</span>
+                            </div>
+                            <div class="xp-bar-container-inline">
+                                <div id="xp-bar" class="xp-bar"></div>
+                                <div class="xp-text-inline">
+                                    <span id="current-xp">0</span> / <span id="required-xp">20</span>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -96,19 +110,7 @@
                     </div>
                 </div>
 
-                <!-- 等級顯示 (左下角) -->
-                <div id="level-display" class="level-display" style="display: none;">
-                    <div class="level-badge">
-                        <span class="level-text">Lv.</span>
-                        <span id="player-level">1</span>
-                    </div>
-                    <div class="xp-bar-container">
-                        <div id="xp-bar" class="xp-bar"></div>
-                        <div class="xp-text">
-                            <span id="current-xp">0</span> / <span id="required-xp">20</span> XP
-                        </div>
-                    </div>
-                </div>
+
 
                 <!-- 商店入口按鈕 (右下角) -->
                 <button id="btn-shop" class="shop-entrance-btn">
@@ -199,6 +201,16 @@
                                 <div id="profile-username" class="profile-username">玩家名稱</div>
                                 <div id="profile-title" class="profile-player-title clickable">
                                     #玩家稱號 ✏️
+                                </div>
+                                <div class="profile-level-section">
+                                    <div class="profile-level-badge">Lv. <span id="profile-level-val">1</span></div>
+                                    <div class="profile-xp-bar-container">
+                                        <div id="profile-xp-bar" class="profile-xp-bar"></div>
+                                        <div class="profile-xp-text">
+                                            <span id="profile-current-xp">0</span> / <span
+                                                id="profile-required-xp">20</span> XP
+                                        </div>
+                                    </div>
                                 </div>
                                 <div id="profile-join-date" class="profile-join-date">
                                     加入時間：2026-01-01

@@ -1156,6 +1156,26 @@ function updateProfilePage() {
     const titleObj = AVAILABLE_TITLES.find(t => t.id === titleId);
     if (titleEl) titleEl.textContent = `#${titleObj ? titleObj.name : titleId} ✏️`;
 
+    // 更新等級與經驗值
+    const levelEl = document.getElementById('profile-level-val');
+    const currentXPEl = document.getElementById('profile-current-xp');
+    const requiredXPEl = document.getElementById('profile-required-xp');
+    const xpBar = document.getElementById('profile-xp-bar');
+
+    if (levelEl) levelEl.textContent = user.level || 1;
+
+    // 計算經驗值需求
+    const currentXP = user.currentXP || 0;
+    const requiredXP = getXPRequiredForLevel(user.level || 1);
+
+    if (currentXPEl) currentXPEl.textContent = currentXP;
+    if (requiredXPEl) requiredXPEl.textContent = requiredXP;
+
+    if (xpBar) {
+        const percentage = Math.min((currentXP / requiredXP) * 100, 100);
+        xpBar.style.width = `${percentage}%`;
+    }
+
     // 更新金幣
     const goldEl = document.getElementById('profile-gold-amount');
     if (goldEl) {

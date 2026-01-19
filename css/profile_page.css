@@ -362,6 +362,69 @@
     font-style: italic;
 }
 
+/* Level and XP Section */
+.profile-level-section {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
+.profile-level-badge {
+    font-family: 'Noto Serif TC', serif;
+    font-size: 20px;
+    font-weight: 800;
+    color: var(--wood-dark);
+    display: flex;
+    align-items: baseline;
+    gap: 4px;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.profile-level-badge span {
+    font-size: 24px;
+    color: #b8860b;
+    /* Dark Goldenrod */
+}
+
+.profile-xp-bar-container {
+    width: 300px;
+    height: 18px;
+    background: rgba(61, 30, 15, 0.15);
+    border: 2px solid var(--wood-medium);
+    border-radius: 9px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.profile-xp-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #4ade80 0%, #22c55e 100%);
+    border-radius: 9px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 8px rgba(74, 222, 128, 0.4);
+}
+
+.profile-xp-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    color: #3e2723;
+    font-weight: 800;
+    width: 100%;
+    text-align: center;
+    line-height: 18px;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+    pointer-events: none;
+    font-family: 'Noto Sans TC', sans-serif;
+    letter-spacing: 0.5px;
+}
+
+
 /* 下方左右分欄 */
 .profile-bottom-section {
     display: grid;
