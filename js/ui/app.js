@@ -1928,9 +1928,85 @@ function renderPlayerThemeList() {
     });
 }
 
+// --- Loading Indicator Helpers ---
+function showLoadingIndicator() {
+    let loader = document.getElementById('global-loading-overlay');
+    if (!loader) {
+        loader = document.createElement('div');
+        loader.id = 'global-loading-overlay';
+        loader.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 99999;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #d4af37; /* Gold */
+            font-family: 'Noto Serif TC', serif;
+            font-size: 24px;
+            flex-direction: column;
+            gap: 20px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        `;
+        loader.innerHTML = `
+            <div style="
+                border: 4px solid #d4af37; 
+                border-top: 4px solid transparent; 
+                border-radius: 50%; 
+                width: 50px; 
+                height: 50px; 
+                animation: spin 1s linear infinite;">
+            </div>
+            <div style="text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);">戰場載入中...</div>
+            <style>
+                @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+            </style>
+        `;
+        document.body.appendChild(loader);
+
+        // Force reflow
+        void loader.offsetWidth;
+    }
+    loader.style.display = 'flex';
+    loader.style.opacity = '1';
+}
+
+function hideLoadingIndicator() {
+    const loader = document.getElementById('global-loading-overlay');
+    if (loader) {
+        loader.style.opacity = '0';
+        setTimeout(() => {
+            loader.style.display = 'none';
+        }, 300);
+    }
+}
+
 function showView(viewId) {
     const nextView = document.getElementById(viewId);
     if (!nextView) return;
+
+    // [Optimize] Show loading indicator for heavy battle view
+    if (viewId === 'battle-view') {
+        showLoadingIndicator();
+        // Preload large background image
+        const bgImg = new Image();
+        bgImg.src = 'assets/images/backgrounds/arena_bg.webp';
+        bgImg.onload = () => {
+            console.log('[App] Battle background loaded');
+            // Consider adding a small delay or check if other assets are needed
+            hideLoadingIndicator();
+        };
+        bgImg.onerror = () => {
+            console.warn('[App] Failed to preload battle background');
+            hideLoadingIndicator();
+        };
+    }
+
 
     // If same view is already fully displayed, ignore
     if (viewId === currentViewId && nextView.style.display === 'flex' && !nextView.classList.contains('enter-active')) {
@@ -2853,6 +2929,21 @@ function getXPReward(difficulty, isFirstVictory) {
     return isFirstVictory ? reward.first : reward.repeat;
 }
 
+/**
+ * 依序顯示獎勵通知
+ * @param {Array} rewards - 獎勵事件陣列，格式：[{message: string, delay: number}, ...]
+ */
+async function showRewardsSequentially(rewards) {
+    for (const reward of rewards) {
+        await new Promise(resolve => {
+            setTimeout(() => {
+                showToast(reward.message);
+                resolve();
+            }, reward.delay);
+        });
+    }
+}
+
 function endGame(result) {
     const resultView = document.getElementById('game-result-view');
     const resultText = document.getElementById('result-status-text');
@@ -2985,30 +3076,41 @@ function endGame(result) {
     showView('game-result-view');
     document.getElementById('game-result-view').style.display = 'flex'; // Ensure flex
 
+    // 建立獎勵事件佇列（依序顯示）
+    const rewardEvents = [];
 
-    // 顯示經驗值和升級信息
+    // 經驗值獎勵
     if (gainedXP > 0) {
-        setTimeout(() => {
-            showToast(`⭐ 獲得 ${gainedXP} 經驗值`);
-        }, 500);
-
-        if (leveledUp) {
-            setTimeout(() => {
-                showToast(`🎉 升級到 Lv.${AuthManager.currentUser.level}！獲得 ${levelsGained * 100} 金幣`);
-            }, 1500);
-        }
+        rewardEvents.push({
+            message: `⭐ 獲得 ${gainedXP} 經驗值`,
+            delay: 800  // 初始延遲
+        });
     }
 
-    // 如果有首次擊敗獎勵，在勝利文字下方顯示
+    // 升級獎勵
+    if (leveledUp) {
+        rewardEvents.push({
+            message: `🎉 升級到 Lv.${AuthManager.currentUser.level}！獲得 ${levelsGained * 100} 金幣`,
+            delay: 1500  // 升級訊息較重要，多給時間閱讀
+        });
+    }
+
+    // 首次擊敗獎勵
     if (firstVictoryReward > 0) {
-        setTimeout(() => {
-            const difficultyNames = {
-                'NORMAL': '普通級',
-                'HARD': '專家級',
-                'HELL': '大師級'
-            };
-            showToast(`🎉 首次擊敗${difficultyNames[currentDifficulty]}！獲得 ${firstVictoryReward} 金幣 🪙`);
-        }, gainedXP > 0 ? 2500 : 500);
+        const difficultyNames = {
+            'NORMAL': '普通級',
+            'HARD': '專家級',
+            'HELL': '大師級'
+        };
+        rewardEvents.push({
+            message: `🎊 首次擊敗${difficultyNames[currentDifficulty]}！獲得 ${firstVictoryReward} 金幣 🪙`,
+            delay: 1500  // 特殊成就，給更多時間
+        });
+    }
+
+    // 依序顯示所有獎勵
+    if (rewardEvents.length > 0) {
+        showRewardsSequentially(rewardEvents);
     }
 
     // 更新等級與經驗條顯示

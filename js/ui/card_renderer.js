@@ -40,7 +40,8 @@ const CardRenderer = {
         // 圖片 - createCardEl line 2914-2916
         let artHtml = '';
         if (card.image && showDetails) {
-            artHtml = `<div class="card-art-box" style="width: 100%; height: 55px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;"></div>`;
+            // [Optimize] Use img tag with loading="lazy" instead of background-image
+            artHtml = `<img class="card-art-box" src="${card.image}" loading="lazy" style="width: 100%; height: 55px; object-fit: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;" alt="${card.name}">`;
         } else {
             artHtml = `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
         }

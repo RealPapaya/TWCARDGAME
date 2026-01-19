@@ -1173,7 +1173,7 @@ body {
     flex-direction: column;
     width: 100%;
     height: 100%;
-    background: url('../assets/images/backgrounds/arena_bg.png') no-repeat center center;
+    background: url('../assets/images/backgrounds/arena_bg.webp') no-repeat center center;
     background-size: cover;
     box-shadow: inset 0 0 100px rgba(0, 0, 0, 0.5);
 }
