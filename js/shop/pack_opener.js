@@ -7,10 +7,10 @@
 const PackOpener = {
     // 稀有度機率 (用戶指定)
     rarityWeights: {
-        'COMMON': 65,
-        'RARE': 25,
-        'EPIC': 7,
-        'LEGENDARY': 3
+        'COMMON': 60,
+        'RARE': 26,
+        'EPIC': 10,
+        'LEGENDARY': 4
     },
 
     /**

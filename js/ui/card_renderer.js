@@ -35,27 +35,27 @@ const CardRenderer = {
         const headerSpacerHtml = `<div style="width: 100%; height: 10px;"></div>`;
 
         // 名稱 - createCardEl line 2944
-        const nameHtml = `<div class="card-title" style="margin: 2px 0; font-size: 10px; z-index: 5; text-shadow: 0 1px 2px #000;">${isOwned && showDetails ? card.name : '???'}</div>`;
+        const nameHtml = `<div class="card-title" style="margin: 2px 0; font-size: 10px; z-index: 5; text-shadow: 0 1px 2px #000;">${showDetails ? card.name : '???'}</div>`;
 
         // 圖片 - createCardEl line 2914-2916
         let artHtml = '';
-        if (isOwned && card.image && showDetails) {
+        if (card.image && showDetails) {
             artHtml = `<div class="card-art-box" style="width: 100%; height: 55px; background: url('${card.image}') no-repeat center; background-size: cover; border-radius: 4px; margin: 2px 0; border: 1px solid #444; flex-shrink: 0; background-color: transparent;"></div>`;
         } else {
             artHtml = `<div class="card-art-box placeholder" style="width: 100%; height: 40px; background: #222; margin: 5px 0; flex-shrink: 0;"></div>`;
         }
 
         // 種族標籤 - createCardEl line 2948
-        const categoryHtml = `<div class="card-category" style="margin: 2px 0; font-size: 7px;">${(card.category && isOwned && showDetails) ? card.category : ''}</div>`;
+        const categoryHtml = `<div class="card-category" style="margin: 2px 0; font-size: 7px;">${(card.category && showDetails) ? card.category : ''}</div>`;
 
         // 描述 - createCardEl line 2950
-        const descHtml = `<div class="card-desc" style="font-size: 8px; line-height: 1.1; overflow: hidden; padding: 2px; flex-grow: 1; text-align: center; white-space: pre-wrap;">${isOwned && showDetails ? (card.description || '') : '尚未解鎖'}</div>`;
+        const descHtml = `<div class="card-desc" style="font-size: 8px; line-height: 1.1; overflow: hidden; padding: 2px; flex-grow: 1; text-align: center; white-space: pre-wrap;">${showDetails ? (card.description || '') : '尚未解鎖'}</div>`;
 
         // 攻血數值 (僅隨從有) - createCardEl line 2880-2884
         let statsHtml = '';
         if (card.type === 'MINION') {
-            const attackValue = (isOwned && showDetails) ? card.attack : '?';
-            const healthValue = (isOwned && showDetails) ? card.health : '?';
+            const attackValue = showDetails ? card.attack : '?';
+            const healthValue = showDetails ? card.health : '?';
             statsHtml = `
         <div class="minion-stats">
             <span class="stat-atk"><span>${attackValue}</span></span>

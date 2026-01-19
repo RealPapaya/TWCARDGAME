@@ -320,6 +320,26 @@
     opacity: 0.8;
 }
 
+.product-drop-rates {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 13px;
+    color: var(--wood-dark);
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    padding: 8px 15px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+    width: 100%;
+    margin-bottom: 5px;
+    border: 1px dashed var(--wood-medium);
+}
+
+.product-drop-rates div {
+    text-align: left;
+    font-weight: 500;
+}
+
 .product-price {
     display: flex;
     align-items: center;

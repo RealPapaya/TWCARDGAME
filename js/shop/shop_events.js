@@ -52,7 +52,16 @@
                 showView('collection-view');
                 CollectionManager.renderCollection('all');
                 CollectionManager.setupFilters();
+                CollectionManager.updateVoucherDisplay();
             });
+        }
+
+        // 分解合成 Modal 關閉
+        const btnCardOpClose = document.getElementById('btn-card-op-close');
+        if (btnCardOpClose) {
+            btnCardOpClose.onclick = () => {
+                document.getElementById('card-op-modal').style.display = 'none';
+            };
         }
 
         // 圖鑑返回按鈕

@@ -32,45 +32,273 @@
     height: 980px;
     display: flex;
     flex-direction: column;
+
+    /* Parchment Background Style */
+    background: var(--parchment-light);
+    background-image:
+        radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
+        url("https://www.transparenttextures.com/patterns/parchment.png");
+    border: 8px solid var(--wood-dark);
+    border-radius: 16px;
+    padding: 35px 30px;
+    box-shadow:
+        inset 0 2px 4px rgba(0, 0, 0, 0.1),
+        0 12px 30px rgba(0, 0, 0, 0.6);
+}
+
+/* Decorative Corners (matching profile page) */
+.collection-container::before,
+.collection-container::after {
+    content: '';
+    position: absolute;
+    width: 60px;
+    height: 60px;
+    border: 4px solid var(--gold);
+    pointer-events: none;
+    /* Ensure clicks pass through */
+}
+
+.collection-container::before {
+    top: -4px;
+    left: -4px;
+    border-right: none;
+    border-bottom: none;
+}
+
+.collection-container::after {
+    bottom: -4px;
+    right: -4px;
+    border-left: none;
+    border-top: none;
 }
 
 /* ===== 標題欄 ===== */
 .collection-header {
     display: flex;
-    justify-content: space-between;
+    justify-content: center;
+    /* Center the title */
     align-items: center;
     margin-bottom: 20px;
+    position: relative;
+}
+
+.collection-header .back-button {
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
 }
 
 .collection-title {
     font-family: 'Noto Serif TC', serif;
     font-size: 42px;
     font-weight: 900;
-    color: #f1e4d1;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8), 0 0 10px rgba(212, 175, 55, 0.4);
+    color: var(--wood-dark);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
     letter-spacing: 8px;
     margin: 0;
-    flex: 1;
-    text-align: center;
 }
 
-.collection-stats {
+/* 新水平控制列 */
+.collection-controls-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.08);
+    /* 稍微深一點的底色 */
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    padding: 15px 10px;
+    margin-bottom: 25px;
+    gap: 20px;
+}
+
+.controls-left,
+.controls-right {
+    flex: 1 1 0;
+    /* Take equal space on both sides */
+}
+
+.controls-right {
+    display: flex;
+    justify-content: flex-start;
+    /* Align search box to the left of this container, next to filters */
+    align-items: center;
+    gap: 20px;
+}
+
+.controls-center {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 30px;
+    flex: 0 0 auto;
+    /* Middle part only takes necessary space */
+}
+
+/* 進度顯示 */
+#collection-progress {
     font-family: 'Noto Serif TC', serif;
-    font-size: 24px;
+    font-size: 20px;
+    font-weight: 900;
+    color: var(--wood-dark);
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    white-space: nowrap;
+}
+
+/* 搜尋框 */
+.search-box {
+    position: relative;
+    width: 250px;
+}
+
+.search-box input {
+    width: 100%;
+    padding: 8px 35px 8px 15px;
+    background: rgba(255, 255, 255, 0.6);
+    border: 2px solid var(--wood-dark);
+    border-radius: 20px;
+    font-size: 14px;
+    color: var(--wood-dark);
+    outline: none;
+    transition: all 0.3s ease;
+}
+
+.search-box input:focus {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: var(--gold);
+    box-shadow: 0 0 10px rgba(212, 175, 55, 0.2);
+}
+
+.search-box .search-icon {
+    position: absolute;
+    right: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    pointer-events: none;
+    opacity: 0.6;
+}
+
+/* 消費券顯示 */
+/* Push vouchers to the far right */
+.collection-stats {
+    margin-left: auto;
+    font-family: 'Noto Serif TC', serif;
+    font-size: 22px;
     font-weight: 700;
     color: var(--gold);
-    background: rgba(0, 0, 0, 0.6);
-    border: 3px solid var(--gold);
+    background: rgba(0, 0, 0, 0.7);
+    border: 2px solid var(--gold);
     border-radius: 30px;
-    padding: 8px 20px;
-    text-shadow: 2px 2px 0 #000;
+    padding: 5px 15px;
+    text-shadow: 1px 1px 0 #000;
+    display: flex;
+    align-items: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+#collection-vouchers {
+    color: #43e97b;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ===== 分解合成 Modal ===== */
+#card-op-title {
+    color: #3e2723 !important;
+    /* Force dark wood color */
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.4);
+    margin-top: 10px;
+    font-size: 32px;
+}
+
+.parchment-modal {
+    width: 800px;
+    /* Increased width for side-by-side */
+    max-width: 95vw;
+}
+
+.card-op-content-wrapper {
+    display: flex;
+    align-items: center;
+    /* Vertically center both children */
+    justify-content: center;
+    gap: 60px;
+    padding: 30px 40px;
+    /* Removed min-height to allow content to dictate centering */
+}
+
+.card-op-preview {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    margin: 0;
+    /* Fixed dimensions to accommodate scaled card (140x200 * 1.35 approx) */
+    width: 220px;
+    height: 300px;
+    flex-shrink: 0;
+}
+
+.card-op-preview .card {
+    transform: scale(1.5) translate(50px, 60px);
+    /* 若要調整位置，修改這裡的 translate(x, y) */
+    /* Slightly Adjusted scale */
+    margin: 0;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+    /* Add shadow to lift it */
+    pointer-events: none;
+    /* 讓點擊事件穿透到 collection-card */
+}
+
+.card-op-actions {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    /* Center content vertically */
+    gap: 20px;
+    flex: 1;
+    /* Take equal width */
+}
+
+.card-op-info {
+    text-align: center;
+    margin-bottom: 10px;
+    font-family: 'Noto Sans TC', sans-serif;
+    color: var(--wood-dark);
+}
+
+#card-op-count {
+    font-weight: 900;
+    font-size: 24px;
+    margin-bottom: 15px;
+    color: var(--gold);
+    text-shadow: 1px 1px 0 #000;
+}
+
+/* #card-op-desc removed */
+
+.medieval-button-group.vertical-group {
+    flex-direction: column;
+    width: 100%;
+    gap: 15px;
+}
+
+.medieval-button-group.vertical-group .medieval-button {
+    width: 100%;
+}
+
+.medieval-button.danger {
+    background: linear-gradient(to bottom, #d32f2f, #b71c1c);
+    color: white;
 }
 
 /* ===== 篩選器 ===== */
 .collection-filters {
     display: flex;
     gap: 15px;
-    margin-bottom: 20px;
     justify-content: center;
 }
 

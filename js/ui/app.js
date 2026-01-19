@@ -1155,6 +1155,12 @@ function updateProfilePage() {
         goldEl.textContent = user.gold !== undefined ? user.gold : 100;
     }
 
+    // 更新消費券
+    const vouchersEl = document.getElementById('profile-vouchers-amount');
+    if (vouchersEl) {
+        vouchersEl.textContent = user.vouchers || 0;
+    }
+
     // 更新加入時間
     const joinDateEl = document.getElementById('profile-join-date');
     if (joinDateEl) {

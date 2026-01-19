@@ -131,6 +131,7 @@ const AuthManager = {
                     selectedtitle: this.currentUser.selectedTitle,
                     stats: JSON.stringify(this.currentUser.stats || {}),
                     ownedcards: JSON.stringify(this.currentUser.ownedCards || {}),
+                    vouchers: this.currentUser.vouchers || 0,
                     lastsaved: this.currentUser.lastsaved
                 })
             });
@@ -184,6 +185,7 @@ const AuthManager = {
             selectedTitle: rawData.selectedtitle || rawData.selectedTitle || "新手玩家",
             stats: rawData.stats || "{}",
             ownedCards: rawData.ownedcards || rawData.ownedCards || "{}",
+            vouchers: parseInt(rawData.vouchers || 0),
             lastsaved: parseInt(rawData.lastsaved || 0)
         };
 

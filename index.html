@@ -189,9 +189,15 @@
                                 </div>
                             </div>
 
-                            <div class="profile-gold-display" title="持有金幣">
-                                <img class="gold-icon" src="assets/images/ui/gold_coin.png" alt="Gold">
-                                <span id="profile-gold-amount">100</span>
+                            <div class="profile-auth-section">
+                                <div class="profile-vouchers-display" title="持有消費券">
+                                    <img class="voucher-icon" src="assets/images/ui/voucher.png" alt="Voucher">
+                                    <span id="profile-vouchers-amount">0</span>
+                                </div>
+                                <div class="profile-gold-display" title="持有金幣">
+                                    <img class="gold-icon" src="assets/images/ui/gold_coin.png" alt="Gold">
+                                    <span id="profile-gold-amount">100</span>
+                                </div>
                             </div>
                         </div>
 
@@ -266,6 +272,12 @@
                             </div>
                             <h3>卡牌包</h3>
                             <p class="product-desc">包含 5 張隨機卡牌</p>
+                            <div class="product-drop-rates">
+                                <div>普通: 60%</div>
+                                <div>稀有: 26%</div>
+                                <div>史詩: 10%</div>
+                                <div>傳說: 4%</div>
+                            </div>
                             <div class="product-price">
                                 <img src="assets/images/ui/gold_coin.png" class="price-coin" alt="Gold">
                                 <span>100</span>
@@ -306,24 +318,67 @@
             <div id="collection-view" class="view" style="display: none;">
                 <div class="collection-container">
                     <!-- 標題欄 -->
+                    <!-- 標題欄 (僅保留返回與標題) -->
                     <div class="collection-header">
                         <button id="btn-collection-back" class="back-button">← 返回</button>
                         <h1 class="collection-title">卡牌圖鑑</h1>
-                        <div class="collection-stats">
-                            <span id="collection-progress">0/150</span>
-                        </div>
                     </div>
 
-                    <!-- 篩選器 -->
-                    <div class="collection-filters">
-                        <button class="filter-btn active" data-filter="all">全部</button>
-                        <button class="filter-btn" data-filter="owned">已擁有</button>
-                        <button class="filter-btn" data-filter="missing">未擁有</button>
+                    <!-- 新水平控制列：進度、搜尋、篩選、消費券 -->
+                    <div class="collection-controls-bar">
+                        <div class="controls-left">
+                            <span id="collection-progress">已收集卡片種類: 0/70</span>
+                        </div>
+
+                        <div class="controls-center">
+                            <div class="collection-filters">
+                                <button class="filter-btn active" data-filter="all">全部</button>
+                                <button class="filter-btn" data-filter="owned">已擁有</button>
+                                <button class="filter-btn" data-filter="missing">未擁有</button>
+                            </div>
+                        </div>
+
+                        <div class="controls-right">
+                            <div class="search-box">
+                                <input type="text" id="collection-search-input" placeholder="搜尋卡牌名稱...">
+                                <span class="search-icon">🔍</span>
+                            </div>
+                            <div class="collection-stats">
+                                <span id="collection-vouchers" title="持有消費券">
+                                    <img src="assets/images/ui/voucher.png" alt="Vouchers"
+                                        style="width: 28px; vertical-align: middle;">
+                                    <span id="vouchers-amount">0</span>
+                                </span>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- 卡牌網格 -->
                     <div id="collection-grid" class="collection-grid">
                         <!-- 由 JS 動態生成 -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- 卡牌操作 Modal (分解/合成) -->
+            <div id="card-op-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 id="card-op-title" class="medieval-title">卡牌名稱</h2>
+                    <div class="card-op-content-wrapper">
+                        <div id="card-op-preview" class="card-op-preview">
+                            <!-- 卡牌預覽會在這裡 -->
+                        </div>
+                        <div class="card-op-actions">
+                            <div class="card-op-info">
+                                <p id="card-op-count">擁有數量: 0</p>
+                            </div>
+                            <div class="modal-buttons medieval-button-group vertical-group">
+                                <button id="btn-card-disenchant" class="medieval-button danger">分解
+                                    (+<span>0</span>)</button>
+                                <button id="btn-card-craft" class="medieval-button">合成 (-<span>0</span>)</button>
+                                <button id="btn-card-op-close" class="medieval-button secondary">關閉</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
