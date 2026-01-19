@@ -4887,6 +4887,14 @@ body.dragging-active .player .hand .card:hover {
     border-color: #4f4f4f !important;
 }
 
+.medieval-button:disabled {
+    filter: grayscale(100%) brightness(0.7) !important;
+    opacity: 0.6 !important;
+    cursor: not-allowed !important;
+    transform: none !important;
+    box-shadow: none !important;
+}
+
 /* Theme Grid */
 .medieval-theme-grid {
     display: grid !important;

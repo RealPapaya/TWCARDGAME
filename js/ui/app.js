@@ -5070,7 +5070,7 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
                     const sfxPath = isHighCost
                         ? 'assets/audio/sfx/HighCostMionion.mp3'
                         : 'assets/audio/sfx/LowCostMionion.mp3';
-                    audioManager.playSFX(sfxPath, isHighCost ? 1.5 : 1.0);
+                    audioManager.playSFX(sfxPath, isHighCost ? 1.02 : 1.0);
                 }
 
                 setTimeout(() => boardEl.classList.remove('board-slam'), 500);
@@ -5118,6 +5118,14 @@ function spawnDustEffect(targetEl, intensity = 1) {
 function animateShatter(el) {
     return new Promise(async resolve => {
         el.classList.add('dying');
+
+        // Delay death sound to play after hit sound
+        setTimeout(() => {
+            if (window.audioManager) {
+                audioManager.playSFX('assets/audio/sfx/MionionDeath.mp3');
+            }
+        }, 250);
+
         await new Promise(r => setTimeout(r, 400));
 
         const rect = el.getBoundingClientRect();
@@ -5969,6 +5977,55 @@ function showToast(message) {
     }, 3000);
 }
 
+/**
+ * 自定義確認對話框 (回傳 Promise)
+ */
+window.gameConfirm = function (message, title = '確認', isAlert = false) {
+    return new Promise((resolve) => {
+        const modal = document.getElementById('game-confirm-modal');
+        const titleEl = document.getElementById('game-confirm-title');
+        const msgEl = document.getElementById('game-confirm-message');
+        const okBtn = document.getElementById('game-confirm-ok');
+        const cancelBtn = document.getElementById('game-confirm-cancel');
+
+        if (!modal) {
+            console.error('Confirm modal not found!');
+            resolve(isAlert);
+            return;
+        }
+
+        titleEl.textContent = title;
+        msgEl.textContent = message;
+        cancelBtn.style.display = isAlert ? 'none' : 'block';
+        modal.style.display = 'flex';
+
+        const handleOk = () => {
+            modal.style.display = 'none';
+            cleanup();
+            resolve(true);
+        };
+        const handleCancel = () => {
+            modal.style.display = 'none';
+            cleanup();
+            resolve(false);
+        };
+        const cleanup = () => {
+            okBtn.removeEventListener('click', handleOk);
+            cancelBtn.removeEventListener('click', handleCancel);
+        };
+
+        okBtn.onclick = handleOk;
+        cancelBtn.onclick = handleCancel;
+    });
+};
+
+/**
+ * 自定義警告對話框
+ */
+window.gameAlert = function (message, title = '提醒') {
+    return window.gameConfirm(message, title, true);
+};
+
 // Start Game
 document.addEventListener('DOMContentLoaded', () => {
     init(); // Initialize listeners and engine
@@ -6133,13 +6190,13 @@ async function confirmMulligan() {
     // 檢查 gameState 是否存在並且有 performMulligan 方法
     if (!gameState) {
         console.error('[ERROR] gameState 不存在!');
-        alert('遊戲狀態錯誤,請重新開始遊戲');
+        gameAlert('遊戲狀態錯誤,請重新開始遊戲', '錯誤');
         return;
     }
 
     if (typeof gameState.performMulligan !== 'function') {
         console.error('[ERROR] gameState.performMulligan 不是一個函數!');
-        alert('遊戲引擎載入錯誤,請重新整理頁面 (Ctrl+Shift+R)');
+        gameAlert('遊戲引擎載入錯誤,請重新整理頁面 (Ctrl+Shift+R)', '載入錯誤');
         return;
     }
 

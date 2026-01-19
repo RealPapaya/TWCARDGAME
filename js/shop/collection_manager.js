@@ -186,6 +186,9 @@ const CollectionManager = {
         const user = AuthManager.currentUser;
         if (!user || !user.ownedCards[cardId] || user.ownedCards[cardId] <= 0) return;
 
+        // 加入確認對話框 (自定義)
+        if (!await gameConfirm(`確定要分解這張卡牌嗎？\n分解後將獲得 ${amount} 點消費券。`, '分解卡牌')) return;
+
         user.ownedCards[cardId]--;
         user.vouchers = (user.vouchers || 0) + amount;
 
@@ -204,6 +207,9 @@ const CollectionManager = {
             showToast('消費券不足！');
             return;
         }
+
+        // 加入確認對話框 (自定義)
+        if (!await gameConfirm(`確定要合成這張卡牌嗎？\n合成將消耗 ${cost} 點消費券。`, '合成卡牌')) return;
 
         user.vouchers -= cost;
         if (!user.ownedCards[cardId]) user.ownedCards[cardId] = 0;

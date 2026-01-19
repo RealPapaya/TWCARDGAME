@@ -961,6 +961,22 @@
         </div>
     </div>
 
+    <!-- 自定義確認對話框 -->
+    <div id="game-confirm-modal" class="modal-overlay" style="display: none; z-index: 99999;">
+        <div class="modal-content parchment-modal">
+            <h2 id="game-confirm-title" class="medieval-title">確認</h2>
+            <p id="game-confirm-message" class="medieval-subtitle"
+                style="margin: 30px 0; font-size: 1.5rem; text-align: center; white-space: pre-wrap; line-height: 1.4; color: #3e2723;">
+            </p>
+            <div class="modal-buttons medieval-button-group"
+                style="flex-direction: row !important; justify-content: center; gap: 30px; width: 100%;">
+                <button id="game-confirm-ok" class="medieval-button" style="width: 180px !important;">確定</button>
+                <button id="game-confirm-cancel" class="medieval-button secondary"
+                    style="width: 180px !important;">取消</button>
+            </div>
+        </div>
+    </div>
+
 
     <!-- Drag Line SVG Layer (Moved outside scaler for correct coordinates) -->
     <svg id="drag-layer">

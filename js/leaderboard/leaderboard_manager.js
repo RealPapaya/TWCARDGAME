@@ -251,11 +251,9 @@ class LeaderboardManager {
      * @param {Object} player - 玩家資料
      */
     addFriend(player) {
-        // 顯示自定義訊息 modal
-        if (window.showCustomModal) {
-            window.showCustomModal(`已發送好友邀請給 ${player.username}！\n（好友系統開發中）`, false);
-        } else {
-            alert(`已發送好友邀請給 ${player.username}！\n（好友系統開發中）`);
+        // 顯示自定義訊息 modal (全域 gameAlert)
+        if (window.gameAlert) {
+            gameAlert(`已發送好友邀請給 ${player.username}！\n（好友系統開發中）`, '好友邀請');
         }
     }
 
