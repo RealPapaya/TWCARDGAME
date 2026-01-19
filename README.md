@@ -5,8 +5,8 @@
 新增卡牌需要修改 `app.js` 中的 `CARD_DATA` 陣列，並將圖片放入 `img/` 資料夾。
 
 ### 1. 準備圖片
-- 格式：建議使用 `.png` 或 `.jpg`
-- 命名：遵循 `twXXX.png` (例如 `tw017.png`)
+- 格式：建議使用 `.webp` 或 `.jpg`
+- 命名：遵循 `twXXX.webp` (例如 `tw017.webp`)
 - 路徑：`d:\Google AI\TWCARDGAME\img\`
 
 ### 2. 在 `app.js` 中新增資料

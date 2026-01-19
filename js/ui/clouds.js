@@ -7,10 +7,10 @@ class CloudManager {
     constructor() {
         this.container = null;
         this.cloudImages = [
-            'assets/images/backgrounds/Cloud (1).PNG',
-            'assets/images/backgrounds/Cloud (2).PNG',
-            'assets/images/backgrounds/Cloud (3).PNG',
-            'assets/images/backgrounds/Cloud (4).PNG'
+            'assets/images/backgrounds/Cloud (1).webp',
+            'assets/images/backgrounds/Cloud (2).webp',
+            'assets/images/backgrounds/Cloud (3).webp',
+            'assets/images/backgrounds/Cloud (4).webp'
         ];
         this.init();
     }

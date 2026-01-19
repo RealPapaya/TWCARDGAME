@@ -77,11 +77,11 @@ function generateDefaultDeck() {
 }
 
 const defaultAIThemes = [
-    { id: 'dpp', name: '賴清德-新聞湧動', image: 'assets/images/illustrations/lai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp },
-    { id: 'dpp2', name: '蔡英文-無限回溯', image: 'assets/images/illustrations/tsai_illustration.png', cards: DEFAULT_THEME_DECKS.dpp2 },
-    { id: 'kmt', name: '韓國瑜-政壇輪迴', image: 'assets/images/illustrations/han_illustration.png', cards: DEFAULT_THEME_DECKS.kmt },
-    { id: 'kmt2', name: '傅崑萁-江湖棄殺', image: 'assets/images/illustrations/fu_kun_chi.png', cards: DEFAULT_THEME_DECKS.kmt2 },
-    { id: 'tpp', name: '柯文哲-台大醫科', image: 'assets/images/illustrations/ko_illustration.png', cards: DEFAULT_THEME_DECKS.tpp }
+    { id: 'dpp', name: '賴清德-新聞湧動', image: 'assets/images/illustrations/lai_illustration.webp', cards: DEFAULT_THEME_DECKS.dpp },
+    { id: 'dpp2', name: '蔡英文-無限回溯', image: 'assets/images/illustrations/tsai_illustration.webp', cards: DEFAULT_THEME_DECKS.dpp2 },
+    { id: 'kmt', name: '韓國瑜-政壇輪迴', image: 'assets/images/illustrations/han_illustration.webp', cards: DEFAULT_THEME_DECKS.kmt },
+    { id: 'kmt2', name: '傅崑萁-江湖棄殺', image: 'assets/images/illustrations/fu_kun_chi.webp', cards: DEFAULT_THEME_DECKS.kmt2 },
+    { id: 'tpp', name: '柯文哲-台大醫科', image: 'assets/images/illustrations/ko_illustration.webp', cards: DEFAULT_THEME_DECKS.tpp }
 ];
 
 let aiThemeDecks = JSON.parse(localStorage.getItem('aiThemeDecks')) || defaultAIThemes;
@@ -5759,7 +5759,7 @@ function renderAIBattleSetup() {
             const reward = difficultyRewards[diff];
             const statusText = isDefeated
                 ? '<span style="color: #4ade80; margin-left: 8px;">✓ 已通關</span>'
-                : `<span style="display: flex; align-items: center; color: #fcd34d; margin-left: 8px;"><img src="assets/images/ui/gold_coin.png" style="width: 20px; height: 20px; margin-right: 4px;"> ${reward}</span>`;
+                : `<span style="display: flex; align-items: center; color: #fcd34d; margin-left: 8px;"><img src="assets/images/ui/gold_coin.webp" style="width: 20px; height: 20px; margin-right: 4px;"> ${reward}</span>`;
 
             return `<div class="sub-difficulty-btn" data-value="${diff}">${label}${statusText}</div>`;
         }).join('');

@@ -1,6 +1,6 @@
 [void][Reflection.Assembly]::LoadWithPartialName('System.Drawing')
-$srcPath = 'C:\Users\Morris\.gemini\antigravity\brain\5ade2e0b-a215-4c6d-bfaf-519a84c467fc\cursor_solid_bg_1768115960684.png'
-$destPath = 'd:\GOOGLE\TWCARDGAME\TWCARDGAME\img\cursor_default.png'
+$srcPath = 'C:\Users\Morris\.gemini\antigravity\brain\5ade2e0b-a215-4c6d-bfaf-519a84c467fc\cursor_solid_bg_1768115960684.webp'
+$destPath = 'd:\GOOGLE\TWCARDGAME\TWCARDGAME\img\cursor_default.webp'
 
 $img = [Drawing.Bitmap]::FromFile($srcPath)
 # Get the background color from top-left pixel

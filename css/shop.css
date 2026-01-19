@@ -39,7 +39,7 @@
     right: 0;
     bottom: 0;
     border-radius: 50%;
-    background: url("https://www.transparenttextures.com/patterns/parchment.png");
+    background: url("https://www.transparenttextures.com/patterns/parchment.webp");
     opacity: 0.3;
     pointer-events: none;
 }
@@ -104,7 +104,7 @@
     right: 0;
     bottom: 0;
     border-radius: 50%;
-    background: url("https://www.transparenttextures.com/patterns/parchment.png");
+    background: url("https://www.transparenttextures.com/patterns/parchment.webp");
     opacity: 0.3;
     pointer-events: none;
 }
@@ -246,7 +246,7 @@
 
 .product-card {
     background: var(--parchment-light);
-    background-image: url("https://www.transparenttextures.com/patterns/parchment.png");
+    background-image: url("https://www.transparenttextures.com/patterns/parchment.webp");
     border: 6px solid var(--wood-dark);
     border-radius: 16px;
     padding: 20px;
@@ -509,7 +509,7 @@
 
 .pack-opening-content {
     background: var(--parchment-light);
-    background-image: url("https://www.transparenttextures.com/patterns/parchment.png");
+    background-image: url("https://www.transparenttextures.com/patterns/parchment.webp");
     border: 8px solid var(--wood-dark);
     border-radius: 20px;
     padding: 50px;
@@ -659,7 +659,7 @@
 }
 
 .pack-card-back {
-    background-image: url('../assets/images/card_back.png');
+    background-image: url('../assets/images/card_back.webp');
     background-size: cover;
     background-position: center;
     background-color: #2c3e50;

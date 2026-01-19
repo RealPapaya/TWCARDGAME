@@ -44,7 +44,7 @@
 /* Custom Cursor Theme */
 body,
 * {
-    cursor: url('../assets/images/cursors/cursor_default.png') 0 0, auto !important;
+    cursor: url('../assets/images/cursors/cursor_default.webp') 0 0, auto !important;
 }
 
 
@@ -366,7 +366,7 @@ body {
 }
 
 .deck-slot {
-    background: url('../assets/images/ui/deck_slot_bg.png') no-repeat center center;
+    background: url('../assets/images/ui/deck_slot_bg.webp') no-repeat center center;
     background-size: 100% 100%;
     border: none !important;
     outline: none !important;
@@ -698,7 +698,7 @@ body {
     left: 0;
     right: 0;
     bottom: 0;
-    background: url("https://www.transparenttextures.com/patterns/parchment.png");
+    background: url("https://www.transparenttextures.com/patterns/parchment.webp");
     opacity: 0.3;
     pointer-events: none;
 }
@@ -1020,7 +1020,7 @@ body {
 #deck-builder {
     padding: 20px;
     box-sizing: border-box;
-    background: url('../assets/images/backgrounds/forge_bg.png') no-repeat center center;
+    background: url('../assets/images/backgrounds/forge_bg.webp') no-repeat center center;
     background-size: 100% 100%;
     position: relative;
 }
@@ -1283,7 +1283,7 @@ body {
 }
 
 .opponent-hero .avatar {
-    background: url('../assets/images/avatars/ai_default.png') no-repeat center;
+    background: url('../assets/images/avatars/ai_default.webp') no-repeat center;
     background-size: cover;
 }
 
@@ -1411,13 +1411,13 @@ body {
 }
 
 .mana-crystal.player-crystal.active {
-    background-image: url('../assets/images/mana/player-crystal.png');
+    background-image: url('../assets/images/mana/player-crystal.webp');
     filter: brightness(1.2) drop-shadow(0 0 12px rgba(0, 243, 255, 0.9));
     transform: rotate(45deg) scale(1.1);
 }
 
 .mana-crystal.opponent-crystal.active {
-    background-image: url('../assets/images/mana/opponent-crystal.png');
+    background-image: url('../assets/images/mana/opponent-crystal.webp');
     filter: brightness(1.2) drop-shadow(0 0 12px rgba(255, 51, 51, 0.9));
     transform: rotate(45deg) scale(1.1);
 }
@@ -1709,7 +1709,7 @@ body {
 .deck-pile {
     width: 60px;
     height: 85px;
-    background: url('../assets/images/ui/card_back.png') no-repeat center center;
+    background: url('../assets/images/ui/card_back.webp') no-repeat center center;
     background-size: 100% 100%;
     border-radius: 6px;
     border: 2px solid #444;
@@ -2111,7 +2111,7 @@ body.dragging-active .player .hand .card:hover {
 }
 
 .opponent .hand .card {
-    background: url('../assets/images/ui/card_back.png') no-repeat center center;
+    background: url('../assets/images/ui/card_back.webp') no-repeat center center;
     background-size: 100% 100%;
     border: 2px solid #444;
     /* Opponent: Mirror rotation */
@@ -3113,7 +3113,7 @@ body.dragging-active .player .hand .card:hover {
 /* Updated Mana Container Style */
 .mana-container.frame-style {
     position: relative;
-    background: url('../assets/images/ui/mana_frame.png') no-repeat center center;
+    background: url('../assets/images/ui/mana_frame.webp') no-repeat center center;
     background-size: 100% 100%;
     border: none;
     border-radius: 0;
@@ -4421,7 +4421,7 @@ body.dragging-active .player .hand .card:hover {
     content: '';
     position: absolute;
     inset: -5px;
-    background: url('../assets/images/ui/wood_frame.png') no-repeat center center;
+    background: url('../assets/images/ui/wood_frame.webp') no-repeat center center;
     /* 保�??�景置中，用 transform 移�??�個�?較直觀 */
     background-size: 65% 65%;
     mix-blend-mode: multiply;
@@ -4818,7 +4818,7 @@ body.dragging-active .player .hand .card:hover {
         radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.3) 0%, transparent 100%),
         repeating-linear-gradient(45deg, rgba(0, 0, 0, 0.02) 0px, rgba(0, 0, 0, 0.02) 2px, transparent 2px, transparent 4px) !important;
     border: 20px solid transparent !important;
-    border-image: url('../assets/images/ui/wood_frame.png') 60 stretch !important;
+    border-image: url('../assets/images/ui/wood_frame.webp') 60 stretch !important;
     padding: 50px !important;
     box-shadow: 0 15px 40px rgba(0, 0, 0, 0.8) !important;
     color: #4a2c1d !important;

@@ -10,7 +10,7 @@
     background: var(--parchment-light);
     background-image:
         radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
-        url("https://www.transparenttextures.com/patterns/parchment.png");
+        url("https://www.transparenttextures.com/patterns/parchment.webp");
     border: 8px solid var(--wood-dark);
     border-radius: 16px;
     padding: 40px 30px;

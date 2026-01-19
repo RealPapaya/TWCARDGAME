@@ -17,7 +17,7 @@
     height: 110px !important;
     background: #e6ccb2 !important;
     /* Parchment-like color */
-    background-image: url("https://www.transparenttextures.com/patterns/parchment.png") !important;
+    background-image: url("https://www.transparenttextures.com/patterns/parchment.webp") !important;
     border: 6px solid #5d2e17 !important;
     /* Dark wood color */
     border-radius: 48% 52% 45% 55% / 55% 45% 52% 48% !important;
@@ -61,7 +61,7 @@
     /* Aged parchment */
     background-image:
         radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.2) 0%, transparent 100%),
-        url("https://www.transparenttextures.com/patterns/parchment.png") !important;
+        url("https://www.transparenttextures.com/patterns/parchment.webp") !important;
     border: 6px solid #5d2e17 !important;
     border-radius: 4px !important;
     padding: 24px 20px !important;
