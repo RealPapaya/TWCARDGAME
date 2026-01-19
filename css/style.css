@@ -4833,13 +4833,13 @@ body.dragging-active .player .hand .card:hover {
 
 .medieval-title {
     font-size: 2.5rem !important;
-    color: #f4e4bc !important;
-    /* 羊皮紙色 */
+    color: #5d2e17 !important;
+    /* 木紋色 */
     text-align: center !important;
     margin-bottom: 20px !important;
-    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.8) !important;
-    /* ?�深?�影以確保可讀??*/
-    border-bottom: 2px solid #8b4513 !important;
+    text-shadow: 1px 1px 1px rgba(255, 255, 255, 0.5) !important;
+    /* 淺色投影 */
+    border-bottom: none !important;
     padding-bottom: 10px !important;
 }
 

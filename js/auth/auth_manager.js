@@ -23,7 +23,8 @@ const AuthManager = {
         if (!this.API_URL) return { success: false, message: "API URL 未設定" };
 
         try {
-            const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&_t=${Date.now()}`;
+            const starterCards = JSON.stringify(this.generateStarterCollection());
+            const url = `${this.API_URL}?action=register&username=${encodeURIComponent(username)}&password=${encodeURIComponent(password)}&owned_cards=${encodeURIComponent(starterCards)}&_t=${Date.now()}`;
             console.log("正在嘗試註冊:", username);
 
             const response = await fetch(url, {
@@ -214,6 +215,14 @@ const AuthManager = {
             try {
                 console.log("[Auth] 嘗試解析 ownedCards:", user.ownedCards);
                 user.ownedCards = JSON.parse(user.ownedCards || "{}");
+
+                // 如果卡包是空的 (新帳號)，則發放初始卡牌
+                if (Object.keys(user.ownedCards).length === 0) {
+                    console.log("[Auth] 偵測到新帳號，發放初始卡牌");
+                    user.ownedCards = this.generateStarterCollection();
+                    // 立即儲存一次以確保雲端也有資料
+                    setTimeout(() => this.saveData(), 1000);
+                }
             }
             catch (e) {
                 console.error("[Auth] ownedCards 解析失敗，載入初始卡組", e);
@@ -271,7 +280,6 @@ const AuthManager = {
             'S026',
             'TW068',
             'TW027',
-            'TW017',
             'TW028'
         ];
 

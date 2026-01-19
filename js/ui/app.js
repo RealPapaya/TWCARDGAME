@@ -128,6 +128,31 @@ let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
 window.isDebugMode = isDebugMode; // 暴露出全域變數供其他模組存取
 
+// Debug Command: Kill Opponent
+window.killOpponent = async function () {
+    if (!gameState || !gameState.players[1]) {
+        console.warn("Game not running or gameState invalid!");
+        return;
+    }
+    console.log("Killing opponent...");
+
+    // Set HP to 0
+    gameState.players[1].hero.hp = 0;
+
+    // Update view immediately
+    if (typeof render === 'function') render();
+
+    // Trigger death resolution
+    if (typeof resolveDeaths === 'function') {
+        await resolveDeaths();
+    } else {
+        console.warn("resolveDeaths not found globally, falling back to manual check");
+        gameState.resolveDeaths();
+        if (typeof render === 'function') render();
+    }
+    console.log("Opponent killed!");
+};
+
 // [權限控制] 判斷是否為 admin 帳號
 function isAdmin() {
     return AuthManager.currentUser?.username?.toLowerCase() === 'admin';
@@ -1994,6 +2019,8 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
 
     try {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
+        // Expose for debugging
+        window.gameState = gameState;
         // Only call showView ONCE
         showView('battle-view');
 

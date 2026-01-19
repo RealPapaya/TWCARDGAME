@@ -50,7 +50,7 @@ function doGet(e) {
     setVal("selectedtitle", "beginner");     // [修改] 預設為菜鳥 (ID)
     setVal("ownedavatars", '["avatar1"]');   // [新增] 初始擁有頭像 1
     setVal("ownedtitles", '["beginner"]');   // [新增] 初始擁有稱號：菜鳥
-    setVal("ownedcards", "{}");
+    setVal("ownedcards", e.parameter.owned_cards || "{}"); // [修改] 從前端傳入初始卡牌
     setVal("stats", "{}");
     setVal("lastsaved", Date.now()); 
     
