@@ -1453,13 +1453,9 @@ class GameState {
             return null;
         }
 
-        let targetPlayer = null;
-        if (target.side === 'PLAYER') targetPlayer = this.currentPlayer;
-        else if (target.side === 'OPPONENT') targetPlayer = this.opponent;
+        const targetPlayer = this.players.find(p => p.side === target.side);
 
-        // Final fallback if side mapping fails
         if (!targetPlayer) {
-            if (target.type === 'HERO') return (target.side === 'OPPONENT' ? this.opponent.hero : this.currentPlayer.hero);
             return null;
         }
 

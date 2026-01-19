@@ -74,7 +74,7 @@ const AuthUI = {
         const password = this.loginPasswordField.value.trim();
 
         if (!username || !password) {
-            alert("請輸入帳號與密碼");
+            await showCustomAlert("請輸入帳號與密碼");
             return;
         }
 
@@ -84,13 +84,13 @@ const AuthUI = {
         const result = await AuthManager.login(username, password);
 
         if (result.success) {
-            alert("登入成功！");
+            await showCustomAlert("登入成功！");
             // 載入使用者資料後導向主選單
             if (window.App) {
                 window.App.onUserLogin(result.user);
             }
         } else {
-            alert("登入失敗: " + result.message);
+            await showCustomAlert("登入失敗: " + result.message);
         }
 
         this.btnLogin.disabled = false;
@@ -103,12 +103,12 @@ const AuthUI = {
         const confirm = this.regConfirmField.value.trim();
 
         if (!username || !password) {
-            alert("請填寫所有欄位");
+            await showCustomAlert("請填寫所有欄位");
             return;
         }
 
         if (password !== confirm) {
-            alert("兩次輸入的密碼不一致");
+            await showCustomAlert("兩次輸入的密碼不一致");
             return;
         }
 
@@ -118,10 +118,10 @@ const AuthUI = {
         const result = await AuthManager.register(username, password);
 
         if (result.success) {
-            alert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
+            await showCustomAlert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
             this.switchTab("login");
         } else {
-            alert("註冊失敗: " + result.message);
+            await showCustomAlert("註冊失敗: " + result.message);
         }
 
         this.btnRegister.disabled = false;
