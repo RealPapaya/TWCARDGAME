@@ -6,7 +6,8 @@ class AudioManager {
     constructor() {
         this.bgm = null;
         this.sfxVolume = parseFloat(localStorage.getItem('sfxVolume')) || 0.5;
-        this.bgmVolume = parseFloat(localStorage.getItem('bgmVolume')) || 0.5;
+        const savedBgm = localStorage.getItem('bgmVolume');
+        this.bgmVolume = savedBgm !== null ? parseFloat(savedBgm) : 0.15;
         this.previousVolume = this.bgmVolume; // Store previous volume for mute toggle
     }
 

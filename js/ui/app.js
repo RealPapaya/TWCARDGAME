@@ -2600,19 +2600,19 @@ async function aiTurn() {
                 const targetIndex = action.target.index;
 
                 // Visuals
+                const attacker = gameState.opponent.board[attackerIdx];
+                const damage = attacker ? attacker.attack : 0;
+
                 const attackerEl = document.getElementById('opp-board').children[attackerIdx];
                 const targetEl = targetType === 'HERO' ? document.getElementById('player-hero') : document.getElementById('player-board').children[targetIndex];
 
                 if (attackerEl && targetEl) {
-                    await animateAttack(attackerEl, targetEl);
+                    await animateAttack(attackerEl, targetEl, damage);
                 }
 
-                // 取得攻擊者和傷害數值
-                const attacker = gameState.opponent.board[attackerIdx];
                 const attackerName = getUnitName('OPPONENT', attackerIdx, 'MINION');
                 const tSide = action.target.side === 'OPPONENT' ? 'OPPONENT' : 'PLAYER';
                 const targetName = getUnitName(tSide, targetIndex, targetType);
-                const damage = attacker ? attacker.attack : 0;
 
                 MatchHistory.add('NORMAL_ATTACK', {
                     attacker: attackerName,
@@ -4033,15 +4033,6 @@ async function onDragEnd(e) {
                     if (newMinionEl && playedCard.type === 'MINION') {
                         const intensity = playedCard.cost >= 7 ? 2 : 1;
                         spawnDustEffect(newMinionEl, intensity);
-
-                        // Play landing sound
-                        if (window.audioManager) {
-                            const isHighCost = playedCard.cost >= 8;
-                            const sfxPath = isHighCost
-                                ? 'assets/audio/sfx/HighCostMionion.mp3'
-                                : 'assets/audio/sfx/LowCostMionion.mp3';
-                            audioManager.playSFX(sfxPath, isHighCost ? 5.0 : 1.0);
-                        }
                     }
 
                     // 4. WAIT 0.5s (as requested)
@@ -4314,15 +4305,16 @@ async function onDragEnd(e) {
 
                 try {
                     const sourceEl = document.getElementById('player-board').children[attackerIndex];
+                    const attacker = gameState.currentPlayer.board[attackerIndex];
+                    const damage = attacker ? attacker.attack : 0;
+
                     if (sourceEl && targetData) {
-                        await animateAttack(sourceEl, targetData);
+                        await animateAttack(sourceEl, targetData, damage);
                     }
 
                     // 取得攻擊者和目標名稱
-                    const attacker = gameState.currentPlayer.board[attackerIndex];
                     const attackerName = getUnitName('PLAYER', attackerIndex, 'MINION');
                     const targetName = getUnitName(targetData.id === 'opp-hero' ? 'OPPONENT' : 'OPPONENT', index, type);
-                    const damage = attacker ? attacker.attack : 0;
 
                     // 記錄普通攻擊
                     MatchHistory.add('NORMAL_ATTACK', {
@@ -4793,8 +4785,9 @@ async function animateDiscard(cardEl) {
  * Animates a card flying from start element to end element and slamming.
  * @param {HTMLElement} fromEl 
  * @param {HTMLElement} toEl 
+ * @param {number} damage
  */
-function animateAttack(fromEl, toEl) {
+function animateAttack(fromEl, toEl, damage = 0) {
     return new Promise(resolve => {
         const rectFrom = fromEl.getBoundingClientRect();
         const rectTo = toEl.getBoundingClientRect();
@@ -4837,6 +4830,12 @@ function animateAttack(fromEl, toEl) {
 
         // On Transition End (Impact)
         setTimeout(() => {
+            // Play attack sound based on damage
+            if (window.audioManager) {
+                const sfxPath = damage >= 7 ? 'assets/audio/sfx/HeavyHit.mp3' : 'assets/audio/sfx/LightHit.mp3';
+                audioManager.playSFX(sfxPath);
+            }
+
             // Shake Target
             toEl.classList.add('shaking');
             setTimeout(() => toEl.classList.remove('shaking'), 500);
