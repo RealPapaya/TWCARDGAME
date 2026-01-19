@@ -19,18 +19,22 @@ const CollectionManager = {
         if (!grid) return;
 
         // 篩選卡牌
+        // 篩選卡牌
         let cardsToShow = CARD_DATA.filter(c => c.type === 'MINION'); // 只顯示隨從卡
 
-        if (filter === 'owned') {
+        const isAdminTest = window.isDebugMode && window.isAdmin?.();
+
+        if (filter === 'owned' && !isAdminTest) {
             cardsToShow = cardsToShow.filter(c => ownedCards[c.id] > 0);
-        } else if (filter === 'missing') {
+        } else if (filter === 'missing' && !isAdminTest) {
             cardsToShow = cardsToShow.filter(c => !ownedCards[c.id] || ownedCards[c.id] === 0);
         }
 
         // 生成卡牌網格
         grid.innerHTML = cardsToShow.map(card => {
             const count = ownedCards[card.id] || 0;
-            const isOwned = count > 0;
+            // admin 在測試模式下視為全開
+            const isOwned = isAdminTest || (count > 0);
             const cardHtml = this.createCardHtml(card, isOwned);
 
             return `
