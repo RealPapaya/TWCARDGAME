@@ -129,6 +129,8 @@ const AuthManager = {
                     deck_data: JSON.stringify(this.currentUser.deck_data),
                     selectedavatar: this.currentUser.selectedAvatar,
                     selectedtitle: this.currentUser.selectedTitle,
+                    ownedavatars: JSON.stringify(this.currentUser.ownedAvatars || []),
+                    ownedtitles: JSON.stringify(this.currentUser.ownedTitles || []),
                     stats: JSON.stringify(this.currentUser.stats || {}),
                     ownedcards: JSON.stringify(this.currentUser.ownedCards || {}),
                     vouchers: this.currentUser.vouchers || 0,
@@ -182,7 +184,9 @@ const AuthManager = {
             gold: parseInt(rawData.gold || 100),
             deck_data: rawData.deck_data || rawData.deck_data,
             selectedAvatar: rawData.selectedavatar || rawData.selectedAvatar || "avatar1",
-            selectedTitle: rawData.selectedtitle || rawData.selectedTitle || "新手玩家",
+            selectedTitle: rawData.selectedtitle || rawData.selectedTitle || "beginner",
+            ownedAvatars: rawData.ownedavatars || rawData.ownedAvatars || "[\"avatar1\"]",
+            ownedTitles: rawData.ownedtitles || rawData.ownedTitles || "[\"beginner\"]",
             stats: rawData.stats || "{}",
             ownedCards: rawData.ownedcards || rawData.ownedCards || "{}",
             vouchers: parseInt(rawData.vouchers || 0),
@@ -205,6 +209,18 @@ const AuthManager = {
         if (typeof user.ownedCards === 'string') {
             try { user.ownedCards = JSON.parse(user.ownedCards || "{}"); }
             catch (e) { user.ownedCards = this.generateStarterCollection(); }
+        }
+
+        // 處理 ownedAvatars
+        if (typeof user.ownedAvatars === 'string') {
+            try { user.ownedAvatars = JSON.parse(user.ownedAvatars || "[\"avatar1\"]"); }
+            catch (e) { user.ownedAvatars = ["avatar1"]; }
+        }
+
+        // 處理 ownedTitles
+        if (typeof user.ownedTitles === 'string') {
+            try { user.ownedTitles = JSON.parse(user.ownedTitles || "[\"beginner\"]"); }
+            catch (e) { user.ownedTitles = ["beginner"]; }
         }
 
         // 確保基本數值存在

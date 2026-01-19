@@ -25,6 +25,7 @@
     <script src="js/engine/game_engine.js?v=1.1"></script>
     <script src="js/data/updates.js"></script>
     <script src="js/data/ui_translations.js"></script>
+    <script src="js/data/profile_data.js"></script>
     <script src="js/auth/auth_manager.js"></script>
     <script src="js/auth/auth_ui.js" defer></script>
     <script src="js/shop/shop_manager.js"></script>
@@ -374,8 +375,11 @@
                             </div>
                             <div class="modal-buttons medieval-button-group vertical-group">
                                 <button id="btn-card-disenchant" class="medieval-button danger">分解
-                                    (+<span>0</span>)</button>
-                                <button id="btn-card-craft" class="medieval-button">合成 (-<span>0</span>)</button>
+                                    (+<span>0</span><img src="assets/images/ui/voucher.png"
+                                        class="btn-voucher-icon">)</button>
+                                <button id="btn-card-craft" class="medieval-button">合成
+                                    (-<span>0</span><img src="assets/images/ui/voucher.png"
+                                        class="btn-voucher-icon">)</button>
                                 <button id="btn-card-op-close" class="medieval-button secondary">關閉</button>
                             </div>
                         </div>

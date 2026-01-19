@@ -62,21 +62,9 @@ let userDecks = [];
 
 let tempDeck = null; // Temporary deck for editing
 
-// 可用稱號列表
-const AVAILABLE_TITLES = [
-    { id: 'salary_thief', name: '薪水小偷' },
-    { id: 'monument_smoker', name: '古蹟抽菸' },
-    { id: 'busy_worker', name: '活網仔' },
-    { id: 'corporate_dog', name: '社畜小狗' }
-];
-
-// 可用頭像列表
-const AVAILABLE_AVATARS = [
-    { id: 'avatar1', path: 'assets/images/avatars/avatar1.jpg', name: '中世紀學者' },
-    { id: 'avatar2', path: 'assets/images/avatars/avatar2.jpg', name: '中世紀貴族' },
-    { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '中世紀修士' },
-    { id: 'avatar4', path: 'assets/images/avatars/avatar4.png', name: '中世紀屠夫' }
-];
+// 可用項目列表 (從 profile_data.js 取得)
+const AVAILABLE_TITLES = window.PROFILE_DATA?.TITLE_DATA || [];
+const AVAILABLE_AVATARS = window.PROFILE_DATA?.AVATAR_DATA || [];
 
 // AI Theme Decks - loaded from default_decks.js
 // DEFAULT_THEME_DECKS is available globally via window.DEFAULT_THEME_DECKS
@@ -969,8 +957,9 @@ function updatePlayerInfo() {
         }
 
         // 稱號
-        const title = AuthManager.currentUser.selectedTitle || '玩家稱號';
-        if (titleEl) titleEl.textContent = `#${title}`;
+        const titleId = AuthManager.currentUser.selectedTitle || 'beginner';
+        const titleObj = AVAILABLE_TITLES.find(t => t.id === titleId);
+        if (titleEl) titleEl.textContent = `#${titleObj ? titleObj.name : titleId}`;
 
         // [權限控制] 只有 admin 可以看到測試模式
         const testBtn = document.getElementById('btn-main-test');
@@ -1012,23 +1001,34 @@ function initPlayerInfoEvents() {
 function showTitleSelectionModal() {
     const modal = document.getElementById('title-selection-modal');
     const container = document.getElementById('title-options');
+    if (!modal || !container) return;
 
-    // 獲取當前稱號
-    const currentTitle = AuthManager.currentUser?.selectedTitle || AVAILABLE_TITLES[0].name;
+    // 獲取當前稱號與已擁有稱號
+    const user = AuthManager.currentUser;
+    const currentTitleId = user?.selectedTitle || 'beginner';
+    const ownedTitles = user?.ownedTitles || ['beginner'];
 
     // 渲染稱號選項
-    container.innerHTML = AVAILABLE_TITLES.map(title => `
-        <div class="title-option ${title.name === currentTitle ? 'selected' : ''}" 
-             data-title="${title.name}">
-            #${title.name}
-        </div>
-    `).join('');
+    container.innerHTML = AVAILABLE_TITLES.map(title => {
+        const isLocked = !ownedTitles.includes(title.id);
+        const isSelected = title.id === currentTitleId;
+        return `
+            <div class="title-option ${isSelected ? 'selected' : ''} ${isLocked ? 'locked' : ''}" 
+                 data-title="${title.id}">
+                #${title.name}
+            </div>
+        `;
+    }).join('');
 
     // 綁定點擊事件
     container.querySelectorAll('.title-option').forEach(option => {
         option.addEventListener('click', () => {
-            const selectedTitle = option.dataset.title;
-            selectPlayerTitle(selectedTitle);
+            if (option.classList.contains('locked')) {
+                showToast("此稱號尚未解鎖");
+                return;
+            }
+            const selectedTitleId = option.dataset.title;
+            selectPlayerTitle(selectedTitleId);
             modal.style.display = 'none';
         });
     });
@@ -1039,12 +1039,14 @@ function showTitleSelectionModal() {
 /**
  * 選擇玩家稱號
  */
-function selectPlayerTitle(title) {
+function selectPlayerTitle(titleId) {
     if (AuthManager.currentUser) {
-        AuthManager.currentUser.selectedTitle = title;
+        AuthManager.currentUser.selectedTitle = titleId;
         updatePlayerInfo();
-        AuthManager.saveData(); // 現在此方法會同時更新 LocalStorage 與雲端
-        showToast(`稱號已更換為：#${title}`);
+        if (typeof updateProfilePage === 'function') updateProfilePage();
+        AuthManager.saveData();
+        const titleObj = AVAILABLE_TITLES.find(t => t.id === titleId);
+        showToast(`稱號已更換為：#${titleObj ? titleObj.name : titleId}`);
     }
 }
 
@@ -1054,21 +1056,31 @@ function selectPlayerTitle(title) {
 function showAvatarSelectionModal() {
     const modal = document.getElementById('avatar-selection-modal');
     const container = document.getElementById('avatar-options');
+    if (!modal || !container) return;
 
-    // 獲取當前頭像
-    const currentAvatar = AuthManager.currentUser?.selectedAvatar || 'avatar1';
+    // 獲取當前頭像與已擁有頭像
+    const user = AuthManager.currentUser;
+    const currentAvatar = user?.selectedAvatar || 'avatar1';
+    const ownedAvatars = user?.ownedAvatars || ['avatar1'];
 
     // 渲染頭像選項
-    container.innerHTML = AVAILABLE_AVATARS.map(avatar => `
-        <div class="avatar-option ${avatar.id === currentAvatar ? 'selected' : ''}" 
-             data-avatar="${avatar.id}">
-            <img src="${avatar.path}" alt="${avatar.name}">
-        </div>
-    `).join('');
+    container.innerHTML = AVAILABLE_AVATARS.map(avatar => {
+        const isLocked = !ownedAvatars.includes(avatar.id);
+        return `
+            <div class="avatar-option ${avatar.id === currentAvatar ? 'selected' : ''} ${isLocked ? 'locked' : ''}" 
+                 data-avatar="${avatar.id}">
+                <img src="${avatar.path}" alt="${avatar.name}">
+            </div>
+        `;
+    }).join('');
 
     // 綁定點擊事件
     container.querySelectorAll('.avatar-option').forEach(option => {
         option.addEventListener('click', () => {
+            if (option.classList.contains('locked')) {
+                showToast("此頭像尚未解鎖");
+                return;
+            }
             const selectedAvatar = option.dataset.avatar;
             selectPlayerAvatar(selectedAvatar);
             modal.style.display = 'none';
@@ -1094,15 +1106,7 @@ function selectPlayerAvatar(avatarId) {
 /**
  * 選擇玩家稱號
  */
-function selectPlayerTitle(title) {
-    if (AuthManager.currentUser) {
-        AuthManager.currentUser.selectedTitle = title;
-        updatePlayerInfo();
-        updateProfilePage();
-        AuthManager.saveData();
-        showToast(`稱號已更換為：#${title}`);
-    }
-}
+
 
 /**
  * 顯示個人頁面
@@ -1146,8 +1150,9 @@ function updateProfilePage() {
     const usernameEl = document.getElementById('profile-username');
     const titleEl = document.getElementById('profile-title');
     if (usernameEl) usernameEl.textContent = user.username;
-    const title = user.selectedTitle || '玩家稱號';
-    if (titleEl) titleEl.textContent = `#${title} ✏️`;
+    const titleId = user.selectedTitle || 'beginner';
+    const titleObj = AVAILABLE_TITLES.find(t => t.id === titleId);
+    if (titleEl) titleEl.textContent = `#${titleObj ? titleObj.name : titleId} ✏️`;
 
     // 更新金幣
     const goldEl = document.getElementById('profile-gold-amount');
