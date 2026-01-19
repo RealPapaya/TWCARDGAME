@@ -1976,16 +1976,16 @@ class AIEngine {
         // Collect all possible targets
         const potentialMinions = [];
         if (rule.side === 'ALL' || rule.side === 'FRIENDLY') {
-            ai.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: 'PLAYER' }));
+            ai.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: ai.side }));
         }
         if (rule.side === 'ALL' || rule.side === 'ENEMY' || rule.side === 'OPPONENT') {
-            opponent.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: 'OPPONENT' }));
+            opponent.board.forEach((m, i) => potentialMinions.push({ unit: m, index: i, side: opponent.side }));
         }
 
         const potentialHeroes = [];
         if (rule.type !== 'MINION') {
-            if (rule.side === 'ALL' || rule.side === 'FRIENDLY') potentialHeroes.push({ type: 'HERO', side: 'PLAYER' });
-            if (rule.side === 'ALL' || rule.side === 'ENEMY' || rule.side === 'OPPONENT') potentialHeroes.push({ type: 'HERO', side: 'OPPONENT' });
+            if (rule.side === 'ALL' || rule.side === 'FRIENDLY') potentialHeroes.push({ type: 'HERO', side: ai.side });
+            if (rule.side === 'ALL' || rule.side === 'ENEMY' || rule.side === 'OPPONENT') potentialHeroes.push({ type: 'HERO', side: opponent.side });
         }
 
         // Filtering
@@ -2004,23 +2004,23 @@ class AIEngine {
         // Preference Logic
         if (battlecry.type === 'HEAL' || battlecry.type?.includes('BUFF') || battlecry.type === 'GIVE_DIVINE_SHIELD') {
             // Prefer friends, then injured, then high attack
-            const friendly = filteredMinions.filter(p => p.side === 'PLAYER');
+            const friendly = filteredMinions.filter(p => p.side === ai.side);
             if (friendly.length > 0) {
                 if (battlecry.type === 'HEAL') {
                     friendly.sort((a, b) => (a.unit.health - a.unit.currentHealth) - (b.unit.health - b.unit.currentHealth));
-                    if (friendly[0].unit.currentHealth < friendly[0].unit.health) return { type: 'MINION', index: friendly[0].index, side: 'PLAYER' };
+                    if (friendly[0].unit.currentHealth < friendly[0].unit.health) return { type: 'MINION', index: friendly[0].index, side: ai.side };
                 }
-                return { type: 'MINION', index: friendly[0].index, side: 'PLAYER' };
+                return { type: 'MINION', index: friendly[0].index, side: ai.side };
             }
-            if (potentialHeroes.some(h => h.side === 'PLAYER')) return { type: 'HERO', side: 'PLAYER' };
+            if (potentialHeroes.some(h => h.side === ai.side)) return { type: 'HERO', side: ai.side };
         } else if (battlecry.type === 'DAMAGE' || battlecry.type === 'DESTROY' || battlecry.type === 'BOUNCE_TARGET') {
             // Prefer enemies, then high threat
-            const enemies = filteredMinions.filter(p => p.side === 'OPPONENT');
+            const enemies = filteredMinions.filter(p => p.side === opponent.side);
             if (enemies.length > 0) {
                 enemies.sort((a, b) => b.unit.attack - a.unit.attack);
-                return { type: 'MINION', index: enemies[0].index, side: 'OPPONENT' };
+                return { type: 'MINION', index: enemies[0].index, side: opponent.side };
             }
-            if (potentialHeroes.some(h => h.side === 'OPPONENT')) return { type: 'HERO', side: 'OPPONENT' };
+            if (potentialHeroes.some(h => h.side === opponent.side)) return { type: 'HERO', side: opponent.side };
         }
 
         return null;

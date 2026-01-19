@@ -1559,6 +1559,10 @@ body {
     animation: ripple-spread 1.5s ease-out forwards;
 }
 
+.ripple-active-opp {
+    animation: ripple-spread-opp 1.5s ease-out forwards;
+}
+
 @keyframes ripple-spread {
     0% {
         transform: translate(-50%, -50%) scale(0);

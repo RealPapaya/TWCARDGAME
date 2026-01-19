@@ -138,6 +138,13 @@ let selectedThemeId = 'dpp'; // Default theme
 let editingDeckIdx = 0;
 let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
+window.isDebugMode = isDebugMode; // 暴露出全域變數供其他模組存取
+
+// [權限控制] 判斷是否為 admin 帳號
+function isAdmin() {
+    return AuthManager.currentUser?.username?.toLowerCase() === 'admin';
+}
+window.isAdmin = isAdmin;
 let currentDifficulty = 'NORMAL';
 let currentSort = { field: 'cost', direction: 'asc' }; // 'cost', 'category', 'rarity'
 
@@ -316,11 +323,13 @@ function init() {
     // --- Main Menu Listeners ---
     document.getElementById('btn-main-battle').addEventListener('click', () => {
         isDebugMode = false;
+        window.isDebugMode = false;
         showView('mode-selection');
     });
 
     document.getElementById('btn-main-test').addEventListener('click', () => {
         isDebugMode = true;
+        window.isDebugMode = true;
         pendingViewMode = 'DEBUG';
         showView('test-mode-selection');
     });
@@ -598,6 +607,7 @@ function init() {
         });
     }
 
+    updatePlayerInfo(); // [修正] 初始化時根據當前狀態更新 UI
     console.log("Game initialized.");
 }
 
@@ -922,7 +932,7 @@ function onUserLogin(user) {
 
     showView('main-menu');
     showToast(`歡迎回來，${processedUser.username}！`);
-    updatePlayerInfo();
+    updatePlayerInfo(); // 登入後確保更新按鈕可見性
 }
 
 /**
@@ -961,6 +971,12 @@ function updatePlayerInfo() {
         // 稱號
         const title = AuthManager.currentUser.selectedTitle || '玩家稱號';
         if (titleEl) titleEl.textContent = `#${title}`;
+
+        // [權限控制] 只有 admin 可以看到測試模式
+        const testBtn = document.getElementById('btn-main-test');
+        if (testBtn) {
+            testBtn.style.display = isAdmin() ? 'block' : 'none';
+        }
     } else {
         // 訪客模式：顯示訪客資訊
         playerCard.style.display = 'flex';
@@ -1345,6 +1361,10 @@ function showDeckCreationOptions() {
  * @returns {Object} { missing: [], owned: [], missingCount: 0, totalCount: 0 }
  */
 function checkMissingCards(themeCards, ownedCards) {
+    // admin 在測試模式下不檢查缺卡
+    if (window.isDebugMode && isAdmin()) {
+        return { missing: [], owned: themeCards, missingCount: 0, totalCount: themeCards.length };
+    }
     const missingCards = [];
     const ownedInTheme = [];
 
@@ -1666,8 +1686,9 @@ function renderDeckSelect() {
     }
 
     // Strict Isolation: Test Mode shows ONLY test decks, Normal Mode shows ONLY normal decks
+    // [權限控制] admin 在測試模式下可以看到所有牌組
     const visibleDecks = userDecks.map((d, i) => ({ ...d, originalIdx: i }))
-        .filter(d => isDebugMode ? d.isTest : !d.isTest);
+        .filter(d => (window.isDebugMode && isAdmin()) ? true : (isDebugMode ? d.isTest : !d.isTest));
 
     visibleDecks.forEach((deck, idx) => {
         const slot = document.createElement('div');
@@ -2050,8 +2071,8 @@ function renderDeckBuilder() {
             else matchCost = card.cost === parseInt(costFilter);
         }
 
-        // 只顯示擁有的卡牌
-        const matchOwned = ownedCards[card.id] && ownedCards[card.id] > 0;
+        // 只顯示擁有的卡牌 (admin 在測試模式下全開)
+        const matchOwned = (window.isDebugMode && isAdmin()) || (ownedCards[card.id] && ownedCards[card.id] > 0);
 
         return matchSearch && matchCat && matchRarity && matchCost && matchOwned;
     }).sort((a, b) => {
@@ -2336,9 +2357,9 @@ async function aiTurn() {
                     let destEl = null;
                     if (action.target.type === 'HERO') {
                         // AI perspective side: 'OPPONENT' is Player, 'PLAYER' is AI.
-                        destEl = (action.target.side === 'OPPONENT') ? document.getElementById('player-hero') : document.getElementById('opp-hero');
+                        destEl = (action.target.side === 'PLAYER') ? document.getElementById('player-hero') : document.getElementById('opp-hero');
                     } else if (action.target.type === 'MINION') {
-                        const targetBoardId = (action.target.side === 'OPPONENT') ? 'player-board' : 'opp-board';
+                        const targetBoardId = (action.target.side === 'PLAYER') ? 'player-board' : 'opp-board';
                         destEl = document.getElementById(targetBoardId).children[action.target.index];
                     }
 
@@ -2369,7 +2390,7 @@ async function aiTurn() {
                             color = '#4a0e4e'; // Dark purple for all destroy effects
                             effectType = 'DESTROY';
                         }
-                        else if (type === 'DAMAGE_NON_CATEGORY') {
+                        else if (type === 'DAMAGE' || type === 'DAMAGE_NON_CATEGORY') {
                             color = '#ff0000';
                             effectType = 'DAMAGE';
                         }
@@ -2377,9 +2398,12 @@ async function aiTurn() {
                         await animateAbility(sourceEl, destEl, color);
                         triggerCombatEffect(destEl, effectType);
 
+                        // [Fix] Await damage number display or a short delay to ensure UI updates
+                        await new Promise(r => setTimeout(r, 600));
+
                         // Log AI Battlecry history
                         const sourceName = card.name;
-                        const destSide = action.target.side === 'OPPONENT' ? 'PLAYER' : 'OPPONENT';
+                        const destSide = action.target.side;
                         const destName = getUnitName(destSide, action.target.index, action.target.type);
 
                         const isAiNews = card.type === 'NEWS';
@@ -5137,7 +5161,7 @@ async function triggerRippleDiffusionAnimation(isPlayer = true) {
     for (let i = 0; i < 3; i++) {
         setTimeout(() => {
             const ripple = document.createElement('div');
-            ripple.className = 'ripple-wave ripple-active';
+            ripple.className = isPlayer ? 'ripple-wave ripple-active' : 'ripple-wave ripple-active-opp';
             ripple.style.left = `${centerX}px`;
             ripple.style.top = `${centerY}px`;
             ripple.style.width = '120px';
