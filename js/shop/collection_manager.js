@@ -20,7 +20,7 @@ const CollectionManager = {
         if (!grid) return;
 
         // 核心篩選邏輯
-        let cardsToShow = CARD_DATA.filter(c => c.type === 'MINION');
+        let cardsToShow = [...CARD_DATA];
 
         const isAdminTest = window.isDebugMode && window.isAdmin?.();
 
@@ -82,7 +82,7 @@ const CollectionManager = {
      */
     updateProgress() {
         const ownedCards = AuthManager.currentUser?.ownedCards || {};
-        const totalCards = CARD_DATA.filter(c => c.type === 'MINION').length;
+        const totalCards = CARD_DATA.length;
         const ownedCount = Object.keys(ownedCards).filter(id => ownedCards[id] > 0).length;
 
         const progressEl = document.getElementById('collection-progress');

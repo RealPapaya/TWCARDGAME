@@ -127,14 +127,14 @@ const AuthManager = {
                     level: this.currentUser.level,
                     gold: this.currentUser.gold,
                     deck_data: JSON.stringify(this.currentUser.deck_data),
-                    selectedavatar: this.currentUser.selectedAvatar,
-                    selectedtitle: this.currentUser.selectedTitle,
-                    ownedavatars: JSON.stringify(this.currentUser.ownedAvatars || []),
-                    ownedtitles: JSON.stringify(this.currentUser.ownedTitles || []),
+                    selected_avatar: this.currentUser.selectedAvatar,
+                    selected_title: this.currentUser.selectedTitle,
+                    owned_avatar: JSON.stringify(this.currentUser.ownedAvatars || []),
+                    owned_titles: JSON.stringify(this.currentUser.ownedTitles || []),
                     stats: JSON.stringify(this.currentUser.stats || {}),
-                    ownedcards: JSON.stringify(this.currentUser.ownedCards || {}),
+                    owned_cards: JSON.stringify(this.currentUser.ownedCards || {}),
                     vouchers: this.currentUser.vouchers || 0,
-                    lastsaved: this.currentUser.lastsaved
+                    last_saved: this.currentUser.lastsaved
                 })
             });
             console.log(`資料已同步至本地與雲端 (${this.currentUser.lastsaved})`);
@@ -182,15 +182,15 @@ const AuthManager = {
             password: rawData.password,
             level: parseInt(rawData.level || 1),
             gold: parseInt(rawData.gold || 100),
-            deck_data: rawData.deck_data || rawData.deck_data,
-            selectedAvatar: rawData.selectedavatar || rawData.selectedAvatar || "avatar1",
-            selectedTitle: rawData.selectedtitle || rawData.selectedTitle || "beginner",
-            ownedAvatars: rawData.ownedavatars || rawData.ownedAvatars || "[\"avatar1\"]",
-            ownedTitles: rawData.ownedtitles || rawData.ownedTitles || "[\"beginner\"]",
+            deck_data: rawData.deck_data || "[]",
+            selectedAvatar: rawData.selected_avatar || rawData.selectedAvatar || rawData.selectedavatar || "avatar1",
+            selectedTitle: rawData.selected_title || rawData.selectedTitle || rawData.selectedtitle || "beginner",
+            ownedAvatars: rawData.owned_avatar || rawData.ownedavatar || rawData.ownedAvatars || "[\"avatar1\"]",
+            ownedTitles: rawData.owned_titles || rawData.ownedTitles || rawData.ownedtitles || "[\"beginner\"]",
             stats: rawData.stats || "{}",
-            ownedCards: rawData.ownedcards || rawData.ownedCards || "{}",
+            ownedCards: rawData.owned_cards || rawData.ownedcards || rawData.ownedCards || "{}",
             vouchers: parseInt(rawData.vouchers || 0),
-            lastsaved: parseInt(rawData.lastsaved || 0)
+            lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0)
         };
 
         // 處理 deck_data
@@ -207,8 +207,14 @@ const AuthManager = {
 
         // 處理 ownedCards
         if (typeof user.ownedCards === 'string') {
-            try { user.ownedCards = JSON.parse(user.ownedCards || "{}"); }
-            catch (e) { user.ownedCards = this.generateStarterCollection(); }
+            try {
+                console.log("[Auth] 嘗試解析 ownedCards:", user.ownedCards);
+                user.ownedCards = JSON.parse(user.ownedCards || "{}");
+            }
+            catch (e) {
+                console.error("[Auth] ownedCards 解析失敗，載入初始卡組", e);
+                user.ownedCards = this.generateStarterCollection();
+            }
         }
 
         // 處理 ownedAvatars
