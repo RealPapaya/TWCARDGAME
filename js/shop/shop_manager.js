@@ -41,7 +41,7 @@ const ShopManager = {
         // 扣除金幣
         user.gold -= product.price;
         this.updateGoldDisplay();
-        await AuthManager.saveData(); // 確保金幣扣除已真正存檔
+        AuthManager.saveData(); // 非阻塞存檔，確保立刻開始開包動畫
 
         // 開包
         PackOpener.open(product);

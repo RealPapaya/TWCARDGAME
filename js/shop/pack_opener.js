@@ -29,7 +29,7 @@ const PackOpener = {
      */
     async openCardPack(count) {
         const cards = this.generateRandomCards(count);
-        await this.addCardsToCollection(cards);
+        this.addCardsToCollection(cards); // 改為非阻塞
         // 使新的互動式開包動畫
         this.showInteractivePackOpening(cards);
     },
@@ -272,7 +272,7 @@ const PackOpener = {
             user.ownedCards[card.id]++;
         });
 
-        await AuthManager.saveData();
+        AuthManager.saveData(); // 非阻塞存檔
     },
 
     /**
