@@ -195,7 +195,9 @@ const AuthManager = {
             vouchers: parseInt(rawData.vouchers || 0),
             defeatedAI: rawData.defeated_ai || rawData.defeatedAI || rawData.defeatedai || "[]",
             currentXP: parseInt(rawData.current_xp || rawData.currentXP || rawData.currentxp || 0) || 0,
-            lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0)
+            lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0),
+            // [新增] 加入時間欄位
+            createdAt: rawData.created_at || rawData.createdat || rawData.createdAt || rawData.join_date
         };
 
         // 處理 deck_data

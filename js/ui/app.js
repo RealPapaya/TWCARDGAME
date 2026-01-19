@@ -1223,10 +1223,20 @@ function updateProfilePage() {
         console.log('[Profile Debug] createdAt:', user.createdAt);
 
         // Check both created_at (DB column) and createdAt (camelCase convention)
-        const dateValue = user.created_at || user.createdAt;
+        // GAS returns keys as lowercase without underscores, so we also check user.createdat
+        const dateValue = user.created_at || user.createdAt || user.createdat;
         if (dateValue) {
-            const date = new Date(dateValue);
-            console.log('[Profile Debug] Parsed Date:', date);
+            let date = new Date(dateValue);
+
+            // 如果直接 parse 失敗 (Invalid Date) 且是字串，嘗試處理中文格式 (如: "2026/1/19 下午 8:37:09")
+            if (isNaN(date.getTime()) && typeof dateValue === 'string') {
+                console.log('[Profile Debug] Standard parse failed, trying fallback for:', dateValue);
+                // 嘗試只取空白前的第一段日期 (YYYY/MM/DD)
+                const simpleDate = dateValue.split(' ')[0];
+                date = new Date(simpleDate);
+            }
+
+            console.log('[Profile Debug] Final Parsed Date:', date);
             if (!isNaN(date.getTime())) {
                 dateStr = `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
             }
@@ -5749,7 +5759,7 @@ function renderAIBattleSetup() {
             const reward = difficultyRewards[diff];
             const statusText = isDefeated
                 ? '<span style="color: #4ade80; margin-left: 8px;">✓ 已通關</span>'
-                : `<span style="color: #fcd34d; margin-left: 8px;">🪙 ${reward}</span>`;
+                : `<span style="display: flex; align-items: center; color: #fcd34d; margin-left: 8px;"><img src="assets/images/ui/gold_coin.png" style="width: 20px; height: 20px; margin-right: 4px;"> ${reward}</span>`;
 
             return `<div class="sub-difficulty-btn" data-value="${diff}">${label}${statusText}</div>`;
         }).join('');

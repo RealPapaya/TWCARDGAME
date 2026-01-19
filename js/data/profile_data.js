@@ -7,10 +7,10 @@
 const PROFILE_DATA = {
     // 可用頭像資料
     AVATAR_DATA: [
-        { id: 'avatar1', path: 'assets/images/avatars/avatar1.jpg', name: '中世紀學者' },
-        { id: 'avatar2', path: 'assets/images/avatars/avatar2.jpg', name: '中世紀貴族' },
-        { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '中世紀修士' },
-        { id: 'avatar4', path: 'assets/images/avatars/avatar4.png', name: '中世紀屠夫' }
+        { id: 'avatar1', path: 'assets/images/avatars/avatar1.jpg', name: '柯文哲' },
+        { id: 'avatar2', path: 'assets/images/avatars/avatar2.jpg', name: '蔡英文' },
+        { id: 'avatar3', path: 'assets/images/avatars/avatar3.jpg', name: '韓國瑜' },
+        { id: 'avatar4', path: 'assets/images/avatars/avatar4.png', name: '傅崐萁' }
     ],
 
     // 可用稱號資料
