@@ -6011,6 +6011,32 @@ document.addEventListener('DOMContentLoaded', () => {
         e.stopPropagation();
         showTitleSelectionModal();
     });
+
+    // 排行榜按鈕
+    document.getElementById('btn-leaderboard')?.addEventListener('click', async () => {
+        const modal = document.getElementById('leaderboard-modal');
+        const listContainer = document.getElementById('leaderboard-list');
+
+        if (!modal || !listContainer) return;
+
+        // 顯示載入中
+        listContainer.innerHTML = '<div class="empty-message">載入中...</div>';
+        modal.style.display = 'flex';
+
+        // 載入排行榜資料
+        await window.leaderboardManager.fetchLeaderboard('level');
+        window.leaderboardManager.renderLeaderboard(listContainer);
+    });
+
+    // 排行榜關閉按鈕
+    document.getElementById('btn-leaderboard-close')?.addEventListener('click', () => {
+        document.getElementById('leaderboard-modal').style.display = 'none';
+    });
+
+    // 玩家資料 Modal 關閉按鈕
+    document.getElementById('btn-profile-modal-close')?.addEventListener('click', () => {
+        document.getElementById('player-profile-modal').style.display = 'none';
+    });
 });
 
 

@@ -21,7 +21,9 @@
     <link rel="stylesheet" href="css/shop.css">
     <link rel="stylesheet" href="css/collection.css">
     <link rel="stylesheet" href="css/style_mulligan.css">
+    <link rel="stylesheet" href="css/leaderboard.css">
     <script src="js/data/card_data.js"></script>
+    <script src="js/leaderboard/leaderboard_manager.js"></script>
     <script src="js/data/default_decks.js"></script>
     <script src="js/engine/game_engine.js?v=1.1"></script>
     <script src="js/data/updates.js"></script>
@@ -65,6 +67,11 @@
             </svg>
             <!-- Main Menu View -->
             <div id="main-menu" class="view">
+                <!-- 排行榜入口按鈕 (左上角) -->
+                <button id="btn-leaderboard" class="leaderboard-entrance-btn" title="排行榜">
+                    🏆
+                </button>
+
                 <!-- Main Menu Settings -->
                 <div class="settings-container">
                     <button id="btn-settings-main" class="settings-btn" title="設定">⚙️</button>
@@ -877,6 +884,53 @@
             </div>
             <div class="modal-buttons">
                 <button id="btn-avatar-cancel" class="medieval-button secondary">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 排行榜 Modal -->
+    <div id="leaderboard-modal" class="modal-overlay" style="display: none;">
+        <div class="leaderboard-modal-content">
+            <div class="leaderboard-modal-header">
+                <h2 class="leaderboard-modal-title">
+                    🏆 等級排行榜
+                </h2>
+                <button id="btn-leaderboard-close" class="leaderboard-close-btn">關閉</button>
+            </div>
+            <div id="leaderboard-list" class="leaderboard-list-container">
+                <!-- 由 JS 動態生成玩家列表 -->
+            </div>
+        </div>
+    </div>
+
+    <!-- 玩家資料查看 Modal -->
+    <div id="player-profile-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content parchment-modal">
+            <div class="profile-modal-avatar" id="profile-modal-avatar">👤</div>
+            <div class="profile-modal-info">
+                <div class="profile-modal-username" id="profile-modal-username">玩家名稱</div>
+                <div class="profile-modal-title" id="profile-modal-title">#稱號</div>
+            </div>
+            <div class="profile-modal-stats">
+                <div class="profile-stat-item">
+                    <div class="profile-stat-label">等級</div>
+                    <div class="profile-stat-value" id="profile-modal-level">1</div>
+                </div>
+                <div class="profile-stat-item">
+                    <div class="profile-stat-label">金幣</div>
+                    <div class="profile-stat-value" id="profile-modal-gold">0</div>
+                </div>
+                <div class="profile-stat-item">
+                    <div class="profile-stat-label">總勝場</div>
+                    <div class="profile-stat-value" id="profile-modal-wins">0</div>
+                </div>
+                <div class="profile-stat-item">
+                    <div class="profile-stat-label">對戰勝率</div>
+                    <div class="profile-stat-value" id="profile-modal-winrate">0%</div>
+                </div>
+            </div>
+            <div class="modal-buttons medieval-button-group" style="margin-top: 20px;">
+                <button id="btn-profile-modal-close" class="medieval-button secondary">關閉</button>
             </div>
         </div>
     </div>
