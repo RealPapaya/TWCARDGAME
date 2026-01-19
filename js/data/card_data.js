@@ -122,7 +122,9 @@ const CARD_DATA = [
     { "id": "TW069", "name": "林佳龍", "category": "民進黨政治人物", "cost": 2, "attack": 1, "health": 2, "type": "MINION", "rarity": "RARE", "description": "嘲諷\n戰吼: 隨機將一名敵方隨從放回手牌", "keywords": { "taunt": true, "battlecry": { "type": "BOUNCE_RANDOM_ENEMY" } }, "image": "assets/images/cards/lin_chia_lung.webp" },
     { "id": "TW070", "name": "蠻牛", "category": "法術", "cost": 3, "type": "NEWS", "rarity": "RARE", "description": "完全恢復一名隨從生命，抽一張牌", "keywords": { "battlecry": { "type": "FULL_HEAL_AND_DRAW", "target": { "side": "ALL", "type": "MINION" } } }, "image": "assets/images/cards/bull.webp" },
     { "id": "TW071", "name": "死亡之握", "category": "法術", "cost": 2, "type": "NEWS", "rarity": "RARE", "description": "指定一名隨從 倒數3回合後死亡", "keywords": { "battlecry": { "type": "SET_DEATH_TIMER", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "assets/images/cards/death_grip.webp" },
-    { "id": "TW072", "name": "TOYZ", "category": "公眾人物", "cost": 5, "attack": 7, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 沈默自己6回合", "keywords": { "battlecry": { "type": "LOCK_SELF", "value": 6 } }, "image": "assets/images/cards/toyz.webp" }
+    { "id": "TW072", "name": "TOYZ", "category": "公眾人物", "cost": 5, "attack": 7, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 沈默自己6回合", "keywords": { "battlecry": { "type": "LOCK_SELF", "value": 6 } }, "image": "assets/images/cards/toyz.webp" },
+    { "id": "TW073", "name": "卡車司機", "category": "勞工", "cost": 8, "attack": 8, "health": 8, "type": "MINION", "rarity": "COMMON", "description": "激怒: +1攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 1 } }, "image": "assets/images/cards/TW073.webp" },
+    { "id": "TW074", "name": "王ADEN", "category": "公眾人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "description": "激怒: +2攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 2 } }, "image": "assets/images/cards/TW074.webp" }
 ];
 
 // Export for browser
