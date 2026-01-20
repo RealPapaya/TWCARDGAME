@@ -78,23 +78,32 @@ const AuthUI = {
             return;
         }
 
+        if (window.showLoadingIndicator) showLoadingIndicator("登入中...");
         this.btnLogin.disabled = true;
         this.btnLogin.innerText = "登入中...";
 
-        const result = await AuthManager.login(username, password);
+        try {
+            const result = await AuthManager.login(username, password);
+            if (window.hideLoadingIndicator) hideLoadingIndicator();
 
-        if (result.success) {
-            await showCustomAlert("登入成功！");
-            // 載入使用者資料後導向主選單
-            if (window.App) {
-                window.App.onUserLogin(result.user);
+            if (result.success) {
+                await showCustomAlert("登入成功！");
+                // 載入使用者資料後導向主選單
+                if (window.App) {
+                    window.App.onUserLogin(result.user);
+                }
+            } else {
+                await showCustomAlert("登入失敗: " + result.message);
             }
-        } else {
-            await showCustomAlert("登入失敗: " + result.message);
+        } catch (error) {
+            console.error("Login Error:", error);
+            if (window.hideLoadingIndicator) hideLoadingIndicator();
+            await showCustomAlert("登入伺服器連線失敗");
+        } finally {
+            this.btnLogin.disabled = false;
+            this.btnLogin.innerText = "確定登入";
+            // if (window.hideLoadingIndicator) hideLoadingIndicator(); // Moved to try/catch
         }
-
-        this.btnLogin.disabled = false;
-        this.btnLogin.innerText = "確定登入";
     },
 
     async handleRegister() {
@@ -112,20 +121,29 @@ const AuthUI = {
             return;
         }
 
+        if (window.showLoadingIndicator) showLoadingIndicator("註冊中...");
         this.btnRegister.disabled = true;
         this.btnRegister.innerText = "註冊中...";
 
-        const result = await AuthManager.register(username, password);
+        try {
+            const result = await AuthManager.register(username, password);
+            if (window.hideLoadingIndicator) hideLoadingIndicator();
 
-        if (result.success) {
-            await showCustomAlert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
-            this.switchTab("login");
-        } else {
-            await showCustomAlert("註冊失敗: " + result.message);
+            if (result.success) {
+                await showCustomAlert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
+                this.switchTab("login");
+            } else {
+                await showCustomAlert("註冊失敗: " + result.message);
+            }
+        } catch (error) {
+            console.error("Register Error:", error);
+            if (window.hideLoadingIndicator) hideLoadingIndicator();
+            await showCustomAlert("註冊連線失敗");
+        } finally {
+            this.btnRegister.disabled = false;
+            this.btnRegister.innerText = "建立帳號";
+            // if (window.hideLoadingIndicator) hideLoadingIndicator(); // Moved to try/catch
         }
-
-        this.btnRegister.disabled = false;
-        this.btnRegister.innerText = "建立帳號";
     },
 
     reset() {

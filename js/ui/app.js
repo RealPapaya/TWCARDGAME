@@ -2222,7 +2222,7 @@ function renderPlayerThemeList() {
 }
 
 // --- Loading Indicator Helpers ---
-function showLoadingIndicator() {
+function showLoadingIndicator(message = '戰場載入中...') {
     let loader = document.getElementById('global-loading-overlay');
     if (!loader) {
         loader = document.createElement('div');
@@ -2255,7 +2255,7 @@ function showLoadingIndicator() {
                 height: 50px; 
                 animation: spin 1s linear infinite;">
             </div>
-            <div style="text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);">戰場載入中...</div>
+            <div id="loading-message" style="text-shadow: 0 0 10px rgba(212, 175, 55, 0.5);"></div>
             <style>
                 @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
             </style>
@@ -2265,6 +2265,11 @@ function showLoadingIndicator() {
         // Force reflow
         void loader.offsetWidth;
     }
+
+    // Update message
+    const messageEl = loader.querySelector('#loading-message');
+    if (messageEl) messageEl.textContent = message;
+
     loader.style.display = 'flex';
     loader.style.opacity = '1';
 }
@@ -6416,7 +6421,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const cachedUser = AuthManager.checkAuth();
     if (cachedUser && cachedUser.username && cachedUser.password) {
         // [靜默登入] 雖然有快取，但還是去背景抓一次最新資料覆蓋
-        console.log('[Auth] 偵測到登入狀態，執行靜默同步...');
+        showLoadingIndicator('登入中...');
         AuthManager.login(cachedUser.username, cachedUser.password).then(result => {
             if (result.success) {
                 onUserLogin(result.user);
@@ -6425,6 +6430,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 如果密碼被改了或 API 故障，則退回登入介面
                 showView('auth-view');
             }
+        }).catch(err => {
+            console.error('[Auth] 靜默登入出錯:', err);
+            showView('auth-view');
+        }).finally(() => {
+            hideLoadingIndicator();
         });
     } else {
         showView('auth-view');
