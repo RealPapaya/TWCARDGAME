@@ -735,6 +735,7 @@ document.getElementById('end-turn-btn').addEventListener('click', async () => {
 
             // 本地結束回合 (不觸發 startTurn，等 Firebase 通知)
             gameState.endTurn(true); // skipStartTurn = true
+            syncLocalStateToFirebase(); // 同步回合結束後的狀態 (Mana, HandSize)
             render();
             await resolveDeaths();
 
@@ -2527,9 +2528,34 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 await handleOpponentPvPAction(action);
             };
 
-            // 遊戲狀態更新 (回合切換)
+            // 遊戲狀態更新 (回合切換 & 狀態同步)
             window.pvpManager.onGameStateUpdate = (remoteState) => {
                 console.log('[PvP] 收到遠端狀態更新:', remoteState);
+                if (!remoteState) return;
+
+                // 如果還在 Mulligan 階段，忽略狀態更新渲染，避免干擾選牌
+                if (mulliganPhase) return;
+
+                // Sync Opponent State (HP, Mana, etc.)
+                const opponentId = pvpPlayerId === 'player1' ? 'player2' : 'player1';
+                const oppState = remoteState[`${opponentId}State`];
+
+                if (oppState && gameState.players[1]) {
+                    const opponent = gameState.players[1];
+                    if (oppState.hp !== undefined) {
+                        opponent.currentHealth = oppState.hp;
+                        opponent.health = oppState.maxHp;
+                    }
+                    if (oppState.mana !== undefined) {
+                        opponent.mana.current = oppState.mana;
+                        opponent.mana.max = oppState.maxMana;
+                    }
+                    // Optional: Sync Hand Size if needed (but actions usually handle this)
+                    // if (oppState.handSize !== undefined) { ... }
+
+                    // Render to show updated stats
+                    render();
+                }
 
                 // 更新本地回合資訊
                 if (remoteState.currentTurn) {
@@ -2544,6 +2570,9 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                             // 輪到自己，開始回合
                             gameState.startTurn();
                             showTurnAnnouncement('你的回合！');
+
+                            // 同步回合開始後的狀態 (Mana增加, 抽牌後)
+                            syncLocalStateToFirebase();
                         } else if (!gameState.gameOver) {
                             showTurnAnnouncement('對手回合');
                         }
@@ -2586,6 +2615,29 @@ function endPvPGame() {
 
     if (window.pvpManager) {
         window.pvpManager.leaveRoom();
+    }
+}
+
+/**
+ * 同步本地玩家狀態到 Firebase
+ */
+async function syncLocalStateToFirebase() {
+    if (!isPvPMode || !window.pvpManager || !gameState) return;
+
+    try {
+        const player = gameState.players[0]; // 我方永遠是 player[0]
+        const stateUpdate = {
+            hp: player.currentHealth,
+            maxHp: player.health,
+            mana: player.mana.current,
+            maxMana: player.mana.max,
+            handSize: player.hand.length,
+            deckSize: player.deck.length
+        };
+
+        await window.pvpManager.updateGameState(stateUpdate);
+    } catch (e) {
+        console.error('[PvP] 狀態同步失敗:', e);
     }
 }
 
@@ -4617,6 +4669,7 @@ async function onDragEnd(e) {
                             targetIndex: null,
                             targetSide: null
                         });
+                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
 
                     // 2. Render to show the minion LANDING on the board
@@ -4927,6 +4980,7 @@ async function onDragEnd(e) {
                             targetType: type,
                             targetIndex: index
                         });
+                        syncLocalStateToFirebase(); // 同步攻擊後的狀態 (HP)
                     }
 
                     render();
@@ -5050,6 +5104,7 @@ async function onDragEnd(e) {
                             targetIndex: target.index,
                             targetSide: target.side
                         });
+                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
                 } else {
                     // For Minion: It's already pending on board, just resolve battlecry
@@ -5068,6 +5123,7 @@ async function onDragEnd(e) {
                             targetIndex: target.index,
                             targetSide: target.side
                         });
+                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
                 }
 
@@ -6840,36 +6896,38 @@ async function confirmMulligan() {
 
     // ===== PVP 模式：同步 Mulligan 狀態 =====
     if (isPvPMode && window.pvpManager) {
-        console.log('[PvP] Mulligan 完成，同步狀態...');
-
-        // 同步 Mulligan 完成狀態
-        await window.pvpManager.syncMulliganStatus(true);
-        await window.pvpManager.syncGameAction('MULLIGAN_DONE', {});
+        console.log('[PvP] Mulligan 完成，播放動畫...');
 
         // 隱藏 Modal 並顯示等待訊息
         mulliganPhase = false;
         const modal = document.getElementById('mulligan-modal');
         modal.style.display = 'none';
 
+        // 1. 立即播放抽牌動畫 (獨立體驗)
+        const player0 = gameState.players[0];
+        const initialHand = [...player0.hand];
+        player0.hand = [];
+        render();
+
+        for (const card of initialHand) {
+            await new Promise(r => setTimeout(r, 400));
+            player0.hand.push(card);
+            render();
+        }
+
+        await new Promise(r => setTimeout(r, 400));
+
         showToast('等待對手完成換牌...');
+
+        // 2. 動畫完成後，同步狀態 (告訴對手我好了)
+        await window.pvpManager.syncMulliganStatus(true);
+        await window.pvpManager.syncGameAction('MULLIGAN_DONE', {});
 
         // 監聽雙方都完成後開始遊戲
         window.pvpManager.listenMulliganStatus(async () => {
             console.log('[PvP] 雙方 Mulligan 完成，開始遊戲');
 
-            // 抽牌動畫（顯示換牌後的手牌）
-            const player0 = gameState.players[0];
-            const initialHand = [...player0.hand];
-            player0.hand = [];
-            render();
 
-            for (const card of initialHand) {
-                await new Promise(r => setTimeout(r, 400));
-                player0.hand.push(card);
-                render();
-            }
-
-            await new Promise(r => setTimeout(r, 400));
 
             // 判斷是否為我的回合（先手）
             const isMyTurn = window.pvpManager?.isMyTurn();
@@ -6878,6 +6936,7 @@ async function confirmMulligan() {
                 // 先手：呼叫 startTurn 進行抽牌和增加法力
                 gameState.startTurn();
                 showTurnAnnouncement('你的回合！');
+                syncLocalStateToFirebase(); // 同步回合開始後的狀態 (Mana, HeadSize)
             } else {
                 // 後手：等待對手行動，不呼叫 startTurn
                 showTurnAnnouncement('對手回合');
