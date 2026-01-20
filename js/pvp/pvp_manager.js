@@ -16,7 +16,6 @@ class PvPManager {
         this.roomListener = null;
         this.matchmakingListener = null;
         this.heartbeatInterval = null;
-        this.processedActionIds = new Set(); // 追蹤已處理的動作
 
         // 回調函數
         this.onMatchFound = null;
@@ -25,10 +24,7 @@ class PvPManager {
         this.onGameEnd = null;
         this.onOpponentDisconnect = null;
         this.onOpponentReconnect = null;
-        this.onBothPlayersReady = null; // 雙方都準備好時觸發
-        this.onGameStart = null; // 遊戲正式開始時觸發
     }
-
 
     /**
      * 檢查 Firebase 是否已設定
@@ -174,41 +170,24 @@ class PvPManager {
         const newRoomRef = push(roomsRef);
         const roomId = newRoomRef.key;
 
-        // 取得雙方配對資料（包含牌組）
-        const p1Ref = ref(database, `matchmaking_queue/${player1Id}`);
-        const p2Ref = ref(database, `matchmaking_queue/${player2Id}`);
-        const [p1Snap, p2Snap] = await Promise.all([get(p1Ref), get(p2Ref)]);
-
-        const p1Data = p1Snap.val() || {};
-        const p2Data = p2Snap.val() || {};
-
         const roomData = {
             roomId: roomId,
             createdAt: Date.now(),
             status: 'initializing',
-            seed: Math.floor(Math.random() * 2147483647),
 
             players: {
                 player1: {
-                    oderId: player1Id,
-                    username: p1Data.username || player1Id,
+                    userId: player1Id,
                     connected: true,
                     lastPing: Date.now(),
                     ready: false
                 },
                 player2: {
-                    oderId: player2Id,
-                    username: p2Data.username || player2Id,
+                    userId: player2Id,
                     connected: true,
                     lastPing: Date.now(),
                     ready: false
                 }
-            },
-
-            // 存儲雙方牌組
-            deckData: {
-                player1: p1Data.deckCards || [],
-                player2: p2Data.deckCards || []
             },
 
             gameState: {
@@ -235,8 +214,7 @@ class PvPManager {
                 }
             },
 
-            actionLog: {},
-            lastActionId: null,
+            actionLog: [],
             result: null
         };
 
@@ -259,7 +237,6 @@ class PvPManager {
         return roomId;
     }
 
-
     /**
      * 加入遊戲房間
      */
@@ -267,11 +244,8 @@ class PvPManager {
         this.currentRoomId = roomId;
         this.myPlayerId = playerId;
         this.opponentId = playerId === 'player1' ? 'player2' : 'player1';
-        this.processedActionIds.clear(); // 清空已處理動作
 
         const roomRef = ref(database, `game_rooms/${roomId}`);
-        let previousStatus = null;
-        let previousBothReady = false;
 
         // 開始監聽房間狀態
         this.roomListener = onValue(roomRef, (snapshot) => {
@@ -289,42 +263,9 @@ class PvPManager {
                 this.onOpponentDisconnect();
             }
 
-            // 檢查雙方準備狀態
-            const p1Ready = room.players?.player1?.ready;
-            const p2Ready = room.players?.player2?.ready;
-            const bothReady = p1Ready && p2Ready;
-
-            if (bothReady && !previousBothReady && this.onBothPlayersReady) {
-                console.log('[PvP] 雙方都準備好了');
-                this.onBothPlayersReady();
-            }
-            previousBothReady = bothReady;
-
-            // 檢查遊戲開始
-            if (room.status === 'playing' && previousStatus === 'initializing' && this.onGameStart) {
-                console.log('[PvP] 遊戲正式開始');
-                this.onGameStart();
-            }
-            previousStatus = room.status;
-
-            // 處理對手動作
-            if (room.actionLog && typeof room.actionLog === 'object') {
-                const actions = Object.entries(room.actionLog);
-                for (const [actionId, action] of actions) {
-                    // 只處理對手的動作，且尚未處理過的
-                    if (action.player === this.opponentId && !this.processedActionIds.has(actionId)) {
-                        this.processedActionIds.add(actionId);
-                        console.log('[PvP] 收到對手動作:', action);
-                        if (this.onOpponentAction) {
-                            this.onOpponentAction(action);
-                        }
-                    }
-                }
-            }
-
             // 遊戲狀態更新
             if (this.onGameStateUpdate) {
-                this.onGameStateUpdate(room.gameState, room);
+                this.onGameStateUpdate(room.gameState);
             }
 
             // 遊戲結束
@@ -342,7 +283,6 @@ class PvPManager {
 
         console.log('[PvP] 已加入房間:', roomId, '身份:', playerId);
     }
-
 
     /**
      * 心跳檢測
@@ -478,146 +418,7 @@ class PvPManager {
             this.matchmakingListener = null;
         }
     }
-
-    // ===== Stage 3: 戰鬥同步方法 =====
-
-    /**
-     * 取得對手牌組
-     * @returns {Array} 對手的牌組卡牌 ID 陣列
-     */
-    getOpponentDeckCards() {
-        if (!this.currentRoom || !this.currentRoom.deckData) {
-            return [];
-        }
-        return this.currentRoom.deckData[this.opponentId] || [];
-    }
-
-    /**
-     * 標記玩家準備完成（Mulligan 結束）
-     */
-    async setPlayerReady(mulliganIndices = []) {
-        if (!this.currentRoomId || !this.myPlayerId) return;
-
-        try {
-            await update(ref(database, `game_rooms/${this.currentRoomId}/players/${this.myPlayerId}`), {
-                ready: true,
-                mulliganIndices: mulliganIndices
-            });
-            console.log('[PvP] 已標記準備完成', mulliganIndices);
-            return { success: true };
-        } catch (error) {
-            console.error('[PvP] 標記準備失敗:', error);
-            return { success: false };
-        }
-    }
-
-    /**
-     * 檢查雙方是否都準備好
-     */
-    areBothPlayersReady() {
-        if (!this.currentRoom || !this.currentRoom.players) return false;
-        const p1Ready = this.currentRoom.players.player1?.ready;
-        const p2Ready = this.currentRoom.players.player2?.ready;
-        return p1Ready && p2Ready;
-    }
-
-    /**
-     * 開始遊戲（雙方都準備好後呼叫）
-     */
-    async startGame() {
-        if (!this.currentRoomId) return;
-
-        try {
-            await update(ref(database, `game_rooms/${this.currentRoomId}`), {
-                status: 'playing',
-                'gameState/turnStartTime': Date.now()
-            });
-            console.log('[PvP] 遊戲開始');
-            return { success: true };
-        } catch (error) {
-            console.error('[PvP] 開始遊戲失敗:', error);
-            return { success: false };
-        }
-    }
-
-    /**
-     * 提交出牌動作
-     */
-    async submitPlayCard(cardIndex, target = null, insertionIndex = -1) {
-        return this.submitAction({
-            type: 'PLAY_CARD',
-            data: { cardIndex, target, insertionIndex }
-        });
-    }
-
-    /**
-     * 提交攻擊動作
-     */
-    async submitAttack(attackerIndex, target) {
-        return this.submitAction({
-            type: 'ATTACK',
-            data: { attackerIndex, target }
-        });
-    }
-
-    /**
-     * 同步場面狀態到 Firebase
-     * @param {Object} localState - 本地遊戲狀態摘要
-     */
-    async syncBoardState(localState) {
-        if (!this.currentRoomId || !this.myPlayerId) return;
-
-        const myStateKey = this.myPlayerId === 'player1' ? 'player1State' : 'player2State';
-
-        try {
-            await update(ref(database, `game_rooms/${this.currentRoomId}/gameState/${myStateKey}`), {
-                hp: localState.hp,
-                mana: localState.mana,
-                maxMana: localState.maxMana,
-                handCount: localState.handCount,
-                deckCount: localState.deckCount,
-                board: localState.board || []
-            });
-        } catch (error) {
-            console.error('[PvP] 同步狀態失敗:', error);
-        }
-    }
-
-    /**
-     * 通知遊戲結束
-     * @param {string} winnerId - 'player1' 或 'player2'
-     * @param {string} reason - 結束原因
-     */
-    async notifyGameEnd(winnerId, reason = 'defeat') {
-        if (!this.currentRoomId) return;
-
-        try {
-            await update(ref(database, `game_rooms/${this.currentRoomId}`), {
-                status: 'finished',
-                result: {
-                    winner: winnerId,
-                    reason: reason,
-                    endTime: Date.now()
-                }
-            });
-            console.log('[PvP] 遊戲結束，勝者:', winnerId);
-            return { success: true };
-        } catch (error) {
-            console.error('[PvP] 通知遊戲結束失敗:', error);
-            return { success: false };
-        }
-    }
-
-    /**
-     * 投降
-     */
-    async surrender() {
-        if (!this.currentRoomId || !this.myPlayerId) return;
-        const opponentId = this.myPlayerId === 'player1' ? 'player2' : 'player1';
-        return this.notifyGameEnd(opponentId, 'surrender');
-    }
 }
-
 
 // 建立全域實例
 window.pvpManager = new PvPManager();
