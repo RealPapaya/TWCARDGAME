@@ -107,12 +107,12 @@ class PvPManager {
     }
 
     /**
-     * 監聽配對結果
+     * 監聯配對結果
      */
     _startMatchmakingListener(userId) {
         const queueRef = ref(database, `matchmaking_queue/${userId}`);
 
-        this.matchmakingListener = onValue(queueRef, (snapshot) => {
+        this.matchmakingListener = onValue(queueRef, async (snapshot) => {
             if (!snapshot.exists()) return;
 
             const data = snapshot.val();
@@ -125,10 +125,10 @@ class PvPManager {
                     this.matchmakingListener = null;
                 }
 
-                // 加入遊戲房間
-                this._joinGameRoom(data.roomId, data.playerId);
+                // 加入遊戲房間（等待房間資料載入）
+                await this._joinGameRoom(data.roomId, data.playerId);
 
-                // 觸發回調
+                // 確保 currentRoom 已設定後再觸發回調
                 if (this.onMatchFound) {
                     this.onMatchFound(data.roomId, data.playerId);
                 }
@@ -239,6 +239,7 @@ class PvPManager {
 
     /**
      * 加入遊戲房間
+     * @returns {Promise} 等待房間資料載入完成
      */
     async _joinGameRoom(roomId, playerId) {
         this.currentRoomId = roomId;
@@ -247,41 +248,57 @@ class PvPManager {
 
         const roomRef = ref(database, `game_rooms/${roomId}`);
 
-        // 開始監聽房間狀態
-        this.roomListener = onValue(roomRef, (snapshot) => {
-            if (!snapshot.exists()) {
-                console.log('[PvP] 房間已不存在');
-                return;
-            }
+        // 使用 Promise 等待第一次房間資料載入
+        return new Promise((resolve) => {
+            let isFirstLoad = true;
 
-            const room = snapshot.val();
-            this.currentRoom = room;
+            // 開始監聽房間狀態
+            this.roomListener = onValue(roomRef, (snapshot) => {
+                if (!snapshot.exists()) {
+                    console.log('[PvP] 房間已不存在');
+                    if (isFirstLoad) {
+                        isFirstLoad = false;
+                        resolve(false);
+                    }
+                    return;
+                }
 
-            // 檢查對手連線狀態
-            const opponentConnected = room.players[this.opponentId]?.connected;
-            if (!opponentConnected && this.onOpponentDisconnect) {
-                this.onOpponentDisconnect();
-            }
+                const room = snapshot.val();
+                this.currentRoom = room;
 
-            // 遊戲狀態更新
-            if (this.onGameStateUpdate) {
-                this.onGameStateUpdate(room.gameState);
-            }
+                // 第一次載入完成，resolve Promise
+                if (isFirstLoad) {
+                    isFirstLoad = false;
+                    console.log('[PvP] 房間資料載入完成');
 
-            // 遊戲結束
-            if (room.status === 'finished' && room.result && this.onGameEnd) {
-                this.onGameEnd(room.result);
-            }
+                    // 設定斷線處理
+                    const myPlayerRef = ref(database, `game_rooms/${roomId}/players/${playerId}`);
+                    onDisconnect(myPlayerRef).update({ connected: false });
+
+                    // 開始心跳
+                    this._startHeartbeat(roomId, playerId);
+
+                    console.log('[PvP] 已加入房間:', roomId, '身份:', playerId);
+                    resolve(true);
+                }
+
+                // 檢查對手連線狀態
+                const opponentConnected = room.players?.[this.opponentId]?.connected;
+                if (!opponentConnected && this.onOpponentDisconnect) {
+                    this.onOpponentDisconnect();
+                }
+
+                // 遊戲狀態更新
+                if (this.onGameStateUpdate) {
+                    this.onGameStateUpdate(room.gameState);
+                }
+
+                // 遊戲結束
+                if (room.status === 'finished' && room.result && this.onGameEnd) {
+                    this.onGameEnd(room.result);
+                }
+            });
         });
-
-        // 設定斷線處理
-        const myPlayerRef = ref(database, `game_rooms/${roomId}/players/${playerId}`);
-        onDisconnect(myPlayerRef).update({ connected: false });
-
-        // 開始心跳
-        this._startHeartbeat(roomId, playerId);
-
-        console.log('[PvP] 已加入房間:', roomId, '身份:', playerId);
     }
 
     /**
@@ -361,6 +378,164 @@ class PvPManager {
     }
 
     /**
+     * 同步遊戲動作到 Firebase
+     * @param {string} actionType - 動作類型: PLAY_CARD, ATTACK, END_TURN, MULLIGAN_DONE
+     * @param {Object} actionData - 動作資料
+     */
+    async syncGameAction(actionType, actionData = {}) {
+        if (!this.currentRoomId || !this.myPlayerId) {
+            console.warn('[PvP] syncGameAction: 未在遊戲中');
+            return { success: false, message: '未在遊戲中' };
+        }
+
+        const action = {
+            turn: this.currentRoom?.gameState?.turnNumber || 1,
+            player: this.myPlayerId,
+            action: actionType,
+            data: actionData,
+            timestamp: Date.now(),
+            processed: false
+        };
+
+        try {
+            const logRef = ref(database, `game_rooms/${this.currentRoomId}/actionLog`);
+            await push(logRef, action);
+            console.log('[PvP] 動作已同步:', actionType, actionData);
+            return { success: true };
+        } catch (error) {
+            console.error('[PvP] 同步動作失敗:', error);
+            return { success: false, message: '同步失敗' };
+        }
+    }
+
+    /**
+     * 開始監聽動作日誌 (用於接收對手動作)
+     */
+    listenActionLog() {
+        if (!this.currentRoomId) return;
+
+        const logRef = ref(database, `game_rooms/${this.currentRoomId}/actionLog`);
+        this.lastProcessedActionKey = null;
+
+        // 監聽動作日誌變化
+        this.actionLogListener = onValue(logRef, (snapshot) => {
+            if (!snapshot.exists()) return;
+
+            const actions = snapshot.val();
+            const actionEntries = Object.entries(actions);
+
+            // 找到尚未處理的對手動作
+            for (const [key, action] of actionEntries) {
+                // 跳過自己的動作
+                if (action.player === this.myPlayerId) continue;
+
+                // 跳過已處理的動作 (使用 key 比較，確保順序)
+                if (this.lastProcessedActionKey && key <= this.lastProcessedActionKey) continue;
+
+                // 記錄此動作已處理
+                this.lastProcessedActionKey = key;
+
+                console.log('[PvP] 收到對手動作:', action.action, action.data);
+
+                // 觸發回調
+                if (this.onOpponentAction) {
+                    this.onOpponentAction(action);
+                }
+            }
+        });
+
+        console.log('[PvP] 開始監聽動作日誌');
+    }
+
+    /**
+     * 停止監聽動作日誌
+     */
+    stopListenActionLog() {
+        if (this.actionLogListener) {
+            this.actionLogListener();
+            this.actionLogListener = null;
+        }
+    }
+
+    /**
+     * 更新遊戲狀態到 Firebase (公開資訊)
+     * @param {Object} stateUpdate - 要更新的狀態
+     */
+    async updateGameState(stateUpdate) {
+        if (!this.currentRoomId || !this.myPlayerId) return;
+
+        const myStateKey = `${this.myPlayerId}State`;
+
+        try {
+            await update(ref(database, `game_rooms/${this.currentRoomId}/gameState/${myStateKey}`), stateUpdate);
+            console.log('[PvP] 狀態已同步:', stateUpdate);
+        } catch (error) {
+            console.error('[PvP] 同步狀態失敗:', error);
+        }
+    }
+
+    /**
+     * 同步 Mulligan 完成狀態
+     */
+    async syncMulliganStatus(isReady) {
+        if (!this.currentRoomId || !this.myPlayerId) return;
+
+        try {
+            await update(ref(database, `game_rooms/${this.currentRoomId}/gameState/mulliganStatus`), {
+                [this.myPlayerId]: isReady
+            });
+            console.log('[PvP] Mulligan 狀態已同步:', isReady);
+            return { success: true };
+        } catch (error) {
+            console.error('[PvP] 同步 Mulligan 狀態失敗:', error);
+            return { success: false };
+        }
+    }
+
+    /**
+     * 監聯 Mulligan 狀態，雙方都完成時觸發回調
+     * @param {Function} onBothReady - 雙方都準備好時的回調
+     */
+    listenMulliganStatus(onBothReady) {
+        if (!this.currentRoomId) return;
+
+        const statusRef = ref(database, `game_rooms/${this.currentRoomId}/gameState/mulliganStatus`);
+
+        this.mulliganListener = onValue(statusRef, (snapshot) => {
+            if (!snapshot.exists()) return;
+
+            const status = snapshot.val();
+            console.log('[PvP] Mulligan 狀態更新:', status);
+
+            // 檢查雙方是否都完成
+            if (status.player1 && status.player2) {
+                console.log('[PvP] 雙方 Mulligan 完成，開始遊戲');
+                if (onBothReady) onBothReady();
+
+                // 清理監聽器
+                if (this.mulliganListener) {
+                    this.mulliganListener();
+                    this.mulliganListener = null;
+                }
+            }
+        });
+    }
+
+    /**
+     * 檢查是否輪到自己
+     */
+    isMyTurn() {
+        return this.currentRoom?.gameState?.currentTurn === this.myPlayerId;
+    }
+
+    /**
+     * 取得當前遊戲狀態
+     */
+    getGameState() {
+        return this.currentRoom?.gameState || null;
+    }
+
+    /**
      * 投降
      */
     async surrender() {
@@ -395,6 +570,18 @@ class PvPManager {
             this.roomListener = null;
         }
 
+        // 清理動作日誌監聽器
+        if (this.actionLogListener) {
+            this.actionLogListener();
+            this.actionLogListener = null;
+        }
+
+        // 清理 Mulligan 監聽器
+        if (this.mulliganListener) {
+            this.mulliganListener();
+            this.mulliganListener = null;
+        }
+
         if (this.heartbeatInterval) {
             clearInterval(this.heartbeatInterval);
             this.heartbeatInterval = null;
@@ -404,6 +591,7 @@ class PvPManager {
         this.currentRoomId = null;
         this.myPlayerId = null;
         this.opponentId = null;
+        this.lastProcessedActionKey = null;
 
         console.log('[PvP] 已離開房間');
     }

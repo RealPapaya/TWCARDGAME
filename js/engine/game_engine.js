@@ -1000,8 +1000,9 @@ class GameState {
 
     /**
      * End current turn and switch player.
+     * @param {boolean} skipStartTurn - If true, don't call startTurn (for PvP mode)
      */
-    endTurn() {
+    endTurn(skipStartTurn = false) {
         // Quest Logic: Process for ALL minions on BOTH boards at any turn end
         [this.players[0], this.players[1]].forEach(player => {
             player.board.forEach(m => {
@@ -1077,7 +1078,11 @@ class GameState {
         // this.resolveDeaths();
 
         this.currentPlayerIdx = this.currentPlayerIdx === 0 ? 1 : 0;
-        this.startTurn();
+
+        // PvP 模式：跳過 startTurn，等 Firebase 通知輪到自己時再呼叫
+        if (!skipStartTurn) {
+            this.startTurn();
+        }
     }
 
     /**
