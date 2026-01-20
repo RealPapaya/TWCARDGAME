@@ -182,12 +182,13 @@ const AuthManager = {
      */
     parseUserData(rawData) {
         // [重要] 將 GAS 回傳的所有小寫鍵名對應回前端預期的名稱
+        // 增加鍵名變體偵測 (deck_data, deckdata, deckData 等)
         const user = {
             username: rawData.username,
             password: rawData.password,
-            level: parseInt(rawData.level || 1),
-            gold: parseInt(rawData.gold || 100),
-            deck_data: rawData.deck_data || "[]",
+            level: parseInt(rawData.level || rawData.level || 1),
+            gold: parseInt(rawData.gold || rawData.gold || 100),
+            deck_data: rawData.deck_data || rawData.deckdata || rawData.deckData || "[]",
             selectedAvatar: rawData.selected_avatar || rawData.selectedAvatar || rawData.selectedavatar || "avatar1",
             selectedTitle: rawData.selected_title || rawData.selectedTitle || rawData.selectedtitle || "beginner",
             ownedAvatars: rawData.owned_avatar || rawData.ownedavatar || rawData.ownedAvatars || "[\"avatar1\"]",

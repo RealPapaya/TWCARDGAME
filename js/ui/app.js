@@ -1299,19 +1299,27 @@ window.App = {
 };
 
 function onUserLogin(user) {
-    // [重要] 解析資料確保 JSON 欄位正確 (例如 deck_data, ownedCards)
-    const processedUser = AuthManager.parseUserData(user);
-    AuthManager.currentUser = processedUser;
+    // [重要] user 已經是經由 AuthManager.parseUserData 處理過的物件
+    AuthManager.currentUser = user;
 
     // Load deck data from cloud if available
-    if (processedUser.deck_data && processedUser.deck_data.length > 0) {
-        userDecks = processedUser.deck_data;
+    if (user.deck_data && Array.isArray(user.deck_data) && user.deck_data.length > 0) {
+        userDecks = user.deck_data;
+        console.log(`[Auth] 已載入並同步 ${userDecks.length} 個牌組`);
+    } else if (typeof user.deck_data === 'string' && user.deck_data !== "[]") {
+        // 二次保險：如果是字串則解析
+        try {
+            userDecks = JSON.parse(user.deck_data);
+        } catch (e) {
+            userDecks = [];
+        }
     } else {
         userDecks = [];
+        console.warn('[Auth] 用戶資料中未發現牌組資料');
     }
 
     // 更新本地快取，確保兩邊一致
-    localStorage.setItem('tw_card_game_user', JSON.stringify(processedUser));
+    localStorage.setItem('tw_card_game_user', JSON.stringify(user));
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
     showView('main-menu');

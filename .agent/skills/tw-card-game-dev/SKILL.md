@@ -327,3 +327,247 @@ function calculateCardCost(card, gameState) {
 3. **必讀此文件** - 每次改動前都要閱讀
 
 **違反此規範的代碼將不被接受!**
+
+---
+
+## 📡 後端 (Google Apps Script) 規範
+
+### 寶島遊戲王 後端 v2.0 - 完整版
+
+此代碼部署於 Google Sheets 的 Apps Script 中，負責處理：
+- **認證 (Auth)**: 註冊、登入
+- **資料庫 (DB)**: 讀寫 Google Sheets
+- **排行榜 (Leaderboard)**: 讀取並排序玩家資料
+- **好友系統 (Friend System)**: 好友邀請、接受、拒絕、刪除
+
+```javascript
+/* 寶島遊戲王 後端 v2.0 - 完整版 (含好友系統與排行榜) */
+function doGet(e) {
+  var action = e.parameter.action;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().toLowerCase().trim(); });
+  
+  var JSONResponse = function(obj) {
+    return ContentService.createTextOutput(JSON.stringify(obj)).setMimeType(ContentService.MimeType.JSON);
+  };
+  
+  // 輔助函數：搜尋玩家所在的列號 (不分大小寫)
+  var findRowByUsername = function(name) {
+    var uIdx = headers.indexOf("username");
+    if (uIdx === -1) return -1;
+    var searchName = name.toString().toLowerCase().trim();
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][uIdx].toString().toLowerCase().trim() === searchName) return i + 1;
+    }
+    return -1;
+  };
+
+  // ========== 排行榜 API ==========
+  if (action === 'leaderboard') {
+    var sortBy = e.parameter.sortBy || 'level';
+    var limit = parseInt(e.parameter.limit || 50);
+    var offset = parseInt(e.parameter.offset || 0);
+    
+    var players = [];
+    var levelIdx = headers.indexOf("level");
+    var usernameIdx = headers.indexOf("username");
+    var goldIdx = headers.indexOf("gold");
+    var statsIdx = headers.indexOf("stats");
+    
+    // 找到 selected_avatar 欄位（可能有底線或沒有）
+    var selectedAvatarIdx = headers.indexOf("selectedavatar");
+    if (selectedAvatarIdx === -1) selectedAvatarIdx = headers.indexOf("selected_avatar");
+    
+    var selectedTitleIdx = headers.indexOf("selectedtitle");
+    if (selectedTitleIdx === -1) selectedTitleIdx = headers.indexOf("selected_title");
+    
+    // 收集所有玩家資料
+    for (var i = 1; i < data.length; i++) {
+      var playerObj = {
+        username: data[i][usernameIdx],
+        level: parseInt(data[i][levelIdx] || 1),
+        gold: parseInt(data[i][goldIdx] || 0),
+        stats: data[i][statsIdx] || "{}",
+        selectedavatar: selectedAvatarIdx !== -1 ? data[i][selectedAvatarIdx] : "avatar1",
+        selectedtitle: selectedTitleIdx !== -1 ? data[i][selectedTitleIdx] : "beginner"
+      };
+      players.push(playerObj);
+    }
+    
+    // 排序
+    players.sort(function(a, b) {
+      if (sortBy === 'level') return b.level - a.level;
+      if (sortBy === 'gold') return b.gold - a.gold;
+      return 0;
+    });
+    
+    // 分頁
+    var pagedPlayers = players.slice(offset, offset + limit);
+    
+    return JSONResponse({ success: true, players: pagedPlayers, total: players.length });
+  }
+
+  // ========== 帳號註冊 ==========
+  if (action === 'register') {
+    var username = e.parameter.username;
+    var password = e.parameter.password;
+    
+    for (var i = 1; i < data.length; i++) {
+        if (data[i][0] == username) return JSONResponse({ success: false, message: "帳號已被使用" });
+    }
+    
+    var newRow = new Array(headers.length).fill("");
+    var setVal = function(name, val) {
+      var idx = headers.indexOf(name.toLowerCase().trim());
+      if (idx !== -1) newRow[idx] = val;
+    };
+    
+    // 起始卡牌包 (20 種 x 2 張)
+    var defaultStarterCards = {
+      'TW001':2,'TW003':2,'TW004':2,'TW005':2,'TW030':2,'TW053':2,'TW006':2,'TW007':2,
+      'TW008':2,'TW013':2,'TW012':2,'TW017':2,'S006':2,'S009':2,'S016':2,'S022':2,
+      'S026':2,'TW068':2,'TW027':2,'TW028':2
+    };
+    var starterCollection = e.parameter.owned_cards || JSON.stringify(defaultStarterCards);
+    
+    // 初始資料賦值
+    setVal("username", username);
+    setVal("password", password);
+    setVal("level", 1);
+    setVal("gold", 100);
+    setVal("vouchers", 0);
+    setVal("deck_data", "[]");
+    setVal("selected_avatar", "avatar1");
+    setVal("selected_title", "beginner");
+    setVal("owned_avatar", '["avatar1"]');
+    setVal("owned_titles", '["beginner"]');
+    setVal("owned_cards", starterCollection);
+    setVal("stats", "{}");
+    setVal("defeated_ai", "[]");
+    setVal("current_xp", 0);
+    setVal("last_saved", Date.now());
+    setVal("friends", "[]");
+    setVal("friend_requests", "[]");
+    
+    sheet.appendRow(newRow);
+    SpreadsheetApp.flush();
+    return JSONResponse({ success: true, message: "註冊成功" });
+  }
+
+  // ========== 登入 & 搜尋玩家 ==========
+  if (action === 'login' || action === 'search_user') {
+    var target = e.parameter.username;
+    var rowNum = findRowByUsername(target);
+    if (rowNum === -1) return JSONResponse({ success: false, message: "找不到玩家" });
+    
+    if (action === 'login') {
+      var pass = e.parameter.password;
+      var pIdx = headers.indexOf("password");
+      if (data[rowNum-1][pIdx] != pass) return JSONResponse({ success: false, message: "密碼錯誤" });
+    }
+    
+    var user = {};
+    for (var j = 0; j < headers.length; j++) {
+        var key = headers[j].replace(/_/g, "");
+        user[key] = data[rowNum-1][j];
+    }
+    return JSONResponse({ success: true, data: user });
+  }
+
+  // ========== 好友操作 ==========
+  if (action === 'friend_op') {
+    var type = e.parameter.type; 
+    var username = e.parameter.username;
+    var targetId = e.parameter.targetId;
+    
+    var userRow = findRowByUsername(username);
+    var targetRow = findRowByUsername(targetId);
+    
+    if (userRow === -1) return JSONResponse({ success: false, message: "無法識別您的帳號資訊" });
+    if (targetRow === -1) return JSONResponse({ success: false, message: "目標玩家不存在" });
+    
+    var fIdx = headers.indexOf("friends"), rIdx = headers.indexOf("friend_requests");
+    if (fIdx === -1 || rIdx === -1) return JSONResponse({ success: false, message: "資料表缺少 friends 欄位" });
+
+    var myFriends = JSON.parse(sheet.getRange(userRow, fIdx + 1).getValue() || "[]");
+    var myReqs = JSON.parse(sheet.getRange(userRow, rIdx + 1).getValue() || "[]");
+    var targetFriends = JSON.parse(sheet.getRange(targetRow, fIdx + 1).getValue() || "[]");
+    var targetReqs = JSON.parse(sheet.getRange(targetRow, rIdx + 1).getValue() || "[]");
+
+    // 發送申請
+    if (type === 'SEND') {
+      if (myFriends.map(function(s){return s.toString().toLowerCase();}).indexOf(targetId.toLowerCase()) !== -1) 
+        return JSONResponse({ success: false, message: "已經是好友了" });
+      if (targetReqs.map(function(s){return s.toString().toLowerCase();}).indexOf(username.toLowerCase()) === -1) {
+        targetReqs.push(username);
+        sheet.getRange(targetRow, rIdx + 1).setValue(JSON.stringify(targetReqs));
+      }
+      return JSONResponse({ success: true });
+    }
+    
+    // 接受申請
+    if (type === 'ACCEPT') {
+       if (myFriends.map(function(s){return s.toString().toLowerCase();}).indexOf(targetId.toLowerCase()) === -1) myFriends.push(targetId);
+       if (targetFriends.map(function(s){return s.toString().toLowerCase();}).indexOf(username.toLowerCase()) === -1) targetFriends.push(username);
+       myReqs = myReqs.filter(function(id) { return id.toString().toLowerCase() !== targetId.toLowerCase(); });
+       sheet.getRange(userRow, fIdx + 1).setValue(JSON.stringify(myFriends));
+       sheet.getRange(userRow, rIdx + 1).setValue(JSON.stringify(myReqs));
+       sheet.getRange(targetRow, fIdx + 1).setValue(JSON.stringify(targetFriends));
+       return JSONResponse({ success: true });
+    }
+    
+    // 拒絕申請
+    if (type === 'REJECT') {
+      myReqs = myReqs.filter(function(id) { return id.toString().toLowerCase() !== targetId.toLowerCase(); });
+      sheet.getRange(userRow, rIdx + 1).setValue(JSON.stringify(myReqs));
+      return JSONResponse({ success: true });
+    }
+    
+    // 刪除好友
+    if (type === 'REMOVE') {
+      myFriends = myFriends.filter(function(id) { return id.toString().toLowerCase() !== targetId.toLowerCase(); });
+      targetFriends = targetFriends.filter(function(id) { return id.toString().toLowerCase() !== username.toLowerCase(); });
+      sheet.getRange(userRow, fIdx + 1).setValue(JSON.stringify(myFriends));
+      sheet.getRange(targetRow, fIdx + 1).setValue(JSON.stringify(targetFriends));
+      return JSONResponse({ success: true });
+    }
+  }
+}
+
+// ========== 更新資料 (POST) ==========
+function doPost(e) {
+  var params = JSON.parse(e.postData.contents);
+  var action = params.action;
+  var sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  var data = sheet.getDataRange().getValues();
+  var headers = data[0].map(function(h) { return h.toString().toLowerCase().trim(); });
+
+  if (action === 'update') {
+    var username = params.username;
+    var lastSavedIdx = headers.indexOf("last_saved");
+    
+    for (var i = 1; i < data.length; i++) {
+      if (data[i][0] == username) {
+        // 時序檢查防止蓋檔
+        if (lastSavedIdx !== -1) {
+          var existingT = parseInt(data[i][lastSavedIdx] || 0);
+          var incomingT = parseInt(params.last_saved || 0);
+          if (incomingT <= existingT) return ContentService.createTextOutput("Ignored: Stale Data");
+        }
+
+        for (var key in params) {
+          var colIndex = headers.indexOf(key.toLowerCase().replace(/_/g, ""));
+          if (colIndex === -1) colIndex = headers.indexOf(key.toLowerCase());
+          
+          if (colIndex !== -1) {
+            sheet.getRange(i + 1, colIndex + 1).setValue(params[key]);
+          }
+        }
+        SpreadsheetApp.flush(); 
+        return ContentService.createTextOutput("Success");
+      }
+    }
+  }
+}
+```
