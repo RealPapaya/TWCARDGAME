@@ -354,6 +354,77 @@ function init() {
         renderAIBattleSetup();
     });
 
+    // --- PvP Mode Listener ---
+    let matchmakingTimer = null;
+    let matchmakingStartTime = null;
+
+    document.getElementById('btn-mode-player').addEventListener('click', async () => {
+        // 檢查是否有選擇牌組
+        if (!userDecks || userDecks.length === 0) {
+            showToast('請先建立一個牌組！');
+            return;
+        }
+
+        // 檢查 Firebase 是否已設定
+        if (window.pvpManager && !window.pvpManager.isReady()) {
+            showToast('PvP 功能尚未設定完成');
+            console.warn('[PvP] Firebase 尚未設定，請先完成 firebase_config.js');
+            return;
+        }
+
+        // 顯示配對畫面
+        const modal = document.getElementById('pvp-matchmaking-modal');
+        modal.style.display = 'flex';
+        matchmakingStartTime = Date.now();
+
+        // 開始計時器
+        matchmakingTimer = setInterval(() => {
+            const elapsed = Math.floor((Date.now() - matchmakingStartTime) / 1000);
+            document.getElementById('matchmaking-timer').textContent = `等待時間: ${elapsed} 秒`;
+        }, 1000);
+
+        // 加入配對佇列
+        if (window.pvpManager) {
+            const result = await window.pvpManager.joinMatchmaking({
+                username: AuthManager.currentUser.username,
+                level: AuthManager.currentUser.level || 1,
+                deckId: userDecks[0]?.name || 'default'
+            });
+
+            if (!result.success) {
+                showToast(result.message);
+                modal.style.display = 'none';
+                clearInterval(matchmakingTimer);
+            }
+
+            // 設定配對成功回調
+            window.pvpManager.onMatchFound = (roomId, playerId) => {
+                clearInterval(matchmakingTimer);
+                modal.style.display = 'none';
+                showToast('配對成功！');
+                console.log('[PvP] 進入房間:', roomId, '身份:', playerId);
+                // TODO: 進入 PvP 對戰畫面
+            };
+        }
+    });
+
+    // 取消配對按鈕
+    document.getElementById('btn-cancel-matchmaking').addEventListener('click', async () => {
+        const modal = document.getElementById('pvp-matchmaking-modal');
+        modal.style.display = 'none';
+
+        if (matchmakingTimer) {
+            clearInterval(matchmakingTimer);
+            matchmakingTimer = null;
+        }
+
+        if (window.pvpManager) {
+            await window.pvpManager.leaveMatchmaking(AuthManager.currentUser.username);
+        }
+
+        showToast('已取消配對');
+    });
+
     // --- Difficulty Selection Listeners ---
     document.querySelectorAll('.diff-btn').forEach(btn => {
         btn.addEventListener('click', () => {

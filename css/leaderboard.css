@@ -507,3 +507,43 @@
     padding: 5px 10px;
     font-size: 12px;
 }
+
+/* PvP Matchmaking Styles */
+.matchmaking-spinner {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+}
+
+.matchmaking-spinner .spinner {
+    width: 60px;
+    height: 60px;
+    border: 6px solid #e6ccb2;
+    border-top: 6px solid #5d2e17;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    0% {
+        transform: rotate(0deg);
+    }
+
+    100% {
+        transform: rotate(360deg);
+    }
+}
+
+.matchmaking-text {
+    text-align: center;
+    color: #5d2e17;
+    font-size: 18px;
+    margin: 15px 0;
+}
+
+.matchmaking-timer {
+    text-align: center;
+    color: #8b4513;
+    font-size: 14px;
+    margin-bottom: 20px;
+}

@@ -39,6 +39,8 @@
     <script src="js/ui/app.js?v=1.1" defer></script>
     <script src="js/ui/clouds.js" defer></script>
     <script src="js/ui/click_effect.js" defer></script>
+    <!-- PvP System (ES Module) -->
+    <script type="module" src="js/pvp/pvp_manager.js"></script>
 </head>
 
 <body>
@@ -462,8 +464,23 @@
                     <h2 class="sub-title">選擇對戰模式</h2>
                     <div class="menu-buttons">
                         <button id="btn-mode-ai" class="neon-button">電腦對戰</button>
-                        <button id="btn-mode-player" class="neon-button disabled-mode" disabled>玩家對戰</button>
+                        <button id="btn-mode-player" class="neon-button">玩家對戰</button>
                         <button class="neon-button secondary btn-back">返回</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PvP Matchmaking Modal -->
+            <div id="pvp-matchmaking-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 class="medieval-title">尋找對手中...</h2>
+                    <div class="matchmaking-spinner">
+                        <div class="spinner"></div>
+                    </div>
+                    <p id="matchmaking-status" class="matchmaking-text">正在搜尋適合的對手</p>
+                    <p id="matchmaking-timer" class="matchmaking-timer">等待時間: 0 秒</p>
+                    <div class="modal-buttons medieval-button-group">
+                        <button type="button" id="btn-cancel-matchmaking" class="medieval-button danger">取消配對</button>
                     </div>
                 </div>
             </div>
