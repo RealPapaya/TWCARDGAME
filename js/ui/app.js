@@ -821,17 +821,30 @@ document.getElementById('btn-result-continue').addEventListener('click', () => {
 });
 
 // --- Settings & Logout (Main Menu) ---
+// --- Settings & Logout (Main Menu) ---
 const settingsBtn = document.getElementById('btn-settings-main');
 const logoutBtn = document.getElementById('btn-logout-main');
-const settingsMenu = document.getElementById('settings-menu-main');
+const settingsModal = document.getElementById('settings-modal');
+const settingsCloseBtn = document.getElementById('btn-settings-close');
 
 if (settingsBtn) {
     settingsBtn.addEventListener('click', (e) => {
         e.stopPropagation();
-        if (settingsMenu.style.display === 'none' || !settingsMenu.style.display) {
-            settingsMenu.style.display = 'flex'; // Use flex for layout
-        } else {
-            settingsMenu.style.display = 'none';
+        if (settingsModal) settingsModal.style.display = 'flex';
+    });
+}
+
+if (settingsCloseBtn) {
+    settingsCloseBtn.addEventListener('click', () => {
+        if (settingsModal) settingsModal.style.display = 'none';
+    });
+}
+
+// Close modal when clicking outside (on overlay)
+if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+            settingsModal.style.display = 'none';
         }
     });
 }
@@ -841,6 +854,7 @@ if (logoutBtn) {
         e.stopPropagation();
         const confirmed = await showCustomConfirm('確定要登出嗎？');
         if (confirmed) {
+            if (settingsModal) settingsModal.style.display = 'none';
             AuthManager.logout();
             showView('auth-view');
             if (window.AuthUI) AuthUI.reset();
@@ -848,7 +862,6 @@ if (logoutBtn) {
             // 清除玩家資訊
             updatePlayerInfo();
         }
-        if (settingsMenu) settingsMenu.style.display = 'none';
     });
 }
 
@@ -858,10 +871,6 @@ document.addEventListener('click', (e) => {
     const battleBtn = document.getElementById('settings-button');
     if (battleMenu && battleBtn && !battleMenu.contains(e.target) && !battleBtn.contains(e.target)) {
         battleMenu.style.display = 'none';
-    }
-
-    if (settingsMenu && settingsBtn && !settingsMenu.contains(e.target) && !settingsBtn.contains(e.target)) {
-        settingsMenu.style.display = 'none';
     }
 });
 

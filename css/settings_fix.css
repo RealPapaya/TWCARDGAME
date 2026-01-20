@@ -7,7 +7,7 @@
 .settings-container {
     position: absolute !important;
     top: 30px !important;
-    right: 120px !important;
+    right: 80px !important;
     z-index: 200 !important;
     pointer-events: auto !important;
 }
@@ -53,7 +53,7 @@
 .settings-menu {
     position: absolute !important;
     top: 155px !important;
-    right: -92px !important;
+    right: -40px !important;
     left: auto !important;
     transition: none !important;
     min-width: 240px !important;

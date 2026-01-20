@@ -67,18 +67,15 @@
             </svg>
             <!-- Main Menu View -->
             <div id="main-menu" class="view">
-                <!-- 排行榜入口按鈕 (左上角) -->
-                <button id="btn-leaderboard" class="leaderboard-entrance-btn" title="排行榜">
-                    🏆
-                </button>
-
                 <!-- Main Menu Settings -->
                 <div class="settings-container">
                     <button id="btn-settings-main" class="settings-btn" title="設定">⚙️</button>
-                    <div id="settings-menu-main" class="settings-menu" style="display: none;">
-                        <button id="btn-logout-main" class="settings-menu-item">登出</button>
-                    </div>
                 </div>
+
+                <!-- 排行榜入口按鈕 (移動到設定下方) -->
+                <button id="btn-leaderboard" class="leaderboard-entrance-btn" title="排行榜">
+                    🏆
+                </button>
 
                 <!-- 玩家資訊卡片 (左下角) -->
                 <div id="player-info-card" class="player-info-card" style="display: none;">
@@ -784,6 +781,17 @@
                         <button id="btn-custom-confirm" class="medieval-button">確定</button>
                         <button id="btn-custom-cancel" class="medieval-button secondary"
                             style="display:none;">取消</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Modal -->
+            <div id="settings-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 class="medieval-title">遊戲設定</h2>
+                    <div class="modal-buttons medieval-button-group vertical-group">
+                        <button id="btn-logout-main" class="medieval-button danger">登出</button>
+                        <button id="btn-settings-close" class="medieval-button secondary">關閉</button>
                     </div>
                 </div>
             </div>
