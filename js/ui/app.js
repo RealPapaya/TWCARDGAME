@@ -2332,6 +2332,7 @@ function showView(viewId) {
     nextView.classList.remove('exit-active');
     nextView.scrollTop = 0;
 
+    const previousViewId = currentViewId;
     currentViewId = viewId;
 
     transitionTimeout = setTimeout(() => {
@@ -2361,7 +2362,7 @@ function showView(viewId) {
     if (audioManager) {
         if (viewId === 'battle-view') {
             audioManager.play();
-        } else if (currentViewId === 'battle-view' && viewId !== 'battle-view') {
+        } else if (previousViewId === 'battle-view' && viewId !== 'battle-view') {
             audioManager.pause();
         }
     }
