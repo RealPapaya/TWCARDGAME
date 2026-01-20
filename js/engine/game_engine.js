@@ -65,53 +65,31 @@ class GameEngine {
      * Initialize a new game.
      * @param {Array<string>} deck1Ids
      * @param {Array<string>} deck2Ids
-     * @param {boolean} debugMode
-     * @param {string} difficulty
-     * @param {string} localPlayerId - 'player1' or 'player2' (Used for PvP perspective normalization)
      * @returns {GameState}
      */
-    createGame(deck1Ids, deck2Ids, debugMode = false, difficulty = 'NORMAL', localPlayerId = 'player1') {
-        // Validate decks
+    createGame(deck1Ids, deck2Ids, debugMode = false, difficulty = 'NORMAL') {
+        // Validate decks first
         if (!this.validateDeck(deck1Ids).valid || !this.validateDeck(deck2Ids).valid) {
             throw new Error("Invalid decks");
         }
 
-        // [Crucial Fix for PvP RNG Sync]
-        // 永遠按絕對順序 (P1 -> P2) 建立玩家與洗牌，確保隨機數消耗順序一致。
-        // 不論在哪個視角，deck1Ids 代表 P1，deck2Ids 代表 P2。
-        const p1 = new Player(deck1Ids, this.collection, 'PLAYER', 'player1');
-        const p2 = new Player(deck2Ids, this.collection, 'OPPONENT', 'player2');
+        const p1 = new Player(deck1Ids, this.collection, 'PLAYER');
+        const p2 = new Player(deck2Ids, this.collection, 'OPPONENT');
 
-        // 決定絕對順序下的先後手 (0: P1 先, 1: P2 先)
-        const absStartingIndex = Math.random() < 0.5 ? 0 : 1;
+        // Randomly choose starting player
+        const startingIndex = Math.random() < 0.5 ? 0 : 1;
 
-        // 根據在地視角 (localPlayerId) 調整 players 陣列順序
-        // 確保 players[0] 始終是在地玩家 (UI 依賴此預設)
-        let finalPlayers;
-        let finalStartingIndex;
+        const state = new GameState([p1, p2], startingIndex, debugMode, difficulty, this.collection);
 
-        if (localPlayerId === 'player1') {
-            finalPlayers = [p1, p2];
-            finalStartingIndex = absStartingIndex;
-            // 修正 side 以符合 UI
-            p1.side = 'PLAYER'; p1.hero.side = 'PLAYER';
-            p2.side = 'OPPONENT'; p2.hero.side = 'OPPONENT';
-        } else {
-            // Player 2 視角
-            finalPlayers = [p2, p1];
-            // 如果絕對索引是 0 (P1先)，在 [p2, p1] 陣列中索引變為 1
-            finalStartingIndex = (absStartingIndex === 0 ? 1 : 0);
-            // 修正 side：在 P2 視角，自己是 PLAYER，對手 (P1) 是 OPPONENT
-            p2.side = 'PLAYER'; p2.hero.side = 'PLAYER';
-            p1.side = 'OPPONENT'; p1.hero.side = 'OPPONENT';
-        }
+        // Initial Draw: Both players get 3 cards as per user request
+        const p1Draws = 3;
+        const p2Draws = 3;
 
-        const state = new GameState(finalPlayers, finalStartingIndex, debugMode, difficulty, this.collection);
+        for (let i = 0; i < p1Draws; i++) p1.drawCard();
+        for (let i = 0; i < p2Draws; i++) p2.drawCard();
 
-        // 按絕對順序抽牌 (P1 先抽, 再 P2 抽)
-        for (let i = 0; i < 3; i++) p1.drawCard();
-        for (let i = 0; i < 3; i++) p2.drawCard();
-
+        // Mulligan Phase: startTurn() will be called AFTER mulligan完成
+        // state.startTurn();
         return state;
     }
 }
@@ -1700,47 +1678,11 @@ class GameState {
             }
         }
     }
-
-    /**
-     * Mulligan Handler: 處理起手換牌邏輯
-     * @param {number} playerIdx - 玩家索引 (0 or 1)
-     * @param {Array<number>} selectedIndices - 要替換的手牌索引陣列
-     * @returns {Array} 被替換的卡牌列表
-     */
-    performMulligan(playerIdx, selectedIndices) {
-        const player = this.players[playerIdx];
-        if (!player) return [];
-
-        const replacedCards = [];
-
-        // 從手牌中移除選中的卡並放回牌組底部
-        selectedIndices.sort((a, b) => b - a).forEach(idx => {
-            if (idx >= 0 && idx < player.hand.length) {
-                const card = player.hand.splice(idx, 1)[0];
-                player.deck.push(card);
-                replacedCards.push(card);
-            }
-        });
-
-        // 洗牌 (Fisher-Yates shuffle)
-        for (let i = player.deck.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [player.deck[i], player.deck[j]] = [player.deck[j], player.deck[i]];
-        }
-
-        // 重抽等量的牌
-        for (let i = 0; i < selectedIndices.length; i++) {
-            player.drawCard();
-        }
-
-        return replacedCards;
-    }
 }
 
 class Player {
-    constructor(deckIds, collection, side, playerId = null) {
+    constructor(deckIds, collection, side) {
         this.side = side;
-        this.playerId = playerId; // 'player1' or 'player2'
         this.hero = { type: 'HERO', hp: 30, maxHp: 30, side: side };
         this.mana = { current: 0, max: 0 };
         this.deck = this.buildDeck(deckIds, collection);
@@ -2078,6 +2020,41 @@ class AIEngine {
         }
 
         return null;
+    }
+
+    /**
+     * Mulligan Handler: 處理起手換牌邏輯
+     * @param {number} playerIdx - 玩家索引 (0 or 1)
+     * @param {Array<number>} selectedIndices - 要替換的手牌索引陣列
+     * @returns {Array} 被替換的卡牌列表
+     */
+    performMulligan(playerIdx, selectedIndices) {
+        const player = this.players[playerIdx];
+        if (!player) return [];
+
+        const replacedCards = [];
+
+        // 從手牌中移除選中的卡並放回牌組底部
+        selectedIndices.sort((a, b) => b - a).forEach(idx => {
+            if (idx >= 0 && idx < player.hand.length) {
+                const card = player.hand.splice(idx, 1)[0];
+                player.deck.push(card);
+                replacedCards.push(card);
+            }
+        });
+
+        // 洗牌 (Fisher-Yates shuffle)
+        for (let i = player.deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [player.deck[i], player.deck[j]] = [player.deck[j], player.deck[i]];
+        }
+
+        // 重抽等量的牌
+        for (let i = 0; i < selectedIndices.length; i++) {
+            player.drawCard();
+        }
+
+        return replacedCards;
     }
 }
 // Export for Node.js

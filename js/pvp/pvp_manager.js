@@ -190,14 +190,14 @@ class PvPManager {
 
             players: {
                 player1: {
-                    userId: player1Id,
+                    oderId: player1Id,
                     username: p1Data.username || player1Id,
                     connected: true,
                     lastPing: Date.now(),
                     ready: false
                 },
                 player2: {
-                    userId: player2Id,
+                    oderId: player2Id,
                     username: p2Data.username || player2Id,
                     connected: true,
                     lastPing: Date.now(),
@@ -378,7 +378,7 @@ class PvPManager {
         const actionData = {
             turn: this.currentRoom.gameState.turnNumber,
             player: this.myPlayerId,
-            type: action.type,
+            action: action.type,
             data: action.data,
             timestamp: Date.now()
         };
