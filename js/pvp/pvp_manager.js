@@ -59,6 +59,7 @@ class PvPManager {
                 username: playerData.username,
                 level: playerData.level || 1,
                 deckId: playerData.deckId || 'default',
+                deckCards: playerData.deckCards || [],
                 timestamp: Date.now(),
                 status: 'waiting'
             });
@@ -68,8 +69,14 @@ class PvPManager {
 
             console.log('[PvP] 已加入配對佇列');
 
-            // 開始監聽配對結果
+            // 開始監聯配對結果
             this._startMatchmakingListener(userId);
+
+            // 嘗試與其他等待中的玩家配對
+            const matchResult = await this.tryMatchWithPlayer(userId);
+            if (matchResult) {
+                console.log('[PvP] 自動配對成功！');
+            }
 
             return { success: true, message: '已加入配對佇列' };
         } catch (error) {

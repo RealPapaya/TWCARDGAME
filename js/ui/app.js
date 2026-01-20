@@ -385,10 +385,15 @@ function init() {
 
         // 加入配對佇列
         if (window.pvpManager) {
+            // 使用第一個牌組
+            const selectedDeck = userDecks[0];
+            const deckCards = selectedDeck?.cards || [];
+
             const result = await window.pvpManager.joinMatchmaking({
                 username: AuthManager.currentUser.username,
                 level: AuthManager.currentUser.level || 1,
-                deckId: userDecks[0]?.name || 'default'
+                deckId: selectedDeck?.name || 'default',
+                deckCards: deckCards
             });
 
             if (!result.success) {
@@ -401,9 +406,11 @@ function init() {
             window.pvpManager.onMatchFound = (roomId, playerId) => {
                 clearInterval(matchmakingTimer);
                 modal.style.display = 'none';
-                showToast('配對成功！');
+                showToast('配對成功！正在載入對戰...');
                 console.log('[PvP] 進入房間:', roomId, '身份:', playerId);
-                // TODO: 進入 PvP 對戰畫面
+
+                // 進入 PvP 對戰畫面
+                startPvPGame(roomId, playerId, deckCards);
             };
         }
     });
@@ -2419,6 +2426,104 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
     */
 
     // Mulligan 會在玩家選擇完後自動呼叫 render() 和 startTurn()
+}
+
+// ===== PvP 對戰初始化 =====
+let isPvPMode = false;
+let pvpRoomId = null;
+let pvpPlayerId = null;
+
+async function startPvPGame(roomId, playerId, myDeckCards) {
+    isPvPMode = true;
+    pvpRoomId = roomId;
+    pvpPlayerId = playerId;
+
+    MatchHistory.clear();
+
+    console.log('[PvP] 開始對戰初始化...', { roomId, playerId, deckSize: myDeckCards.length });
+
+    // 等待對手資料
+    const roomData = window.pvpManager?.currentRoom;
+    if (!roomData) {
+        showToast('無法取得房間資料');
+        return;
+    }
+
+    try {
+        // 暫時使用隨機對手牌組（未來會從 Firebase 取得）
+        const allIds = CARD_DATA.map(c => c.id);
+        let oppDeck = [];
+        while (oppDeck.length < 30) {
+            oppDeck.push(allIds[Math.floor(Math.random() * allIds.length)]);
+        }
+
+        // 根據身份決定先後手
+        const isFirstPlayer = playerId === 'player1';
+
+        // 建立遊戲狀態
+        gameState = gameEngine.createGame(
+            myDeckCards,
+            oppDeck,
+            false, // debugMode
+            'NORMAL' // difficulty
+        );
+
+        // 強制設定先後手
+        if (!isFirstPlayer) {
+            gameState.currentPlayerIdx = 1;
+        }
+
+        window.gameState = gameState;
+        showView('battle-view');
+
+        // PvP 模式標記
+        window.isPvPMode = true;
+
+        // Play battle BGM
+        if (audioManager) {
+            audioManager.play();
+        }
+
+        // 啟動 Mulligan Phase
+        showMulliganPhase();
+
+        // 設定 PvP 事件回調
+        if (window.pvpManager) {
+            window.pvpManager.onGameStateUpdate = (remoteState) => {
+                console.log('[PvP] 收到遠端狀態更新:', remoteState);
+                // TODO: 同步遠端狀態到本地 gameState
+            };
+
+            window.pvpManager.onOpponentDisconnect = () => {
+                showToast('對手已斷線，等待重連中...');
+            };
+
+            window.pvpManager.onGameEnd = (result) => {
+                const isWinner = result.winner === pvpPlayerId;
+                showVictoryOverlay(isWinner);
+            };
+        }
+
+        console.log('[PvP] 對戰初始化完成，身份:', playerId);
+
+    } catch (e) {
+        console.error('[PvP] 對戰初始化失敗:', e);
+        logMessage(e.message);
+        isPvPMode = false;
+        return;
+    }
+}
+
+// 結束 PvP 對戰
+function endPvPGame() {
+    isPvPMode = false;
+    pvpRoomId = null;
+    pvpPlayerId = null;
+    window.isPvPMode = false;
+
+    if (window.pvpManager) {
+        window.pvpManager.leaveRoom();
+    }
 }
 
 function initManaContainers(id) {
