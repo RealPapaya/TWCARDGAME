@@ -840,17 +840,9 @@ if (settingsCloseBtn) {
     });
 }
 
-// Close modal when clicking outside (on overlay)
-if (settingsModal) {
-    settingsModal.addEventListener('click', (e) => {
-        if (e.target === settingsModal) {
-            settingsModal.style.display = 'none';
-        }
-    });
-}
-
 if (logoutBtn) {
     logoutBtn.addEventListener('click', async (e) => {
+        e.preventDefault();
         e.stopPropagation();
         const confirmed = await showCustomConfirm('確定要登出嗎？');
         if (confirmed) {
@@ -865,12 +857,204 @@ if (logoutBtn) {
     });
 }
 
+// Close modal when clicking outside (on overlay)
+if (settingsModal) {
+    settingsModal.addEventListener('click', (e) => {
+        if (e.target === settingsModal) {
+            settingsModal.style.display = 'none';
+        }
+    });
+}
+
+// --- Friends Modal ---
+const friendsBtn = document.getElementById('btn-friends');
+const friendsModal = document.getElementById('friends-modal');
+const friendsCloseBtn = document.getElementById('btn-friends-close');
+
+if (friendsBtn) {
+    friendsBtn.addEventListener('click', () => {
+        if (friendsModal) {
+            friendsModal.style.display = 'flex';
+            renderFriendsList();
+            updateFriendRequestBadge();
+        }
+    });
+}
+
+if (friendsCloseBtn) {
+    friendsCloseBtn.addEventListener('click', () => {
+        friendsModal.style.display = 'none';
+    });
+}
+
+// Friends Search Logic
+document.getElementById('btn-friends-search')?.addEventListener('click', handleFriendsSearch);
+document.getElementById('friends-search-input')?.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleFriendsSearch();
+});
+
+async function handleFriendsSearch() {
+    const input = document.getElementById('friends-search-input');
+    const resultArea = document.getElementById('friends-search-result');
+    const username = input.value.trim();
+
+    if (!username) return;
+    if (username.toLowerCase() === AuthManager.currentUser?.username.toLowerCase()) {
+        showToast("不能搜尋自己喔！");
+        return;
+    }
+
+    resultArea.style.display = 'block';
+    resultArea.innerHTML = '<div class="loading">搜尋中...</div>';
+
+    const result = await AuthManager.searchUser(username);
+    if (result.success && result.data) {
+        const u = result.data;
+        const isAlreadyFriend = AuthManager.currentUser.friends.includes(u.username);
+
+        resultArea.innerHTML = `
+            <div class="friend-item">
+                <div class="avatar">${u.username.charAt(0)}</div>
+                <div class="info">
+                    <div class="name">${u.username} (Lv.${u.level || 1})</div>
+                    <div class="title">#${u.selected_title || '新手'}</div>
+                </div>
+                <div class="friend-actions">
+                    ${isAlreadyFriend ?
+                '<span class="status-tag">已是好友</span>' :
+                `<button class="medieval-button btn-small" onclick="sendFriendRequest('${u.username}')">發送申請</button>`
+            }
+                </div>
+            </div>
+        `;
+    } else {
+        resultArea.innerHTML = `<div class="empty-message">${result.message || "找不到該玩家"}</div>`;
+    }
+}
+
+window.sendFriendRequest = async function (targetId) {
+    const result = await AuthManager.handleFriendOp('SEND', targetId);
+    if (result.success) {
+        showToast("申請已發送！");
+        document.getElementById('friends-search-result').style.display = 'none';
+        document.getElementById('friends-search-input').value = '';
+    } else {
+        showToast(result.message);
+    }
+};
+
+// Friends Tabs
+document.getElementById('tab-friends-list')?.addEventListener('click', () => {
+    switchFriendsTab('list');
+});
+document.getElementById('tab-friends-requests')?.addEventListener('click', () => {
+    switchFriendsTab('requests');
+});
+
+function switchFriendsTab(tab) {
+    const listTab = document.getElementById('tab-friends-list');
+    const reqTab = document.getElementById('tab-friends-requests');
+
+    if (tab === 'list') {
+        listTab.classList.add('active');
+        reqTab.classList.remove('active');
+        renderFriendsList();
+    } else {
+        listTab.classList.remove('active');
+        reqTab.classList.add('active');
+        renderFriendRequests();
+    }
+}
+
+async function renderFriendsList() {
+    const container = document.getElementById('friends-list-container');
+    container.innerHTML = '<div class="loading">載入中...</div>';
+
+    const friendIds = AuthManager.currentUser.friends || [];
+    if (friendIds.length === 0) {
+        container.innerHTML = '<div class="empty-message">目前還沒有好友，快去搜尋玩家吧！</div>';
+        return;
+    }
+
+    // 這裡為了簡單，目前先只顯示名稱。未來可以批次抓取好友詳情。
+    let html = '';
+    for (const id of friendIds) {
+        html += `
+            <div class="friend-item">
+                <div class="avatar">${id.charAt(0)}</div>
+                <div class="info">
+                    <div class="name">${id}</div>
+                </div>
+                <div class="friend-actions">
+                    <button class="medieval-button danger btn-small" onclick="handleFriendAction('REMOVE', '${id}')">刪除</button>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+function renderFriendRequests() {
+    const container = document.getElementById('friends-list-container');
+    const requests = AuthManager.currentUser.friendRequests || [];
+
+    if (requests.length === 0) {
+        container.innerHTML = '<div class="empty-message">目前沒有待處理的邀請。</div>';
+        return;
+    }
+
+    let html = '';
+    for (const id of requests) {
+        html += `
+            <div class="friend-item">
+                <div class="avatar">${id.charAt(0)}</div>
+                <div class="info">
+                    <div class="name">${id} 向你發送了好友邀請</div>
+                </div>
+                <div class="friend-actions">
+                    <button class="medieval-button btn-small" onclick="handleFriendAction('ACCEPT', '${id}')">接受</button>
+                    <button class="medieval-button secondary btn-small" onclick="handleFriendAction('REJECT', '${id}')">拒絕</button>
+                </div>
+            </div>
+        `;
+    }
+    container.innerHTML = html;
+}
+
+window.handleFriendAction = async function (type, targetId) {
+    const result = await AuthManager.handleFriendOp(type, targetId);
+    if (result.success) {
+        showToast(type === 'ACCEPT' ? "已成為好友！" : "操作成功");
+        const activeTab = document.getElementById('tab-friends-list').classList.contains('active') ? 'list' : 'requests';
+        switchFriendsTab(activeTab);
+        updateFriendRequestBadge();
+    } else {
+        showToast(result.message);
+    }
+};
+
+function updateFriendRequestBadge() {
+    const badge = document.getElementById('friends-req-count');
+    const count = AuthManager.currentUser.friendRequests?.length || 0;
+    if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+    } else {
+        badge.style.display = 'none';
+    }
+}
+
 // Close menus when clicking outside
 document.addEventListener('click', (e) => {
     const battleMenu = document.getElementById('settings-menu-battle');
     const battleBtn = document.getElementById('settings-button');
     if (battleMenu && battleBtn && !battleMenu.contains(e.target) && !battleBtn.contains(e.target)) {
         battleMenu.style.display = 'none';
+    }
+
+    // Close friends modal if clicking outside content
+    if (friendsModal && e.target === friendsModal) {
+        friendsModal.style.display = 'none';
     }
 });
 

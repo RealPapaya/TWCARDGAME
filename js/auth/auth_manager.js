@@ -137,7 +137,9 @@ const AuthManager = {
                     vouchers: this.currentUser.vouchers || 0,
                     defeated_ai: JSON.stringify(this.currentUser.defeatedAI || []),
                     current_xp: this.currentUser.currentXP || 0,
-                    last_saved: this.currentUser.lastsaved
+                    last_saved: this.currentUser.lastsaved,
+                    friends: JSON.stringify(this.currentUser.friends || []),
+                    friend_requests: JSON.stringify(this.currentUser.friendRequests || [])
                 })
             });
             console.log(`資料已同步至本地與雲端 (${this.currentUser.lastsaved})`);
@@ -197,7 +199,10 @@ const AuthManager = {
             currentXP: parseInt(rawData.current_xp || rawData.currentXP || rawData.currentxp || 0) || 0,
             lastsaved: parseInt(rawData.last_saved || rawData.lastSaved || rawData.lastsaved || 0),
             // [新增] 加入時間欄位
-            createdAt: rawData.created_at || rawData.createdat || rawData.createdAt || rawData.join_date
+            createdAt: rawData.created_at || rawData.createdat || rawData.createdAt || rawData.join_date,
+            // [新增] 好友相關
+            friends: rawData.friends || "[]",
+            friendRequests: rawData.friend_requests || rawData.friendrequests || rawData.friendRequests || "[]"
         };
 
         // 處理 deck_data
@@ -250,6 +255,18 @@ const AuthManager = {
             catch (e) { user.defeatedAI = []; }
         }
 
+        // 處理 friends
+        if (typeof user.friends === 'string') {
+            try { user.friends = JSON.parse(user.friends || "[]"); }
+            catch (e) { user.friends = []; }
+        }
+
+        // 處理 friendRequests
+        if (typeof user.friendRequests === 'string') {
+            try { user.friendRequests = JSON.parse(user.friendRequests || "[]"); }
+            catch (e) { user.friendRequests = []; }
+        }
+
         // 確保基本數值存在
         if (user.gold === undefined || user.gold === null) user.gold = 100;
         if (user.level === undefined || user.level === null) user.level = 1;
@@ -292,6 +309,58 @@ const AuthManager = {
 
         console.log('[AuthManager] 發放初始卡牌：', collection);
         return collection;
+    },
+
+    /**
+     * 搜尋玩家
+     */
+    async searchUser(targetUsername) {
+        if (!this.API_URL) return { success: false, message: "API URL 未設定" };
+        try {
+            const url = `${this.API_URL}?action=search_user&username=${encodeURIComponent(targetUsername)}&_t=${Date.now()}`;
+            const response = await fetch(url);
+            return await response.json();
+        } catch (error) {
+            console.error("Search User Error:", error);
+            return { success: false, message: "搜尋失敗" };
+        }
+    },
+
+    /**
+     * 發送/回應好友請求
+     * type: 'SEND', 'ACCEPT', 'REJECT', 'REMOVE'
+     */
+    async handleFriendOp(type, targetId) {
+        if (!this.currentUser || !this.API_URL) return { success: false, message: "未登入" };
+        try {
+            const url = `${this.API_URL}?action=friend_op&type=${type}&username=${encodeURIComponent(this.currentUser.username)}&targetId=${encodeURIComponent(targetId)}&_t=${Date.now()}`;
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result.success) {
+                // 更新本地資料
+                if (type === 'ACCEPT') {
+                    // 互相加好友
+                    if (!this.currentUser.friends.includes(targetId)) {
+                        this.currentUser.friends.push(targetId);
+                    }
+                    this.currentUser.friendRequests = this.currentUser.friendRequests.filter(id => id !== targetId);
+                } else if (type === 'REJECT') {
+                    this.currentUser.friendRequests = this.currentUser.friendRequests.filter(id => id !== targetId);
+                } else if (type === 'REMOVE') {
+                    this.currentUser.friends = this.currentUser.friends.filter(id => id !== targetId);
+                }
+
+                // 儲存至本地並同步
+                localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                this.saveData();
+            }
+
+            return result;
+        } catch (error) {
+            console.error("Friend Op Error:", error);
+            return { success: false, message: "連線失敗" };
+        }
     }
 };
 

@@ -4801,6 +4801,11 @@ body.dragging-active .player .hand .card:hover {
     z-index: 99999;
 }
 
+/* Ensure confirmation dialogs appear above all other modals */
+#custom-modal {
+    z-index: 999999 !important;
+}
+
 .modal-content {
     background: #f4e4bc;
     padding: 30px;

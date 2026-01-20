@@ -15,7 +15,6 @@
     <link rel="stylesheet" href="css/settings_fix.css">
     <link rel="stylesheet" href="css/auth_style.css">
     <link rel="stylesheet" href="css/player_info.css">
-    <link rel="stylesheet" href="css/level_display.css">
     <link rel="stylesheet" href="css/selection_modals.css">
     <link rel="stylesheet" href="css/profile_page.css">
     <link rel="stylesheet" href="css/shop.css">
@@ -75,6 +74,11 @@
                 <!-- 排行榜入口按鈕 (移動到設定下方) -->
                 <button id="btn-leaderboard" class="leaderboard-entrance-btn" title="排行榜">
                     🏆
+                </button>
+
+                <!-- 好友入口按鈕 -->
+                <button id="btn-friends" class="friends-entrance-btn" title="好友">
+                    🤝
                 </button>
 
                 <!-- 玩家資訊卡片 (左下角) -->
@@ -790,8 +794,38 @@
                 <div class="modal-content parchment-modal">
                     <h2 class="medieval-title">遊戲設定</h2>
                     <div class="modal-buttons medieval-button-group vertical-group">
-                        <button id="btn-logout-main" class="medieval-button danger">登出</button>
-                        <button id="btn-settings-close" class="medieval-button secondary">關閉</button>
+                        <button type="button" id="btn-logout-main" class="medieval-button danger">登出</button>
+                        <button type="button" id="btn-settings-close" class="medieval-button secondary">關閉</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Friends Modal -->
+            <div id="friends-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal wide-modal">
+                    <h2 class="medieval-title">好友</h2>
+
+                    <div class="friends-search-bar">
+                        <input type="text" id="friends-search-input" placeholder="輸入玩家 ID (名稱)...">
+                        <button id="btn-friends-search" class="medieval-button">搜尋</button>
+                    </div>
+
+                    <div id="friends-search-result" class="friends-result-area" style="display: none;">
+                        <!-- 搜尋結果會顯示在這裡 -->
+                    </div>
+
+                    <div class="friends-tabs">
+                        <button id="tab-friends-list" class="friends-tab active">好友列表</button>
+                        <button id="tab-friends-requests" class="friends-tab">好友邀請 <span id="friends-req-count"
+                                class="count-badge" style="display:none;">0</span></button>
+                    </div>
+
+                    <div id="friends-list-container" class="friends-list-scroll">
+                        <!-- 好友列表或邀請列表由 JS 渲染 -->
+                    </div>
+
+                    <div class="modal-buttons medieval-button-group">
+                        <button id="btn-friends-close" class="medieval-button secondary">關閉</button>
                     </div>
                 </div>
             </div>
