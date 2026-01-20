@@ -1299,23 +1299,27 @@ window.App = {
 };
 
 function onUserLogin(user) {
+    if (!user) return;
+
     // [重要] user 已經是經由 AuthManager.parseUserData 處理過的物件
     AuthManager.currentUser = user;
+    console.log('[Auth] onUserLogin 觸發，用戶：', user.username);
 
-    // Load deck data from cloud if available
-    if (user.deck_data && Array.isArray(user.deck_data) && user.deck_data.length > 0) {
+    // 處理牌組資料：優先從 user 物件中讀取
+    if (user.deck_data && Array.isArray(user.deck_data)) {
         userDecks = user.deck_data;
-        console.log(`[Auth] 已載入並同步 ${userDecks.length} 個牌組`);
+        console.log(`[Auth] 成功從用戶資料載入 ${userDecks.length} 個牌組`);
     } else if (typeof user.deck_data === 'string' && user.deck_data !== "[]") {
-        // 二次保險：如果是字串則解析
         try {
             userDecks = JSON.parse(user.deck_data);
+            console.log(`[Auth] 成功解析字串格式牌組：${userDecks.length} 個`);
         } catch (e) {
+            console.error('[Auth] 牌組字串解析失敗:', e);
             userDecks = [];
         }
     } else {
         userDecks = [];
-        console.warn('[Auth] 用戶資料中未發現牌組資料');
+        console.warn('[Auth] 用戶資料中未發現任何牌組');
     }
 
     // 更新本地快取，確保兩邊一致
@@ -1323,7 +1327,7 @@ function onUserLogin(user) {
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
     showView('main-menu');
-    showToast(`歡迎回來，${processedUser.username}！`);
+    showToast(`歡迎回來，${user.username}！`);
     updatePlayerInfo(); // 登入後確保更新按鈕可見性
     updateLevelDisplay(); // 更新等級和經驗條顯示
 }
