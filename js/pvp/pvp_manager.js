@@ -57,6 +57,8 @@ class PvPManager {
             await set(queueRef, {
                 userId: userId,
                 username: playerData.username,
+                avatar: playerData.avatar || '👤',
+                title: playerData.title || '',
                 level: playerData.level || 1,
                 deckId: playerData.deckId || 'default',
                 deckCards: playerData.deckCards || [],
@@ -170,10 +172,36 @@ class PvPManager {
         const newRoomRef = push(roomsRef);
         const roomId = newRoomRef.key;
 
+        // 從配對佇列中取得雙方玩家資料
+        const player1QueueRef = ref(database, `matchmaking_queue/${player1Id}`);
+        const player2QueueRef = ref(database, `matchmaking_queue/${player2Id}`);
+
+        const [player1Snapshot, player2Snapshot] = await Promise.all([
+            get(player1QueueRef),
+            get(player2QueueRef)
+        ]);
+
+        const player1Data = player1Snapshot.val() || {};
+        const player2Data = player2Snapshot.val() || {};
+
         const roomData = {
             roomId: roomId,
             createdAt: Date.now(),
             status: 'initializing',
+
+            // 儲存雙方玩家資訊
+            playerInfo: {
+                player1: {
+                    username: player1Data.username || player1Id,
+                    avatar: player1Data.avatar || '👤',
+                    title: player1Data.title || ''
+                },
+                player2: {
+                    username: player2Data.username || player2Id,
+                    avatar: player2Data.avatar || '👤',
+                    title: player2Data.title || ''
+                }
+            },
 
             players: {
                 player1: {

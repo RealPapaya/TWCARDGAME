@@ -402,6 +402,8 @@ function init() {
 
             const result = await window.pvpManager.joinMatchmaking({
                 username: AuthManager.currentUser.username,
+                avatar: AuthManager.currentUser.selectedAvatar || '👤',
+                title: AuthManager.currentUser.selectedTitle || '',
                 level: AuthManager.currentUser.level || 1,
                 deckId: selectedDeck?.name || 'default',
                 deckCards: deckCards
@@ -2628,6 +2630,54 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             window.pvpManager.listenActionLog();
         }
 
+        // 顯示對手資訊 (PVP 模式)
+        if (window.pvpManager && window.pvpManager.currentRoom) {
+            const room = window.pvpManager.currentRoom;
+            const isPlayer1 = window.pvpManager.myPlayerId === 'player1';
+
+            console.log('[PvP] 房間資料:', room);
+            console.log('[PvP] 我的身份:', window.pvpManager.myPlayerId);
+            console.log('[PvP] playerInfo:', room.playerInfo);
+
+            const opponentInfo = room.playerInfo ? (isPlayer1 ? room.playerInfo.player2 : room.playerInfo.player1) : null;
+
+            console.log('[PvP] 對手資訊:', opponentInfo);
+
+            if (opponentInfo && opponentInfo.username) {
+                // 從 AVATAR_DATA 查找對應的圖片路徑
+                let avatarPath = '';
+                if (opponentInfo.avatar && window.PROFILE_DATA && window.PROFILE_DATA.AVATAR_DATA) {
+                    const avatarData = window.PROFILE_DATA.AVATAR_DATA.find(a => a.id === opponentInfo.avatar);
+                    avatarPath = avatarData ? avatarData.path : '';
+                }
+
+                // 設定對手英雄頭像
+                const oppHeroAvatarEl = document.querySelector('#opp-hero .avatar');
+                if (oppHeroAvatarEl && avatarPath) {
+                    oppHeroAvatarEl.style.backgroundImage = `url('${avatarPath}')`;
+                    oppHeroAvatarEl.style.backgroundSize = 'cover';
+                    oppHeroAvatarEl.style.backgroundPosition = 'center';
+                    console.log('[PvP] 對手英雄頭像已設定:', avatarPath);
+                }
+
+                // 從 TITLE_DATA 查找對應的顯示名稱
+                let titleDisplay = opponentInfo.title || '無稱號';
+                if (opponentInfo.title && window.PROFILE_DATA && window.PROFILE_DATA.TITLE_DATA) {
+                    const titleData = window.PROFILE_DATA.TITLE_DATA.find(t => t.id === opponentInfo.title);
+                    titleDisplay = titleData ? titleData.name : opponentInfo.title;
+                }
+
+                // 更新資訊卡顯示（僅用戶名和稱號）
+                document.getElementById('battle-opponent-username').textContent = opponentInfo.username || '對手';
+                document.getElementById('battle-opponent-title').textContent = titleDisplay;
+                document.getElementById('battle-opponent-info').style.display = 'flex';
+
+                console.log('[PvP] 對手資訊已顯示 - 頭像:', avatarPath, '用戶:', opponentInfo.username, '稱號:', titleDisplay);
+            } else {
+                console.warn('[PvP] 對手資訊不可用:', opponentInfo);
+            }
+        }
+
         console.log('[PvP] 對戰初始化完成，身份:', playerId);
 
     } catch (e) {
@@ -2644,6 +2694,9 @@ function endPvPGame() {
     pvpRoomId = null;
     pvpPlayerId = null;
     window.isPvPMode = false;
+
+    // 隱藏對手資訊卡
+    document.getElementById('battle-opponent-info').style.display = 'none';
 
     if (window.pvpManager) {
         window.pvpManager.leaveRoom();
