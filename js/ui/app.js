@@ -2562,6 +2562,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                     const isMyTurn = remoteState.currentTurn === pvpPlayerId;
                     const localIdx = isMyTurn ? 0 : 1;
 
+                    // 只有在回合真正切換時才顯示提示和執行回合邏輯
                     if (gameState.currentPlayerIdx !== localIdx) {
                         console.log('[PvP] 回合切換:', isMyTurn ? '輪到我' : '對手回合');
                         gameState.currentPlayerIdx = localIdx;
@@ -2574,10 +2575,12 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                             // 同步回合開始後的狀態 (Mana增加, 抽牌後)
                             syncLocalStateToFirebase();
                         } else if (!gameState.gameOver) {
+                            // 只在回合切換時顯示，不是每次狀態更新都顯示
                             showTurnAnnouncement('對手回合');
                         }
                         render();
                     }
+                    // 如果 currentPlayerIdx 沒變化，表示只是對手在其回合中的動作，不需要顯示提示
                 }
             };
 
@@ -2628,14 +2631,15 @@ async function syncLocalStateToFirebase() {
         const player = gameState.players[0]; // 我方永遠是 player[0]
 
         // 確保所有欄位都有有效值，避免 undefined 導致 Firebase 錯誤
-        if (!player || player.currentHealth === undefined || player.health === undefined) {
+        // Player 結構使用 hero.hp 和 hero.maxHp，而非 currentHealth/health
+        if (!player || !player.hero || player.hero.hp === undefined) {
             console.warn('[PvP] 玩家狀態尚未完整初始化，跳過同步');
             return;
         }
 
         const stateUpdate = {
-            hp: player.currentHealth ?? 30,
-            maxHp: player.health ?? 30,
+            hp: player.hero.hp ?? 30,
+            maxHp: player.hero.maxHp ?? 30,
             mana: player.mana?.current ?? 0,
             maxMana: player.mana?.max ?? 0,
             handSize: player.hand?.length ?? 0,
@@ -2755,6 +2759,7 @@ async function executeOpponentAction(action) {
                     card: card.name
                 });
 
+                // 渲染更新（不需要額外同步，對手會自行同步其狀態）
                 render();
                 await resolveDeaths();
 
@@ -2794,6 +2799,13 @@ async function executeOpponentAction(action) {
                 const originalIdx = gameState.currentPlayerIdx;
                 gameState.currentPlayerIdx = 1;
 
+                // 強制設置攻擊者為可攻擊狀態（繞過 sleeping 檢查）
+                // 因為對手的攻擊動作已經在其本地驗證過，我們只需執行結果
+                const wasAttackable = attacker.canAttack;
+                const wasSleeping = attacker.sleeping;
+                attacker.canAttack = true;
+                attacker.sleeping = false;
+
                 // 翻轉目標視角
                 const flippedTarget = {
                     type: targetType,
@@ -2801,6 +2813,9 @@ async function executeOpponentAction(action) {
                 };
 
                 gameState.attack(attackerIndex, flippedTarget);
+
+                // 恢復原始狀態標記（如果需要）
+                // 注意：攻擊後 canAttack 會被設為 false，這是正常的
 
                 gameState.currentPlayerIdx = originalIdx;
 
@@ -4986,7 +5001,9 @@ async function onDragEnd(e) {
         const targetData = targetEl?.closest('[data-type]');
         if (targetData) {
             const type = targetData.dataset.type;
-            const index = parseInt(targetData.dataset.index);
+            // 修復：當目標是英雄時，index 為 undefined，parseInt 會返回 NaN
+            // 改為攻擊英雄時設為 null
+            const index = targetData.dataset.index ? parseInt(targetData.dataset.index) : null;
 
             if (type === 'HERO' && targetData.id === 'opp-hero'
                 || type === 'MINION' && targetEl.closest('#opp-board')) {
@@ -5018,7 +5035,7 @@ async function onDragEnd(e) {
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
-                            targetIndex: index
+                            targetIndex: index  // 英雄時為 null，隨從時為數字
                         });
                         syncLocalStateToFirebase(); // 同步攻擊後的狀態 (HP)
                     }
