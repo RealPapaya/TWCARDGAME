@@ -2626,13 +2626,20 @@ async function syncLocalStateToFirebase() {
 
     try {
         const player = gameState.players[0]; // 我方永遠是 player[0]
+
+        // 確保所有欄位都有有效值，避免 undefined 導致 Firebase 錯誤
+        if (!player || player.currentHealth === undefined || player.health === undefined) {
+            console.warn('[PvP] 玩家狀態尚未完整初始化，跳過同步');
+            return;
+        }
+
         const stateUpdate = {
-            hp: player.currentHealth,
-            maxHp: player.health,
-            mana: player.mana.current,
-            maxMana: player.mana.max,
-            handSize: player.hand.length,
-            deckSize: player.deck.length
+            hp: player.currentHealth ?? 30,
+            maxHp: player.health ?? 30,
+            mana: player.mana?.current ?? 0,
+            maxMana: player.mana?.max ?? 0,
+            handSize: player.hand?.length ?? 0,
+            deckSize: player.deck?.length ?? 0
         };
 
         await window.pvpManager.updateGameState(stateUpdate);
@@ -2678,12 +2685,16 @@ async function executeOpponentAction(action) {
         case 'PLAY_CARD': {
             const { cardId, handIndex, targetType, targetIndex, targetSide, insertionIndex } = action.data;
 
-            // 在對手手牌中找到卡牌
-            const card = opponent.hand[handIndex];
-            if (!card) {
-                console.warn('[PvP] 找不到對手手牌:', handIndex);
+            // 從 CARD_DATA 根據 cardId 查找卡牌資料
+            const cardDef = window.CARD_DATA?.find(c => c.id === cardId);
+            if (!cardDef) {
+                console.warn('[PvP] 找不到卡牌資料:', cardId);
                 return;
             }
+
+            // 創建卡牌實例（對手出牌，我們無法知道其手牌內容，需要自己創建）
+            const card = JSON.parse(JSON.stringify(cardDef));
+            card.side = opponent.side;
 
             // 顯示出牌動畫
             const oppBoard = document.getElementById('opp-board');
@@ -2701,12 +2712,41 @@ async function executeOpponentAction(action) {
             }
 
             try {
-                // 臨時切換到對手視角執行
+                // 臨時切換到對手視角
                 const originalIdx = gameState.currentPlayerIdx;
                 gameState.currentPlayerIdx = 1;
 
-                const { battlecryResult: result } = gameState.playCard(handIndex, target, insertionIndex || -1);
+                // 手動處理出牌邏輯（不調用 playCard，因為會檢查 mana 和手牌）
+                // 1. 從手牌移除（如果 handIndex 有效）
+                if (handIndex >= 0 && handIndex < opponent.hand.length) {
+                    opponent.hand.splice(handIndex, 1);
+                }
 
+                // 2. 扣除 mana（使用卡牌實際費用）
+                const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
+                opponent.mana.current = Math.max(0, opponent.mana.current - actualCost);
+
+                // 3. 如果是隨從，加入場上
+                if (card.type === 'MINION') {
+                    const minion = gameState.createMinion(cardDef, opponent.side);
+                    const insertIdx = insertionIndex >= 0 ? insertionIndex : opponent.board.length;
+                    opponent.board.splice(insertIdx, 0, minion);
+
+                    // 處理戰吼（如果有）
+                    if (card.keywords?.battlecry) {
+                        gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                    }
+                } else if (card.type === 'NEWS') {
+                    // 新聞牌直接執行效果
+                    if (card.keywords?.battlecry) {
+                        gameState.resolveBattlecry(card.keywords.battlecry, target);
+                    }
+                }
+
+                // 更新光環
+                gameState.updateAuras();
+
+                // 切換回原本視角
                 gameState.currentPlayerIdx = originalIdx;
 
                 // 記錄歷史
