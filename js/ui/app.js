@@ -2529,7 +2529,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             };
 
             // 遊戲狀態更新 (回合切換 & 狀態同步)
-            window.pvpManager.onGameStateUpdate = (remoteState) => {
+            window.pvpManager.onGameStateUpdate = async (remoteState) => {
                 console.log('[PvP] 收到遠端狀態更新:', remoteState);
                 if (!remoteState) return;
 
@@ -2575,10 +2575,12 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                             // 同步回合開始後的狀態 (Mana增加, 抽牌後)
                             syncLocalStateToFirebase();
                         } else if (!gameState.gameOver) {
-                            // 只在回合切換時顯示，不是每次狀態更新都顯示
+                            // 對手回合：不調用 startTurn，避免對手也增加 mana 和抽牌
                             showTurnAnnouncement('對手回合');
                         }
                         render();
+                        // 回合切換後檢查死亡（處理上一回合的計時器到期）
+                        await resolveDeaths();
                     }
                     // 如果 currentPlayerIdx 沒變化，表示只是對手在其回合中的動作，不需要顯示提示
                 }
@@ -2830,9 +2832,14 @@ async function executeOpponentAction(action) {
 
         case 'END_TURN': {
             console.log('[PvP] 對手結束回合');
-            // 回合切換會由 onGameStateUpdate 處理
-            // 這裡只需要確保死亡結算完成
+
+            // 在本地也執行 endTurn 以同步計時器倒數（deathTimer, lockedTurns等）
+            // skipStartTurn = true，避免對手也增加 mana 和抽牌
+            gameState.endTurn(true);
+
+            // 確保死亡結算完成
             await resolveDeaths();
+            render();
             break;
         }
 

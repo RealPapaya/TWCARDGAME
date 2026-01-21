@@ -952,39 +952,11 @@ class GameState {
         // Draw a card (Always draw at start of turn)
         player.drawCard();
 
-        // Decrease Lock Turns for ALL players' minions
-        [this.players[0], this.players[1]].forEach(p => {
-            p.board.forEach(m => {
-                if (m.lockedTurns > 0) {
-                    m.lockedTurns--;
-                    if (m.lockedTurns === 0) {
-                        m.justUnlocked = true;
-                    }
-                } else {
-                    delete m.justUnlocked;
-                }
-            });
-        });
-
         // Wake up minions (summoning sickness wears off)
         player.board.forEach(minion => {
             minion.canAttack = true;
             // Re-apply lock if still locked
             if (minion.lockedTurns > 0) minion.canAttack = false;
-        });
-
-        // Handle Delayed Death (Death Grip) for ALL minions on the board
-        // This makes the timer tick down on every turn start (Player or AI)
-        [this.players[0], this.players[1]].forEach(p => {
-            p.board.forEach(minion => {
-                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
-                    minion.deathTimer--;
-                    if (minion.deathTimer === 0) {
-                        minion.currentHealth = 0;
-                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
-                    }
-                }
-            });
         });
 
         // Sleeping minions from last turn wake up (simplified: all board minions can attack unless just summoned)
@@ -1003,6 +975,34 @@ class GameState {
      * @param {boolean} skipStartTurn - If true, don't call startTurn (for PvP mode)
      */
     endTurn(skipStartTurn = false) {
+        // PvP 修復：在回合結束時處理計時器倒數，確保雙方同步
+        // Decrease Lock Turns for ALL players' minions
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(m => {
+                if (m.lockedTurns > 0) {
+                    m.lockedTurns--;
+                    if (m.lockedTurns === 0) {
+                        m.justUnlocked = true;
+                    }
+                } else {
+                    delete m.justUnlocked;
+                }
+            });
+        });
+
+        // Handle Delayed Death (Death Grip) for ALL minions on the board
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(minion => {
+                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+                    minion.deathTimer--;
+                    if (minion.deathTimer === 0) {
+                        minion.currentHealth = 0;
+                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
+                    }
+                }
+            });
+        });
+
         // Quest Logic: Process for ALL minions on BOTH boards at any turn end
         [this.players[0], this.players[1]].forEach(player => {
             player.board.forEach(m => {
