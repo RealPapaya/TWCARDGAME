@@ -2570,6 +2570,11 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         }
                     }
 
+                    // 同步牌組數量
+                    if (oppState.deckSize !== undefined) {
+                        opponent._syncedDeckSize = oppState.deckSize;
+                    }
+
                     // Render to show updated stats
                     render();
                 }
@@ -3497,8 +3502,16 @@ function renderGameUI(p1, p2) {
         p2HpEl.innerText = p2.hero.hp;
     }
 
+    // Deck counts
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
-    document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+
+    // In PVP mode, use synced deck size for opponent
+    if (isPvPMode && p2._syncedDeckSize !== undefined) {
+        document.querySelector('#opp-deck .count-badge').innerText = p2._syncedDeckSize;
+    } else {
+        document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+    }
+
 
     // Update Battle Player Info Card
     const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
