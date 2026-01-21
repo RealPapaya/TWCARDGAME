@@ -5598,12 +5598,23 @@ function animateAttack(fromEl, toEl, damage = 0) {
         const statElements = clone.querySelectorAll('.stat-atk, .stat-hp');
         statElements.forEach(stat => stat.classList.remove('stat-pop'));
 
+        // Calculate current game scale to ensure clone matches visual size
+        const scaler = document.getElementById('game-content-scaler');
+        // Retrieve scale from transform string "scale(0.5)" -> 0.5
+        const scaleMatch = scaler && scaler.style.transform ? scaler.style.transform.match(/scale\(([^)]+)\)/) : null;
+        const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+
         // Initial Position
         clone.style.top = `${rectFrom.top}px`;
         clone.style.left = `${rectFrom.left}px`;
-        clone.style.width = `${rectFrom.width}px`;
-        clone.style.height = `${rectFrom.height}px`;
+        // Restore original (unscaled) dimensions so content inside isn't cramped/large
+        clone.style.width = `${rectFrom.width / currentScale}px`;
+        clone.style.height = `${rectFrom.height / currentScale}px`;
         clone.style.margin = '0'; // Clear margins
+
+        // Apply the same scale as the game container
+        clone.style.transformOrigin = 'top left';
+        clone.style.transform = `scale(${currentScale})`;
 
         document.body.appendChild(clone);
 
@@ -5617,7 +5628,8 @@ function animateAttack(fromEl, toEl, damage = 0) {
 
         clone.style.top = `${centerY}px`;
         clone.style.left = `${centerX}px`;
-        clone.style.transform = "scale(1.2)"; // Bigger on impact
+        // Combine scales for impact effect (Game Scale * 1.2)
+        clone.style.transform = `scale(${currentScale * 1.2})`; // Bigger on impact
 
         // On Transition End (Impact)
         setTimeout(() => {
