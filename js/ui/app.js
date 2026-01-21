@@ -2550,8 +2550,23 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         opponent.mana.current = oppState.mana;
                         opponent.mana.max = oppState.maxMana;
                     }
-                    // Optional: Sync Hand Size if needed (but actions usually handle this)
-                    // if (oppState.handSize !== undefined) { ... }
+
+                    // 同步手牌數（對手手牌不顯示具體內容，但數量需要同步）
+                    if (oppState.handSize !== undefined) {
+                        // 調整對手手牌陣列長度以匹配實際數量
+                        const currentHandSize = opponent.hand.length;
+                        const targetHandSize = oppState.handSize;
+
+                        if (targetHandSize > currentHandSize) {
+                            // 對手抽牌了，補充空白卡牌顯示
+                            for (let i = currentHandSize; i < targetHandSize; i++) {
+                                opponent.hand.push({ id: 'HIDDEN', name: '?', cost: 0, type: 'HIDDEN' });
+                            }
+                        } else if (targetHandSize < currentHandSize) {
+                            // 對手出牌/丟牌了，移除多餘的卡牌
+                            opponent.hand.splice(targetHandSize);
+                        }
+                    }
 
                     // Render to show updated stats
                     render();
@@ -2561,15 +2576,27 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 if (remoteState.currentTurn) {
                     const isMyTurn = remoteState.currentTurn === pvpPlayerId;
                     const localIdx = isMyTurn ? 0 : 1;
+                    const prevIdx = gameState.currentPlayerIdx;
+
+                    console.log('[PvP] 回合狀態檢查:', {
+                        currentTurn: remoteState.currentTurn,
+                        pvpPlayerId,
+                        isMyTurn,
+                        localIdx,
+                        prevIdx,
+                        willSwitch: prevIdx !== localIdx
+                    });
 
                     // 只有在回合真正切換時才顯示提示和執行回合邏輯
-                    if (gameState.currentPlayerIdx !== localIdx) {
+                    if (prevIdx !== localIdx) {
                         console.log('[PvP] 回合切換:', isMyTurn ? '輪到我' : '對手回合');
                         gameState.currentPlayerIdx = localIdx;
 
                         if (isMyTurn && !gameState.gameOver) {
                             // 輪到自己，開始回合
+                            console.log('[PvP] 執行 startTurn()，回合前手牌數:', gameState.players[0].hand.length);
                             gameState.startTurn();
+                            console.log('[PvP] startTurn() 完成，回合後手牌數:', gameState.players[0].hand.length);
                             showTurnAnnouncement('你的回合！');
 
                             // 同步回合開始後的狀態 (Mana增加, 抽牌後)
@@ -2723,16 +2750,14 @@ async function executeOpponentAction(action) {
                 gameState.currentPlayerIdx = 1;
 
                 // 手動處理出牌邏輯（不調用 playCard，因為會檢查 mana 和手牌）
-                // 1. 從手牌移除（如果 handIndex 有效）
-                if (handIndex >= 0 && handIndex < opponent.hand.length) {
-                    opponent.hand.splice(handIndex, 1);
-                }
+                // 注意：不需要手動從手牌移除，因為 onGameStateUpdate 會通過 handSize 同步自動調整
+                console.log('[PvP] 執行對手出牌，當前對手手牌數:', opponent.hand.length);
 
-                // 2. 扣除 mana（使用卡牌實際費用）
+                // 1. 扣除 mana（使用卡牌實際費用）
                 const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
                 opponent.mana.current = Math.max(0, opponent.mana.current - actualCost);
 
-                // 3. 如果是隨從，加入場上
+                // 2. 如果是隨從，加入場上
                 if (card.type === 'MINION') {
                     const minion = gameState.createMinion(cardDef, opponent.side);
                     const insertIdx = insertionIndex >= 0 ? insertionIndex : opponent.board.length;
@@ -2744,8 +2769,25 @@ async function executeOpponentAction(action) {
                     }
                 } else if (card.type === 'NEWS') {
                     // 新聞牌直接執行效果
+                    console.log('[PvP] 對手出 NEWS 卡，戰吼前手牌數:', opponent.hand.length);
+
+                    let battlecryResult = null;
                     if (card.keywords?.battlecry) {
-                        gameState.resolveBattlecry(card.keywords.battlecry, target);
+                        card.side = opponent.side; // 確保 News Power 計算正確
+                        battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, card);
+                    }
+
+                    // 處理戰吼結果（特別是 DISCARD_DRAW 需要抽牌）
+                    if (battlecryResult) {
+                        console.log('[PvP] 對手戰吼結果:', battlecryResult);
+                        if (battlecryResult.type === 'DISCARD_DRAW' && battlecryResult.drawCount) {
+                            console.log('[PvP] DISCARD_DRAW 前手牌數:', opponent.hand.length);
+                            // 對手執行抽牌
+                            for (let i = 0; i < battlecryResult.drawCount; i++) {
+                                opponent.drawCard();
+                            }
+                            console.log('[PvP] DISCARD_DRAW 抽牌完成，最終手牌數:', opponent.hand.length);
+                        }
                     }
                 }
 
@@ -2833,9 +2875,9 @@ async function executeOpponentAction(action) {
         case 'END_TURN': {
             console.log('[PvP] 對手結束回合');
 
-            // 在本地也執行 endTurn 以同步計時器倒數（deathTimer, lockedTurns等）
-            // skipStartTurn = true，避免對手也增加 mana 和抽牌
-            gameState.endTurn(true);
+            // 只處理計時器倒數，不切換 currentPlayerIdx
+            // 完整的回合切換邏輯由 onGameStateUpdate 處理
+            gameState.processEndOfTurnTimers();
 
             // 確保死亡結算完成
             await resolveDeaths();
@@ -6991,18 +7033,21 @@ async function confirmMulligan() {
         window.pvpManager.listenMulliganStatus(async () => {
             console.log('[PvP] 雙方 Mulligan 完成，開始遊戲');
 
-
-
             // 判斷是否為我的回合（先手）
             const isMyTurn = window.pvpManager?.isMyTurn();
+            console.log('[PvP Mulligan] isMyTurn:', isMyTurn, 'currentPlayerIdx:', gameState.currentPlayerIdx);
+            console.log('[PvP Mulligan] Mulligan 完成時手牌數:', gameState.players[0].hand.length);
 
             if (isMyTurn) {
                 // 先手：呼叫 startTurn 進行抽牌和增加法力
+                console.log('[PvP Mulligan] 先手執行 startTurn()');
                 gameState.startTurn();
+                console.log('[PvP Mulligan] startTurn() 完成，手牌數:', gameState.players[0].hand.length);
                 showTurnAnnouncement('你的回合！');
                 syncLocalStateToFirebase(); // 同步回合開始後的狀態 (Mana, HeadSize)
             } else {
                 // 後手：等待對手行動，不呼叫 startTurn
+                console.log('[PvP Mulligan] 後手等待對手');
                 showTurnAnnouncement('對手回合');
             }
 

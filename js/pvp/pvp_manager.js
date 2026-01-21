@@ -196,6 +196,12 @@ class PvPManager {
                 turnStartTime: null,
                 turnTimeLimit: 60000,
 
+                // Mulligan 狀態追蹤
+                mulliganStatus: {
+                    player1: false,
+                    player2: false
+                },
+
                 player1State: {
                     hp: 30,
                     mana: 1,

@@ -926,6 +926,39 @@ class GameState {
     }
 
     /**
+     * 處理回合結束時的計時器效果（不切換玩家）
+     * PvP 專用：讓雙方都能同步執行計時器倒數，但不影響回合切換
+     */
+    processEndOfTurnTimers() {
+        // Decrease Lock Turns for ALL players' minions
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(m => {
+                if (m.lockedTurns > 0) {
+                    m.lockedTurns--;
+                    if (m.lockedTurns === 0) {
+                        m.justUnlocked = true;
+                    }
+                } else {
+                    delete m.justUnlocked;
+                }
+            });
+        });
+
+        // Handle Delayed Death (Death Grip) for ALL minions on the board
+        [this.players[0], this.players[1]].forEach(p => {
+            p.board.forEach(minion => {
+                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+                    minion.deathTimer--;
+                    if (minion.deathTimer === 0) {
+                        minion.currentHealth = 0;
+                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
+                    }
+                }
+            });
+        });
+    }
+
+    /**
      * Start a new turn.
      */
     startTurn() {
@@ -975,33 +1008,8 @@ class GameState {
      * @param {boolean} skipStartTurn - If true, don't call startTurn (for PvP mode)
      */
     endTurn(skipStartTurn = false) {
-        // PvP 修復：在回合結束時處理計時器倒數，確保雙方同步
-        // Decrease Lock Turns for ALL players' minions
-        [this.players[0], this.players[1]].forEach(p => {
-            p.board.forEach(m => {
-                if (m.lockedTurns > 0) {
-                    m.lockedTurns--;
-                    if (m.lockedTurns === 0) {
-                        m.justUnlocked = true;
-                    }
-                } else {
-                    delete m.justUnlocked;
-                }
-            });
-        });
-
-        // Handle Delayed Death (Death Grip) for ALL minions on the board
-        [this.players[0], this.players[1]].forEach(p => {
-            p.board.forEach(minion => {
-                if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
-                    minion.deathTimer--;
-                    if (minion.deathTimer === 0) {
-                        minion.currentHealth = 0;
-                        console.log(`[DEATH_GRIP] Minion ${minion.name} timer expired. Death triggered.`);
-                    }
-                }
-            });
-        });
+        // 處理回合結束時的計時器效果
+        this.processEndOfTurnTimers();
 
         // Quest Logic: Process for ALL minions on BOTH boards at any turn end
         [this.players[0], this.players[1]].forEach(player => {
