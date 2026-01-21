@@ -2415,6 +2415,8 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
         // Expose for debugging
         window.gameState = gameState;
+        // Store initial deck for Deck View
+        gameState.players[0].initialDeckIds = [...deckIds];
         // Only call showView ONCE
         showView('battle-view');
 
@@ -2509,6 +2511,8 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
         gameState.currentPlayerIdx = isFirstPlayer ? 0 : 1;
 
         window.gameState = gameState;
+        // Store initial deck for Deck View
+        gameState.players[0].initialDeckIds = [...myDeckCards];
         showView('battle-view');
 
         // PvP 模式標記
@@ -3524,19 +3528,22 @@ function renderGameUI(p1, p2) {
     // Also update main hero avatar if available
     const mainHeroAvatar = document.querySelector('#player-hero .avatar');
 
-    // 優先顯示登入的用戶名
     const displayUsername = (authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家');
+    const displayTitleId = (authUser && authUser.selectedTitle) ? authUser.selectedTitle : (playerInfo.selectedTitle || 'beginner');
+    const displayAvatarId = (authUser && authUser.selectedAvatar) ? authUser.selectedAvatar : (playerInfo.selectedAvatar || 'avatar1');
 
     if (battleUsername) {
         battleUsername.innerText = displayUsername;
     }
     if (battleTitle) {
-        // 如果有登入，也許未來可以從 authUser 獲取稱號 (目前暫時使用本地設定)
-        const titleObj = AVAILABLE_TITLES.find(t => t.id === playerInfo.selectedTitle);
+        const titleData = window.PROFILE_DATA?.TITLE_DATA || [];
+        const titleObj = titleData.find(t => t.id === displayTitleId);
         battleTitle.innerText = titleObj ? titleObj.name : '無稱號';
     }
     if (battleAvatar) {
-        const avatarObj = AVAILABLE_AVATARS.find(a => a.id === playerInfo.selectedAvatar);
+        const avatarData = window.PROFILE_DATA?.AVATAR_DATA || [];
+        const avatarObj = avatarData.find(a => a.id === displayAvatarId);
+
         if (avatarObj && avatarObj.path) {
             const url = `url('${avatarObj.path}')`;
             // Info Card Avatar
@@ -6762,7 +6769,14 @@ function showDeckView() {
     }
 
     const player = gameState.players[0]; // 玩家永遠是 players[0]
-    const deckIds = player.deck.map(card => card.id);
+
+    // 使用初始牌組（若有），否則退回到當前剩餘牌組
+    let deckIds;
+    if (player.initialDeckIds) {
+        deckIds = player.initialDeckIds;
+    } else {
+        deckIds = player.deck.map(card => card.id);
+    }
 
     // 統計每張卡的數量
     const cardCounts = {};
