@@ -2588,8 +2588,16 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
 
             // 遊戲結束
             window.pvpManager.onGameEnd = (result) => {
+                console.log('[PvP] 遊戲結束:', result);
                 const isWinner = result.winner === pvpPlayerId;
-                showVictoryOverlay(isWinner);
+
+                // 顯示勝利/失敗畫面
+                endGame(isWinner ? 'VICTORY' : 'DEFEAT');
+
+                // 延遲清理 PvP 狀態，確保結果畫面顯示後再清理
+                setTimeout(() => {
+                    endPvPGame();
+                }, 1000);
             };
 
             // 開始監聽動作日誌

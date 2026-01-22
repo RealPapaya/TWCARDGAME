@@ -24,6 +24,9 @@ class PvPManager {
         this.onGameEnd = null;
         this.onOpponentDisconnect = null;
         this.onOpponentReconnect = null;
+
+        // 防止重複觸發遊戲結束
+        this._gameEndTriggered = false;
     }
 
     /**
@@ -293,9 +296,16 @@ class PvPManager {
                     this.onGameStateUpdate(room.gameState);
                 }
 
-                // 遊戲結束
+                // 遊戲結束（添加防重複觸發的標記）
                 if (room.status === 'finished' && room.result && this.onGameEnd) {
-                    this.onGameEnd(room.result);
+                    console.log('[PvP] 檢測到遊戲結束:', room.result);
+
+                    // 防止重複觸發
+                    if (!this._gameEndTriggered) {
+                        this._gameEndTriggered = true;
+                        console.log('[PvP] 觸發 onGameEnd 回調');
+                        this.onGameEnd(room.result);
+                    }
                 }
             });
         });
@@ -592,6 +602,7 @@ class PvPManager {
         this.myPlayerId = null;
         this.opponentId = null;
         this.lastProcessedActionKey = null;
+        this._gameEndTriggered = false; // 重置標記
 
         console.log('[PvP] 已離開房間');
     }
