@@ -233,6 +233,12 @@ class PvPManager {
                     player2: false
                 },
 
+                // 保存初始手牌（用於重連恢復）
+                initialHands: {
+                    player1: [],
+                    player2: []
+                },
+
                 player1State: {
                     hp: 30,
                     mana: 1,
@@ -283,6 +289,10 @@ class PvPManager {
         this.myPlayerId = playerId;
         this.opponentId = playerId === 'player1' ? 'player2' : 'player1';
 
+        // 保存到 localStorage 以便重連
+        localStorage.setItem('pvp_current_room', roomId);
+        localStorage.setItem('pvp_player_id', playerId);
+
         const roomRef = ref(database, `game_rooms/${roomId}`);
 
         // 使用 Promise 等待第一次房間資料載入
@@ -324,13 +334,20 @@ class PvPManager {
 
                 // 檢查對手連線狀態
                 const opponentConnected = room.players?.[this.opponentId]?.connected;
-                if (!opponentConnected && this.onOpponentDisconnect) {
+                if (opponentConnected && this.onOpponentReconnect) {
+                    // 對手重新連接
+                    this.onOpponentReconnect();
+                } else if (!opponentConnected && this.onOpponentDisconnect) {
                     this.onOpponentDisconnect();
                 }
 
                 // 優先檢查遊戲是否結束
                 if (room.status === 'finished' && room.result) {
                     console.log('[PvP] 檢測到遊戲結束:', room.result);
+
+                    // 清除 localStorage
+                    localStorage.removeItem('pvp_current_room');
+                    localStorage.removeItem('pvp_player_id');
 
                     // 防止重複觸發
                     if (!this._gameEndTriggered) {
@@ -543,6 +560,28 @@ class PvPManager {
     }
 
     /**
+     * 保存初始手牌到 Firebase（用於重連恢復）
+     * @param {Array<string>} cardIds - 手牌的卡牌 ID 陣列
+     */
+    async saveInitialHand(cardIds) {
+        if (!this.currentRoomId || !this.myPlayerId) {
+            console.warn('[PvP] saveInitialHand: 未在遊戲中');
+            return { success: false };
+        }
+
+        try {
+            await update(ref(database, `game_rooms/${this.currentRoomId}/gameState/initialHands`), {
+                [this.myPlayerId]: cardIds
+            });
+            console.log('[PvP] 初始手牌已保存:', cardIds);
+            return { success: true };
+        } catch (error) {
+            console.error('[PvP] 保存初始手牌失敗:', error);
+            return { success: false };
+        }
+    }
+
+    /**
      * 監聯 Mulligan 狀態，雙方都完成時觸發回調
      * @param {Function} onBothReady - 雙方都準備好時的回調
      */
@@ -586,6 +625,70 @@ class PvPManager {
     }
 
     /**
+     * 嘗試重新連接到之前的對戰
+     * @returns {Object|null} 如果有未完成對戰返回 {roomId, playerId}，否則返回 null
+     */
+    async tryReconnect() {
+        const savedRoom = localStorage.getItem('pvp_current_room');
+        const savedPlayer = localStorage.getItem('pvp_player_id');
+
+        if (!savedRoom || !savedPlayer) {
+            return null;
+        }
+
+        console.log('[PvP] 檢測到未完成對戰:', savedRoom, savedPlayer);
+
+        // 檢查房間是否還存在且未結束
+        try {
+            const roomRef = ref(database, `game_rooms/${savedRoom}`);
+            const snapshot = await get(roomRef);
+
+            if (!snapshot.exists()) {
+                console.log('[PvP] 房間已不存在');
+                localStorage.removeItem('pvp_current_room');
+                localStorage.removeItem('pvp_player_id');
+                return null;
+            }
+
+            const room = snapshot.val();
+            if (room.status === 'finished') {
+                console.log('[PvP] 對戰已結束');
+                localStorage.removeItem('pvp_current_room');
+                localStorage.removeItem('pvp_player_id');
+                return null;
+            }
+
+            // 房間存在且未結束，返回資訊
+            return {
+                roomId: savedRoom,
+                playerId: savedPlayer,
+                room: room
+            };
+        } catch (error) {
+            console.error('[PvP] 檢查房間失敗:', error);
+            return null;
+        }
+    }
+
+    /**
+     * 重新連接到對戰
+     * @param {string} roomId 
+     * @param {string} playerId 
+     */
+    async reconnect(roomId, playerId) {
+        console.log('[PvP] 重新連接:', roomId, playerId);
+
+        // 更新 connected 狀態為 true
+        const playerRef = ref(database, `game_rooms/${roomId}/players/${playerId}`);
+        await update(playerRef, { connected: true, lastPing: Date.now() });
+
+        // 重新加入房間
+        await this._joinGameRoom(roomId, playerId);
+
+        console.log('[PvP] 重新連接成功');
+    }
+
+    /**
      * 投降
      */
     async surrender() {
@@ -614,6 +717,11 @@ class PvPManager {
         try {
             await update(ref(database, updatePath), updateData);
             console.log('[PvP] ✅ Firebase 更新成功，投降完成');
+
+            // 清除 localStorage
+            localStorage.removeItem('pvp_current_room');
+            localStorage.removeItem('pvp_player_id');
+
             return { success: true };
         } catch (error) {
             console.error('[PvP] ❌ Firebase 更新失敗:', error);
@@ -625,6 +733,10 @@ class PvPManager {
      * 離開遊戲房間
      */
     async leaveRoom() {
+        // 清除 localStorage
+        localStorage.removeItem('pvp_current_room');
+        localStorage.removeItem('pvp_player_id');
+
         if (this.roomListener) {
             this.roomListener();
             this.roomListener = null;

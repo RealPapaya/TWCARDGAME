@@ -702,6 +702,7 @@ function init() {
     }
 
     updatePlayerInfo(); // [修正] 初始化時根據當前狀態更新 UI
+
     console.log("Game initialized.");
 }
 
@@ -1250,6 +1251,13 @@ function onUserLogin(user) {
     showToast(`歡迎回來，${user.username}！`);
     updatePlayerInfo(); // 登入後確保更新按鈕可見性
     updateLevelDisplay(); // 更新等級和經驗條顯示
+
+    // [PVP 重連] 延遲檢查，確保畫面切換完成和 Firebase 準備好
+    setTimeout(async () => {
+        if (window.pvpManager && window.pvpManager.isReady()) {
+            await checkPvPReconnection();
+        }
+    }, 300);
 }
 
 /**
@@ -2523,8 +2531,114 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             audioManager.play();
         }
 
-        // 啟動 Mulligan Phase
-        showMulliganPhase();
+        // ===== 檢查是否需要 Mulligan（重連判斷）=====
+        const roomData = window.pvpManager?.currentRoom;
+        const mulliganStatus = roomData?.gameState?.mulliganStatus;
+        const myMulliganDone = mulliganStatus?.[pvpPlayerId];
+        const bothCompleted = mulliganStatus?.player1 && mulliganStatus?.player2;
+        const savedInitialHand = roomData?.gameState?.initialHands?.[pvpPlayerId];
+
+        // 情況 1: 雙方都完成 Mulligan（重連且已完成換牌）
+        if (bothCompleted) {
+            console.log('[PvP 重連] Mulligan 已完成，跳過 Mulligan 階段');
+            console.log('[PvP 重連] savedInitialHand:', savedInitialHand);
+            console.log('[PvP 重連] 當前手牌 (createGame 生成的):', gameState.players[0].hand.map(c => c.id));
+
+            // 恢復換牌後的手牌
+            if (savedInitialHand && savedInitialHand.length > 0) {
+                console.log('[PvP 重連] 開始恢復換牌後的手牌:', savedInitialHand);
+                gameState.players[0].hand = savedInitialHand.map(cardId => {
+                    const cardData = CARD_DATA.find(c => c.id === cardId);
+                    if (!cardData) {
+                        console.error('[PvP 重連] 找不到卡牌:', cardId);
+                        return null;
+                    }
+                    // 使用 JSON 深拷貝創建卡牌實例
+                    const cardInstance = JSON.parse(JSON.stringify(cardData));
+                    cardInstance.side = 'PLAYER';
+                    return cardInstance;
+                }).filter(card => card !== null);
+                console.log('[PvP 重連] 手牌已恢復，數量:', gameState.players[0].hand.length);
+                console.log('[PvP 重連] 恢復後的手牌 ID:', gameState.players[0].hand.map(c => c.id));
+            } else {
+                console.warn('[PvP 重連] 沒有保存的手牌，使用當前手牌');
+            }
+
+            // 確保我方 Mulligan 狀態標記為已完成
+            gameState.mulliganCompleted = true;
+
+            // 渲染當前狀態
+            render();
+
+            // 檢查是否輪到我
+            const isMyTurn = window.pvpManager?.isMyTurn();
+            if (isMyTurn) {
+                showTurnAnnouncement('你的回合！');
+            } else {
+                showTurnAnnouncement('對手回合');
+            }
+        }
+        // 情況 2: 我已完成 Mulligan，但對手未完成（重連且我已換牌）
+        else if (myMulliganDone && !bothCompleted) {
+            console.log('[PvP 重連] 我已完成 Mulligan，等待對手');
+
+            // 不進入 mulligan UI，直接等待對手
+            gameState.mulliganCompleted = true;
+            render();
+            showToast('等待對手完成換牌...');
+
+            // 繼續監聽 mulligan 完成
+            window.pvpManager.listenMulliganStatus(async () => {
+                console.log('[PvP] 雙方 Mulligan 完成，開始遊戲');
+
+                // 判斷是否為我的回合（先手）
+                const isMyTurn = window.pvpManager?.isMyTurn();
+                console.log('[PvP Mulligan] isMyTurn:', isMyTurn, 'currentPlayerIdx:', gameState.currentPlayerIdx);
+
+                if (isMyTurn) {
+                    console.log('[PvP Mulligan] 先手執行 startTurn()');
+                    gameState.startTurn();
+                    showTurnAnnouncement('你的回合！');
+                    syncLocalStateToFirebase();
+                } else {
+                    console.log('[PvP Mulligan] 後手等待對手');
+                    showTurnAnnouncement('對手回合');
+                }
+
+                render();
+            });
+        }
+        // 情況 3: 我未完成 Mulligan（新遊戲 或 重連且還沒換牌）
+        else {
+            // 如果有保存的手牌，使用保存的手牌
+            if (savedInitialHand && savedInitialHand.length > 0) {
+                console.log('[PvP 重連] 恢復 Mulligan 手牌:', savedInitialHand);
+
+                // 用保存的手牌替換當前手牌
+                gameState.players[0].hand = savedInitialHand.map(cardId => {
+                    const cardData = CARD_DATA.find(c => c.id === cardId);
+                    if (!cardData) {
+                        console.error('[PvP 重連] 找不到卡牌:', cardId);
+                        return null;
+                    }
+                    // 使用 JSON 深拷貝創建卡牌實例
+                    const cardInstance = JSON.parse(JSON.stringify(cardData));
+                    cardInstance.side = 'PLAYER';
+                    return cardInstance;
+                }).filter(card => card !== null);
+
+                console.log('[PvP 重連] 手牌已恢復，數量:', gameState.players[0].hand.length);
+            } else {
+                // 新遊戲：保存初始手牌到 Firebase
+                const initialHandIds = gameState.players[0].hand.map(card => card.id);
+                console.log('[PvP] 新遊戲，保存初始手牌:', initialHandIds);
+                await window.pvpManager.saveInitialHand(initialHandIds);
+            }
+
+            // 進入 Mulligan 階段
+            console.log('[PvP] 開始 Mulligan 階段');
+            showMulliganPhase();
+        }
 
         // ===== 設定 PvP 事件回調 =====
         if (window.pvpManager) {
@@ -7184,6 +7298,17 @@ async function confirmMulligan() {
     if (isPvPMode && window.pvpManager) {
         console.log('[PvP] Mulligan 完成，播放動畫...');
 
+        // 確保初始手牌已保存（以防萬一）
+        const roomData = window.pvpManager.currentRoom;
+        const savedHand = roomData?.gameState?.initialHands?.[pvpPlayerId];
+        if (!savedHand || savedHand.length === 0) {
+            console.log('[PvP] 初始手牌未保存，現在保存');
+            const initialHandIds = gameState.players[0].hand.map(card => card.id);
+            await window.pvpManager.saveInitialHand(initialHandIds);
+        } else {
+            console.log('[PvP] 初始手牌已保存:', savedHand);
+        }
+
         // 隱藏 Modal 並顯示等待訊息
         mulliganPhase = false;
         const modal = document.getElementById('mulligan-modal');
@@ -7205,7 +7330,12 @@ async function confirmMulligan() {
 
         showToast('等待對手完成換牌...');
 
-        // 2. 動畫完成後，同步狀態 (告訴對手我好了)
+        // 2. 動畫完成後，更新保存的手牌為換牌後的手牌（重要！）
+        const finalHandIds = gameState.players[0].hand.map(card => card.id);
+        console.log('[PvP] 更新換牌後的手牌到 Firebase:', finalHandIds);
+        await window.pvpManager.saveInitialHand(finalHandIds);
+
+        // 3. 同步狀態 (告訴對手我好了)
         await window.pvpManager.syncMulliganStatus(true);
         await window.pvpManager.syncGameAction('MULLIGAN_DONE', {});
 
@@ -7410,3 +7540,81 @@ window.addEventListener('beforeunload', (e) => {
         return e.returnValue;
     }
 });
+
+/**
+ * PVP 重新連接檢測與處理
+ */
+async function checkPvPReconnection() {
+    console.log('[PVP 重連] 開始檢查...');
+
+    if (!window.pvpManager || !window.pvpManager.isReady()) {
+        console.log('[PVP 重連] pvpManager 未準備好，跳過');
+        return;
+    }
+
+    const reconnectInfo = await window.pvpManager.tryReconnect();
+
+    if (!reconnectInfo) {
+        console.log('[PVP 重連] 沒有未完成的對戰');
+        return;
+    }
+
+    console.log('[PVP 重連] 發現未完成對戰:', reconnectInfo);
+
+    // 確保在主選單才顯示
+    const currentView = document.querySelector('.view:not([style*="display: none"])');
+    if (!currentView || currentView.id !== 'main-menu') {
+        console.warn('[PVP 重連] 當前不在主選單，延後檢查');
+        return;
+    }
+
+    // 顯示重連 modal
+    const modal = document.getElementById('pvp-reconnect-modal');
+    const detailsDiv = document.getElementById('reconnect-details');
+
+    // 顯示對戰資訊
+    const room = reconnectInfo.room;
+    const opponentId = reconnectInfo.playerId === 'player1' ? 'player2' : 'player1';
+    const opponentInfo = room.playerInfo?.[opponentId];
+
+    detailsDiv.innerHTML = `
+        <p><strong>對手：</strong>${opponentInfo?.username || '未知玩家'}</p>
+        <p><strong>回合數：</strong>${room.gameState?.turnNumber || 1}</p>
+    `;
+
+    modal.style.display = 'flex';
+
+    // 重新連接按鈕
+    document.getElementById('btn-reconnect-confirm').onclick = async () => {
+        modal.style.display = 'none';
+        showToast('正在重新連接...');
+
+        try {
+            await window.pvpManager.reconnect(reconnectInfo.roomId, reconnectInfo.playerId);
+
+            // 進入 PVP 對戰畫面
+            const deckCards = userDecks[0]?.cards || [];
+            startPvPGame(reconnectInfo.roomId, reconnectInfo.playerId, deckCards, reconnectInfo.room);
+
+        } catch (error) {
+            console.error('[PVP 重連] 重連失敗:', error);
+            showToast('重新連接失敗');
+        }
+    };
+
+    // 放棄對戰按鈕
+    document.getElementById('btn-reconnect-abandon').onclick = async () => {
+        modal.style.display = 'none';
+
+        // 清除 localStorage
+        localStorage.removeItem('pvp_current_room');
+        localStorage.removeItem('pvp_player_id');
+
+        // 通知對手（投降）
+        if (window.pvpManager) {
+            await window.pvpManager.surrender();
+        }
+
+        showToast('已放棄對戰');
+    };
+}
