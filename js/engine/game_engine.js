@@ -465,9 +465,9 @@ class GameState {
                         if (this.currentPlayer.board.length < 7) {
                             const minion = this.createMinion(cardDef, this.currentPlayer.side);
 
-                            // Apply specific properties if needed
+                            // Apply death timer for temporary minions (e.g. '側翼出動')
                             if (bc.isTemporary) {
-                                minion.isTemporary = true;
+                                minion.deathTimer = 1; // 一回合後死亡
                             }
 
                             // Redundant Charge Check
@@ -1075,12 +1075,7 @@ class GameState {
             }
         });
 
-        // Kill Temporary Minions (e.g. from '側翼出動')
-        this.currentPlayer.board.forEach(m => {
-            if (m.isTemporary) {
-                m.currentHealth = 0; // Mark as dead
-            }
-        });
+        // Temporary minions are now handled by deathTimer in processEndOfTurnTimers()
 
         // resolveDeaths is now removed from endTurn to allow UI to animate end-turn deaths
         // this.resolveDeaths();
