@@ -402,6 +402,8 @@ function init() {
 
             const result = await window.pvpManager.joinMatchmaking({
                 username: AuthManager.currentUser.username,
+                avatar: AuthManager.currentUser.selectedAvatar || '👤',
+                title: AuthManager.currentUser.selectedTitle || '',
                 level: AuthManager.currentUser.level || 1,
                 deckId: selectedDeck?.name || 'default',
                 deckCards: deckCards
@@ -2413,6 +2415,8 @@ async function startBattle(deckIds, debugMode = false, oppDeckIds = null) {
         gameState = gameEngine.createGame(deckIds, oppDeck, isDebugMode, currentDifficulty);
         // Expose for debugging
         window.gameState = gameState;
+        // Store initial deck for Deck View
+        gameState.players[0].initialDeckIds = [...deckIds];
         // Only call showView ONCE
         showView('battle-view');
 
@@ -2507,6 +2511,8 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
         gameState.currentPlayerIdx = isFirstPlayer ? 0 : 1;
 
         window.gameState = gameState;
+        // Store initial deck for Deck View
+        gameState.players[0].initialDeckIds = [...myDeckCards];
         showView('battle-view');
 
         // PvP 模式標記
@@ -2529,7 +2535,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             };
 
             // 遊戲狀態更新 (回合切換 & 狀態同步)
-            window.pvpManager.onGameStateUpdate = (remoteState) => {
+            window.pvpManager.onGameStateUpdate = async (remoteState) => {
                 console.log('[PvP] 收到遠端狀態更新:', remoteState);
                 if (!remoteState) return;
 
@@ -2550,8 +2556,28 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         opponent.mana.current = oppState.mana;
                         opponent.mana.max = oppState.maxMana;
                     }
-                    // Optional: Sync Hand Size if needed (but actions usually handle this)
-                    // if (oppState.handSize !== undefined) { ... }
+
+                    // 同步手牌數（對手手牌不顯示具體內容，但數量需要同步）
+                    if (oppState.handSize !== undefined) {
+                        // 調整對手手牌陣列長度以匹配實際數量
+                        const currentHandSize = opponent.hand.length;
+                        const targetHandSize = oppState.handSize;
+
+                        if (targetHandSize > currentHandSize) {
+                            // 對手抽牌了，補充空白卡牌顯示
+                            for (let i = currentHandSize; i < targetHandSize; i++) {
+                                opponent.hand.push({ id: 'HIDDEN', name: '?', cost: 0, type: 'HIDDEN' });
+                            }
+                        } else if (targetHandSize < currentHandSize) {
+                            // 對手出牌/丟牌了，移除多餘的卡牌
+                            opponent.hand.splice(targetHandSize);
+                        }
+                    }
+
+                    // 同步牌組數量
+                    if (oppState.deckSize !== undefined) {
+                        opponent._syncedDeckSize = oppState.deckSize;
+                    }
 
                     // Render to show updated stats
                     render();
@@ -2561,23 +2587,40 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 if (remoteState.currentTurn) {
                     const isMyTurn = remoteState.currentTurn === pvpPlayerId;
                     const localIdx = isMyTurn ? 0 : 1;
+                    const prevIdx = gameState.currentPlayerIdx;
 
-                    if (gameState.currentPlayerIdx !== localIdx) {
+                    console.log('[PvP] 回合狀態檢查:', {
+                        currentTurn: remoteState.currentTurn,
+                        pvpPlayerId,
+                        isMyTurn,
+                        localIdx,
+                        prevIdx,
+                        willSwitch: prevIdx !== localIdx
+                    });
+
+                    // 只有在回合真正切換時才顯示提示和執行回合邏輯
+                    if (prevIdx !== localIdx) {
                         console.log('[PvP] 回合切換:', isMyTurn ? '輪到我' : '對手回合');
                         gameState.currentPlayerIdx = localIdx;
 
                         if (isMyTurn && !gameState.gameOver) {
                             // 輪到自己，開始回合
+                            console.log('[PvP] 執行 startTurn()，回合前手牌數:', gameState.players[0].hand.length);
                             gameState.startTurn();
+                            console.log('[PvP] startTurn() 完成，回合後手牌數:', gameState.players[0].hand.length);
                             showTurnAnnouncement('你的回合！');
 
                             // 同步回合開始後的狀態 (Mana增加, 抽牌後)
                             syncLocalStateToFirebase();
                         } else if (!gameState.gameOver) {
+                            // 對手回合：不調用 startTurn，避免對手也增加 mana 和抽牌
                             showTurnAnnouncement('對手回合');
                         }
                         render();
+                        // 回合切換後檢查死亡（處理上一回合的計時器到期）
+                        await resolveDeaths();
                     }
+                    // 如果 currentPlayerIdx 沒變化，表示只是對手在其回合中的動作，不需要顯示提示
                 }
             };
 
@@ -2604,6 +2647,54 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             window.pvpManager.listenActionLog();
         }
 
+        // 顯示對手資訊 (PVP 模式)
+        if (window.pvpManager && window.pvpManager.currentRoom) {
+            const room = window.pvpManager.currentRoom;
+            const isPlayer1 = window.pvpManager.myPlayerId === 'player1';
+
+            console.log('[PvP] 房間資料:', room);
+            console.log('[PvP] 我的身份:', window.pvpManager.myPlayerId);
+            console.log('[PvP] playerInfo:', room.playerInfo);
+
+            const opponentInfo = room.playerInfo ? (isPlayer1 ? room.playerInfo.player2 : room.playerInfo.player1) : null;
+
+            console.log('[PvP] 對手資訊:', opponentInfo);
+
+            if (opponentInfo && opponentInfo.username) {
+                // 從 AVATAR_DATA 查找對應的圖片路徑
+                let avatarPath = '';
+                if (opponentInfo.avatar && window.PROFILE_DATA && window.PROFILE_DATA.AVATAR_DATA) {
+                    const avatarData = window.PROFILE_DATA.AVATAR_DATA.find(a => a.id === opponentInfo.avatar);
+                    avatarPath = avatarData ? avatarData.path : '';
+                }
+
+                // 設定對手英雄頭像
+                const oppHeroAvatarEl = document.querySelector('#opp-hero .avatar');
+                if (oppHeroAvatarEl && avatarPath) {
+                    oppHeroAvatarEl.style.backgroundImage = `url('${avatarPath}')`;
+                    oppHeroAvatarEl.style.backgroundSize = 'cover';
+                    oppHeroAvatarEl.style.backgroundPosition = 'center';
+                    console.log('[PvP] 對手英雄頭像已設定:', avatarPath);
+                }
+
+                // 從 TITLE_DATA 查找對應的顯示名稱
+                let titleDisplay = opponentInfo.title || '無稱號';
+                if (opponentInfo.title && window.PROFILE_DATA && window.PROFILE_DATA.TITLE_DATA) {
+                    const titleData = window.PROFILE_DATA.TITLE_DATA.find(t => t.id === opponentInfo.title);
+                    titleDisplay = titleData ? titleData.name : opponentInfo.title;
+                }
+
+                // 更新資訊卡顯示（僅用戶名和稱號）
+                document.getElementById('battle-opponent-username').textContent = opponentInfo.username || '對手';
+                document.getElementById('battle-opponent-title').textContent = titleDisplay;
+                document.getElementById('battle-opponent-info').style.display = 'flex';
+
+                console.log('[PvP] 對手資訊已顯示 - 頭像:', avatarPath, '用戶:', opponentInfo.username, '稱號:', titleDisplay);
+            } else {
+                console.warn('[PvP] 對手資訊不可用:', opponentInfo);
+            }
+        }
+
         console.log('[PvP] 對戰初始化完成，身份:', playerId);
 
     } catch (e) {
@@ -2621,6 +2712,9 @@ function endPvPGame() {
     pvpPlayerId = null;
     window.isPvPMode = false;
 
+    // 隱藏對手資訊卡
+    document.getElementById('battle-opponent-info').style.display = 'none';
+
     if (window.pvpManager) {
         window.pvpManager.leaveRoom();
     }
@@ -2634,13 +2728,21 @@ async function syncLocalStateToFirebase() {
 
     try {
         const player = gameState.players[0]; // 我方永遠是 player[0]
+
+        // 確保所有欄位都有有效值，避免 undefined 導致 Firebase 錯誤
+        // Player 結構使用 hero.hp 和 hero.maxHp，而非 currentHealth/health
+        if (!player || !player.hero || player.hero.hp === undefined) {
+            console.warn('[PvP] 玩家狀態尚未完整初始化，跳過同步');
+            return;
+        }
+
         const stateUpdate = {
-            hp: player.currentHealth,
-            maxHp: player.health,
-            mana: player.mana.current,
-            maxMana: player.mana.max,
-            handSize: player.hand.length,
-            deckSize: player.deck.length
+            hp: player.hero.hp ?? 30,
+            maxHp: player.hero.maxHp ?? 30,
+            mana: player.mana?.current ?? 0,
+            maxMana: player.mana?.max ?? 0,
+            handSize: player.hand?.length ?? 0,
+            deckSize: player.deck?.length ?? 0
         };
 
         await window.pvpManager.updateGameState(stateUpdate);
@@ -2686,12 +2788,16 @@ async function executeOpponentAction(action) {
         case 'PLAY_CARD': {
             const { cardId, handIndex, targetType, targetIndex, targetSide, insertionIndex } = action.data;
 
-            // 在對手手牌中找到卡牌
-            const card = opponent.hand[handIndex];
-            if (!card) {
-                console.warn('[PvP] 找不到對手手牌:', handIndex);
+            // 從 CARD_DATA 根據 cardId 查找卡牌資料
+            const cardDef = window.CARD_DATA?.find(c => c.id === cardId);
+            if (!cardDef) {
+                console.warn('[PvP] 找不到卡牌資料:', cardId);
                 return;
             }
+
+            // 創建卡牌實例（對手出牌，我們無法知道其手牌內容，需要自己創建）
+            const card = JSON.parse(JSON.stringify(cardDef));
+            card.side = opponent.side;
 
             // 顯示出牌動畫
             const oppBoard = document.getElementById('opp-board');
@@ -2709,12 +2815,56 @@ async function executeOpponentAction(action) {
             }
 
             try {
-                // 臨時切換到對手視角執行
+                // 臨時切換到對手視角
                 const originalIdx = gameState.currentPlayerIdx;
                 gameState.currentPlayerIdx = 1;
 
-                const { battlecryResult: result } = gameState.playCard(handIndex, target, insertionIndex || -1);
+                // 手動處理出牌邏輯（不調用 playCard，因為會檢查 mana 和手牌）
+                // 注意：不需要手動從手牌移除，因為 onGameStateUpdate 會通過 handSize 同步自動調整
+                console.log('[PvP] 執行對手出牌，當前對手手牌數:', opponent.hand.length);
 
+                // 1. 扣除 mana（使用卡牌實際費用）
+                const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
+                opponent.mana.current = Math.max(0, opponent.mana.current - actualCost);
+
+                // 2. 如果是隨從，加入場上
+                if (card.type === 'MINION') {
+                    const minion = gameState.createMinion(cardDef, opponent.side);
+                    const insertIdx = insertionIndex >= 0 ? insertionIndex : opponent.board.length;
+                    opponent.board.splice(insertIdx, 0, minion);
+
+                    // 處理戰吼（如果有）
+                    if (card.keywords?.battlecry) {
+                        gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                    }
+                } else if (card.type === 'NEWS') {
+                    // 新聞牌直接執行效果
+                    console.log('[PvP] 對手出 NEWS 卡，戰吼前手牌數:', opponent.hand.length);
+
+                    let battlecryResult = null;
+                    if (card.keywords?.battlecry) {
+                        card.side = opponent.side; // 確保 News Power 計算正確
+                        battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, card);
+                    }
+
+                    // 處理戰吼結果（特別是 DISCARD_DRAW 需要抽牌）
+                    if (battlecryResult) {
+                        console.log('[PvP] 對手戰吼結果:', battlecryResult);
+                        if (battlecryResult.type === 'DISCARD_DRAW' && battlecryResult.drawCount) {
+                            console.log('[PvP] DISCARD_DRAW 前手牌數:', opponent.hand.length);
+                            // 對手執行抽牌
+                            for (let i = 0; i < battlecryResult.drawCount; i++) {
+                                opponent.drawCard();
+                            }
+                            console.log('[PvP] DISCARD_DRAW 抽牌完成，最終手牌數:', opponent.hand.length);
+                        }
+                    }
+                }
+
+                // 更新光環
+                gameState.updateAuras();
+
+                // 切換回原本視角
                 gameState.currentPlayerIdx = originalIdx;
 
                 // 記錄歷史
@@ -2723,6 +2873,7 @@ async function executeOpponentAction(action) {
                     card: card.name
                 });
 
+                // 渲染更新（不需要額外同步，對手會自行同步其狀態）
                 render();
                 await resolveDeaths();
 
@@ -2762,6 +2913,13 @@ async function executeOpponentAction(action) {
                 const originalIdx = gameState.currentPlayerIdx;
                 gameState.currentPlayerIdx = 1;
 
+                // 強制設置攻擊者為可攻擊狀態（繞過 sleeping 檢查）
+                // 因為對手的攻擊動作已經在其本地驗證過，我們只需執行結果
+                const wasAttackable = attacker.canAttack;
+                const wasSleeping = attacker.sleeping;
+                attacker.canAttack = true;
+                attacker.sleeping = false;
+
                 // 翻轉目標視角
                 const flippedTarget = {
                     type: targetType,
@@ -2769,6 +2927,9 @@ async function executeOpponentAction(action) {
                 };
 
                 gameState.attack(attackerIndex, flippedTarget);
+
+                // 恢復原始狀態標記（如果需要）
+                // 注意：攻擊後 canAttack 會被設為 false，這是正常的
 
                 gameState.currentPlayerIdx = originalIdx;
 
@@ -2783,9 +2944,14 @@ async function executeOpponentAction(action) {
 
         case 'END_TURN': {
             console.log('[PvP] 對手結束回合');
-            // 回合切換會由 onGameStateUpdate 處理
-            // 這裡只需要確保死亡結算完成
+
+            // 只處理計時器倒數，不切換 currentPlayerIdx
+            // 完整的回合切換邏輯由 onGameStateUpdate 處理
+            gameState.processEndOfTurnTimers();
+
+            // 確保死亡結算完成
             await resolveDeaths();
+            render();
             break;
         }
 
@@ -3348,8 +3514,16 @@ function renderGameUI(p1, p2) {
         p2HpEl.innerText = p2.hero.hp;
     }
 
+    // Deck counts
     document.querySelector('#player-deck .count-badge').innerText = p1.deck.length;
-    document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+
+    // In PVP mode, use synced deck size for opponent
+    if (isPvPMode && p2._syncedDeckSize !== undefined) {
+        document.querySelector('#opp-deck .count-badge').innerText = p2._syncedDeckSize;
+    } else {
+        document.querySelector('#opp-deck .count-badge').innerText = p2.deck.length;
+    }
+
 
     // Update Battle Player Info Card
     const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
@@ -3362,19 +3536,22 @@ function renderGameUI(p1, p2) {
     // Also update main hero avatar if available
     const mainHeroAvatar = document.querySelector('#player-hero .avatar');
 
-    // 優先顯示登入的用戶名
     const displayUsername = (authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家');
+    const displayTitleId = (authUser && authUser.selectedTitle) ? authUser.selectedTitle : (playerInfo.selectedTitle || 'beginner');
+    const displayAvatarId = (authUser && authUser.selectedAvatar) ? authUser.selectedAvatar : (playerInfo.selectedAvatar || 'avatar1');
 
     if (battleUsername) {
         battleUsername.innerText = displayUsername;
     }
     if (battleTitle) {
-        // 如果有登入，也許未來可以從 authUser 獲取稱號 (目前暫時使用本地設定)
-        const titleObj = AVAILABLE_TITLES.find(t => t.id === playerInfo.selectedTitle);
+        const titleData = window.PROFILE_DATA?.TITLE_DATA || [];
+        const titleObj = titleData.find(t => t.id === displayTitleId);
         battleTitle.innerText = titleObj ? titleObj.name : '無稱號';
     }
     if (battleAvatar) {
-        const avatarObj = AVAILABLE_AVATARS.find(a => a.id === playerInfo.selectedAvatar);
+        const avatarData = window.PROFILE_DATA?.AVATAR_DATA || [];
+        const avatarObj = avatarData.find(a => a.id === displayAvatarId);
+
         if (avatarObj && avatarObj.path) {
             const url = `url('${avatarObj.path}')`;
             // Info Card Avatar
@@ -4954,7 +5131,9 @@ async function onDragEnd(e) {
         const targetData = targetEl?.closest('[data-type]');
         if (targetData) {
             const type = targetData.dataset.type;
-            const index = parseInt(targetData.dataset.index);
+            // 修復：當目標是英雄時，index 為 undefined，parseInt 會返回 NaN
+            // 改為攻擊英雄時設為 null
+            const index = targetData.dataset.index ? parseInt(targetData.dataset.index) : null;
 
             if (type === 'HERO' && targetData.id === 'opp-hero'
                 || type === 'MINION' && targetEl.closest('#opp-board')) {
@@ -4986,7 +5165,7 @@ async function onDragEnd(e) {
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
-                            targetIndex: index
+                            targetIndex: index  // 英雄時為 null，隨從時為數字
                         });
                         syncLocalStateToFirebase(); // 同步攻擊後的狀態 (HP)
                     }
@@ -5500,12 +5679,23 @@ function animateAttack(fromEl, toEl, damage = 0) {
         const statElements = clone.querySelectorAll('.stat-atk, .stat-hp');
         statElements.forEach(stat => stat.classList.remove('stat-pop'));
 
+        // Calculate current game scale to ensure clone matches visual size
+        const scaler = document.getElementById('game-content-scaler');
+        // Retrieve scale from transform string "scale(0.5)" -> 0.5
+        const scaleMatch = scaler && scaler.style.transform ? scaler.style.transform.match(/scale\(([^)]+)\)/) : null;
+        const currentScale = scaleMatch ? parseFloat(scaleMatch[1]) : 1;
+
         // Initial Position
         clone.style.top = `${rectFrom.top}px`;
         clone.style.left = `${rectFrom.left}px`;
-        clone.style.width = `${rectFrom.width}px`;
-        clone.style.height = `${rectFrom.height}px`;
+        // Restore original (unscaled) dimensions so content inside isn't cramped/large
+        clone.style.width = `${rectFrom.width / currentScale}px`;
+        clone.style.height = `${rectFrom.height / currentScale}px`;
         clone.style.margin = '0'; // Clear margins
+
+        // Apply the same scale as the game container
+        clone.style.transformOrigin = 'top left';
+        clone.style.transform = `scale(${currentScale})`;
 
         document.body.appendChild(clone);
 
@@ -5519,7 +5709,8 @@ function animateAttack(fromEl, toEl, damage = 0) {
 
         clone.style.top = `${centerY}px`;
         clone.style.left = `${centerX}px`;
-        clone.style.transform = "scale(1.2)"; // Bigger on impact
+        // Combine scales for impact effect (Game Scale * 1.2)
+        clone.style.transform = `scale(${currentScale * 1.2})`; // Bigger on impact
 
         // On Transition End (Impact)
         setTimeout(() => {
@@ -6586,7 +6777,14 @@ function showDeckView() {
     }
 
     const player = gameState.players[0]; // 玩家永遠是 players[0]
-    const deckIds = player.deck.map(card => card.id);
+
+    // 使用初始牌組（若有），否則退回到當前剩餘牌組
+    let deckIds;
+    if (player.initialDeckIds) {
+        deckIds = player.initialDeckIds;
+    } else {
+        deckIds = player.deck.map(card => card.id);
+    }
 
     // 統計每張卡的數量
     const cardCounts = {};
@@ -6935,18 +7133,21 @@ async function confirmMulligan() {
         window.pvpManager.listenMulliganStatus(async () => {
             console.log('[PvP] 雙方 Mulligan 完成，開始遊戲');
 
-
-
             // 判斷是否為我的回合（先手）
             const isMyTurn = window.pvpManager?.isMyTurn();
+            console.log('[PvP Mulligan] isMyTurn:', isMyTurn, 'currentPlayerIdx:', gameState.currentPlayerIdx);
+            console.log('[PvP Mulligan] Mulligan 完成時手牌數:', gameState.players[0].hand.length);
 
             if (isMyTurn) {
                 // 先手：呼叫 startTurn 進行抽牌和增加法力
+                console.log('[PvP Mulligan] 先手執行 startTurn()');
                 gameState.startTurn();
+                console.log('[PvP Mulligan] startTurn() 完成，手牌數:', gameState.players[0].hand.length);
                 showTurnAnnouncement('你的回合！');
                 syncLocalStateToFirebase(); // 同步回合開始後的狀態 (Mana, HeadSize)
             } else {
                 // 後手：等待對手行動，不呼叫 startTurn
+                console.log('[PvP Mulligan] 後手等待對手');
                 showTurnAnnouncement('對手回合');
             }
 
