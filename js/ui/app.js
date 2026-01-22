@@ -2544,10 +2544,19 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             console.log('[PvP 重連] savedInitialHand:', savedInitialHand);
             console.log('[PvP 重連] 當前手牌 (createGame 生成的):', gameState.players[0].hand.map(c => c.id));
 
-            // 恢復換牌後的手牌
-            if (savedInitialHand && savedInitialHand.length > 0) {
-                console.log('[PvP 重連] 開始恢復換牌後的手牌:', savedInitialHand);
-                gameState.players[0].hand = savedInitialHand.map(cardId => {
+            // 恢復完整遊戲狀態（手牌、場面、血量、法力等）
+            const myStateKey = `${pvpPlayerId}State`;
+            const myState = roomData?.gameState?.[myStateKey];
+
+            console.log('[PvP 重連] myState:', myState);
+            console.log('[PvP 重連] savedInitialHand:', savedInitialHand);
+
+            // 優先使用 myState.hand（當前手牌），否則使用 savedInitialHand（初始手牌）
+            const savedHand = myState?.hand || savedInitialHand;
+
+            if (savedHand && savedHand.length > 0) {
+                console.log('[PvP 重連] 開始恢復手牌:', savedHand);
+                gameState.players[0].hand = savedHand.map(cardId => {
                     const cardData = CARD_DATA.find(c => c.id === cardId);
                     if (!cardData) {
                         console.error('[PvP 重連] 找不到卡牌:', cardId);
@@ -2561,7 +2570,39 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 console.log('[PvP 重連] 手牌已恢復，數量:', gameState.players[0].hand.length);
                 console.log('[PvP 重連] 恢復後的手牌 ID:', gameState.players[0].hand.map(c => c.id));
             } else {
-                console.warn('[PvP 重連] 沒有保存的手牌，使用當前手牌');
+                console.warn('[PvP 重連] 沒有保存的手牌');
+            }
+
+            if (myState) {
+                console.log('[PvP 重連] 恢復我的遊戲狀態:', myState);
+
+                // 恢復血量
+                if (myState.hp !== undefined) {
+                    gameState.players[0].hero.hp = myState.hp;
+                    gameState.players[0].hero.maxHp = myState.maxHp || 30;
+                    console.log('[PvP 重連] 血量已恢復:', myState.hp, '/', myState.maxHp);
+                }
+
+                // 恢復法力
+                if (myState.mana !== undefined) {
+                    gameState.players[0].mana.current = myState.mana;
+                    gameState.players[0].mana.max = myState.maxMana || 1;
+                    console.log('[PvP 重連] 法力已恢復:', myState.mana, '/', myState.maxMana);
+                }
+
+                // 恢復場面
+                if (myState.board && Array.isArray(myState.board)) {
+                    console.log('[PvP 重連] 恢復場面，隨從數量:', myState.board.length);
+                    gameState.players[0].board = myState.board.map(minionData => {
+                        // 場面上的隨從需要完整恢復
+                        const minion = JSON.parse(JSON.stringify(minionData));
+                        minion.side = 'PLAYER';
+                        return minion;
+                    });
+                    console.log('[PvP 重連] 場面已恢復');
+                }
+            } else {
+                console.warn('[PvP 重連] 無法取得我的遊戲狀態');
             }
 
             // 確保我方 Mulligan 狀態標記為已完成
@@ -2868,16 +2909,58 @@ async function syncLocalStateToFirebase() {
             return;
         }
 
+        // 輔助函數：移除物件中的 undefined 值
+        const removeUndefined = (obj) => {
+            const cleaned = {};
+            for (const key in obj) {
+                if (obj[key] !== undefined && obj[key] !== null) {
+                    cleaned[key] = obj[key];
+                }
+            }
+            return cleaned;
+        };
+
         const stateUpdate = {
             hp: player.hero.hp ?? 30,
             maxHp: player.hero.maxHp ?? 30,
             mana: player.mana?.current ?? 0,
             maxMana: player.mana?.max ?? 0,
             handSize: player.hand?.length ?? 0,
-            deckSize: player.deck?.length ?? 0
+            deckSize: player.deck?.length ?? 0,
+            // 同步當前手牌（保存 ID）
+            hand: player.hand?.map(card => card.id) ?? [],
+            // 同步場面上的所有隨從
+            board: player.board?.map(minion => {
+                // 只保存非 undefined 的屬性
+                return removeUndefined({
+                    id: minion.id,
+                    name: minion.name,
+                    cost: minion.cost,
+                    attack: minion.attack,
+                    health: minion.health,
+                    currentHealth: minion.currentHealth,
+                    type: minion.type,
+                    category: minion.category,
+                    rarity: minion.rarity,
+                    description: minion.description,
+                    image: minion.image,
+                    keywords: minion.keywords,
+                    sleeping: minion.sleeping,
+                    canAttack: minion.canAttack,
+                    attacksThisTurn: minion.attacksThisTurn,
+                    lockedTurns: minion.lockedTurns,
+                    deathTimer: minion.deathTimer,
+                    tempBuffs: minion.tempBuffs,
+                    baseAttackOverride: minion.baseAttackOverride,
+                    ongoingStats: minion.ongoingStats,
+                    side: minion.side
+                });
+            }) ?? []
         };
 
+        console.log('[PvP] 準備同步狀態:', stateUpdate);
         await window.pvpManager.updateGameState(stateUpdate);
+        console.log('[PvP] 狀態同步成功');
     } catch (e) {
         console.error('[PvP] 狀態同步失敗:', e);
     }
