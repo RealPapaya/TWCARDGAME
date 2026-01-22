@@ -2608,6 +2608,52 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
             // 確保我方 Mulligan 狀態標記為已完成
             gameState.mulliganCompleted = true;
 
+            // 恢復對手狀態（英雄血量、場面等）
+            const opponentId = pvpPlayerId === 'player1' ? 'player2' : 'player1';
+            const opponentStateKey = `${opponentId}State`;
+            const opponentState = roomData?.gameState?.[opponentStateKey];
+
+            if (opponentState) {
+                console.log('[PvP 重連] 恢復對手狀態:', opponentState);
+                const opponent = gameState.players[1];
+
+                // 恢復對手英雄血量
+                if (opponentState.hp !== undefined) {
+                    opponent.hero.hp = opponentState.hp;
+                    opponent.hero.maxHp = opponentState.maxHp || 30;
+                    console.log('[PvP 重連] 對手血量已恢復:', opponentState.hp, '/', opponentState.maxHp);
+                }
+
+                // 恢復對手法力
+                if (opponentState.mana !== undefined) {
+                    opponent.mana.current = opponentState.mana;
+                    opponent.mana.max = opponentState.maxMana || 1;
+                    console.log('[PvP 重連] 對手法力已恢復:', opponentState.mana, '/', opponentState.maxMana);
+                }
+
+                // 恢復對手場面
+                if (opponentState.board && Array.isArray(opponentState.board)) {
+                    console.log('[PvP 重連] 恢復對手場面，隨從數量:', opponentState.board.length);
+                    opponent.board = opponentState.board.map(minionData => {
+                        const minion = JSON.parse(JSON.stringify(minionData));
+                        minion.side = 'OPPONENT';
+                        return minion;
+                    });
+                    console.log('[PvP 重連] 對手場面已恢復');
+                }
+
+                // 恢復對手手牌數量（顯示為隱藏卡牌）
+                if (opponentState.handSize !== undefined) {
+                    opponent.hand = [];
+                    for (let i = 0; i < opponentState.handSize; i++) {
+                        opponent.hand.push({ id: 'HIDDEN', name: '?', cost: 0, type: 'HIDDEN' });
+                    }
+                    console.log('[PvP 重連] 對手手牌數量已恢復:', opponentState.handSize);
+                }
+            } else {
+                console.warn('[PvP 重連] 無法取得對手遊戲狀態');
+            }
+
             // 渲染當前狀態
             render();
 
@@ -2804,8 +2850,8 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 }, 1000);
             };
 
-            // 開始監聽動作日誌
-            window.pvpManager.listenActionLog();
+            // 開始監聽動作日誌（重連時跳過舊動作）
+            await window.pvpManager.listenActionLog(true);
         }
 
         // 顯示對手資訊 (PVP 模式)

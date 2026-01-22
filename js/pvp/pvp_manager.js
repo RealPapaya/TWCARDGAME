@@ -477,19 +477,38 @@ class PvPManager {
 
     /**
      * 開始監聽動作日誌 (用於接收對手動作)
+     * @param {boolean} skipOldActions - 是否跳過舊動作（重連時使用）
      */
-    listenActionLog() {
+    async listenActionLog(skipOldActions = false) {
         if (!this.currentRoomId) return;
 
         const logRef = ref(database, `game_rooms/${this.currentRoomId}/actionLog`);
-        this.lastProcessedActionKey = null;
+
+        // 如果需要跳過舊動作，先一次性查詢所有現有動作並記錄最後一個 key
+        if (skipOldActions) {
+            try {
+                const snapshot = await get(logRef);
+                if (snapshot.exists()) {
+                    const actions = snapshot.val();
+                    const actionKeys = Object.keys(actions).sort();
+                    if (actionKeys.length > 0) {
+                        this.lastProcessedActionKey = actionKeys[actionKeys.length - 1];
+                        console.log('[PvP] 重連模式：已跳過', actionKeys.length, '個舊動作，最後 key:', this.lastProcessedActionKey);
+                    }
+                }
+            } catch (error) {
+                console.error('[PvP] 讀取舊動作失敗:', error);
+            }
+        } else {
+            this.lastProcessedActionKey = null;
+        }
 
         // 監聽動作日誌變化
         this.actionLogListener = onValue(logRef, (snapshot) => {
             if (!snapshot.exists()) return;
 
             const actions = snapshot.val();
-            const actionEntries = Object.entries(actions);
+            const actionEntries = Object.entries(actions).sort((a, b) => a[0].localeCompare(b[0]));
 
             // 找到尚未處理的對手動作
             for (const [key, action] of actionEntries) {
@@ -511,7 +530,7 @@ class PvPManager {
             }
         });
 
-        console.log('[PvP] 開始監聽動作日誌');
+        console.log('[PvP] 開始監聽動作日誌', skipOldActions ? '(已跳過舊動作)' : '');
     }
 
     /**
