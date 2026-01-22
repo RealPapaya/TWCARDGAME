@@ -2841,6 +2841,38 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 console.log('[PvP] 遊戲結束:', result);
                 const isWinner = result.winner === pvpPlayerId;
 
+                // PvP 勝利經驗發放
+                if (isWinner && AuthManager.currentUser && gameState) {
+                    const winnerHP = gameState.players[0].hero.hp;
+                    const turnCount = gameState.turnCount;
+
+                    const pvpExp = calculatePvPExp(winnerHP, turnCount);
+
+                    // 發放經驗
+                    AuthManager.currentUser.currentXP = (AuthManager.currentUser.currentXP || 0) + pvpExp;
+
+                    // 檢查升級
+                    let levelsGained = 0;
+                    while (AuthManager.currentUser.level < 50) {
+                        const xpRequired = getXPRequiredForLevel(AuthManager.currentUser.level);
+                        if (AuthManager.currentUser.currentXP >= xpRequired) {
+                            AuthManager.currentUser.currentXP -= xpRequired;
+                            AuthManager.currentUser.level++;
+                            levelsGained++;
+                            AuthManager.currentUser.gold += 100;
+                        } else {
+                            break;
+                        }
+                    }
+
+                    if (levelsGained > 0) {
+                        ShopManager.updateGoldDisplay();
+                    }
+
+                    AuthManager.saveData();
+                    console.log('[PvP] 獲得經驗:', pvpExp, '升級次數:', levelsGained);
+                }
+
                 // 顯示勝利/失敗畫面
                 endGame(isWinner ? 'VICTORY' : 'DEFEAT');
 
@@ -3209,6 +3241,13 @@ async function executeOpponentAction(action) {
             // 只處理計時器倒數，不切換 currentPlayerIdx
             // 完整的回合切換邏輯由 onGameStateUpdate 處理
             gameState.processEndOfTurnTimers();
+
+            // 顯式調用 Buff 清理邏輯，確保「凍蒜」等暫時性 Buff 在視覺上正確移除
+            // 因為我們不調用 gameState.endTurn()，所以必須手動觸發這部分
+            if (gameState.cleanupTemporaryBuffs) {
+                console.log('[PvP] 執行 END_TURN 清理暫時性 Buff');
+                gameState.cleanupTemporaryBuffs();
+            }
 
             // 確保死亡結算完成
             await resolveDeaths();
@@ -4021,6 +4060,36 @@ function getXPReward(difficulty, isFirstVictory) {
 }
 
 /**
+ * 計算 PvP 勝利經驗
+ * @param {number} winnerHP - 勝利者剩餘血量
+ * @param {number} turnCount - 總回合數
+ * @returns {number} 經驗值 (8-15)
+ */
+function calculatePvPExp(winnerHP, turnCount) {
+    // 基礎經驗
+    let exp = 8;
+
+    // 血量獎勵 (最多 +4)
+    const hpBonus = Math.floor((winnerHP / 30) * 4);
+    exp += hpBonus;
+
+    // 速度獎勵 (最多 +3)
+    let speedBonus = 0;
+    if (turnCount <= 5) {
+        speedBonus = 3;
+    } else if (turnCount <= 10) {
+        speedBonus = 2;
+    } else if (turnCount <= 15) {
+        speedBonus = 1;
+    }
+    exp += speedBonus;
+
+    console.log('[PvP 經驗] 基礎:8 血量獎勵:+' + hpBonus + ' (剩餘' + winnerHP + 'HP) 速度獎勵:+' + speedBonus + ' (' + turnCount + '回合) 總計:' + exp);
+
+    return exp;
+}
+
+/**
  * 依序顯示獎勵通知
  * @param {Array} rewards - 獎勵事件陣列，格式：[{message: string, delay: number}, ...]
  */
@@ -4130,12 +4199,12 @@ function endGame(result) {
         }
     }
 
-    // 經驗值和升級處理
+    // 經驗值和升級處理（只在 AI 對戰時發放，PvP 經驗已在 onGameEnd 中處理）
     let gainedXP = 0;
     let leveledUp = false;
     let levelsGained = 0;
 
-    if (!isDebugMode && AuthManager.currentUser && result === 'VICTORY' && currentDifficulty && currentOpponentDeckId) {
+    if (!isDebugMode && AuthManager.currentUser && result === 'VICTORY' && currentDifficulty && currentOpponentDeckId && !isPvPMode) {
         const challengeKey = `${currentOpponentDeckId}-${currentDifficulty}`;
         const isFirstVictory = firstVictoryReward > 0;
 

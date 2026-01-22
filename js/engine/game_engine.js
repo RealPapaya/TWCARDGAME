@@ -212,18 +212,23 @@ class GameState {
             'BOUNCE': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {
-                    const owner = targetUnit.side === this.currentPlayer.side ? this.currentPlayer : this.opponent;
-                    const index = owner.board.indexOf(targetUnit);
+                    // Fix: Use absolute side matching to find owner
+                    // In PvP, when executing opponent move, logic might differ, so we trust target.side or unit.side
+                    const owner = this.players.find(p => p.side === targetUnit.side);
 
-                    if (index > -1) {
-                        owner.board.splice(index, 1);
-                        const cardToHand = this._createBounceCard(targetUnit);
+                    if (owner) {
+                        const index = owner.board.indexOf(targetUnit);
+                        if (index > -1) {
+                            owner.board.splice(index, 1);
+                            const cardToHand = this._createBounceCard(targetUnit);
 
-                        if (owner.hand.length < 10) {
-                            owner.hand.push(cardToHand);
+                            if (owner.hand.length < 10) {
+                                owner.hand.push(cardToHand);
+                            }
+                            this.updateAuras();
+                            // Return explicit side so UI knows whose hand to animate to
+                            return { type: 'BOUNCE', target: { ...targetUnit, index: target.index, side: targetUnit.side } };
                         }
-                        this.updateAuras();
-                        return { type: 'BOUNCE', target: { ...targetUnit, index: target.index } };
                     }
                 }
                 return null;
@@ -667,13 +672,17 @@ class GameState {
             'BOUNCE_TARGET': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {
-                    const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
-                    const idx = owner.board.indexOf(targetUnit);
-                    if (idx !== -1) {
-                        owner.board.splice(idx, 1);
-                        const cardToHand = this._createBounceCard(targetUnit);
-                        if (owner.hand.length < 10) owner.hand.push(cardToHand);
-                        return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                    // Fix: Use absolute side matching to find owner
+                    const owner = this.players.find(p => p.side === targetUnit.side);
+
+                    if (owner) {
+                        const index = owner.board.indexOf(targetUnit);
+                        if (index !== -1) {
+                            owner.board.splice(index, 1);
+                            const cardToHand = this._createBounceCard(targetUnit);
+                            if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                            return { type: 'BOUNCE', target: { ...targetUnit, index: index, side: targetUnit.side } };
+                        }
                     }
                 }
                 return null;
@@ -693,13 +702,19 @@ class GameState {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {
                     if (bc.target_category_includes && (!targetUnit.category || !targetUnit.category.includes(bc.target_category_includes))) return null;
-                    const owner = target.side === 'PLAYER' ? this.currentPlayer : this.opponent;
-                    const idx = owner.board.indexOf(targetUnit);
-                    if (idx !== -1) {
-                        owner.board.splice(idx, 1);
-                        const cardToHand = this._createBounceCard(targetUnit);
-                        if (owner.hand.length < 10) owner.hand.push(cardToHand);
-                        return { type: 'BOUNCE', target: { ...targetUnit, index: idx } };
+                    if (bc.target_category_includes && (!targetUnit.category || !targetUnit.category.includes(bc.target_category_includes))) return null;
+
+                    // Fix: Use absolute side matching to find owner
+                    const owner = this.players.find(p => p.side === targetUnit.side);
+
+                    if (owner) {
+                        const index = owner.board.indexOf(targetUnit);
+                        if (index !== -1) {
+                            owner.board.splice(index, 1);
+                            const cardToHand = this._createBounceCard(targetUnit);
+                            if (owner.hand.length < 10) owner.hand.push(cardToHand);
+                            return { type: 'BOUNCE', target: { ...targetUnit, index: index, side: targetUnit.side } };
+                        }
                     }
                 }
                 return null;
@@ -1063,17 +1078,8 @@ class GameState {
             });
         });
 
-        // Cleanup Temporary Buffs for current player
-        this.currentPlayer.board.forEach(m => {
-            if (m.tempBuffs && m.tempBuffs.length > 0) {
-                m.tempBuffs.forEach(buff => {
-                    m.attack -= buff.attack;
-                    m.health -= buff.health;
-                    if (m.currentHealth > m.health) m.currentHealth = m.health;
-                });
-                m.tempBuffs = [];
-            }
-        });
+        // Cleanup Temporary Buffs
+        this.cleanupTemporaryBuffs();
 
         // Temporary minions are now handled by deathTimer in processEndOfTurnTimers()
 
@@ -1086,6 +1092,22 @@ class GameState {
         if (!skipStartTurn) {
             this.startTurn();
         }
+    }
+
+    cleanupTemporaryBuffs() {
+        // Cleanup Temporary Buffs for ALL players (important for PvP sync)
+        [this.players[0], this.players[1]].forEach(player => {
+            player.board.forEach(m => {
+                if (m.tempBuffs && m.tempBuffs.length > 0) {
+                    m.tempBuffs.forEach(buff => {
+                        m.attack -= buff.attack;
+                        m.health -= buff.health;
+                        if (m.currentHealth > m.health) m.currentHealth = m.health;
+                    });
+                    m.tempBuffs = [];
+                }
+            });
+        });
     }
 
     /**
