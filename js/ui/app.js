@@ -7009,6 +7009,47 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-profile-modal-close')?.addEventListener('click', () => {
         document.getElementById('player-profile-modal').style.display = 'none';
     });
+
+    // ===== 投降功能 =====
+    // 點擊設定選單中的「投降」按鈕
+    document.getElementById('btn-surrender-menu')?.addEventListener('click', () => {
+        console.log('[UI] 投降按鈕被點擊');
+        document.getElementById('settings-menu-battle').style.display = 'none'; // 關閉設定選單
+        document.getElementById('surrender-modal').style.display = 'flex'; // 顯示確認彈窗
+    });
+
+    // 確認投降
+    document.getElementById('btn-surrender-confirm')?.addEventListener('click', async () => {
+        console.log('[UI] 確認投降');
+        document.getElementById('surrender-modal').style.display = 'none';
+
+        if (isPvPMode && window.pvpManager) {
+            // PvP 模式：調用 pvpManager.surrender()
+            console.log('[UI] PvP 模式，執行 pvpManager.surrender()');
+            const result = await window.pvpManager.surrender();
+            if (result && result.success) {
+                console.log('[UI] 投降成功，顯示敗北畫面');
+                endGame('DEFEAT');
+                // 延遲清理 PvP 狀態
+                setTimeout(() => {
+                    endPvPGame();
+                }, 1000);
+            } else {
+                console.error('[UI] 投降失敗:', result);
+                showToast('投降失敗，請稍後再試');
+            }
+        } else {
+            // AI 模式：直接顯示失敗
+            console.log('[UI] AI 模式，直接結束遊戲');
+            endGame('DEFEAT');
+        }
+    });
+
+    // 取消投降
+    document.getElementById('btn-surrender-cancel')?.addEventListener('click', () => {
+        console.log('[UI] 取消投降');
+        document.getElementById('surrender-modal').style.display = 'none';
+    });
 });
 
 

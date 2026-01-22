@@ -303,6 +303,9 @@ class PvPManager {
                 const room = snapshot.val();
                 this.currentRoom = room;
 
+                // 調試日誌：記錄每次房間更新
+                console.log('[PvP] 房間狀態更新 - status:', room.status, 'result:', room.result, '_gameEndTriggered:', this._gameEndTriggered);
+
                 // 第一次載入完成，resolve Promise
                 if (isFirstLoad) {
                     isFirstLoad = false;
@@ -325,21 +328,24 @@ class PvPManager {
                     this.onOpponentDisconnect();
                 }
 
-                // 遊戲狀態更新
-                if (this.onGameStateUpdate) {
-                    this.onGameStateUpdate(room.gameState);
-                }
-
-                // 遊戲結束（添加防重複觸發的標記）
-                if (room.status === 'finished' && room.result && this.onGameEnd) {
+                // 優先檢查遊戲是否結束
+                if (room.status === 'finished' && room.result) {
                     console.log('[PvP] 檢測到遊戲結束:', room.result);
 
                     // 防止重複觸發
                     if (!this._gameEndTriggered) {
                         this._gameEndTriggered = true;
                         console.log('[PvP] 觸發 onGameEnd 回調');
-                        this.onGameEnd(room.result);
+                        if (this.onGameEnd) {
+                            this.onGameEnd(room.result);
+                        }
                     }
+                    // 遊戲結束後可能仍需要一次狀態更新來顯示最終場面，但通常不需要
+                }
+
+                // 遊戲狀態更新
+                if (this.onGameStateUpdate) {
+                    this.onGameStateUpdate(room.gameState);
                 }
             });
         });
@@ -583,24 +589,34 @@ class PvPManager {
      * 投降
      */
     async surrender() {
-        if (!this.currentRoomId) return;
+        console.log('[PvP] surrender() 被調用');
+        console.log('[PvP] currentRoomId:', this.currentRoomId);
+        console.log('[PvP] opponentId:', this.opponentId);
+
+        if (!this.currentRoomId) {
+            console.error('[PvP] 投降失敗：沒有房間 ID');
+            return;
+        }
 
         const winnerId = this.opponentId;
+        const updatePath = `game_rooms/${this.currentRoomId}`;
+        const updateData = {
+            status: 'finished',
+            result: {
+                winner: winnerId,
+                reason: 'surrender',
+                endTime: Date.now()
+            }
+        };
+
+        console.log('[PvP] 準備更新 Firebase:', updatePath, updateData);
 
         try {
-            await update(ref(database, `game_rooms/${this.currentRoomId}`), {
-                status: 'finished',
-                result: {
-                    winner: winnerId,
-                    reason: 'surrender',
-                    endTime: Date.now()
-                }
-            });
-
-            console.log('[PvP] 已投降');
+            await update(ref(database, updatePath), updateData);
+            console.log('[PvP] ✅ Firebase 更新成功，投降完成');
             return { success: true };
         } catch (error) {
-            console.error('[PvP] 投降失敗:', error);
+            console.error('[PvP] ❌ Firebase 更新失敗:', error);
             return { success: false };
         }
     }
