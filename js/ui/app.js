@@ -2542,6 +2542,12 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 // 如果還在 Mulligan 階段，忽略狀態更新渲染，避免干擾選牌
                 if (mulliganPhase) return;
 
+                // 如果遊戲已經結束或 gameState 不存在，忽略狀態更新
+                if (!gameState || !gameState.players) {
+                    console.log('[PvP] 遊戲已結束或 gameState 不存在，忽略狀態更新');
+                    return;
+                }
+
                 // Sync Opponent State (HP, Mana, etc.)
                 const opponentId = pvpPlayerId === 'player1' ? 'player2' : 'player1';
                 const oppState = remoteState[`${opponentId}State`];
@@ -2707,6 +2713,8 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
 
 // 結束 PvP 對戰
 function endPvPGame() {
+    console.log('[PvP] endPvPGame() 被調用');
+
     isPvPMode = false;
     pvpRoomId = null;
     pvpPlayerId = null;
@@ -2716,8 +2724,18 @@ function endPvPGame() {
     document.getElementById('battle-opponent-info').style.display = 'none';
 
     if (window.pvpManager) {
+        // 離開遊戲房間
         window.pvpManager.leaveRoom();
+
+        // 從配對佇列中移除（如果還在佇列中）
+        if (AuthManager.currentUser && AuthManager.currentUser.username) {
+            console.log('[PvP] 從配對佇列中移除玩家');
+            window.pvpManager.leaveMatchmaking(AuthManager.currentUser.username)
+                .catch(err => console.error('[PvP] 離開佇列失敗:', err));
+        }
     }
+
+    console.log('[PvP] PvP 狀態已清理');
 }
 
 /**
@@ -7049,6 +7067,27 @@ document.addEventListener('DOMContentLoaded', () => {
     document.getElementById('btn-surrender-cancel')?.addEventListener('click', () => {
         console.log('[UI] 取消投降');
         document.getElementById('surrender-modal').style.display = 'none';
+    });
+
+    // ===== 遊戲結果畫面「繼續」按鈕 =====
+    document.getElementById('btn-result-continue')?.addEventListener('click', () => {
+        console.log('[UI] 點擊繼續按鈕');
+
+        // 如果是 PvP 模式，確保狀態已清理
+        if (isPvPMode || window.isPvPMode) {
+            console.log('[UI] PvP 模式結束，清理狀態');
+            endPvPGame();
+        }
+
+        // 重置遊戲狀態
+        gameState = null;
+        window.gameState = null;
+        currentOpponentDeckId = null;
+
+        // 返回主選單
+        console.log('[UI] 返回主選單');
+        showView('main-menu');
+        updateLevelDisplay();
     });
 });
 
