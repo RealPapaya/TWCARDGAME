@@ -3416,6 +3416,62 @@ async function executeOpponentAction(action) {
                     }
                 }
 
+                // [新增] 處理戰吼動畫
+                if (target && card.keywords?.battlecry) {
+                    const board = document.getElementById('opp-board');
+
+                    // 判斷來源元素
+                    let sourceEl = null;
+                    if (card.type === 'NEWS') {
+                        sourceEl = document.getElementById('opp-hero');
+                    } else {
+                        // 最新的隨從在場上最後
+                        sourceEl = board.children[board.children.length - 1];
+                    }
+
+                    // 判斷目標元素（需要翻轉視角）
+                    let destEl = null;
+                    if (target.type === 'HERO') {
+                        // 對手視角：target.side='PLAYER' 是對手自己，'OPPONENT' 是我方
+                        destEl = (target.side === 'PLAYER') ?
+                            document.getElementById('opp-hero') :
+                            document.getElementById('player-hero');
+                    } else if (target.type === 'MINION') {
+                        const targetBoardId = (target.side === 'PLAYER') ? 'opp-board' : 'player-board';
+                        destEl = document.getElementById(targetBoardId).children[target.index];
+                    }
+
+                    if (sourceEl && destEl) {
+                        const type = card.keywords.battlecry.type;
+                        let color = '#ff0000';
+                        let effectType = 'DAMAGE';
+
+                        // 根據戰吼類型設置顏色和特效
+                        if (type === 'HEAL' || type === 'FULL_HEAL') {
+                            color = '#43e97b';
+                            effectType = 'HEAL';
+                        } else if (type === 'BUFF_STAT_TARGET' || type === 'GIVE_DIVINE_SHIELD') {
+                            color = '#ffa500';
+                            effectType = 'BUFF';
+                        } else if (type === 'EAT_FRIENDLY') {
+                            color = '#ffa500';
+                            effectType = 'BUFF';
+                        } else if (type === 'DESTROY' || type === 'DESTROY_DAMAGED' ||
+                            type === 'DESTROY_LOW_ATTACK' || type === 'DESTROY_HIGH_ATTACK' ||
+                            type === 'SET_DEATH_TIMER' || type === 'DESTROY_LOCKED') {
+                            color = '#4a0e4e';
+                            effectType = 'DESTROY';
+                        } else if (type === 'DAMAGE' || type === 'DAMAGE_NON_CATEGORY') {
+                            color = '#ff0000';
+                            effectType = 'DAMAGE';
+                        }
+
+                        await animateAbility(sourceEl, destEl, color);
+                        triggerCombatEffect(destEl, effectType);
+                        await new Promise(r => setTimeout(r, 600));
+                    }
+                }
+
                 // 更新光環
                 gameState.updateAuras();
 
