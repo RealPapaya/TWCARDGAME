@@ -239,6 +239,20 @@ class PvPManager {
                     player2: []
                 },
 
+                // 斷線狀態追蹤
+                disconnectionStatus: {
+                    player1: {
+                        isDisconnected: false,
+                        disconnectedAt: null,
+                        waitingForReconnect: false
+                    },
+                    player2: {
+                        isDisconnected: false,
+                        disconnectedAt: null,
+                        waitingForReconnect: false
+                    }
+                },
+
                 player1State: {
                     hp: 30,
                     mana: 1,
@@ -705,6 +719,84 @@ class PvPManager {
         await this._joinGameRoom(roomId, playerId);
 
         console.log('[PvP] 重新連接成功');
+    }
+
+    /**
+     * 設定對手斷線狀態
+     */
+    async markOpponentDisconnected() {
+        if (!this.currentRoomId || !this.opponentId) return;
+
+        const statusPath = `game_rooms/${this.currentRoomId}/gameState/disconnectionStatus/${this.opponentId}`;
+        await update(ref(database, statusPath), {
+            isDisconnected: true,
+            disconnectedAt: Date.now(),
+            waitingForReconnect: true
+        });
+
+        console.log('[PvP] 已標記對手斷線:', this.opponentId);
+    }
+
+    /**
+     * 對手超時未重連,判定己方勝利
+     */
+    async claimVictoryByTimeout() {
+        if (!this.currentRoomId) return;
+
+        const updatePath = `game_rooms/${this.currentRoomId}`;
+        const updateData = {
+            status: 'finished',
+            result: {
+                winner: this.myPlayerId,
+                reason: 'timeout',
+                endTime: Date.now()
+            }
+        };
+
+        try {
+            await update(ref(database, updatePath), updateData);
+            console.log('[PvP] ✅ 對手超時未重連,己方獲勝');
+
+            localStorage.removeItem('pvp_current_room');
+            localStorage.removeItem('pvp_player_id');
+            return { success: true };
+        } catch (error) {
+            console.error('[PvP] ❌ 判定勝利失敗:', error);
+            return { success: false };
+        }
+    }
+
+    /**
+     * 玩家主動放棄重連 (從重連 Modal)
+     */
+    async abandonReconnection() {
+        const savedRoom = localStorage.getItem('pvp_current_room');
+        if (!savedRoom) return;
+
+        const playerId = localStorage.getItem('pvp_player_id');
+        const winnerId = playerId === 'player1' ? 'player2' : 'player1';
+
+        const updatePath = `game_rooms/${savedRoom}`;
+        const updateData = {
+            status: 'finished',
+            result: {
+                winner: winnerId,
+                reason: 'abandon',
+                endTime: Date.now()
+            }
+        };
+
+        try {
+            await update(ref(database, updatePath), updateData);
+            console.log('[PvP] ✅ 已放棄重連,對手獲勝');
+
+            localStorage.removeItem('pvp_current_room');
+            localStorage.removeItem('pvp_player_id');
+            return { success: true };
+        } catch (error) {
+            console.error('[PvP] ❌ 放棄重連失敗:', error);
+            return { success: false };
+        }
     }
 
     /**

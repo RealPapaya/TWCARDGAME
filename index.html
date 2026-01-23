@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="css/collection.css">
     <link rel="stylesheet" href="css/style_mulligan.css">
     <link rel="stylesheet" href="css/leaderboard.css">
+    <link rel="stylesheet" href="css/style_pvp_disconnect.css">
     <script src="js/data/card_data.js"></script>
     <script src="js/leaderboard/leaderboard_manager.js"></script>
     <script src="js/data/default_decks.js"></script>
@@ -499,6 +500,33 @@
                     <div class="modal-buttons medieval-button-group">
                         <button type="button" id="btn-reconnect-confirm" class="medieval-button">重新連接</button>
                         <button type="button" id="btn-reconnect-abandon" class="medieval-button danger">放棄對戰</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PvP Opponent Disconnected Modal -->
+            <div id="pvp-disconnect-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 class="medieval-title">⚠️ 對手已斷線</h2>
+                    <div class="disconnect-info">
+                        <p class="matchmaking-text">對手連線中斷,正在等待重新連接...</p>
+                        <div class="disconnect-timer-container">
+                            <div class="timer-circle">
+                                <svg class="timer-svg" width="120" height="120">
+                                    <circle class="timer-bg" cx="60" cy="60" r="54"></circle>
+                                    <circle id="timer-progress" class="timer-fg" cx="60" cy="60" r="54"></circle>
+                                </svg>
+                                <div class="timer-text">
+                                    <span id="disconnect-countdown">60</span>
+                                    <span class="timer-unit">秒</span>
+                                </div>
+                            </div>
+                        </div>
+                        <p class="disconnect-hint">若對手在倒數結束前未重連,您將自動獲勝</p>
+                    </div>
+                    <div class="modal-buttons medieval-button-group">
+                        <button type="button" id="btn-claim-victory" class="medieval-button">判定勝利</button>
+                        <button type="button" id="btn-keep-waiting" class="medieval-button secondary">繼續等待</button>
                     </div>
                 </div>
             </div>

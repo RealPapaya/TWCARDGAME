@@ -434,6 +434,118 @@ function init() {
         showToast('已取消配對');
     });
 
+    // --- PvP 斷線處理 ---
+    let disconnectTimer = null;
+    let disconnectCountdown = 60;
+    const MAX_WAIT_TIME = 60;
+
+    // 顯示斷線等待 Modal
+    function showDisconnectModal() {
+        const modal = document.getElementById('pvp-disconnect-modal');
+        const countdownEl = document.getElementById('disconnect-countdown');
+        const progressCircle = document.getElementById('timer-progress');
+
+        if (!modal || !countdownEl || !progressCircle) {
+            console.error('[Disconnect UI] Modal 元素未找到');
+            return;
+        }
+
+        modal.style.display = 'flex';
+        disconnectCountdown = MAX_WAIT_TIME;
+        countdownEl.textContent = disconnectCountdown;
+
+        // 開始倒數
+        if (disconnectTimer) clearInterval(disconnectTimer);
+
+        disconnectTimer = setInterval(() => {
+            disconnectCountdown--;
+            countdownEl.textContent = disconnectCountdown;
+
+            // 更新圓形進度條 (SVG circle circumference = 2 * π * r = 2 * π * 54 ≈ 339.292)
+            const dashOffset = (disconnectCountdown / MAX_WAIT_TIME) * 339.292;
+            progressCircle.style.strokeDashoffset = dashOffset;
+
+            if (disconnectCountdown <= 0) {
+                clearInterval(disconnectTimer);
+                handleDisconnectTimeout();
+            }
+        }, 1000);
+
+        console.log('[Disconnect UI] 顯示斷線等待 Modal');
+    }
+
+    // 隱藏斷線等待 Modal
+    function hideDisconnectModal() {
+        const modal = document.getElementById('pvp-disconnect-modal');
+        if (modal) modal.style.display = 'none';
+
+        if (disconnectTimer) {
+            clearInterval(disconnectTimer);
+            disconnectTimer = null;
+        }
+
+        console.log('[Disconnect UI] 隱藏斷線等待 Modal');
+    }
+
+    // 超時處理
+    async function handleDisconnectTimeout() {
+        hideDisconnectModal();
+        if (window.pvpManager) {
+            await window.pvpManager.claimVictoryByTimeout();
+        }
+        showToast('對手未能重連,您獲勝了!');
+    }
+
+    // 設定 PvP Manager 回調
+    if (window.pvpManager) {
+        // 對手斷線回調
+        window.pvpManager.onOpponentDisconnect = () => {
+            console.log('[PvP] 對手斷線');
+            showDisconnectModal();
+        };
+
+        // 對手重連回調
+        window.pvpManager.onOpponentReconnect = () => {
+            console.log('[PvP] 對手重連');
+            hideDisconnectModal();
+            showToast('對手已重新連線');
+        };
+    }
+
+    // 判定勝利按鈕
+    document.getElementById('btn-claim-victory')?.addEventListener('click', async () => {
+        const confirmed = await showCustomConfirm('確定要結束等待並判定勝利嗎?');
+        if (confirmed) {
+            hideDisconnectModal();
+            if (window.pvpManager) {
+                await window.pvpManager.claimVictoryByTimeout();
+            }
+        }
+    });
+
+    // 繼續等待按鈕
+    document.getElementById('btn-keep-waiting')?.addEventListener('click', () => {
+        // 重置倒數計時
+        disconnectCountdown = MAX_WAIT_TIME;
+        document.getElementById('disconnect-countdown').textContent = disconnectCountdown;
+        document.getElementById('timer-progress').style.strokeDashoffset = 339.292;
+        showToast('繼續等待對手重連...');
+    });
+
+    // 放棄重連按鈕 (在重連 Modal 中)
+    document.getElementById('btn-reconnect-abandon')?.addEventListener('click', async () => {
+        const confirmed = await showCustomConfirm('確定要放棄重連嗎? 您將認輸。');
+        if (confirmed) {
+            if (window.pvpManager) {
+                await window.pvpManager.abandonReconnection();
+            }
+            const reconnectModal = document.getElementById('pvp-reconnect-modal');
+            if (reconnectModal) reconnectModal.style.display = 'none';
+            showToast('您已放棄重連');
+            showView('main-menu');
+        }
+    });
+
     // --- Difficulty Selection Listeners ---
     document.querySelectorAll('.diff-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -7802,15 +7914,17 @@ async function checkPvPReconnection() {
 
     // 放棄對戰按鈕
     document.getElementById('btn-reconnect-abandon').onclick = async () => {
+        const confirmed = await showCustomConfirm('確定要放棄這場對戰嗎？對手將會獲勝。');
+        if (!confirmed) {
+            modal.style.display = 'flex';
+            return;
+        }
+
         modal.style.display = 'none';
 
-        // 清除 localStorage
-        localStorage.removeItem('pvp_current_room');
-        localStorage.removeItem('pvp_player_id');
-
-        // 通知對手（投降）
+        // 使用 abandonReconnection 而非 surrender,因為此時還未加入房間
         if (window.pvpManager) {
-            await window.pvpManager.surrender();
+            await window.pvpManager.abandonReconnection();
         }
 
         showToast('已放棄對戰');

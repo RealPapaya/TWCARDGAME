@@ -1,0 +1,68 @@
+/* PvP 斷線等待 Modal 樣式 */
+.disconnect-info {
+    text-align: center;
+    padding: 20px;
+}
+
+.disconnect-timer-container {
+    display: flex;
+    justify-content: center;
+    margin: 30px 0;
+}
+
+.timer-circle {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.timer-svg {
+    transform: rotate(-90deg);
+}
+
+.timer-bg {
+    fill: none;
+    stroke: rgba(93, 46, 23, 0.2);
+    stroke-width: 8;
+}
+
+.timer-fg {
+    fill: none;
+    stroke: #d4af37;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 339.292;
+    stroke-dashoffset: 0;
+    transition: stroke-dashoffset 1s linear;
+}
+
+.timer-text {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.timer-text span {
+    display: block;
+    color: #5d2e17;
+    font-family: 'Noto Serif TC', serif;
+}
+
+.timer-text span:first-child {
+    font-size: 36px;
+    font-weight: 900;
+}
+
+.timer-unit {
+    font-size: 14px;
+    margin-top: -5px;
+}
+
+.disconnect-hint {
+    font-size: 14px;
+    color: #8b6434;
+    font-style: italic;
+    margin-top: 15px;
+}
