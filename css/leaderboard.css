@@ -380,6 +380,40 @@
     z-index: 100;
 }
 
+/* 通知紅點樣式 */
+.notification-dot {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    width: 24px;
+    height: 24px;
+    background-color: #ff3b30;
+    /* 亮紅色 */
+    border: 3px solid #fff;
+    border-radius: 50%;
+    box-shadow: 0 0 10px rgba(255, 59, 48, 0.6);
+    z-index: 10;
+    pointer-events: none;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 59, 48, 0.7);
+    }
+
+    70% {
+        transform: scale(1.1);
+        box-shadow: 0 0 0 15px rgba(255, 59, 48, 0);
+    }
+
+    100% {
+        transform: scale(1);
+        box-shadow: 0 0 0 0 rgba(255, 59, 48, 0);
+    }
+}
+
 .friends-entrance-btn:hover {
     background-color: #ede0d4;
     transform: rotate(-15deg) scale(1.1);
@@ -532,6 +566,32 @@
     100% {
         transform: rotate(360deg);
     }
+}
+
+/* 按鈕 Loading 狀態 */
+.btn-loading {
+    position: relative !important;
+    color: transparent !important;
+    pointer-events: none !important;
+}
+
+.btn-loading::after {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    top: 50%;
+    left: 50%;
+    margin-top: -10px;
+    margin-left: -10px;
+    border: 3px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.medieval-button.secondary.btn-loading::after {
+    border-top-color: #5d2e17;
 }
 
 .matchmaking-text {

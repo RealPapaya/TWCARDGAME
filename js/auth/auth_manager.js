@@ -362,6 +362,30 @@ const AuthManager = {
             console.error("Friend Op Error:", error);
             return { success: false, message: "連線失敗" };
         }
+    },
+
+    /**
+     * 同步最新用戶資料 (用於背景檢查好友邀請等)
+     */
+    async syncUserData() {
+        if (!this.currentUser || !this.API_URL) return { success: false };
+
+        try {
+            const url = `${this.API_URL}?action=login&username=${encodeURIComponent(this.currentUser.username)}&password=${encodeURIComponent(this.currentUser.password)}&_t=${Date.now()}`;
+            const response = await fetch(url);
+            const result = await response.json();
+
+            if (result.success) {
+                // 解析並更新資料
+                this.currentUser = this.parseUserData(result.data);
+                localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                return { success: true, user: this.currentUser };
+            }
+            return { success: false };
+        } catch (error) {
+            console.error("Sync User Data Error:", error);
+            return { success: false };
+        }
     }
 };
 
