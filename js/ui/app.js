@@ -1433,14 +1433,14 @@ function onUserLogin(user) {
         const isNewAccount = (user.level === 1 || user.level === '1') && userDecks.length === 0;
 
         if (isNewAccount) {
-            // 新玩家：彈窗要求設定名號
+            // 新玩家：彈窗要求設定名稱
             showView('auth-view'); // 保持在 auth 背景
             document.getElementById('nickname-modal').style.display = 'flex';
         } else {
             // 舊帳號（已有遊戲進度）：自動設為 username 以避免每次登入都彈窗
             user.nickname = user.username;
             AuthManager.currentUser = user;
-            AuthManager.saveData().catch(err => console.warn('[登入] 自動設定名號失敗:', err));
+            AuthManager.saveData().catch(err => console.warn('[登入] 自動設定名稱失敗:', err));
             showView('main-menu');
             showToast(`歡迎回來，${user.username}！`);
         }
@@ -1482,12 +1482,12 @@ async function handleNicknameSave() {
         AuthManager.currentUser.nickname = nickname;
         AuthManager.currentUser.lastsaved = Date.now(); // 更新時間戳
 
-        console.log('[Nickname] 準備儲存名號:', nickname);
+        console.log('[Nickname] 準備儲存名稱:', nickname);
         console.log('[Nickname] 當前用戶資料:', AuthManager.currentUser);
 
         await AuthManager.saveData();
 
-        console.log('[Nickname] 名號已儲存至後端');
+        console.log('[Nickname] 名稱已儲存至後端');
 
         modal.style.display = 'none';
 
@@ -7937,6 +7937,14 @@ async function confirmMulligan() {
 
         // 開始第一回合 (這會觸發首回合抽牌)
         gameState.startTurn();
+
+        // [新增] 顯示回合提示
+        if (gameState.currentPlayerIdx === 0) {
+            showTurnAnnouncement('你的回合！');
+        } else {
+            showTurnAnnouncement('對手回合');
+        }
+
         render();
 
         // 如果是AI先手, 觸發AI回合

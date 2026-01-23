@@ -188,7 +188,7 @@ const AuthManager = {
             username: String(rawData.username || ''), // 強制轉字串
             password: rawData.password,
             level: parseInt(rawData.level || rawData.level || 1),
-            gold: parseInt(rawData.gold || rawData.gold || 100),
+            gold: parseInt(rawData.gold ?? 100),
             deck_data: rawData.deck_data || rawData.deckdata || rawData.deckData || "[]",
             selectedAvatar: rawData.selected_avatar || rawData.selectedAvatar || rawData.selectedavatar || "avatar1",
             selectedTitle: rawData.selected_title || rawData.selectedTitle || rawData.selectedtitle || "beginner",
