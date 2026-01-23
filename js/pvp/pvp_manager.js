@@ -60,6 +60,7 @@ class PvPManager {
             await set(queueRef, {
                 userId: userId,
                 username: playerData.username,
+                nickname: playerData.nickname || playerData.username,
                 avatar: playerData.avatar || '👤',
                 title: playerData.title || '',
                 level: playerData.level || 1,

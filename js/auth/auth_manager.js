@@ -139,7 +139,8 @@ const AuthManager = {
                     current_xp: this.currentUser.currentXP || 0,
                     last_saved: this.currentUser.lastsaved,
                     friends: JSON.stringify(this.currentUser.friends || []),
-                    friend_requests: JSON.stringify(this.currentUser.friendRequests || [])
+                    friend_requests: JSON.stringify(this.currentUser.friendRequests || []),
+                    nickname: this.currentUser.nickname || ""
                 })
             });
             console.log(`資料已同步至本地與雲端 (${this.currentUser.lastsaved})`);
@@ -184,7 +185,7 @@ const AuthManager = {
         // [重要] 將 GAS 回傳的所有小寫鍵名對應回前端預期的名稱
         // 增加鍵名變體偵測 (deck_data, deckdata, deckData 等)
         const user = {
-            username: rawData.username,
+            username: String(rawData.username || ''), // 強制轉字串
             password: rawData.password,
             level: parseInt(rawData.level || rawData.level || 1),
             gold: parseInt(rawData.gold || rawData.gold || 100),
@@ -203,7 +204,9 @@ const AuthManager = {
             createdAt: rawData.created_at || rawData.createdat || rawData.createdAt || rawData.join_date,
             // [新增] 好友相關
             friends: rawData.friends || "[]",
-            friendRequests: rawData.friend_requests || rawData.friendrequests || rawData.friendRequests || "[]"
+            friendRequests: rawData.friend_requests || rawData.friendrequests || rawData.friendRequests || "[]",
+            // [新增] 顯示名稱
+            nickname: rawData.nickname || rawData.nickname || ""
         };
 
         // 處理 deck_data

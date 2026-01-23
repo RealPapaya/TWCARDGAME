@@ -29,6 +29,12 @@ class LeaderboardManager {
             if (data.success) {
                 this.players = data.players;
                 this.currentSortBy = sortBy;
+
+                // [新增] 同步至全域 UserCache
+                if (window.cacheUser) {
+                    this.players.forEach(p => window.cacheUser(p.username, p.nickname));
+                }
+
                 return this.players;
             } else {
                 console.error('載入排行榜失敗:', data.message);
@@ -90,6 +96,7 @@ class LeaderboardManager {
         const titleId = player.selectedtitle || player.title || 'beginner';
         const level = parseInt(player.level || 1);
         const username = player.username || '未知玩家';
+        const nickname = player.nickname || username;
 
         const avatarPath = this.getAvatarPath(avatarId);
         const titleName = this.getTitleName(titleId);
@@ -98,7 +105,7 @@ class LeaderboardManager {
       <div class="rank-badge">${rankBadge}</div>
       <div class="player-avatar-display" style="background-image: url('${avatarPath}'); background-size: cover; background-position: center;"></div>
       <div class="player-info-display">
-        <div class="player-name">${username}</div>
+        <div class="player-name">${nickname}</div>
         <div class="player-title-display">#${titleName}</div>
       </div>
       <div class="player-level-display">Lv. ${level}</div>
@@ -211,6 +218,7 @@ class LeaderboardManager {
         if (!modal) return;
 
         const username = player.username || '未知';
+        const nickname = player.nickname || username;
         const level = parseInt(player.level || 1);
         const gold = parseInt(player.gold || 0);
         const avatarPath = this.getAvatarPath(player.selectedavatar || 'avatar1');
@@ -236,7 +244,7 @@ class LeaderboardManager {
         avatarEl.style.borderRadius = '50%';
         avatarEl.textContent = '';
 
-        document.getElementById('profile-modal-username').textContent = username;
+        document.getElementById('profile-modal-username').textContent = nickname;
         document.getElementById('profile-modal-title').textContent = `#${titleName}`;
         document.getElementById('profile-modal-level').textContent = level;
         document.getElementById('profile-modal-gold').textContent = gold;

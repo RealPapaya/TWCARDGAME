@@ -210,7 +210,7 @@
                             </div>
 
                             <div class="profile-info">
-                                <div id="profile-username" class="profile-username">玩家名稱</div>
+                                <div id="profile-username" class="profile-username clickable">玩家名稱 ✏️</div>
                                 <div id="profile-title" class="profile-player-title clickable">
                                     #玩家稱號 ✏️
                                 </div>
@@ -870,6 +870,20 @@
                     <div class="modal-buttons medieval-button-group vertical-group">
                         <button type="button" id="btn-logout-main" class="medieval-button danger">登出</button>
                         <button type="button" id="btn-settings-close" class="medieval-button secondary">關閉</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Nickname Setup Modal -->
+            <div id="nickname-modal" class="modal-overlay" style="display: none;">
+                <div class="modal-content parchment-modal">
+                    <h2 class="medieval-title">設定你的名稱</h2>
+                    <p style="text-align: center; color: #5d2e17; margin-bottom: 20px;">這是其他玩家在遊戲中看到你的名字。</p>
+                    <div class="auth-input-group" style="margin-bottom: 25px;">
+                        <input type="text" id="nickname-input" placeholder="輸入名稱 (2-10字)..." maxlength="10">
+                    </div>
+                    <div class="modal-buttons medieval-button-group">
+                        <button type="button" id="btn-save-nickname" class="medieval-button">確定進入</button>
                     </div>
                 </div>
             </div>

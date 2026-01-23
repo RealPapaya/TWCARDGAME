@@ -57,6 +57,15 @@ let gameState;
 
 let cardDB = [];
 
+// [新增] UserCache：緩存帳號與暱稱的對應關係，解決好友列表顯示問題
+window.UserCache = JSON.parse(localStorage.getItem('tw_user_cache') || '{}');
+function cacheUser(username, nickname) {
+    if (!username) return;
+    window.UserCache[username] = nickname || username;
+    localStorage.setItem('tw_user_cache', JSON.stringify(window.UserCache));
+}
+window.cacheUser = cacheUser;
+
 // [修正] 不再直接從 localStorage 讀取 userDecks，而是等 AuthManager 初始化後從 currentUser 讀取
 let userDecks = [];
 
@@ -155,7 +164,9 @@ window.killOpponent = async function () {
 
 // [權限控制] 判斷是否為 admin 帳號
 function isAdmin() {
-    return AuthManager.currentUser?.username?.toLowerCase() === 'admin';
+    if (!AuthManager.currentUser?.username) return false;
+    const username = String(AuthManager.currentUser.username).toLowerCase();
+    return username === 'admin' || username === 'realpapaya';
 }
 window.isAdmin = isAdmin;
 let currentDifficulty = 'NORMAL';
@@ -348,6 +359,8 @@ function init() {
         showView('test-mode-selection');
     });
 
+    document.getElementById('btn-save-nickname')?.addEventListener('click', handleNicknameSave);
+
     // --- Mode Selection Listeners ---
     document.getElementById('btn-mode-ai').addEventListener('click', () => {
         showView('ai-battle-setup');
@@ -402,6 +415,7 @@ function init() {
 
             const result = await window.pvpManager.joinMatchmaking({
                 username: AuthManager.currentUser.username,
+                nickname: AuthManager.currentUser.nickname || AuthManager.currentUser.username,
                 avatar: AuthManager.currentUser.selectedAvatar || '👤',
                 title: AuthManager.currentUser.selectedTitle || '',
                 level: AuthManager.currentUser.level || 1,
@@ -1123,13 +1137,17 @@ async function handleFriendsSearch() {
         const result = await AuthManager.searchUser(username);
         if (result.success && result.data) {
             const u = result.data;
+            cacheUser(u.username, u.nickname); // 快取搜尋結果
             const isAlreadyFriend = AuthManager.currentUser.friends.includes(u.username);
+
+            const nickname = u.nickname || u.username;
+            const displayName = u.nickname ? `${u.nickname} (${u.username})` : u.username;
 
             resultArea.innerHTML = `
                 <div class="friend-item">
-                    <div class="avatar">${u.username.charAt(0)}</div>
+                    <div class="avatar">${nickname.charAt(0)}</div>
                     <div class="info">
-                        <div class="name">${u.username} (Lv.${u.level || 1})</div>
+                        <div class="name">${displayName} (Lv.${u.level || 1})</div>
                         <div class="title">#${u.selected_title || '新手'}</div>
                     </div>
                     <div class="friend-actions">
@@ -1200,11 +1218,13 @@ async function renderFriendsList() {
     // 這裡為了簡單，目前先只顯示名稱。未來可以批次抓取好友詳情。
     let html = '';
     for (const id of friendIds) {
+        const nickname = window.UserCache[id] || id;
         html += `
             <div class="friend-item">
-                <div class="avatar">${id.charAt(0)}</div>
+                <div class="avatar">${nickname.charAt(0)}</div>
                 <div class="info">
-                    <div class="name">${id}</div>
+                    <div class="name">${nickname}</div>
+                    ${window.UserCache[id] ? `<div class="account-hint">@${id}</div>` : ''}
                 </div>
                 <div class="friend-actions">
                     <button class="medieval-button danger btn-small" onclick="handleFriendAction(this, 'REMOVE', '${id}')">刪除</button>
@@ -1226,11 +1246,13 @@ function renderFriendRequests() {
 
     let html = '';
     for (const id of requests) {
+        const nickname = window.UserCache[id] || id;
         html += `
             <div class="friend-item">
-                <div class="avatar">${id.charAt(0)}</div>
+                <div class="avatar">${nickname.charAt(0)}</div>
                 <div class="info">
-                    <div class="name">${id} 向你發送了好友邀請</div>
+                    <div class="name">${nickname} 向你發送了邀請</div>
+                    ${window.UserCache[id] ? `<div class="account-hint">@${id}</div>` : ''}
                 </div>
                 <div class="friend-actions">
                     <button class="medieval-button btn-small" onclick="handleFriendAction(this, 'ACCEPT', '${id}')">接受</button>
@@ -1372,6 +1394,7 @@ function onUserLogin(user) {
 
     // [重要] user 已經是經由 AuthManager.parseUserData 處理過的物件
     AuthManager.currentUser = user;
+    cacheUser(user.username, user.nickname); // 快取登入者
     console.log('[Auth] onUserLogin 觸發，用戶：', user.username);
 
     // 處理牌組資料：優先從 user 物件中讀取
@@ -1395,8 +1418,28 @@ function onUserLogin(user) {
     localStorage.setItem('tw_card_game_user', JSON.stringify(user));
     localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
-    showView('main-menu');
-    showToast(`歡迎回來，${user.username}！`);
+    // [新增] 檢查是否已設定名稱
+    if (!user.nickname || user.nickname.trim() === '') {
+        // 判斷是否為全新帳號：level 1 且無牌組
+        const isNewAccount = (user.level === 1 || user.level === '1') && userDecks.length === 0;
+
+        if (isNewAccount) {
+            // 新玩家：彈窗要求設定名號
+            showView('auth-view'); // 保持在 auth 背景
+            document.getElementById('nickname-modal').style.display = 'flex';
+        } else {
+            // 舊帳號（已有遊戲進度）：自動設為 username 以避免每次登入都彈窗
+            user.nickname = user.username;
+            AuthManager.currentUser = user;
+            AuthManager.saveData().catch(err => console.warn('[登入] 自動設定名號失敗:', err));
+            showView('main-menu');
+            showToast(`歡迎回來，${user.username}！`);
+        }
+    } else {
+        showView('main-menu');
+        showToast(`歡迎回來，${user.nickname}！`);
+    }
+
     updatePlayerInfo(); // 登入後確保更新按鈕可見性
     updateLevelDisplay(); // 更新等級和經驗條顯示
 
@@ -1406,6 +1449,57 @@ function onUserLogin(user) {
             await checkPvPReconnection();
         }
     }, 300);
+}
+
+/**
+ * 處理儲存暱稱
+ */
+async function handleNicknameSave() {
+    const input = document.getElementById('nickname-input');
+    const nickname = input.value.trim();
+
+    if (nickname.length < 2 || nickname.length > 10) {
+        showToast("名稱長度需在 2-10 字之間");
+        return;
+    }
+
+    const modal = document.getElementById('nickname-modal');
+    const btn = document.getElementById('btn-save-nickname');
+
+    btn.disabled = true;
+    btn.innerText = "設定中...";
+
+    try {
+        AuthManager.currentUser.nickname = nickname;
+        AuthManager.currentUser.lastsaved = Date.now(); // 更新時間戳
+
+        console.log('[Nickname] 準備儲存名號:', nickname);
+        console.log('[Nickname] 當前用戶資料:', AuthManager.currentUser);
+
+        await AuthManager.saveData();
+
+        console.log('[Nickname] 名號已儲存至後端');
+
+        modal.style.display = 'none';
+
+        // 判斷當前視圖，若在個人頁面則留在該頁面
+        const currentView = document.querySelector('.view[style*="display: flex"], .view[style*="display: block"]');
+        if (currentView && currentView.id === 'profile-view') {
+            showToast(`名稱已更新為「${nickname}」`);
+            updateProfilePage();
+        } else {
+            showView('main-menu');
+            showToast(`你好，${nickname}！冒險開始。`);
+        }
+
+        updatePlayerInfo();
+    } catch (e) {
+        console.error("Save Nickname Error:", e);
+        showToast("設定失敗，請稍後再試");
+    } finally {
+        btn.disabled = false;
+        btn.innerText = "確定進入";
+    }
 }
 
 /**
@@ -1422,7 +1516,7 @@ function updatePlayerInfo() {
     if (AuthManager.currentUser) {
         // 已登入：顯示玩家資訊
         playerCard.style.display = 'flex';
-        usernameEl.textContent = AuthManager.currentUser.username;
+        usernameEl.textContent = AuthManager.currentUser.nickname || AuthManager.currentUser.username;
 
         // 頭像：使用選擇的頭像或名稱第一個字
         const selectedAvatar = AuthManager.currentUser.selectedAvatar;
@@ -1437,7 +1531,7 @@ function updatePlayerInfo() {
         } else {
             // 沒有選擇頭像，使用名稱第一個字
             avatarEl.style.backgroundImage = '';
-            const firstChar = AuthManager.currentUser.username.charAt(0);
+            const firstChar = (AuthManager.currentUser.nickname || AuthManager.currentUser.username).charAt(0);
             avatarEl.textContent = firstChar || '👤';
         }
 
@@ -1627,14 +1721,25 @@ function updateProfilePage() {
             }
         } else {
             avatarEl.style.backgroundImage = '';
-            avatarEl.textContent = user.username.charAt(0) || '👤';
+            avatarEl.textContent = (user.nickname || user.username).charAt(0) || '👤';
         }
     }
 
     // 更新名稱和稱號
     const usernameEl = document.getElementById('profile-username');
     const titleEl = document.getElementById('profile-title');
-    if (usernameEl) usernameEl.textContent = user.username;
+    if (usernameEl) {
+        usernameEl.textContent = `${user.nickname || user.username} ✏️`;
+        // 綁定點擊事件以修改名稱
+        usernameEl.onclick = () => {
+            const modal = document.getElementById('nickname-modal');
+            const input = document.getElementById('nickname-input');
+            if (modal && input) {
+                input.value = user.nickname || '';
+                modal.style.display = 'flex';
+            }
+        };
+    }
     const titleId = user.selectedTitle || 'beginner';
     const titleObj = AVAILABLE_TITLES.find(t => t.id === titleId);
     if (titleEl) titleEl.textContent = `#${titleObj ? titleObj.name : titleId} ✏️`;
@@ -3072,7 +3177,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                 }
 
                 // 更新資訊卡顯示（僅用戶名和稱號）
-                document.getElementById('battle-opponent-username').textContent = opponentInfo.username || '對手';
+                document.getElementById('battle-opponent-username').textContent = opponentInfo.nickname || opponentInfo.username || '對手';
                 document.getElementById('battle-opponent-title').textContent = titleDisplay;
                 document.getElementById('battle-opponent-info').style.display = 'flex';
 
@@ -3984,7 +4089,8 @@ function renderGameUI(p1, p2) {
     // Also update main hero avatar if available
     const mainHeroAvatar = document.querySelector('#player-hero .avatar');
 
-    const displayUsername = (authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家');
+    const displayUsername = (authUser && authUser.nickname) ? authUser.nickname :
+        ((authUser && authUser.username) ? authUser.username : (playerInfo.username || '玩家'));
     const displayTitleId = (authUser && authUser.selectedTitle) ? authUser.selectedTitle : (playerInfo.selectedTitle || 'beginner');
     const displayAvatarId = (authUser && authUser.selectedAvatar) ? authUser.selectedAvatar : (playerInfo.selectedAvatar || 'avatar1');
 
