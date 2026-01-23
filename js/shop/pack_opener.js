@@ -223,9 +223,11 @@ const PackOpener = {
 
         const animation = document.getElementById('pack-animation');
         const rewardsContainer = document.getElementById('pack-rewards');
+        const closeBtn = document.getElementById('btn-close-pack');
 
-        // 顯示 Modal
+        // 顯示 Modal，但先隱藏領取按鈕
         modal.style.display = 'flex';
+        if (closeBtn) closeBtn.style.display = 'none';
 
         // 簡單的開包動畫
         animation.innerHTML = packType === 'card' ? '🎴' : '✨';
@@ -250,32 +252,37 @@ const PackOpener = {
                     const rewardEl = document.createElement('div');
                     rewardEl.className = 'reward-item';
 
-                    let icon = '🎁';
+                    let contentHtml = '';
                     let name = '未知獎勵';
                     let subText = '外觀物品';
 
                     if (item.type === 'avatar') {
-                        icon = '👤';
+                        // 顯示頭像圖片
+                        contentHtml = `<img src="${item.data.path}" style="width: 80px; height: 80px; border-radius: 50%; border: 3px solid var(--wood-medium); object-fit: cover;">`;
                         name = item.data.name;
                         subText = '新頭像';
                     } else if (item.type === 'title') {
-                        icon = '🏷️';
-                        name = '#' + item.data.name;
+                        // 顯示稱號字樣
+                        contentHtml = `<div style="font-size: 24px; font-weight: 900; color: #5d2e17; background: #f4e4bc; padding: 10px 20px; border-radius: 8px; border: 2px solid #5d2e17; margin-bottom: 5px;"># ${item.data.name}</div>`;
+                        name = '稱號獎勵';
                         subText = '新稱號';
                     } else if (item.type === 'voucher') {
-                        icon = '🎟️';
-                        name = item.amount;
+                        contentHtml = `<div style="font-size: 40px;">🎟️</div>`;
+                        name = item.amount + ' 消費券';
                         subText = item.name;
                     }
 
                     rewardEl.innerHTML = `
-                        <div style="font-size: 40px;">${icon}</div>
+                        <div class="reward-visual" style="display: flex; justify-content: center; align-items: center; min-height: 90px;">${contentHtml}</div>
                         <div class="reward-item-name">${name}</div>
                         <div style="font-size: 12px; color: var(--text-secondary);">${subText}</div>
                     `;
                     rewardsContainer.appendChild(rewardEl);
                 });
             }
+
+            // 獎勵全數出現後，顯示領取按鈕
+            if (closeBtn) closeBtn.style.display = 'block';
         }, 1500);
     },
 

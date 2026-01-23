@@ -1436,13 +1436,13 @@ body {
 }
 
 .mana-crystal.locked {
-    background: rgba(0, 0, 0, 0.7);
-    clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+    background: transparent;
+    clip-path: none;
     width: 20px;
     height: 20px;
     margin: 11px;
     /* (42 - 20) / 2 = 11 to keep alignment */
-    opacity: 0.6;
+    opacity: 0;
 }
 
 /* Dust Effect */

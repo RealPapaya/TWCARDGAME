@@ -147,3 +147,23 @@
 #btn-logout-main.settings-menu-item:hover {
     background: #a3333d !important;
 }
+
+/* 投降按鈕專用紅色樣式 */
+.settings-menu-item.danger {
+    background: #c1121f !important;
+    /* 更明亮的紅色 */
+    color: #f4e4bc !important;
+    border-color: #5d2e17 !important;
+    box-shadow: 4px 6px 0px #3d1e0f !important;
+}
+
+.settings-menu-item.danger:hover {
+    background: #780001 !important;
+    /* 懸停時變深 */
+    box-shadow: 7px 9px 0px #3d1e0f !important;
+}
+
+.settings-menu-item.danger:active {
+    background: #660708 !important;
+    box-shadow: 2px 2px 0px #3d1e0f !important;
+}
