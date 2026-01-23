@@ -415,13 +415,19 @@
 }
 
 /* 未擁有狀態 (灰階 + 半透明) */
-.collection-card.missing .card {
+.collection-card.missing .card,
+.collection-card.unowned .card {
     filter: grayscale(100%);
-    opacity: 0.6;
+    opacity: 0.8;
+    /* 調整透明度讓它明顯一點但不至於太暗 */
 }
 
-.collection-card.missing:hover .card {
-    opacity: 0.8;
+.collection-card.missing:hover .card,
+.collection-card.unowned:hover .card {
+    opacity: 1;
+    filter: grayscale(0%);
+    /* Hover 時恢復原色 */
+    transition: all 0.3s ease;
 }
 
 /* 卡牌數量標籤 */

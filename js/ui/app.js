@@ -385,50 +385,56 @@ function init() {
             return;
         }
 
-        // 顯示配對畫面
-        const modal = document.getElementById('pvp-matchmaking-modal');
-        modal.style.display = 'flex';
-        matchmakingStartTime = Date.now();
+        // 顯示牌組選擇畫面，而不是直接配對
+        showView('deck-selection');
+        document.getElementById('deck-select-title').textContent = "選擇對戰牌組";
 
-        // 開始計時器
-        matchmakingTimer = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - matchmakingStartTime) / 1000);
-            document.getElementById('matchmaking-timer').textContent = `等待時間: ${elapsed} 秒`;
-        }, 1000);
-
-        // 加入配對佇列
-        if (window.pvpManager) {
-            // 使用第一個牌組
-            const selectedDeck = userDecks[0];
+        // 渲染牌組選擇，並傳入確認回調
+        renderDeckSelection(async (selectedDeck) => {
             const deckCards = selectedDeck?.cards || [];
 
-            // 先設定配對成功回調（必須在 joinMatchmaking 之前設定）
-            window.pvpManager.onMatchFound = (roomId, playerId) => {
-                clearInterval(matchmakingTimer);
-                modal.style.display = 'none';
-                showToast('配對成功！正在載入對戰...');
-                console.log('[PvP] 進入房間:', roomId, '身份:', playerId);
+            // 顯示配對畫面
+            const modal = document.getElementById('pvp-matchmaking-modal');
+            modal.style.display = 'flex';
+            matchmakingStartTime = Date.now();
 
-                // 進入 PvP 對戰畫面
-                startPvPGame(roomId, playerId, deckCards);
-            };
+            // 開始計時器
+            if (matchmakingTimer) clearInterval(matchmakingTimer);
+            matchmakingTimer = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - matchmakingStartTime) / 1000);
+                document.getElementById('matchmaking-timer').textContent = `等待時間: ${elapsed} 秒`;
+            }, 1000);
 
-            const result = await window.pvpManager.joinMatchmaking({
-                username: AuthManager.currentUser.username,
-                nickname: AuthManager.currentUser.nickname || AuthManager.currentUser.username,
-                avatar: AuthManager.currentUser.selectedAvatar || '👤',
-                title: AuthManager.currentUser.selectedTitle || '',
-                level: AuthManager.currentUser.level || 1,
-                deckId: selectedDeck?.name || 'default',
-                deckCards: deckCards
-            });
+            // 加入配對佇列
+            if (window.pvpManager) {
+                // 先設定配對成功回調
+                window.pvpManager.onMatchFound = (roomId, playerId) => {
+                    clearInterval(matchmakingTimer);
+                    modal.style.display = 'none';
+                    showToast('配對成功！正在載入對戰...');
+                    console.log('[PvP] 進入房間:', roomId, '身份:', playerId);
 
-            if (!result.success) {
-                showToast(result.message);
-                modal.style.display = 'none';
-                clearInterval(matchmakingTimer);
+                    // 進入 PvP 對戰畫面
+                    startPvPGame(roomId, playerId, deckCards);
+                };
+
+                const result = await window.pvpManager.joinMatchmaking({
+                    username: AuthManager.currentUser.username,
+                    nickname: AuthManager.currentUser.nickname || AuthManager.currentUser.username,
+                    avatar: AuthManager.currentUser.selectedAvatar || '👤',
+                    title: AuthManager.currentUser.selectedTitle || '',
+                    level: AuthManager.currentUser.level || 1,
+                    deckId: selectedDeck?.name || 'default',
+                    deckCards: deckCards
+                });
+
+                if (!result.success) {
+                    showToast(result.message);
+                    modal.style.display = 'none';
+                    clearInterval(matchmakingTimer);
+                }
             }
-        }
+        });
     });
 
     // 取消配對按鈕
@@ -603,12 +609,15 @@ function init() {
                     showView('difficulty-selection');
                 }
             } else if (document.getElementById('deck-selection').style.display === 'flex') {
-                // Check if we're in test mode or builder mode
+                // Check if we're in test mode, pvp mode, or builder mode
                 const title = document.getElementById('deck-select-title').innerText;
                 if (title.includes('測試')) {
                     showView('test-mode-selection');
+                } else if (title.includes('對戰牌組')) {
+                    showView('mode-selection');
                 } else {
-                    showView('ai-battle-setup');
+                    // Default fallback
+                    showView('mode-selection');
                 }
             }
         });
@@ -3539,6 +3548,68 @@ function shakeManaContainer(isPlayer = true) {
     setTimeout(() => el.classList.remove('shake-mana'), 500);
 }
 
+// 新增：PVP/通用 牌組選擇渲染
+function renderDeckSelection(onConfirmCallback) {
+    const container = document.getElementById('deck-select-slots');
+    container.innerHTML = '';
+
+    // 按鈕控制
+    const btnStart = document.getElementById('btn-start-battle');
+    const btnEdit = document.getElementById('btn-edit-deck');
+    btnStart.style.display = 'block'; // PvP 模式顯示開始戰鬥按鈕
+    btnEdit.style.display = 'none';   // 隱藏編輯按鈕
+
+    // 解除舊的事件綁定 (透過 cloneNode)
+    const newBtnStart = btnStart.cloneNode(true);
+    btnStart.parentNode.replaceChild(newBtnStart, btnStart);
+
+    let currentSelectedIndex = -1;
+
+    userDecks.forEach((deck, index) => {
+        const slot = document.createElement('div');
+        slot.className = 'deck-slot';
+
+        // 檢查牌組完整性
+        const isComplete = deck.cards.length === 30;
+
+        slot.innerHTML = `
+            <div class="deck-name">${deck.name}</div>
+            <div class="deck-count ${isComplete ? '' : 'incomplete'}">
+                ${isComplete ? '30/30' : deck.cards.length + '/30'}
+                ${isComplete ? '' : '⚠️'}
+            </div>
+            <div class="hero-avatar"></div>
+        `;
+
+        slot.addEventListener('click', () => {
+            // 移除其他選取狀態
+            document.querySelectorAll('.deck-slot').forEach(s => s.classList.remove('selected'));
+            slot.classList.add('selected');
+            currentSelectedIndex = index;
+        });
+
+        container.appendChild(slot);
+    });
+
+    // 綁定確認按鈕事件
+    newBtnStart.addEventListener('click', () => {
+        if (currentSelectedIndex === -1) {
+            showToast('請先選擇一個牌組');
+            return;
+        }
+
+        const selectedDeck = userDecks[currentSelectedIndex];
+        if (selectedDeck.cards.length !== 30) {
+            showToast('牌組必須有 30 張卡片才能進行對戰！');
+            return;
+        }
+
+        if (onConfirmCallback) {
+            onConfirmCallback(selectedDeck);
+        }
+    });
+}
+
 function renderDeckBuilder() {
     // Use tempDeck for rendering during edit
     const deck = tempDeck || userDecks[editingDeckIdx];
@@ -3864,8 +3935,14 @@ async function aiTurn() {
                 // Show Battlecry Visuals
                 if (action.target) {
                     const board = document.getElementById('opp-board');
-                    // Newest minion is at the end
-                    const sourceEl = board.children[board.children.length - 1];
+
+                    let sourceEl = null;
+                    if (card.type === 'NEWS') {
+                        sourceEl = document.getElementById('opp-hero');
+                    } else {
+                        // Newest minion is at the end
+                        sourceEl = board.children[board.children.length - 1];
+                    }
 
                     let destEl = null;
                     if (action.target.type === 'HERO') {

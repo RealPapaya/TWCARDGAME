@@ -10,7 +10,7 @@
  */
 const AuthManager = {
     // 這裡填入部署後的 Google Apps Script 網址
-    API_URL: "https://script.google.com/macros/s/AKfycbxgyK3pOaHPtWkHaw1oIbc-RRM-rUiZKyMbOul6mgDNV9ELd9spyMB11kmq7j8NTY6R6A/exec",
+    API_URL: "https://script.google.com/macros/s/AKfycby5PutdFwBxluDlHIXCjrU1C_Gjk63vpZHykqwTlLpLYqSOJ38Sc-c5S02qiepRMl7B/exec",
 
     currentUser: null,
     isSaving: false,
@@ -379,9 +379,19 @@ const AuthManager = {
             const result = await response.json();
 
             if (result.success) {
-                // 解析並更新資料
-                this.currentUser = this.parseUserData(result.data);
-                localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                // [修正] 比對時間戳，防止雲端舊資料覆寫本地新資料
+                const cloudLastSaved = parseInt(result.data.last_saved || result.data.lastsaved || 0);
+                const localLastSaved = parseInt(this.currentUser.lastsaved || 0);
+
+                if (cloudLastSaved > localLastSaved) {
+                    // 雲端資料較新，更新本地
+                    this.currentUser = this.parseUserData(result.data);
+                    localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                    console.log(`[Sync] 雲端資料較新 (${cloudLastSaved} > ${localLastSaved})，已更新本地`);
+                } else {
+                    console.log(`[Sync] 本地資料較新或相同 (${localLastSaved} >= ${cloudLastSaved})，保留本地資料`);
+                }
+
                 return { success: true, user: this.currentUser };
             }
             return { success: false };

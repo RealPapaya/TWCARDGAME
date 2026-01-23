@@ -49,11 +49,11 @@ const CollectionManager = {
             const cardHtml = this.createCardHtml(card, isOwned);
 
             return `
-                <div class="collection-card ${isOwned ? 'owned' : 'missing'}" 
+                <div class="collection-card ${isOwned ? 'owned' : 'unowned'}" 
                      data-card-id="${card.id}" 
                      onclick="CollectionManager.showCardOpModal('${card.id}')"
                      title="${card.description}">
-                    ${isOwned ? `<div class="card-count-badge">x${count}</div>` : ''}
+                    ${isOwned ? `<div class="card-count-badge">x${count}</div>` : '<div class="card-count-badge">x0</div>'}
                     ${cardHtml}
                 </div>
             `;
