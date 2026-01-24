@@ -1588,15 +1588,12 @@ class GameState {
      * @param {number} minionIndex Attacker index on board
      * @param {Object} target Target { type: 'HERO'|'MINION', index: number }
      */
-    attack(minionIndex, target) {
+    validateAttack(minionIndex, target) {
         const attacker = this.currentPlayer.board[minionIndex];
         if (!attacker) throw new Error("Attacker not found");
         if (attacker.sleeping || !attacker.canAttack) throw new Error(UI_TEXT.CANNOT_ATTACK_SLEEPING);
         if (attacker.lockedTurns > 0) throw new Error(UI_TEXT.LOCKED_CANNOT_ATTACK);
         if (attacker.attack <= 0) throw new Error(UI_TEXT.ATTACK_ZERO);
-        if (attacker.allowAttackCount <= 0 && attacker.keywords?.windfury !== true) {
-            // Basic check, refined later
-        }
 
         // Taunt Check
         const opponentTaunts = this.opponent.board.filter(m => m.keywords && m.keywords.taunt);
@@ -1604,6 +1601,12 @@ class GameState {
             const isTargetTaunt = (target.type === 'MINION' && this.opponent.board[target.index]?.keywords?.taunt);
             if (!isTargetTaunt) throw new Error(UI_TEXT.NEED_TAUNT_TARGET);
         }
+
+        return attacker;
+    }
+
+    attack(minionIndex, target) {
+        const attacker = this.validateAttack(minionIndex, target);
 
         // Execute Attack
         let targetUnit = null;

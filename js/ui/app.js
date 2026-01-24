@@ -275,16 +275,15 @@ function getUnitName(side, index, type) {
         return side === 'PLAYER' ? "你" : "對手";
     }
 
-    // 確保 side 正確對應到 gameState 的 player
-    const unitSide = side === 'PLAYER' ? gameState.currentPlayer : gameState.opponent;
+    // Fix: Properly map side to players[0/1] regardless of whose turn it is
+    const player = (side === 'PLAYER') ? gameState.players[0] : gameState.players[1];
 
-    if (!unitSide || !unitSide.board) {
-        console.warn(`[getUnitName] Invalid unitSide:`, side, unitSide);
+    if (!player || !player.board) {
+        console.warn(`[getUnitName] Invalid player for side:`, side);
         return "未知隨從";
     }
 
-    const minion = unitSide.board[index];
-
+    const minion = player.board[index];
     if (!minion) {
         console.warn(`[getUnitName] Minion not found at index ${index} for side ${side}`);
         return "未知隨從";
@@ -3181,6 +3180,23 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         opponent._syncedDeckSize = oppState.deckSize;
                     }
 
+                    // [新增] 同步場面上隨從的具體狀態，防止屬性脫節
+                    if (oppState.board && Array.isArray(oppState.board)) {
+                        oppState.board.forEach((remoteMinion, idx) => {
+                            const localMinion = opponent.board[idx];
+                            if (localMinion && localMinion.id === remoteMinion.id) {
+                                // 僅在兩邊 ID 一致時同步關鍵屬性
+                                localMinion.attack = remoteMinion.attack;
+                                localMinion.currentHealth = remoteMinion.currentHealth;
+                                localMinion.health = remoteMinion.health;
+                                localMinion.keywords = remoteMinion.keywords;
+                                localMinion.lockedTurns = remoteMinion.lockedTurns;
+                                localMinion.sleeping = remoteMinion.sleeping;
+                                localMinion.canAttack = remoteMinion.canAttack;
+                            }
+                        });
+                    }
+
                     // Render to show updated stats
                     render();
                 }
@@ -6041,6 +6057,9 @@ async function onDragEnd(e) {
                 || type === 'MINION' && targetEl.closest('#opp-board')) {
 
                 try {
+                    // Pre-validation: Check if attack is legal before animating
+                    gameState.validateAttack(attackerIndex, { type, index });
+
                     const sourceEl = document.getElementById('player-board').children[attackerIndex];
                     const attacker = gameState.currentPlayer.board[attackerIndex];
                     const damage = attacker ? attacker.attack : 0;
