@@ -257,30 +257,27 @@ body {
     top: 0;
     left: 0;
     width: 100%;
-    height: 50%;
-    /* Only upper half */
+    height: 100%;
+    overflow: hidden;
     pointer-events: none;
     z-index: 1;
-    /* Above view background, below view content */
-    overflow: hidden;
+    /* 確保在背景之上，UI 之下 */
 }
 
 .cloud {
     position: absolute;
-    height: auto;
     pointer-events: none;
-    opacity: 1;
-    filter: drop-shadow(0 5px 15px rgba(0, 0, 0, 0.2));
     will-change: transform;
 }
 
-@keyframes cloud-move {
+/* 響應式雲朵移動動畫 */
+@keyframes cloud-move-responsive {
     from {
-        transform: translateX(110vw);
+        transform: translateX(0);
     }
 
     to {
-        transform: translateX(-110vw);
+        transform: translateX(var(--animation-distance));
     }
 }
 
