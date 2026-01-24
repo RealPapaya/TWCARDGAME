@@ -627,13 +627,13 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: flex-start;
-    /* 改為頂部對齊以利捲動 */
+    justify-content: center;
+    /* 垂直居中 */
     backdrop-filter: blur(5px);
     overflow-y: auto;
     /* 允許垂直捲動 */
-    padding: 60px 20px;
-    /* 增加上下邊距 */
+    padding: 40px 20px;
+    /* 調整邊距 */
     box-sizing: border-box;
 }
 
