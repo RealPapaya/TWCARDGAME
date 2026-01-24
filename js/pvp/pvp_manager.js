@@ -197,11 +197,13 @@ class PvPManager {
             playerInfo: {
                 player1: {
                     username: player1Data.username || player1Id,
+                    nickname: player1Data.nickname || player1Data.username || player1Id,
                     avatar: player1Data.avatar || '👤',
                     title: player1Data.title || ''
                 },
                 player2: {
                     username: player2Data.username || player2Id,
+                    nickname: player2Data.nickname || player2Data.username || player2Id,
                     avatar: player2Data.avatar || '👤',
                     title: player2Data.title || ''
                 }

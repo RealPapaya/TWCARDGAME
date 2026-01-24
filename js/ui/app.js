@@ -4397,8 +4397,8 @@ function renderGameUI(p1, p2) {
 
 
     // Update Battle Player Info Card
+    const authUser = AuthManager.currentUser;
     const playerInfo = JSON.parse(localStorage.getItem('playerInfo')) || {};
-    const authUser = JSON.parse(localStorage.getItem('tw_card_game_user'));
 
     const battleUsername = document.getElementById('battle-player-username');
     const battleTitle = document.getElementById('battle-player-title');

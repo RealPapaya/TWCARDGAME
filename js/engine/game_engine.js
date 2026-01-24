@@ -535,19 +535,16 @@ class GameState {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit && targetUnit.type === 'MINION') {
                     const oldAttack = targetUnit.attack;
-                    const oldHealth = targetUnit.health;
                     const oldCurrentHealth = targetUnit.currentHealth;
 
-                    // Swap attack and max health
-                    targetUnit.attack = oldHealth;
+                    // New Attack = Old Current Health
+                    // New Health (Max and Current) = Old Attack
+                    targetUnit.attack = oldCurrentHealth;
                     targetUnit.health = oldAttack;
-
-                    // Adjust current health proportionally, but ensure it's at least 1
-                    const healthRatio = oldCurrentHealth / oldHealth;
-                    targetUnit.currentHealth = Math.max(0, Math.floor(oldAttack * healthRatio));
+                    targetUnit.currentHealth = oldAttack;
 
                     this.updateEnrage(targetUnit);
-                    return { type: 'SWAP', target: { ...targetUnit, index: target.index }, oldAttack, oldHealth };
+                    return { type: 'SWAP', target: { ...targetUnit, index: target.index }, oldAttack, oldHealth: oldCurrentHealth };
                 }
                 return null;
             },
