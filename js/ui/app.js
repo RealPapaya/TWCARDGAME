@@ -8213,3 +8213,13 @@ async function checkPvPReconnection() {
         showToast('已放棄對戰');
     };
 }
+
+// [Tutorial] Initialize check on load for persistence
+window.addEventListener('load', () => {
+    setTimeout(() => {
+        const user = AuthManager.checkAuth();
+        if (user && window.tutorialManager) {
+             window.tutorialManager.checkTutorialStatus(user);
+        }
+    }, 1500);
+});

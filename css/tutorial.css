@@ -1,0 +1,127 @@
+/* Tutorial Overlay Container - Fixed on top of everything */
+#tutorial-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 99999;
+    /* Highest priority */
+    pointer-events: none;
+    /* Allow clicks to pass through by default (we use masks to block) */
+}
+
+/* Mask Pieces - These block clicks and darken the screen */
+.tutorial-mask {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.7);
+    pointer-events: auto;
+    /* Block clicks */
+    transition: all 0.3s ease-out;
+    /* Smooth transition for hole movement */
+}
+
+/* Spotlight Border - Visual glow around the hole */
+.tutorial-spotlight-border {
+    position: absolute;
+    border: 2px solid #ffeb3b;
+    box-shadow: 0 0 15px #ffeb3b;
+    border-radius: 4px;
+    pointer-events: none;
+    transition: all 0.3s ease-out;
+    z-index: 100000;
+}
+
+/* Guide Character */
+#tutorial-guide {
+    position: fixed;
+    bottom: -100%;
+    left: 20px;
+    transform: none;
+    width: auto;
+    height: auto;
+    max-width: 300px;
+    max-height: 50vh;
+    z-index: 100001;
+    /* Above mask */
+    pointer-events: none;
+    transition: bottom 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    filter: drop-shadow(0 0 10px rgba(0, 0, 0, 0.5));
+}
+
+#tutorial-guide.active {
+    bottom: 0;
+}
+
+#tutorial-guide img {
+    display: block;
+    width: 100%;
+    /* Fill container */
+    max-height: 100%;
+}
+
+/* Dialog Bubble */
+.tutorial-dialog {
+    position: fixed;
+    bottom: 100px;
+    left: 320px;
+    transform: scale(0);
+    transform-origin: bottom left;
+    width: 350px;
+    max-width: 60vw;
+    background: #fff;
+    border: 4px solid #333;
+    border-radius: 20px;
+    padding: 20px;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-size: 1.2rem;
+    color: #333;
+    box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+    z-index: 10003;
+    transition: transform 0.3s ease;
+    pointer-events: auto;
+}
+
+.tutorial-dialog.active {
+    transform: scale(1);
+}
+
+.tutorial-dialog::after {
+    content: '';
+    position: absolute;
+    bottom: 20px;
+    left: -20px;
+    transform: none;
+    border-width: 20px 20px 20px 0;
+    border-style: solid;
+    border-color: transparent #333 transparent transparent;
+}
+
+.tutorial-dialog::before {
+    content: '';
+    position: absolute;
+    bottom: 24px;
+    left: -14px;
+    transform: none;
+    border-width: 17px 17px 17px 0;
+    border-style: solid;
+    border-color: transparent #fff transparent transparent;
+    z-index: 1;
+}
+
+.tutorial-dialog-content {
+    line-height: 1.6;
+    font-weight: bold;
+}
+
+.btn-tutorial-next {
+    display: block;
+    margin: 10px auto 0;
+    padding: 5px 20px;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 1rem;
+}

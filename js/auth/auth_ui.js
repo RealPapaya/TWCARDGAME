@@ -92,6 +92,11 @@ const AuthUI = {
                 if (window.App) {
                     window.App.onUserLogin(result.user);
                 }
+
+                // [Tutorial] 檢查新手教學狀態
+                if (window.tutorialManager) {
+                    setTimeout(() => window.tutorialManager.checkTutorialStatus(result.user), 500);
+                }
             } else {
                 await showCustomAlert("登入失敗: " + result.message);
             }
