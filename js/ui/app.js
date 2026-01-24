@@ -685,6 +685,92 @@ function init() {
         renderDeckBuilder();
     });
 
+    // This function is responsible for rendering the list of decks in the profile view.
+    function renderProfileDeckList() {
+        const container = document.getElementById('profile-deck-list');
+        if (!container) return;
+        container.innerHTML = ''; // Clear existing decks
+
+        // Add existing decks
+        userDecks.forEach((deck, index) => {
+            const deckItem = document.createElement('div');
+            deckItem.className = 'deck-item';
+            deckItem.innerHTML = `
+                <img src="${deck.image || 'assets/card_back.png'}" alt="Deck Image" class="deck-image">
+                <div class="deck-name">${deck.name}</div>
+                <div class="deck-card-count">${deck.cards.length}/30</div>
+                <div class="deck-actions">
+                    <button class="btn btn-sm btn-primary btn-edit-deck" data-index="${index}">編輯</button>
+                    <button class="btn btn-sm btn-danger btn-delete-deck" data-index="${index}">刪除</button>
+                </div>
+            `;
+            container.appendChild(deckItem);
+        });
+
+        // Add "Add New Deck" button if less than 6 decks
+        if (userDecks.length < 6) {
+            const addItem = document.createElement('div');
+            addItem.className = 'deck-item add-new-deck';
+            addItem.innerHTML = `
+                <i class="fas fa-plus"></i>
+                <span>新增牌組</span>
+            `;
+            addItem.addEventListener('click', () => {
+                if (editingDeckIdx !== -1) return; // Prevent if already editing? No, simple logic
+                // Create new deck
+                const newDeck = {
+                    id: `deck_${Date.now()}`,
+                    name: `新牌組 ${userDecks.length + 1}`,
+                    cards: [],
+                    image: ''
+                };
+                userDecks.push(newDeck);
+                // Save
+                if (AuthManager.currentUser) {
+                    AuthManager.currentUser.deck_data = userDecks;
+                    AuthManager.saveData();
+                }
+                renderProfileDeckList();
+            });
+            container.appendChild(addItem);
+        }
+
+        // Fill remaining slots up to 6 (Fixed Grid Layout)
+        const currentCount = container.children.length;
+        if (currentCount < 6) {
+            const remaining = 6 - currentCount;
+            for (let i = 0; i < remaining; i++) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'deck-item-placeholder';
+                container.appendChild(placeholder);
+            }
+        }
+
+        // Add event listeners for edit and delete buttons
+        container.querySelectorAll('.btn-edit-deck').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const index = parseInt(e.target.dataset.index);
+                editPlayerDeck(index);
+            });
+        });
+
+        container.querySelectorAll('.btn-delete-deck').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                const index = parseInt(e.target.dataset.index);
+                const confirmed = await showCustomConfirm(`確定要刪除牌組 "${userDecks[index].name}" 嗎？`);
+                if (confirmed) {
+                    userDecks.splice(index, 1);
+                    if (AuthManager.currentUser) {
+                        AuthManager.currentUser.deck_data = userDecks;
+                        AuthManager.saveData();
+                    }
+                    showToast('牌組已刪除');
+                    renderProfileDeckList();
+                }
+            });
+        });
+    }
+
     // Clear Deck Listener
     document.getElementById('btn-clear-deck')?.addEventListener('click', async () => {
         if (!tempDeck || tempDeck.cards.length === 0) return;
@@ -694,6 +780,22 @@ function init() {
             renderDeckBuilder();
             showToast("牌組已清空");
         }
+    });
+
+    // Auto Build Listener (New)
+    document.getElementById('btn-auto-build')?.addEventListener('click', async () => {
+        if (!tempDeck) return;
+
+        // 檢查是否已滿
+        if (tempDeck.cards.length >= 30) {
+            showToast("牌組已滿！");
+            return;
+        }
+
+        const confirmed = await showCustomConfirm("確定要自動補滿牌組嗎？這將從您的收藏中隨機挑選卡牌。");
+        if (!confirmed) return;
+
+        autoBuildDeck();
     });
 
     // Search Listener
@@ -1424,8 +1526,9 @@ function onUserLogin(user) {
     }
 
     // 更新本地快取，確保兩邊一致
-    localStorage.setItem('tw_card_game_user', JSON.stringify(user));
-    localStorage.setItem('userDecks', JSON.stringify(userDecks));
+    // 更新本地快取，確保兩邊一致 (Disabled for session-only login)
+    // localStorage.setItem('tw_card_game_user', JSON.stringify(user));
+    // localStorage.setItem('userDecks', JSON.stringify(userDecks));
 
     // [新增] 檢查是否已設定名稱
     if (!user.nickname || user.nickname.trim() === '') {
@@ -1499,6 +1602,11 @@ async function handleNicknameSave() {
         } else {
             showView('main-menu');
             showToast(`你好，${nickname}！冒險開始。`);
+
+            // [Tutorial] Now that nickname is set, check if we need to start tutorial
+            if (window.tutorialManager) {
+                window.tutorialManager.checkTutorialStatus(AuthManager.currentUser);
+            }
         }
 
         updatePlayerInfo();
@@ -1907,78 +2015,106 @@ function renderProfileDeckList() {
         console.log('[RENDER] 準備渲染', userDecks.length, '個牌組');
         container.innerHTML = '';
 
-        // 顯示所有牌組
+        // Render existing decks first
         userDecks.forEach((deck, idx) => {
-            const item = document.createElement('div');
-            item.className = `profile-deck-item ${idx === selectedDeckIdx ? 'selected' : ''}`;
-
-            const isDeckIncomplete = deck.cards.length !== 30;
-            const countClass = isDeckIncomplete ? 'incomplete' : '';
-            const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
-
-            item.innerHTML = `
-                <div class="deck-item-name">${deck.name}</div>
-                <div class="deck-item-right">
-                    <div class="deck-item-count ${countClass}">${warningIcon}${deck.cards.length}/30</div>
-                    <button class="btn-deck-icon btn-deck-edit" data-idx="${idx}" title="編輯">✏️</button>
-                    <button class="btn-deck-icon btn-deck-delete" data-idx="${idx}" title="刪除">🗑️</button>
-                </div>
-            `;
-
-            // 點擊卡片選擇牌組
-            item.addEventListener('click', (e) => {
-                if (!e.target.classList.contains('btn-deck-icon')) {
-                    selectedDeckIdx = idx;
-                    localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
-                    renderProfileDeckList();
-                }
-            });
-
-            // 編輯按鈕
-            item.querySelector('.btn-deck-edit').addEventListener('click', (e) => {
-                e.stopPropagation();
-                editingDeckIdx = idx;
-                tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
-                showView('deck-builder');
-                renderDeckBuilder();
-            });
-
-            // 刪除按鈕
-            item.querySelector('.btn-deck-delete').addEventListener('click', async (e) => {
-                e.stopPropagation();
-                if (userDecks.length <= 1) {
-                    await showCustomAlert('至少需保留一個牌組！');
-                    return;
-                }
-                const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
-                if (confirmed) {
-                    userDecks.splice(idx, 1);
-                    if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
-                    if (AuthManager.currentUser) {
-                        AuthManager.currentUser.deck_data = userDecks;
-                        AuthManager.saveData();
-                    }
-                    showToast('牌組已刪除');
-                    renderProfileDeckList();
-                }
-            });
-
+            const item = createDeckItem(deck, idx);
             container.appendChild(item);
         });
+
+        // Add "Add New Deck" button
+        if (userDecks.length < 10) {
+            const addItem = document.createElement('div');
+            addItem.className = 'add-deck-item';
+            addItem.innerHTML = `
+                <div class="add-deck-icon">+</div>
+                <div class="add-deck-text">建立新牌組</div>
+            `;
+            addItem.addEventListener('click', () => {
+                if (editingDeckIdx !== -1) return;
+                const newDeck = {
+                    id: `deck_${Date.now()}`,
+                    name: `新牌組 ${userDecks.length + 1}`,
+                    cards: [],
+                    image: ''
+                };
+                userDecks.push(newDeck);
+                if (AuthManager.currentUser) {
+                    AuthManager.currentUser.deck_data = userDecks;
+                    AuthManager.saveData();
+                }
+                renderProfileDeckList();
+            });
+            container.appendChild(addItem);
+        }
+
+        // Fill remaining slots up to 6 with placeholders
+        // We append them at the end. Since it's a grid, they will fill the next available slots sequentially.
+        const currentCount = container.children.length;
+        if (currentCount < 6) {
+            const remaining = 6 - currentCount;
+            for (let i = 0; i < remaining; i++) {
+                const placeholder = document.createElement('div');
+                placeholder.className = 'deck-item-placeholder';
+                // Optional: add content to placeholder if desired, e.g. "Empty Slot"
+                container.appendChild(placeholder);
+            }
+        }
     }
 
-    // 新增牌組按鈕
-    if (userDecks.length < 10) {
-        const addItem = document.createElement('div');
-        addItem.className = 'add-deck-item';
-        addItem.innerHTML = `
-            <div class="add-deck-icon">+</div>
-            <div class="add-deck-text">建立新牌組</div>
+    function createDeckItem(deck, idx) {
+        const item = document.createElement('div');
+        item.className = `profile-deck-item ${idx === selectedDeckIdx ? 'selected' : ''}`;
+
+        const isDeckIncomplete = deck.cards.length !== 30;
+        const countClass = isDeckIncomplete ? 'incomplete' : '';
+        const warningIcon = isDeckIncomplete ? '⚠️ ' : '';
+
+        // Minimalist Design Structure
+        item.innerHTML = `
+            <div class="deck-item-main">
+                <div class="deck-item-name-large" title="${deck.name}">${deck.name}</div>
+                <div class="deck-item-count-badge ${countClass}">${warningIcon}${deck.cards.length}/30</div>
+            </div>
+            <div class="deck-item-actions-bottom">
+                <button class="btn-deck-action-half btn-deck-edit" data-idx="${idx}">✏️ <span style="margin-left: 6px;">編輯</span></button>
+                <button class="btn-deck-action-half btn-deck-delete" data-idx="${idx}">🗑️ <span style="margin-left: 6px;">刪除</span></button>
+            </div>
         `;
-        addItem.addEventListener('click', () => {
-            showDeckCreationOptions();
+
+        item.querySelector('.deck-item-main').addEventListener('click', () => {
+            selectedDeckIdx = idx;
+            localStorage.setItem('selectedDeckIdx', selectedDeckIdx);
+            renderProfileDeckList();
         });
-        container.appendChild(addItem);
+
+        item.querySelector('.btn-deck-edit').addEventListener('click', (e) => {
+            e.stopPropagation();
+            editingDeckIdx = idx;
+            tempDeck = JSON.parse(JSON.stringify(userDecks[idx]));
+            showView('deck-builder');
+            renderDeckBuilder();
+        });
+
+        item.querySelector('.btn-deck-delete').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            if (userDecks.length <= 1) {
+                await showCustomAlert('至少需保留一個牌組！');
+                return;
+            }
+            const confirmed = await showCustomConfirm(`確定要刪除「${deck.name}」嗎？`);
+            if (confirmed) {
+                userDecks.splice(idx, 1);
+                if (selectedDeckIdx >= userDecks.length) selectedDeckIdx = userDecks.length - 1;
+                if (AuthManager.currentUser) {
+                    AuthManager.currentUser.deck_data = userDecks;
+                    AuthManager.saveData();
+                }
+                showToast('牌組已刪除');
+                renderProfileDeckList();
+            }
+        });
+
+        return item;
     }
 }
 
@@ -3674,7 +3810,6 @@ function renderDeckBuilder() {
     const gridEl = document.getElementById('all-cards-grid');
     gridEl.innerHTML = '';
 
-    // Search Functionality
     // Search Functionality & Window Filters
     const searchInput = document.getElementById('card-search-input');
     const searchTerm = searchInput ? searchInput.value.toLowerCase() : "";
@@ -3703,7 +3838,7 @@ function renderDeckBuilder() {
     CARD_DATA.filter(card => {
         const matchSearch = card.name.toLowerCase().includes(searchTerm) || (card.description && card.description.toLowerCase().includes(searchTerm));
         const matchCat = catFilter === 'ALL' || (card.category || '一般') === catFilter;
-        const matchRarity = rarFilter === 'ALL' || (card.rarity || 'COMMON') === rarFilter; // Default rarity if missing?
+        const matchRarity = rarFilter === 'ALL' || (card.rarity || 'COMMON') === rarFilter;
 
         let matchCost = true;
         if (costFilter !== 'ALL') {
@@ -3733,8 +3868,6 @@ function renderDeckBuilder() {
     }).forEach(card => {
         const cardEl = createCardEl(card, -1);
 
-
-
         // Count copies in current deck
         const countInDeck = deck.cards.filter(id => id === card.id).length;
         if (countInDeck > 0) {
@@ -3743,60 +3876,119 @@ function renderDeckBuilder() {
             badge.style.position = 'absolute';
             badge.style.top = '5px';
             badge.style.right = '5px';
-            badge.style.background = 'var(--neon-yellow)';
-            badge.style.color = '#000';
-            badge.style.fontWeight = 'bold';
+            badge.style.background = 'rgba(0,0,0,0.8)';
+            badge.style.color = '#fff';
+            badge.style.borderRadius = '50%';
+            badge.style.width = '20px';
+            badge.style.height = '20px';
+            badge.style.display = 'flex';
+            badge.style.justifyContent = 'center';
+            badge.style.alignItems = 'center';
             badge.style.fontSize = '12px';
-            badge.style.padding = '2px 6px';
-            badge.style.borderRadius = '10px';
             badge.style.zIndex = '20';
-            badge.style.boxShadow = '0 0 5px rgba(0,0,0,0.8)';
-            badge.style.border = '1px solid #000';
             cardEl.appendChild(badge);
-
-            // Visual feedback for max copies
-            // Legendary: max 1 (but logic says global limit 2? Wait logic says "legendCount >= 2" is global limit, but usually deck limit is 1 per unique legendary. 
-            // In Hearthstone: 1 per legendary, 2 per non-legendary.
-            // My code handles global legendary limit of 2? "傳說卡牌在牌組中最多只能放 2 張！" -> This sounds like total legendaries in deck <= 2. 
-            // But let's look at "count >= 2" check below (lines 236-237). It applies to everything. 
-            // So currently duplicate limit is 2 for ALL cards.
-            // Let's stick to simple dimming if count >= 2.
-
-            if (countInDeck >= 2) {
-                cardEl.style.opacity = '0.5';
-                cardEl.style.filter = 'grayscale(0.5)';
-            }
         }
 
-        cardEl.addEventListener('click', async (e) => {
-            e.stopPropagation();
-            if (deck.cards.length < 30 || isDebugMode) {
-                // Check legendary limit
-                if (!isDebugMode && card.rarity === 'LEGENDARY') {
-                    const legendCount = deck.cards.filter(id => {
-                        const c = CARD_DATA.find(x => x.id === id);
-                        return c?.rarity === 'LEGENDARY';
-                    }).length;
-                    if (legendCount >= 2) {
-                        await showCustomAlert("傳說卡牌在牌組中最多只能放 2 張！");
-                        return;
-                    }
-                }
+        // Add Click to Add
+        cardEl.addEventListener('click', async () => {
+            if (deck.cards.length >= 30) {
+                showToast("牌組已滿 (30/30)");
+                return;
+            }
+            // Check ownership count limit
+            const currentCount = deck.cards.filter(id => id === card.id).length;
+            const ownedCount = (window.isDebugMode && isAdmin()) ? 99 : (ownedCards[card.id] || 0);
 
-                // Normal 2 copies limit
-                const count = deck.cards.filter(id => id === card.id).length;
-                if (!isDebugMode && count >= 2) {
-                    await showCustomAlert("每種卡牌最多只能放 2 張！");
+            if (currentCount >= ownedCount) {
+                showToast("擁有的卡牌數量不足");
+                return;
+            }
+            // Check legendary limit & normal limit
+            if (!isDebugMode && card.rarity === 'LEGENDARY') {
+                const legendCount = deck.cards.filter(id => {
+                    const c = CARD_DATA.find(x => x.id === id);
+                    return c?.rarity === 'LEGENDARY';
+                }).length;
+                if (legendCount >= 2) {
+                    await showCustomAlert("傳說卡牌在牌組中最多只能放 2 張！");
                     return;
                 }
-
-                deck.cards.push(card.id);
-                renderDeckBuilder();
             }
+            if (!isDebugMode && currentCount >= 2) {
+                await showCustomAlert("每種卡牌最多只能放 2 張！");
+                return;
+            }
+
+            deck.cards.push(card.id);
+            renderDeckBuilder();
         });
+
+        // Add Drag to Add
+        cardEl.setAttribute('draggable', 'false');
         gridEl.appendChild(cardEl);
     });
 
+    updateDeckStats(deck);
+}
+
+/**
+ * 自動組牌功能
+ */
+function autoBuildDeck() {
+    if (!tempDeck) return;
+
+    const maxCards = 30;
+    let currentSize = tempDeck.cards.length;
+    const cardsNeeded = maxCards - currentSize;
+
+    if (cardsNeeded <= 0) {
+        showToast("牌組已經滿了");
+        return;
+    }
+
+    const ownedCards = AuthManager.currentUser?.ownedCards || {};
+    const validCandidates = [];
+
+    // 1. 找出所有合法的候選卡牌
+    CARD_DATA.forEach(card => {
+        const ownedCount = (window.isDebugMode && isAdmin()) ? 2 : (ownedCards[card.id] || 0);
+        const currentInDeck = tempDeck.cards.filter(id => id === card.id).length;
+
+        // 規則：必須擁有，且牌組內少於2張，且牌組內數量少於擁有數量
+        if (ownedCount > 0 && currentInDeck < 2 && currentInDeck < ownedCount) {
+            // 加入候選名單，數量等於剩餘可放張數
+            const availableToAdd = Math.min(2 - currentInDeck, ownedCount - currentInDeck);
+            for (let i = 0; i < availableToAdd; i++) {
+                validCandidates.push(card.id);
+            }
+        }
+    });
+
+    if (validCandidates.length === 0) {
+        showToast("沒有足夠的卡牌來組成完整牌組");
+        return;
+    }
+
+    // 2. 隨機填滿
+    let addedCount = 0;
+    while (currentSize < maxCards && validCandidates.length > 0) {
+        const randIdx = Math.floor(Math.random() * validCandidates.length);
+        const cardId = validCandidates[randIdx];
+
+        // 加入牌組
+        tempDeck.cards.push(cardId);
+        currentSize++;
+        addedCount++;
+
+        // 從候選池移除一張該卡
+        validCandidates.splice(randIdx, 1);
+    }
+
+    renderDeckBuilder();
+    showToast(`已自動加入 ${addedCount} 張卡牌！`);
+}
+
+function updateDeckStats(deck) {
     const listEl = document.getElementById('my-deck-list');
     listEl.innerHTML = '';
 
@@ -3805,11 +3997,7 @@ function renderDeckBuilder() {
         const cardA = CARD_DATA.find(c => c.id === a);
         const cardB = CARD_DATA.find(c => c.id === b);
 
-        // Handle missing cards gracefully
-        if (!cardA || !cardB) {
-            console.warn('[SORT] Missing card data:', { a, cardA, b, cardB });
-            return 0; // Keep original order if either card is missing
-        }
+        if (!cardA || !cardB) return 0;
 
         if (cardA.cost !== cardB.cost) return cardA.cost - cardB.cost;
         return cardA.name.localeCompare(cardB.name);
@@ -3894,10 +4082,10 @@ function renderDeckBuilder() {
     const statsEl = document.getElementById('deck-stats');
     if (statsEl) {
         statsEl.innerHTML = `
-            <div class="stat-row">平均花費: <span style="color:var(--neon-cyan)">${avgCost}</span></div>
-            <div class="stat-row">單位卡: <span style="color:var(--neon-yellow)">${minionCount}</span></div>
-            <div class="stat-row">技能卡: <span style="color:#ff4b2b">${newsCount}</span></div>
-        `;
+                <div class="stat-row">平均花費: <span style="color:var(--neon-cyan)">${avgCost}</span></div>
+                <div class="stat-row">單位卡: <span style="color:var(--neon-yellow)">${minionCount}</span></div>
+                <div class="stat-row">技能卡: <span style="color:#ff4b2b">${newsCount}</span></div>
+            `;
     }
 }
 
@@ -8218,8 +8406,23 @@ async function checkPvPReconnection() {
 window.addEventListener('load', () => {
     setTimeout(() => {
         const user = AuthManager.checkAuth();
-        if (user && window.tutorialManager) {
-             window.tutorialManager.checkTutorialStatus(user);
+
+        // Ensure Main Menu is actually visible before starting tutorial
+        // This prevents tutorial from overlaying on Login screen if auth check passed but view didn't switch
+        const mainMenu = document.getElementById('main-menu');
+        const authView = document.getElementById('auth-view');
+
+        const isMainMenuVisible = mainMenu && window.getComputedStyle(mainMenu).display !== 'none';
+        const isAuthVisible = authView && window.getComputedStyle(authView).display !== 'none';
+
+        // Critical: If auth view is visible (Login/Register), NEVER show tutorial
+        if (isAuthVisible) {
+            console.log('[Tutorial] Skipping check: Auth View is active');
+            return;
+        }
+
+        if (user && window.tutorialManager && isMainMenuVisible) {
+            window.tutorialManager.checkTutorialStatus(user);
         }
     }, 1500);
 });

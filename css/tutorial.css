@@ -125,3 +125,13 @@
     cursor: pointer;
     font-size: 1rem;
 }
+
+.tutorial-blocker {
+    position: fixed;
+    background: rgba(255, 0, 0, 0);
+    /* Transparent */
+    z-index: 10002;
+    /* Below dialog (10003) but above UI */
+    cursor: not-allowed;
+    pointer-events: auto;
+}

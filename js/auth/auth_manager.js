@@ -80,7 +80,7 @@ const AuthManager = {
                     this.currentUser = this.parseUserData(result.data);
                 }
 
-                localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+                // localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
                 return { success: true, user: this.currentUser };
             } else {
                 return { success: false, message: result.message };
@@ -111,8 +111,8 @@ const AuthManager = {
             // [關鍵] 更新時間戳，讓系統知道這是最新的版本
             this.currentUser.lastsaved = Date.now();
 
-            // 同步更新本地儲存
-            localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
+            // 同步更新本地儲存 (Disabled for session-only login)
+            // localStorage.setItem("tw_card_game_user", JSON.stringify(this.currentUser));
 
             // [關鍵] 使用 keepalive 確保 F5 時請求仍能完成
             await fetch(this.API_URL, {
@@ -165,7 +165,9 @@ const AuthManager = {
     },
 
     checkAuth() {
-        const savedUser = localStorage.getItem("tw_card_game_user");
+        // [Session Only] Do not read from local storage
+        // const savedUser = localStorage.getItem("tw_card_game_user");
+        const savedUser = null;
         if (savedUser) {
             try {
                 const user = JSON.parse(savedUser);

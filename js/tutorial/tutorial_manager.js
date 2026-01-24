@@ -64,6 +64,13 @@ class TutorialManager {
      */
     checkTutorialStatus(user) {
         if (!user) return;
+
+        // [New] Require nickname to be set before starting tutorial
+        if (!user.nickname) {
+            console.log('[Tutorial] Skipping check: Nickname not set yet.');
+            return;
+        }
+
         if (!user.stats) user.stats = {};
         const level = user.level || 1;
         const progress = user.stats.tutorial_progress || 0;
@@ -74,15 +81,54 @@ class TutorialManager {
     }
 
     startTutorial(savedProgress) {
+        // [Failsafe] Only run tutorial if Main Menu is visible
+        const mainMenu = document.getElementById('main-menu');
+        if (mainMenu && window.getComputedStyle(mainMenu).display === 'none') {
+            console.warn('[Tutorial] Aborted: Main Menu not visible.');
+            return;
+        }
+
         this.isActive = true;
         this.init();
-        let nextStep = savedProgress <= 0 ? 1 : savedProgress;
-        this.goToStep(nextStep);
+
+        // If starting fresh (progress 0 or less), play intro first
+        if (savedProgress <= 0) {
+            this.playIntroSequence();
+        } else {
+            this.goToStep(savedProgress);
+        }
+    }
+
+    playIntroSequence() {
+        // Ensure guide is active
+        if (this.guide) this.guide.classList.add('active');
+
+        // Ensure reset mask (full cover)
+        this.resetMask();
+
+        // 1. Hello
+        const nickname = (AuthManager.currentUser && AuthManager.currentUser.nickname)
+            ? AuthManager.currentUser.nickname
+            : ((AuthManager.currentUser && AuthManager.currentUser.username) ? AuthManager.currentUser.username : "玩家");
+
+        this.updateDialog(`尊敬的${nickname}你好`);
+        this.showNextButton(() => {
+            // 2. Welcome
+            this.updateDialog("歡迎來到寶島遊戲王");
+            this.showNextButton(() => {
+                // 3. Intro
+                this.updateDialog("現在阿北帶你簡單介紹一下環境");
+                this.showNextButton(() => {
+                    // Start actual tutorial
+                    this.goToStep(1);
+                });
+            });
+        });
     }
 
     async goToStep(stepIndex) {
         this.currentStep = stepIndex;
-        console.log(`[Tutorial] Starting Step \${stepIndex}`);
+        console.log(`[Tutorial] Starting Step ${stepIndex}`);
 
         if (AuthManager.currentUser) {
             if (!AuthManager.currentUser.stats) AuthManager.currentUser.stats = {};
@@ -107,9 +153,14 @@ class TutorialManager {
             this.addOneTimeClick('.collection-entrance-btn', () => {
                 setTimeout(() => {
                     // In Collection View:
-                    this.hideHighlights();
+                    this.hideHighlights(); // Hides the dark mask (User requested no dark background)
+
+                    // Specific blocking for Back Button
+                    this.blockElement('#btn-collection-back');
+
                     this.updateDialog("在這裡可以查看所有獲得的卡牌。");
                     this.showNextButton(() => {
+                        this.clearBlockers(); // Unblock
                         this.advance();
                     });
                 }, 500);
@@ -127,9 +178,16 @@ class TutorialManager {
                     this.setupTarget('.product-card[data-product="card-pack"] .btn-buy', "這裡可以購買卡牌，購買完成會存進去卡牌庫。");
                     this.addOneTimeClick('.product-card[data-product="card-pack"] .btn-buy', () => {
                         this.hideHighlights();
-                        setTimeout(() => {
-                            this.advance();
-                        }, 5000);
+                        // Wait for pack opening animation to finish and close button to appear
+                        this.waitForElement('#btn-pack-done.visible', (btn) => {
+                            this.setupTarget('#btn-pack-done', "點擊完成繼續");
+                            this.addOneTimeClick('#btn-pack-done', () => {
+                                this.hideHighlights();
+                                setTimeout(() => {
+                                    this.advance();
+                                }, 500);
+                            });
+                        });
                     });
                 }, 500);
             });
@@ -141,8 +199,10 @@ class TutorialManager {
             this.setupTarget('#btn-main-profile', "前往個人頁面查看詳細資訊。");
             this.addOneTimeClick('#btn-main-profile', () => {
                 setTimeout(() => {
+                    this.blockElement('#btn-profile-back'); // Block back button here too
                     this.setupTarget('.profile-vouchers-display', "這是消費券，透過剛才的卡牌庫分解過多的牌獲得，也可以用來合成卡片。");
                     this.showNextButton(() => {
+                        this.clearBlockers();
                         this.advance();
                     });
                 }, 500);
@@ -186,6 +246,31 @@ class TutorialManager {
         `;
         // Always append to body for fixed positioning relative to viewport
         document.body.appendChild(container);
+    }
+
+    blockElement(selector) {
+        const el = document.querySelector(selector);
+        if (!el) return;
+        const rect = el.getBoundingClientRect();
+        const blocker = document.createElement('div');
+        blocker.className = 'tutorial-blocker';
+        blocker.style.top = `${rect.top}px`;
+        blocker.style.left = `${rect.left}px`;
+        blocker.style.width = `${rect.width}px`;
+        blocker.style.height = `${rect.height}px`;
+
+        let container = document.getElementById('tutorial-blockers-container');
+        if (!container) {
+            // fallback if UI not updated yet
+            this.overlay.appendChild(document.createElement('div')).id = 'tutorial-blockers-container';
+            container = document.getElementById('tutorial-blockers-container');
+        }
+        container.appendChild(blocker);
+    }
+
+    clearBlockers() {
+        const container = document.getElementById('tutorial-blockers-container');
+        if (container) container.innerHTML = '';
     }
 
     hideHighlights() {
@@ -305,9 +390,29 @@ class TutorialManager {
     resetMask() {
         // Cover everything if no target
         const maskTop = this.overlay.querySelector('#mask-top');
+        const masks = this.overlay.querySelectorAll('.tutorial-mask');
         if (maskTop) {
+            // Ensure visible
+            masks.forEach(m => m.style.display = 'block');
+
+            maskTop.style.top = '0';
+            maskTop.style.left = '0';
+            maskTop.style.width = '100vw';
             maskTop.style.height = '100vh';
-            // Hide others or zero them
+
+            // Hide others to avoid overlaps (though z-index stack is same)
+            const otherMasks = [
+                this.overlay.querySelector('#mask-bottom'),
+                this.overlay.querySelector('#mask-left'),
+                this.overlay.querySelector('#mask-right')
+            ];
+            otherMasks.forEach(m => {
+                if (m) m.style.display = 'none';
+            });
+
+            // Hide spotlight
+            const spotlight = this.overlay.querySelector('#tutorial-spotlight');
+            if (spotlight) spotlight.style.display = 'none';
         }
     }
 
@@ -361,6 +466,19 @@ class TutorialManager {
     advance() {
         const next = this.currentStep + 1;
         this.goToStep(next);
+    }
+
+    waitForElement(selector, callback) {
+        const check = () => {
+            const el = document.querySelector(selector);
+            // Ensure element exists AND is visible (display not none)
+            if (el && el.offsetParent !== null) {
+                callback(el);
+            } else {
+                requestAnimationFrame(check);
+            }
+        };
+        check();
     }
 
     completeTutorial() {
