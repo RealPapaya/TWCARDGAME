@@ -4346,20 +4346,17 @@ function renderGameUI(p1, p2) {
     document.getElementById('turn-indicator').innerText = `TURN: ${gameState.turnCount}`;
 
     // Toggle Turn Lights
+    // Toggle Turn Lights & Button
     const isPlayerTurn = gameState.currentPlayerIdx === 0;
-    const playerInd = document.getElementById('indicator-player');
-    const oppInd = document.getElementById('indicator-opp');
     const endBtn = document.getElementById('end-turn-btn');
 
-    if (playerInd && oppInd) {
+    if (endBtn) {
         if (isPlayerTurn) {
-            playerInd.classList.add('active');
-            oppInd.classList.remove('active');
-            if (endBtn) endBtn.disabled = false;
+            endBtn.disabled = false;
+            endBtn.innerText = "結束回合";
         } else {
-            playerInd.classList.remove('active');
-            oppInd.classList.add('active');
-            if (endBtn) endBtn.disabled = true;
+            endBtn.disabled = true;
+            endBtn.innerText = "對手回合";
         }
     }
 

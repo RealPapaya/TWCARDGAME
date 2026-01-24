@@ -1705,11 +1705,11 @@ body {
 
 /* Deck Pile */
 .deck-pile {
-    width: 60px;
-    height: 85px;
+    width: 80px;
+    height: 110px;
     background: url('../assets/images/ui/card_back.webp') no-repeat center center;
     background-size: 100% 100%;
-    border-radius: 6px;
+    border-radius: 8px;
     border: 2px solid #444;
     box-shadow:
         1px 1px 0 #222,
@@ -2192,15 +2192,24 @@ body.dragging-active .player .hand .card:hover {
     position: static;
     background: var(--neon-yellow);
     border: none;
-    padding: 8px 20px;
+    padding: 15px 30px;
     font-weight: 800;
-    font-size: 16px;
+    font-size: 20px;
     text-transform: uppercase;
     color: #000;
     cursor: pointer;
     clip-path: polygon(10% 0, 100% 0, 100% 80%, 90% 100%, 0 100%, 0 20%);
     transition: all 0.2s;
     box-shadow: 0 0 15px rgba(255, 238, 0, 0.4);
+}
+
+#end-turn-btn:disabled {
+    background: #333;
+    color: #666;
+    box-shadow: none;
+    cursor: not-allowed;
+    filter: grayscale(1);
+    opacity: 0.8;
 }
 
 .turn-light {
