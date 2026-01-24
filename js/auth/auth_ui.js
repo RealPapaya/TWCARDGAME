@@ -135,7 +135,7 @@ const AuthUI = {
             if (window.hideLoadingIndicator) hideLoadingIndicator();
 
             if (result.success) {
-                await showCustomAlert("註冊請求已送出！請稍候再試著登入 (由於 Apps Script 非同步性)。");
+                await showCustomAlert("註冊請求已送出！請稍候再試著登入");
                 this.switchTab("login");
             } else {
                 await showCustomAlert("註冊失敗: " + result.message);

@@ -12,40 +12,110 @@ class TutorialManager {
         this.targetElement = null;
 
         // Steps Configuration
-        // Steps Configuration
         this.steps = {
             1: {
                 target: '.collection-entrance-btn',
                 text: '這是存放卡牌的地方。',
-                actionRequired: 'click', // wait for click on target
-                view: 'main-menu' // expected view
+                actionRequired: 'click',
+                view: 'main-menu'
             },
             2: {
-                target: '.product-card[data-product="card-pack"] .btn-buy', // Specific buy button
-                fallbackTarget: '#btn-shop', // If we are not in shop
+                target: '.product-card[data-product="card-pack"] .btn-buy',
                 text: '這裡可以購買卡牌，購買完成會存進去卡牌庫，現在就來試抽一包吧。',
                 actionRequired: 'click',
                 view: 'shop-view'
             },
             3: {
-                target: '#profile-vouchers-display', // Will need to find this in DOM
+                target: '#profile-vouchers-display',
                 text: '這是消費券，透過剛才的卡牌庫分解過多的牌獲得，也可以用來合成卡片。',
-                actionRequired: 'next', // Click next button on dialog
+                actionRequired: 'next',
                 view: 'profile-view'
             },
             4: {
-                target: '#profile-deck-list', // Or a create deck button
-                text: '我們再來慢慢研發。',
-                actionRequired: 'finish',
+                target: '.add-deck-item',
+                text: '我們來組一副套牌吧！點擊這裡新增牌組。',
+                actionRequired: 'click',
                 view: 'profile-view'
+            },
+            5: {
+                target: '#btn-create-custom',
+                text: '選擇「自由組建」來開始打造你的專屬牌組。',
+                actionRequired: 'click',
+                view: 'profile-view'
+            },
+            6: {
+                target: '#all-cards-grid',
+                text: '這裡是牌組編輯器。左邊是所有卡牌，右邊是你目前的牌組。',
+                actionRequired: 'next',
+                view: 'deck-builder'
+            },
+            7: {
+                target: '#my-deck-list',
+                text: '一副牌組需要由 30 張卡牌組成。每種卡牌最多放 2 張，傳說卡牌只能放 2 張(總數)。',
+                actionRequired: 'next',
+                view: 'deck-builder'
+            },
+            8: {
+                target: '#btn-auto-build',
+                text: '為了節省時間，阿北幫你用「一鍵組成」功能快速完成。',
+                actionRequired: 'click',
+                view: 'deck-builder'
+            },
+            9: {
+                target: '#btn-custom-confirm',
+                text: '按下確定，讓阿北幫你補滿！',
+                actionRequired: 'click',
+                view: 'deck-builder'
+            },
+            10: {
+                target: '#btn-save-deck',
+                text: '組好之後，記得保存喔！',
+                actionRequired: 'click',
+                view: 'deck-builder'
+            },
+            11: {
+                target: '#btn-builder-back',
+                text: '保存成功，點擊返回離開編輯器。',
+                actionRequired: 'click',
+                view: 'deck-builder'
+            },
+            12: {
+                target: '#btn-profile-back',
+                text: '現在回到大廳。',
+                actionRequired: 'click',
+                view: 'profile-view'
+            },
+            13: {
+                target: '#btn-main-battle',
+                text: '準備好了嗎？讓我們開始第一場戰鬥吧！',
+                actionRequired: 'click',
+                view: 'main-menu'
+            },
+            14: {
+                target: '#btn-mode-ai',
+                text: '選擇電腦對戰模式',
+                actionRequired: 'click',
+                view: 'mode-selection'
+            },
+            15: {
+                target: '.option-item[data-deck-id="dpp2"]', // Tsai Ing-wen
+                text: '選擇你的對手：蔡英文',
+                actionRequired: 'click',
+                view: 'ai-battle-setup'
+            },
+            16: {
+                target: '.deck-option-group.expanded .sub-difficulty-btn[data-value="NORMAL"]', // Normal difficulty
+                text: '選擇普通難度',
+                actionRequired: 'click',
+                view: 'ai-battle-setup'
+            },
+            17: {
+                target: '#btn-start-ai-battle',
+                text: '開始戰鬥！',
+                actionRequired: 'finish',
+                view: 'ai-battle-setup'
             }
         };
-
-        // Re-defining steps object fully if needed or just assuming it's closed in previous block? 
-        // Wait, the previous block replaced createUI AND setupTarget, effectively removing the middle methods?
-        // Ah, I replaced from createUI (line 57) to setupTarget end (line 266).
-        // The middle methods checkTutorialStatus, startTutorial, goToStep were DELETED.
-        // I need to put them back.
     }
 
     init() {
@@ -75,7 +145,7 @@ class TutorialManager {
         const level = user.level || 1;
         const progress = user.stats.tutorial_progress || 0;
         console.log(`[Tutorial] Checking status: Lv.\${level}, Progress: \${progress}`);
-        if (level === 1 && progress < 5) {
+        if (level === 1 && progress < 17) { // Back to 17 steps (removed 1, added 1)
             this.startTutorial(progress);
         }
     }
@@ -83,8 +153,14 @@ class TutorialManager {
     startTutorial(savedProgress) {
         // [Failsafe] Only run tutorial if Main Menu is visible
         const mainMenu = document.getElementById('main-menu');
-        if (mainMenu && window.getComputedStyle(mainMenu).display === 'none') {
-            console.warn('[Tutorial] Aborted: Main Menu not visible.');
+        // Allow resuming from Profile (step 3/4)
+        const profileView = document.getElementById('profile-view');
+
+        const isMainMenu = mainMenu && window.getComputedStyle(mainMenu).display !== 'none';
+        const isProfileView = profileView && window.getComputedStyle(profileView).display !== 'none';
+
+        if (!isMainMenu && !isProfileView && savedProgress < 4) {
+            console.warn('[Tutorial] Aborted: Not in Main Menu or Profile.');
             return;
         }
 
@@ -146,6 +222,10 @@ class TutorialManager {
         // We still need guide active
         if (this.guide) this.guide.classList.add('active');
 
+        // [New] Clear old highlights and update dialog immediately so user sees progress
+        this.hideHighlights();
+        this.updateDialog(stepConfig.text);
+
         // Logic for steps
         if (stepIndex === 1) {
             if (typeof showView === 'function') showView('main-menu');
@@ -194,37 +274,153 @@ class TutorialManager {
         }
         else if (stepIndex === 3) {
             if (document.getElementById('shop-view') && document.getElementById('shop-view').style.display !== 'none') {
-                if (typeof showView === 'function') showView('main-menu');
+                // Check if back button exists, otherwise force showView
+                const backBtn = document.getElementById('btn-shop-back');
+                if (backBtn) backBtn.click();
+                else if (typeof showView === 'function') showView('main-menu');
             }
-            this.setupTarget('#btn-main-profile', "前往個人頁面查看詳細資訊。");
-            this.addOneTimeClick('#btn-main-profile', () => {
-                setTimeout(() => {
-                    this.blockElement('#btn-profile-back'); // Block back button here too
-                    this.setupTarget('.profile-vouchers-display', "這是消費券，透過剛才的卡牌庫分解過多的牌獲得，也可以用來合成卡片。");
-                    this.showNextButton(() => {
-                        this.clearBlockers();
-                        this.advance();
-                    });
-                }, 500);
-            });
+            // Ensure we are in main menu before targeting profile button
+            setTimeout(() => {
+                this.setupTarget('#btn-main-profile', "前往個人頁面查看詳細資訊。");
+                this.addOneTimeClick('#btn-main-profile', () => {
+                    setTimeout(() => {
+                        this.blockElement('#btn-profile-back'); // Block back button here too
+                        this.setupTarget('.profile-vouchers-display', "這是消費券，透過剛才的卡牌庫分解過多的牌獲得，也可以用來合成卡片。");
+                        this.showNextButton(() => {
+                            this.clearBlockers();
+                            this.advance();
+                        });
+                    }, 500);
+                });
+            }, 300);
         }
-        else if (stepIndex === 4) {
-            this.setupTarget('.deck-management', "我們再來慢慢研發。");
-            this.showNextButton(() => {
-                this.completeTutorial();
-            });
-        }
-    }
+        else if (stepIndex === 4) { // Add Deck
+            const selector = '.add-deck-item';
+            const text = "我們來組一副套牌吧！點擊這裡新增牌組。";
 
-    init() {
-        // Create UI elements if they don't exist
-        if (!document.getElementById('tutorial-overlay')) {
-            this.createUI();
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, text);
+
+                const handler = (e) => {
+                    if (e.target.closest(selector)) {
+                        document.removeEventListener('click', handler, true);
+                        this.hideHighlights();
+                        setTimeout(() => this.advance(), 500);
+                    }
+                };
+                document.addEventListener('click', handler, true);
+            });
         }
-        this.overlay = document.getElementById('tutorial-overlay');
-        this.backdrop = this.overlay.querySelector('.tutorial-backdrop');
-        this.guide = document.getElementById('tutorial-guide');
-        this.dialog = this.overlay.querySelector('.tutorial-dialog');
+        else if (stepIndex === 5) { // Modal: Click Custom Build
+            const selector = '#btn-create-custom';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    this.advance();
+                });
+            });
+        }
+        else if (stepIndex === 6) { // Deck Builder Intro
+            this.waitForElement('#deck-builder', (el) => {
+                if (window.getComputedStyle(el).display === 'none') return;
+                this.setupTarget('#all-cards-grid', stepConfig.text);
+                this.showNextButton(() => this.advance());
+            });
+        }
+        else if (stepIndex === 7) { // Rules
+            this.setupTarget('#my-deck-list', stepConfig.text);
+            this.showNextButton(() => this.advance());
+        }
+        else if (stepIndex === 8) { // One Click Build
+            const selector = '#btn-auto-build';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 800);
+                });
+            });
+        }
+        else if (stepIndex === 9) { // Confirm Modal
+            const selector = '#btn-custom-confirm';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 1000);
+                });
+            });
+        }
+        else if (stepIndex === 10) { // Save
+            const selector = '#btn-save-deck';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => this.advance());
+            });
+        }
+        else if (stepIndex === 11) { // Back from Builder
+            const selector = '#btn-builder-back';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 500);
+                });
+            });
+        }
+        else if (stepIndex === 12) { // Back from Profile
+            const selector = '#btn-profile-back';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 500);
+                });
+            });
+        }
+        else if (stepIndex === 13) { // Battle Intro
+            const selector = '#btn-main-battle';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.blockElement('#btn-main-profile');
+                this.blockElement('#btn-shop');
+                this.blockElement('#btn-collection');
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 500);
+                });
+            });
+        }
+        else if (stepIndex === 14) { // Mode AI
+            const selector = '#btn-mode-ai';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 500);
+                });
+            });
+        }
+        else if (stepIndex === 15) { // Select Opponent
+            this.waitForElement('#deck-options-container', () => {
+                const selector = '.option-item[data-deck-id="dpp2"]';
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    setTimeout(() => this.advance(), 500);
+                });
+            });
+        }
+        else if (stepIndex === 16) { // Difficulty
+            const selector = '.deck-option-group.expanded .sub-difficulty-btn[data-value="NORMAL"]';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => this.advance());
+            });
+        }
+        else if (stepIndex === 17) { // Start
+            const selector = '#btn-start-ai-battle';
+            this.waitForElement(selector, () => {
+                this.setupTarget(selector, stepConfig.text);
+                this.addOneTimeClick(selector, () => {
+                    this.clearBlockers();
+                    this.completeTutorial();
+                });
+            });
+        }
     }
 
     createUI() {
@@ -284,16 +480,47 @@ class TutorialManager {
     }
 
     setupTarget(selector, text) {
+        // Store selector for re-querying if element gets detached
+        this.currentSelector = selector;
+
         // Clean up previous highlight styles (if any remained)
         if (this.targetElement) {
             this.targetElement.classList.remove('tutorial-highlight');
+
+            // Revert modal boost if exists
+            const modalParent = this.targetElement.closest('.modal-overlay');
+            if (modalParent && modalParent.dataset.originalZIndex !== undefined) {
+                modalParent.style.zIndex = modalParent.dataset.originalZIndex;
+                delete modalParent.dataset.originalZIndex;
+            }
+
+            // Restore position if we modified it
+            if (this.targetElement.dataset.originalPosition === 'static') {
+                this.targetElement.style.position = '';
+                delete this.targetElement.dataset.originalPosition;
+            }
         }
 
         this.targetElement = document.querySelector(selector);
 
         if (this.targetElement) {
-            // Scroll to target first
-            this.targetElement.scrollIntoView({ behavior: "smooth", block: "center" });
+            // Add highlight class to promote z-index
+            this.targetElement.classList.add('tutorial-highlight');
+
+            // [Fix] If target is inside a modal-overlay, we MUST boost the modal's z-index too
+            // otherwise the button will be trapped under its parent's stacking context
+            const modalParent = this.targetElement.closest('.modal-overlay');
+            if (modalParent) {
+                modalParent.dataset.originalZIndex = modalParent.style.zIndex;
+                modalParent.style.zIndex = '100001'; // Above tutorial overlay (99999)
+            }
+
+            // [Fix] Handle positioning for z-index context
+            const computedStyle = window.getComputedStyle(this.targetElement);
+            if (computedStyle.position === 'static') {
+                this.targetElement.dataset.originalPosition = 'static';
+                this.targetElement.style.position = 'relative';
+            }
 
             // Wait a bit for scroll/render, then update mask
             setTimeout(() => this.updateMask(), 300);
@@ -319,7 +546,7 @@ class TutorialManager {
     startTracking() {
         if (this.trackingRaf) cancelAnimationFrame(this.trackingRaf);
         const loop = () => {
-            if (this.targetElement && this.isActive) {
+            if (this.isActive) {
                 this.updateMask();
                 this.trackingRaf = requestAnimationFrame(loop);
             }
@@ -335,7 +562,32 @@ class TutorialManager {
     }
 
     updateMask() {
-        if (!this.overlay || !this.targetElement) return;
+        if (!this.overlay) return;
+
+        // [Robustness Fix] Check if target is lost/detached and try to recover it
+        if ((!this.targetElement || !this.targetElement.isConnected) && this.currentSelector) {
+            const freshEl = document.querySelector(this.currentSelector);
+            if (freshEl && freshEl !== this.targetElement) {
+                console.log('[Tutorial] Re-acquired detached target:', this.currentSelector);
+                this.targetElement = freshEl;
+
+                // Re-apply highlight class
+                this.targetElement.classList.add('tutorial-highlight');
+
+                // Re-apply positioning fix
+                const computedStyle = window.getComputedStyle(this.targetElement);
+                if (computedStyle.position === 'static') {
+                    this.targetElement.dataset.originalPosition = 'static';
+                    this.targetElement.style.position = 'relative';
+                }
+            }
+        }
+
+        if (!this.targetElement || !this.targetElement.isConnected) {
+            // Target is gone and cannot be found -> Full mask to be safe
+            this.resetMask();
+            return;
+        }
 
         const rect = this.targetElement.getBoundingClientRect();
         const spotlight = this.overlay.querySelector('#tutorial-spotlight');
@@ -471,12 +723,17 @@ class TutorialManager {
     waitForElement(selector, callback) {
         const check = () => {
             const el = document.querySelector(selector);
-            // Ensure element exists AND is visible (display not none)
-            if (el && el.offsetParent !== null) {
-                callback(el);
-            } else {
-                requestAnimationFrame(check);
+            if (el) {
+                const style = window.getComputedStyle(el);
+                const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && el.opacity !== '0';
+
+                // offsetParent is null for fixed elements, so we use computed style check
+                if (isVisible) {
+                    callback(el);
+                    return;
+                }
             }
+            requestAnimationFrame(check);
         };
         check();
     }
@@ -485,27 +742,46 @@ class TutorialManager {
         console.log('[Tutorial] Completed!');
         this.isActive = false;
 
-        // Hide UI
+        // Hide UI completely to release frozen state
+        if (this.overlay) {
+            this.overlay.style.display = 'none';
+        }
         if (this.guide) this.guide.classList.remove('active');
         if (this.dialog) this.dialog.classList.remove('active');
         this.resetMask();
-        if (this.targetElement) this.targetElement.classList.remove('tutorial-highlight');
+        if (this.targetElement) {
+            this.targetElement.classList.remove('tutorial-highlight');
+        }
 
         // Grant Rewards
         if (AuthManager.currentUser) {
             AuthManager.currentUser.stats.tutorial_progress = 5; // Completed
+            
+            // User requested 500 gold
+            AuthManager.currentUser.gold = (AuthManager.currentUser.gold || 0) + 500;
 
             // Grant XP to Lv 2
-            // Lv 1 -> Lv 2 need 20 XP usually.
-            // Let's just set Level to 2 directly as per user request "升 to 2級"
             if (AuthManager.currentUser.level < 2) {
                 AuthManager.currentUser.level = 2;
-                AuthManager.currentUser.currentXP = 0; // Reset XP?
-                console.log('[Tutorial] Level Up to 2!');
-                // Show level up (Optional UI, but system is updated)
+                AuthManager.currentUser.currentXP = 0;
             }
 
+            // Sync and update UI
             AuthManager.saveData();
+            
+            // Trigger UI updates (Globals from app.js)
+            if (window.updatePlayerInfo) window.updatePlayerInfo();
+            if (window.updateLevelDisplay) window.updateLevelDisplay();
+            if (window.ShopManager && typeof window.ShopManager.updateGoldDisplay === 'function') {
+                window.ShopManager.updateGoldDisplay();
+            }
+
+            // Show completion modal
+            if (window.gameAlert) {
+                window.gameAlert('恭喜完成新手導覽！獲得 500 金幣與等級提升！', '教學完成');
+            } else {
+                alert('恭喜完成新手導覽！獲得 500 金幣！');
+            }
         }
     }
 }

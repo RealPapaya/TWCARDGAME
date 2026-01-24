@@ -132,7 +132,7 @@ let editingThemeIdx = -1; // -1 means not editing theme
 // }
 let selectedDeckIdx = parseInt(localStorage.getItem('selectedDeckIdx')) || 0;
 let selectedThemeId = 'dpp'; // Default theme
-let editingDeckIdx = 0;
+let editingDeckIdx = -1;
 let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
 window.isDebugMode = isDebugMode; // 暴露出全域變數供其他模組存取
@@ -684,6 +684,18 @@ function init() {
         }
         renderDeckBuilder();
     });
+
+    // Edit Player Deck
+    function editPlayerDeck(index) {
+        if (index < 0 || index >= userDecks.length) return;
+        editingDeckIdx = index;
+        // Deep copy to tempDeck to avoid direct mutation until save
+        tempDeck = JSON.parse(JSON.stringify(userDecks[index]));
+        tempDeck.isTheme = false;
+
+        showView('deck-builder');
+        renderDeckBuilder();
+    }
 
     // This function is responsible for rendering the list of decks in the profile view.
     function renderProfileDeckList() {
@@ -1605,7 +1617,9 @@ async function handleNicknameSave() {
 
             // [Tutorial] Now that nickname is set, check if we need to start tutorial
             if (window.tutorialManager) {
-                window.tutorialManager.checkTutorialStatus(AuthManager.currentUser);
+                setTimeout(() => {
+                    window.tutorialManager.checkTutorialStatus(AuthManager.currentUser);
+                }, 500);
             }
         }
 
@@ -2007,57 +2021,40 @@ function renderProfileDeckList() {
     }
     console.log('[RENDER] 容器找到:', container);
 
-    if (!userDecks || userDecks.length === 0) {
-        console.log('[RENDER] 無牌組資料，顯示空狀態');
-        container.innerHTML = '<div class="empty-decks">尚無牌組</div>';
-        // 不再 return，繼續往下渲染「新增牌組」按鈕
-    } else {
-        console.log('[RENDER] 準備渲染', userDecks.length, '個牌組');
-        container.innerHTML = '';
+    console.log('[RENDER] 準備渲染', userDecks ? userDecks.length : 0, '個牌組');
+    container.innerHTML = '';
 
-        // Render existing decks first
+    // Render existing decks
+    if (userDecks && userDecks.length > 0) {
         userDecks.forEach((deck, idx) => {
             const item = createDeckItem(deck, idx);
             container.appendChild(item);
         });
+    }
 
-        // Add "Add New Deck" button
-        if (userDecks.length < 10) {
-            const addItem = document.createElement('div');
-            addItem.className = 'add-deck-item';
-            addItem.innerHTML = `
-                <div class="add-deck-icon">+</div>
-                <div class="add-deck-text">建立新牌組</div>
-            `;
-            addItem.addEventListener('click', () => {
-                if (editingDeckIdx !== -1) return;
-                const newDeck = {
-                    id: `deck_${Date.now()}`,
-                    name: `新牌組 ${userDecks.length + 1}`,
-                    cards: [],
-                    image: ''
-                };
-                userDecks.push(newDeck);
-                if (AuthManager.currentUser) {
-                    AuthManager.currentUser.deck_data = userDecks;
-                    AuthManager.saveData();
-                }
-                renderProfileDeckList();
-            });
-            container.appendChild(addItem);
-        }
+    // Add "Add New Deck" button
+    if (!userDecks || userDecks.length < 10) {
+        const addItem = document.createElement('div');
+        addItem.className = 'add-deck-item';
+        addItem.innerHTML = `
+            <div class="add-deck-icon">+</div>
+            <div class="add-deck-text">建立新牌組</div>
+        `;
+        addItem.addEventListener('click', () => {
+            if (editingDeckIdx !== -1) return;
+            showDeckCreationOptions();
+        });
+        container.appendChild(addItem);
+    }
 
-        // Fill remaining slots up to 6 with placeholders
-        // We append them at the end. Since it's a grid, they will fill the next available slots sequentially.
-        const currentCount = container.children.length;
-        if (currentCount < 6) {
-            const remaining = 6 - currentCount;
-            for (let i = 0; i < remaining; i++) {
-                const placeholder = document.createElement('div');
-                placeholder.className = 'deck-item-placeholder';
-                // Optional: add content to placeholder if desired, e.g. "Empty Slot"
-                container.appendChild(placeholder);
-            }
+    // Fill remaining slots up to 6 with placeholders
+    const currentCount = container.children.length;
+    if (currentCount < 6) {
+        const remaining = 6 - currentCount;
+        for (let i = 0; i < remaining; i++) {
+            const placeholder = document.createElement('div');
+            placeholder.className = 'deck-item-placeholder';
+            container.appendChild(placeholder);
         }
     }
 
