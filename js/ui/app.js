@@ -3233,17 +3233,14 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
 
                     // 同步手牌數（對手手牌不顯示具體內容，但數量需要同步）
                     if (oppState.handSize !== undefined) {
-                        // 調整對手手牌陣列長度以匹配實際數量
                         const currentHandSize = opponent.hand.length;
                         const targetHandSize = oppState.handSize;
 
                         if (targetHandSize > currentHandSize) {
-                            // 對手抽牌了，補充空白卡牌顯示
                             for (let i = currentHandSize; i < targetHandSize; i++) {
                                 opponent.hand.push({ id: 'HIDDEN', name: '?', cost: 0, type: 'HIDDEN' });
                             }
                         } else if (targetHandSize < currentHandSize) {
-                            // 對手出牌/丟牌了，移除多餘的卡牌
                             opponent.hand.splice(targetHandSize);
                         }
                     }
@@ -3253,12 +3250,36 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         opponent._syncedDeckSize = oppState.deckSize;
                     }
 
-                    // [新增] 同步場面上隨從的具體狀態，防止屬性脫節
+                    // [強化] Desync 偵測與強制同步
+                    if (oppState.boardHash !== undefined) {
+                        // 計算本地對手場面雜湊
+                        const localBoardHash = opponent.board && opponent.board.length > 0
+                            ? opponent.board.map(m => `${m.id}:${m.attack}:${m.currentHealth}`).join('|')
+                            : 'empty';
+
+                        if (localBoardHash !== oppState.boardHash) {
+                            console.warn('[PvP Desync 偵測] 對手場面雜湊不一致！');
+                            console.warn('[PvP] 本地:', localBoardHash);
+                            console.warn('[PvP] 遠端:', oppState.boardHash);
+
+                            // 強制使用遠端狀態覆蓋本地
+                            if (oppState.board && Array.isArray(oppState.board)) {
+                                console.log('[PvP] 強制同步對手場面...');
+                                opponent.board = oppState.board.map(remoteMinion => {
+                                    const minion = JSON.parse(JSON.stringify(remoteMinion));
+                                    minion.side = 'OPPONENT';
+                                    return minion;
+                                });
+                                console.log('[PvP] 強制同步完成，新場面:', opponent.board.length, '個隨從');
+                            }
+                        }
+                    }
+
+                    // 同步場面上隨從的具體狀態（即使沒有 desync 也更新關鍵屬性）
                     if (oppState.board && Array.isArray(oppState.board)) {
                         oppState.board.forEach((remoteMinion, idx) => {
                             const localMinion = opponent.board[idx];
                             if (localMinion && localMinion.id === remoteMinion.id) {
-                                // 僅在兩邊 ID 一致時同步關鍵屬性
                                 localMinion.attack = remoteMinion.attack;
                                 localMinion.currentHealth = remoteMinion.currentHealth;
                                 localMinion.health = remoteMinion.health;
@@ -3464,8 +3485,14 @@ async function syncLocalStateToFirebase() {
     try {
         const player = gameState.players[0]; // 我方永遠是 player[0]
 
+        // ✅ [Validation] Ensure no dead minions are synced
+        const deadMinions = player.board.filter(m => m.currentHealth <= 0);
+        if (deadMinions.length > 0) {
+            console.error('[PvP Sync Error] Found dead minions not cleaned up:', deadMinions);
+            player.board = player.board.filter(m => m.currentHealth > 0);
+        }
+
         // 確保所有欄位都有有效值，避免 undefined 導致 Firebase 錯誤
-        // Player 結構使用 hero.hp 和 hero.maxHp，而非 currentHealth/health
         if (!player || !player.hero || player.hero.hp === undefined) {
             console.warn('[PvP] 玩家狀態尚未完整初始化，跳過同步');
             return;
@@ -3482,18 +3509,29 @@ async function syncLocalStateToFirebase() {
             return cleaned;
         };
 
+        // [新增] 計算場面狀態雜湊用於 desync 偵測
+        const calcBoardHash = (board) => {
+            if (!board || board.length === 0) return 'empty';
+            return board.map(m => `${m.id}:${m.attack}:${m.currentHealth}`).join('|');
+        };
+
+        // [新增] 為英雄血量生成 hash
+        const heroHash = `${player.hero.hp}/${player.hero.maxHp}`;
+
         const stateUpdate = {
             hp: player.hero.hp ?? 30,
             maxHp: player.hero.maxHp ?? 30,
+            heroHash: heroHash, // ✅ 新增
             mana: player.mana?.current ?? 0,
             maxMana: player.mana?.max ?? 0,
             handSize: player.hand?.length ?? 0,
             deckSize: player.deck?.length ?? 0,
+            // [新增] 場面雜湊用於 desync 偵測
+            boardHash: calcBoardHash(player.board),
             // 同步當前手牌（保存 ID）
             hand: player.hand?.map(card => card.id) ?? [],
             // 同步場面上的所有隨從
             board: player.board?.map(minion => {
-                // 只保存非 undefined 的屬性
                 return removeUndefined({
                     id: minion.id,
                     name: minion.name,
@@ -3515,9 +3553,12 @@ async function syncLocalStateToFirebase() {
                     tempBuffs: minion.tempBuffs,
                     baseAttackOverride: minion.baseAttackOverride,
                     ongoingStats: minion.ongoingStats,
-                    side: minion.side
+                    side: minion.side,
+                    instanceId: minion.instanceId // ✅ 用於精確匹配
                 });
-            }) ?? []
+            }) ?? [],
+            // ✅ 新增:時間戳用於檢測過時數據
+            timestamp: Date.now()
         };
 
         console.log('[PvP] 準備同步狀態:', stateUpdate);
@@ -3563,7 +3604,7 @@ async function executeOpponentAction(action) {
 
     switch (action.action) {
         case 'PLAY_CARD': {
-            const { cardId, handIndex, targetType, targetIndex, targetSide, insertionIndex, resolvedEffect } = action.data;
+            const { cardId, handIndex, targetType, targetIndex, targetSide, targetInstanceId, insertionIndex, resolvedEffect } = action.data;
 
             // 從 CARD_DATA 根據 cardId 查找卡牌資料
             const cardDef = window.CARD_DATA?.find(c => c.id === cardId);
@@ -3589,6 +3630,21 @@ async function executeOpponentAction(action) {
                     index: targetIndex,
                     side: targetSide === 'PLAYER' ? 'OPPONENT' : 'PLAYER' // 翻轉視角
                 };
+
+                // [新增] 優先使用 targetInstanceId 尋找目標，防止 index 錯位
+                if (targetInstanceId && targetType === 'MINION') {
+                    const sideToSearch = (target.side === 'PLAYER') ? 0 : 1;
+                    const unit = gameState.players[sideToSearch].board.find(m => m.instanceId === targetInstanceId);
+                    if (unit) {
+                        const newIdx = gameState.players[sideToSearch].board.indexOf(unit);
+                        if (newIdx !== target.index) {
+                            console.log(`[PvP] 修正戰吼目標 Index: ${target.index} -> ${newIdx}`);
+                            target.index = newIdx;
+                        }
+                    } else {
+                        console.warn(`[PvP] 戰吼目標 instanceId 丟失: ${targetInstanceId}, 回退使用 Index`);
+                    }
+                }
             }
 
             try {
@@ -3604,25 +3660,60 @@ async function executeOpponentAction(action) {
                 const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
                 opponent.mana.current = Math.max(0, opponent.mana.current - actualCost);
 
-                // 2. 如果是隨從，加入場上
+                // 2. 如果是隨從，這時加入 board 並處理戰吼
                 if (card.type === 'MINION') {
-                    const minion = gameState.createMinion(cardDef, opponent.side);
-                    const insertIdx = insertionIndex >= 0 ? insertionIndex : opponent.board.length;
-                    opponent.board.splice(insertIdx, 0, minion);
+                    // [修正] 防止重複：先檢查 board 是否已經有此隨從（由 onGameStateUpdate 同步過）
+                    // 使用 instanceId（如果有的話）或簡單的機制（這回合剛加入的？）
+                    let minion = null;
+                    const providedInstanceId = action.data.instanceId;
+
+                    if (providedInstanceId) {
+                        minion = opponent.board.find(m => m.instanceId === providedInstanceId);
+                    }
+
+                    if (minion) {
+                        console.log('[PvP] 隨從已存在，跳過創建:', minion.name, minion.instanceId);
+                        // 如果位置不對，可能需要調整？通常 sync 應該是對的
+                    } else {
+                        // 創建新隨從
+                        minion = gameState.createMinion(cardDef, opponent.side);
+                        // 如果對方有提供 instanceId，強制使用它，以便後續匹配
+                        if (providedInstanceId) {
+                            minion.instanceId = providedInstanceId;
+                        }
+
+                        // 加入 board
+                        if (insertionIndex >= 0) {
+                            opponent.board.splice(insertionIndex, 0, minion);
+                        } else {
+                            opponent.board.push(minion);
+                        }
+                        console.log('[PvP] 創建新隨從:', minion.name, minion.instanceId);
+                    }
 
                     // 處理戰吼（如果有）
                     // 【修正】使用 resolvedEffect 避免 desync
                     if (card.keywords?.battlecry) {
+                        let battlecryResult = null;
                         if (resolvedEffect) {
-                            // 使用對方預先計算的效果值
                             const modifiedBattlecry = { ...card.keywords.battlecry, value: resolvedEffect.value };
-                            gameState.resolveBattlecry(modifiedBattlecry, target, minion);
+                            battlecryResult = gameState.resolveBattlecry(modifiedBattlecry, target, minion);
                             console.log('[PvP] 使用 resolvedEffect:', resolvedEffect);
                         } else {
-                            // 舊版相容：本地計算
-                            gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                            battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                        }
+
+                        // [Fix] Visualize LOCK (Silence) effect from opponent
+                        if (battlecryResult && battlecryResult.type === 'LOCK' && battlecryResult.target) {
+                            const targetSide = battlecryResult.target.side; // 'PLAYER' or 'OPPONENT'
+                            const targetBoardId = (targetSide === 'PLAYER') ? 'player-board' : 'opp-board';
+                            const tBoard = document.getElementById(targetBoardId);
+                            if (tBoard && tBoard.children[battlecryResult.target.index]) {
+                                triggerCombatEffect(tBoard.children[battlecryResult.target.index], 'LOCK');
+                            }
                         }
                     }
+                    // board 會由 onGameStateUpdate 進一步確認同步，但本地先加確保流暢與邏輯正確
                 } else if (card.type === 'NEWS') {
                     // 新聞牌直接執行效果
                     console.log('[PvP] 對手出 NEWS 卡，戰吼前手牌數:', opponent.hand.length);
@@ -3737,12 +3828,19 @@ async function executeOpponentAction(action) {
         }
 
         case 'ATTACK': {
-            const { attackerIndex, targetType, targetIndex } = action.data;
+            const { attackerIndex, targetType, targetIndex, resolvedDamage } = action.data;
 
             const attacker = opponent.board[attackerIndex];
             if (!attacker) {
                 console.warn('[PvP] 找不到對手攻擊者:', attackerIndex);
                 return;
+            }
+
+            // [修正] 強制使用遠端的攻擊者數值，避免 desync
+            if (resolvedDamage) {
+                console.log('[PvP] 攻擊前強制同步攻擊者數值:', resolvedDamage);
+                attacker.attack = resolvedDamage.attackerAttack;
+                attacker.currentHealth = resolvedDamage.attackerHealth;
             }
 
             // 取得 DOM 元素進行動畫
@@ -3752,7 +3850,6 @@ async function executeOpponentAction(action) {
             if (targetType === 'HERO') {
                 targetEl = document.getElementById('player-hero');
             } else {
-                // 翻轉視角：對手攻擊的 OPPONENT 實際上是我方
                 targetEl = document.getElementById('player-board').children[targetIndex];
             }
 
@@ -3762,32 +3859,74 @@ async function executeOpponentAction(action) {
             }
 
             try {
-                // 臨時切換到對手視角執行攻擊
-                const originalIdx = gameState.currentPlayerIdx;
-                gameState.currentPlayerIdx = 1;
+                // [修正] 不切換視角，直接執行對手攻擊我方
+                // 對手發送的攻擊目標是我方(從他視角是OPPONENT)
+                // 我們這邊對手是player[1]，目標需要手動處理
 
-                // 強制設置攻擊者為可攻擊狀態（繞過 sleeping 檢查）
-                // 因為對手的攻擊動作已經在其本地驗證過，我們只需執行結果
-                const wasAttackable = attacker.canAttack;
-                const wasSleeping = attacker.sleeping;
+                // 強制設置攻擊者為可攻擊狀態
                 attacker.canAttack = true;
                 attacker.sleeping = false;
 
-                // 翻轉目標視角
-                const flippedTarget = {
-                    type: targetType,
-                    index: targetIndex
-                };
+                // 手動執行攻擊邏輯（不使用gameState.attack以避免視角混亂）
+                let targetUnit = null;
+                const { targetInstanceId } = action.data; // ✅ [新增] 讀取 targetInstanceId
 
-                gameState.attack(attackerIndex, flippedTarget);
+                if (targetType === 'HERO') {
+                    targetUnit = gameState.players[0].hero;
+                } else if (targetType === 'MINION') {
+                    // ✅ [新增] 優先嘗試使用 instanceId 查找目標，避免 index 錯位
+                    if (targetInstanceId) {
+                        targetUnit = gameState.players[0].board.find(m => m.instanceId === targetInstanceId);
+                        if (!targetUnit) {
+                            console.warn(`[PvP] 無法通過 instanceId 找到目標: ${targetInstanceId}，嘗試回退到 index`);
+                        }
+                    }
 
-                // 恢復原始狀態標記（如果需要）
-                // 注意：攻擊後 canAttack 會被設為 false，這是正常的
+                    // 回退到 index
+                    if (!targetUnit && targetIndex !== null && targetIndex !== undefined) {
+                        targetUnit = gameState.players[0].board[targetIndex];
+                    }
+                }
 
-                gameState.currentPlayerIdx = originalIdx;
+                if (targetUnit) {
+                    // ✅ [修正] 優先使用遠端確定的傷害值 resolvedDamage.damage
+                    // 如果沒有傳遞 damage，則回退到 attacker.attack (可能不一致)
+                    const attackerAtk = (resolvedDamage && resolvedDamage.damage !== undefined)
+                        ? resolvedDamage.damage
+                        : attacker.attack;
+
+                    const targetAtk = (targetType === 'MINION' && targetUnit) ? (targetUnit.attack || 0) : 0;
+
+                    console.log(`[PvP] 執行傷害應用: 攻擊者=${attackerAtk}, 目標反擊=${targetAtk}`);
+
+                    // 對目標造成傷害
+                    gameState.applyDamage(targetUnit, attackerAtk);
+
+                    // 隨從反擊
+                    if (targetType === 'MINION' && targetAtk > 0) {
+                        gameState.applyDamage(attacker, targetAtk);
+                    }
+
+                    // 標記已攻擊
+                    attacker.canAttack = false;
+                    attacker.attacksThisTurn = (attacker.attacksThisTurn || 0) + 1;
+                } else {
+                    console.warn('[PvP] 攻擊目標丟失!', action.data);
+                }
 
                 render();
-                await resolveDeaths();
+                await resolveDeaths();  // 先處理死亡
+
+                // ✅ [Validation] Ensure no dead minions before sync
+                const player = gameState.players[0];
+                const deadMinions = player.board.filter(m => m.currentHealth <= 0);
+                if (deadMinions.length > 0) {
+                    console.error('[PvP Opponent Attack] Found dead minions not cleaned up:', deadMinions);
+                    player.board = player.board.filter(m => m.currentHealth > 0);
+                }
+
+                // 在死亡處理後再同步狀態
+                syncLocalStateToFirebase();
 
             } catch (e) {
                 console.error('[PvP] 執行對手攻擊失敗:', e);
@@ -4680,29 +4819,42 @@ function render() {
 
 
 async function resolveDeaths() {
-    const dead = gameState.checkDeaths ? gameState.checkDeaths() : [];
+    try {
+        const dead = gameState.checkDeaths ? gameState.checkDeaths() : [];
 
-    if (dead.length > 0) {
-        const boards = [document.getElementById('player-board'), document.getElementById('opp-board')];
-        const animations = [];
+        if (dead.length > 0) {
+            const boards = [document.getElementById('player-board'), document.getElementById('opp-board')];
+            const animations = [];
 
-        for (const death of dead) {
-            // Log history
-            const unitName = getUnitName(death.side, death.index, death.type);
-            MatchHistory.add('DEATH', { unit: unitName });
+            for (const death of dead) {
+                // Log history
+                const unitName = getUnitName(death.side, death.index, death.type);
+                MatchHistory.add('DEATH', { unit: unitName });
 
-            const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
-            if (board && board.children[death.index]) {
-                animations.push(animateShatter(board.children[death.index]));
+                const board = (death.side === 'PLAYER') ? boards[0] : boards[1];
+                // [Fix] Robust check: ensure board and child exist
+                if (board && board.children[death.index]) {
+                    animations.push(animateShatter(board.children[death.index]));
+                }
             }
+
+            // [Revert] Wait for animations to finish to avoid race conditions with DOM removal
+            await Promise.allSettled(animations);
+        }
+    } catch (err) {
+        console.error("Error inside resolveDeaths animation phase:", err);
+    } finally {
+        // Always resolve game state logic
+        const beforeCount = (gameState.players[0].board.length + gameState.players[1].board.length);
+        gameState.resolveDeaths();
+        const afterCount = (gameState.players[0].board.length + gameState.players[1].board.length);
+
+        if (beforeCount !== afterCount) {
+            console.log(`[resolveDeaths] Cleaned up ${beforeCount - afterCount} minions.`);
         }
 
-        await Promise.all(animations);
+        render();
     }
-
-    // Always resolve game state logic (Hero death, minion cleanup) and render
-    gameState.resolveDeaths();
-    render();
 }
 
 /**
@@ -5853,6 +6005,9 @@ async function onDragEnd(e) {
                         card: playedCard.name
                     });
 
+                    // [Immediate Feedback] Render as soon as card is played in engine
+                    render();
+
                     // PvP 模式：同步出牌動作到 Firebase
                     if (isPvPMode && window.pvpManager) {
                         // 計算戰吼效果值（含 News Power 加成）
@@ -5875,6 +6030,15 @@ async function onDragEnd(e) {
                             };
                         }
 
+                        // 獲取剛打出的隨從實例ID (從 board 中獲取)
+                        let instanceId = null;
+                        if (playedCard.type === 'MINION') {
+                            const playedMinion = gameState.currentPlayer.board[currentInsertionIndex];
+                            if (playedMinion) {
+                                instanceId = playedMinion.instanceId;
+                            }
+                        }
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: playedCard.id,
                             handIndex: attackerIndex,
@@ -5882,13 +6046,11 @@ async function onDragEnd(e) {
                             targetType: null,
                             targetIndex: null,
                             targetSide: null,
-                            resolvedEffect: resolvedEffect
+                            resolvedEffect: resolvedEffect,
+                            instanceId: instanceId // ✅ 傳遞 instanceId 用於去重
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
-
-                    // 2. Render to show the minion LANDING on the board
-                    render();
 
                     // 3. Trigger Dust and Sound at newly played minion (Capture from fresh DOM)
                     const boardEl = document.getElementById('player-board');
@@ -5898,13 +6060,17 @@ async function onDragEnd(e) {
                         spawnDustEffect(newMinionEl, intensity);
                     }
 
-                    // 4. WAIT 0.5s (as requested)
+                    // [Responsive Fix] Reduced wait from 0.5s to 0.2s
                     await new Promise(r => setTimeout(r, 500));
 
                     // 5. Execute Battlecry manually to get the result/target
                     if (playedCard.keywords && playedCard.keywords.battlecry) {
                         const minionOnBoard = gameState.currentPlayer.board[currentInsertionIndex];
                         const result = gameState.resolveBattlecry(playedCard.keywords.battlecry, null, minionOnBoard);
+
+                        // [Immediate Feedback] Render after battlecry resolution
+                        render();
+                        await resolveDeaths();
 
                         if (result) {
                             // 6. Show Visual Effects based on result
@@ -6164,13 +6330,14 @@ async function onDragEnd(e) {
             // 修復：當目標是英雄時，index 為 undefined，parseInt 會返回 NaN
             // 改為攻擊英雄時設為 null
             const index = targetData.dataset.index ? parseInt(targetData.dataset.index) : null;
+            const targetInstanceIdBefore = targetData.dataset.minionId || null;
 
             if (type === 'HERO' && targetData.id === 'opp-hero'
                 || type === 'MINION' && targetEl.closest('#opp-board')) {
 
                 try {
                     // Pre-validation: Check if attack is legal before animating
-                    gameState.validateAttack(attackerIndex, { type, index });
+                    gameState.validateAttack(attackerIndex, { type, index, side: 'OPPONENT' });
 
                     const sourceEl = document.getElementById('player-board').children[attackerIndex];
                     const attacker = gameState.currentPlayer.board[attackerIndex];
@@ -6191,20 +6358,45 @@ async function onDragEnd(e) {
                         damage: damage
                     });
 
-                    gameState.attack(attackerIndex, { type, index });
+                    // ✅ [修正] 傳遞 side: 'OPPONENT' 確保 engine 能找到目標
+                    // ✅ 修正後的代碼
+                    gameState.attack(attackerIndex, { type, index, side: 'OPPONENT' });
 
-                    // PvP 模式：同步攻擊動作到 Firebase
+                    render();
+                    await resolveDeaths();  // ⬅️ 先處理死亡
+
+                    // ✅ 在死亡結算後再處理 PvP 同步
                     if (isPvPMode && window.pvpManager) {
+                        // 取得攻擊後的狀態（已經過死亡處理）
+                        let targetCurrentHealth = 0;
+                        let targetInstanceId = null;
+
+                        if (type === 'HERO') {
+                            targetCurrentHealth = gameState.players[1].hero.hp;
+                        } else if (index !== null) {
+                            // 注意：目標可能已經死亡，需要處理 undefined
+                            const targetMinion = gameState.players[1].board[index];
+                            if (targetMinion) {
+                                targetCurrentHealth = targetMinion.currentHealth;
+                                targetInstanceId = targetMinion.instanceId;
+                            }
+                        }
+
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
-                            targetIndex: index  // 英雄時為 null，隨從時為數字
+                            targetIndex: index,
+                            targetInstanceId: targetInstanceIdBefore || targetInstanceId, // Use early captured ID
+                            resolvedDamage: {
+                                attackerAttack: attacker ? attacker.attack : 0,
+                                attackerHealth: attacker ? attacker.currentHealth : 0,
+                                targetHealthBefore: targetCurrentHealth,
+                                damage: damage
+                            }
                         });
-                        syncLocalStateToFirebase(); // 同步攻擊後的狀態 (HP)
-                    }
 
-                    render();
-                    await resolveDeaths();
+                        syncLocalStateToFirebase();  // ⬅️ 最後同步狀態
+                    }
                 } catch (err) {
                     logMessage(err.message);
                 }
@@ -6331,6 +6523,8 @@ async function onDragEnd(e) {
                             };
                         }
 
+                        const targetInstanceId = target.instanceId || (target.index !== -1 ? (gameState.players[target.side === 'PLAYER' ? 0 : 1].board[target.index]?.instanceId) : null);
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: card.id,
                             handIndex: battlecrySourceIndex,
@@ -6338,6 +6532,7 @@ async function onDragEnd(e) {
                             targetType: target.type,
                             targetIndex: target.index,
                             targetSide: target.side,
+                            targetInstanceId: targetInstanceId, // [新增] 傳遞目標實例 ID
                             resolvedEffect: resolvedEffect
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
@@ -6362,6 +6557,8 @@ async function onDragEnd(e) {
                             };
                         }
 
+                        const targetInstanceId = target.instanceId || (target.index !== -1 ? (gameState.players[target.side === 'PLAYER' ? 0 : 1].board[target.index]?.instanceId) : null);
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: minionInfo?.id,
                             handIndex: -1, // 已在場上
@@ -6369,11 +6566,15 @@ async function onDragEnd(e) {
                             targetType: target.type,
                             targetIndex: target.index,
                             targetSide: target.side,
+                            targetInstanceId: targetInstanceId, // [新增] 傳遞目標實例 ID
                             resolvedEffect: resolvedEffect
                         });
-                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
                 }
+
+                // [Immediate Feedback] Render before waiting for draw or other syncs
+                render();
+                await resolveDeaths();
 
                 // Check for special draw trigger (e.g. DAMAGE_AND_DRAW_IF_KILL)
                 if (battlecryResult && battlecryResult.drew) {
@@ -6404,10 +6605,21 @@ async function onDragEnd(e) {
                 } else if (draggingMode === 'DAMAGE' || effectType === 'DAMAGE') {
                     const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
                     MatchHistory.add(eventType, { source: sourceName, target: destName, value: value });
+                } else if (battlecryResult && battlecryResult.type === 'LOCK') {
+                    // [Fix] Handle Silence/Lock visualization
+                    const tBoard = (target.side === 'PLAYER') ? document.getElementById('player-board') : document.getElementById('opp-board');
+                    if (tBoard && tBoard.children[target.index]) {
+                        triggerCombatEffect(tBoard.children[target.index], 'LOCK');
+                    }
                 }
 
                 render();
                 await resolveDeaths();
+
+                // [Sync] Move sync to the very end of interaction
+                if (isPvPMode && window.pvpManager && !isNews) {
+                    syncLocalStateToFirebase();
+                }
 
             } else {
                 // Non-targeted logic (Fallback for Minions played without target if flow allows, or AOE)
@@ -6639,7 +6851,7 @@ function animateAbility(fromEl, toEl, color, shouldShake = true) {
 
             projectile.remove();
             resolve();
-        }, 550);
+        }, 650); // Reduced from 550ms
     });
 }
 
@@ -6802,7 +7014,7 @@ function animateAttack(fromEl, toEl, damage = 0) {
                 clone.remove();
                 resolve();
             }, 100);
-        }, 450); // Slightly longer than CSS to ensure completion
+        }, 350); // Reduced from 450ms for faster impact feedback
     });
 }
 
@@ -7031,6 +7243,7 @@ async function showCardPlayPreview(card, isAI = false, targetEl = null) {
         }
     }
 
+    // [Responsive Fix] Reduced from 400ms to 200ms
     await new Promise(r => setTimeout(r, 400));
 
     overlay.style.display = 'none';
@@ -7079,7 +7292,8 @@ function animateShatter(el) {
             }
         }, 250);
 
-        await new Promise(r => setTimeout(r, 400));
+        // Reduce delay for snappier feel
+        await new Promise(r => setTimeout(r, 200));
 
         const rect = el.getBoundingClientRect();
         const container = document.createElement('div');
@@ -7218,6 +7432,16 @@ function triggerCombatEffect(el, type) {
             p.style.animationDelay = `${Math.random() * 0.4}s`;
             container.appendChild(p);
         }
+    } else if (type === 'LOCK') {
+        const p = document.createElement('div');
+        p.className = 'buff-particle';
+        p.innerText = '🔒';
+        p.style.fontSize = '40px';
+        p.style.left = '50%';
+        p.style.top = '50%';
+        p.style.transform = 'translate(-50%, -50%)';
+        p.style.animation = 'float-up 1.5s ease-out forwards';
+        container.appendChild(p);
     }
 
     el.appendChild(container);
@@ -7225,7 +7449,7 @@ function triggerCombatEffect(el, type) {
     container.style.display = 'flex';
     setTimeout(() => {
         container.remove();
-    }, 1000);
+    }, 800);
 }
 
 // Global listeners to lock right-click menu and handle targeting cancellation
