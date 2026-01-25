@@ -6187,6 +6187,7 @@ async function onDragEnd(e) {
                 const destName = getUnitName(target.side, target.index, target.type);
 
                 // 3. Execute Game Logic (Phase 2)
+                let battlecryResult = null;
                 if (battlecrySourceType === 'NEWS') {
                     // For News: Now we play it
                     const card = gameState.currentPlayer.hand[battlecrySourceIndex];
@@ -6194,7 +6195,8 @@ async function onDragEnd(e) {
                         player: "你",
                         card: card.name
                     });
-                    gameState.playCard(battlecrySourceIndex, target);
+                    const outcome = gameState.playCard(battlecrySourceIndex, target);
+                    battlecryResult = outcome.battlecryResult;
 
                     // PvP 模式：同步帶目標的新聞牌出牌
                     if (isPvPMode && window.pvpManager) {
@@ -6212,7 +6214,7 @@ async function onDragEnd(e) {
                     // For Minion: It's already pending on board, just resolve battlecry
                     const minionInfo = gameState.currentPlayer.board[battlecrySourceIndex];
                     if (minionInfo && minionInfo.keywords?.battlecry) {
-                        gameState.resolveBattlecry(minionInfo.keywords.battlecry, target, minionInfo);
+                        battlecryResult = gameState.resolveBattlecry(minionInfo.keywords.battlecry, target, minionInfo);
                     }
 
                     // PvP 模式：同步帶目標的戰吼效果
@@ -6227,6 +6229,14 @@ async function onDragEnd(e) {
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
+                }
+
+                // Check for special draw trigger (e.g. DAMAGE_AND_DRAW_IF_KILL)
+                if (battlecryResult && battlecryResult.drew) {
+                    render(); // Sync hand size after playing the card
+                    await new Promise(r => setTimeout(r, 600));
+                    gameState.currentPlayer.drawCard();
+                    render();
                 }
 
                 // Log target effect after resolution

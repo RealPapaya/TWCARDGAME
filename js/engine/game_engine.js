@@ -141,6 +141,23 @@ class GameState {
                 this.applyDamage(targetUnit, bc.value);
                 return { type: 'DAMAGE', target: targetUnit, value: bc.value };
             },
+            'DAMAGE_AND_DRAW_IF_KILL': (bc, target) => {
+                const targetUnit = this.getTargetUnit(target);
+                if (targetUnit && targetUnit.type === 'MINION') {
+                    this.applyDamage(targetUnit, bc.value);
+                    let drew = false;
+                    if (targetUnit.currentHealth <= 0) {
+                        // Only auto-draw for opponent (AI)
+                        if (this.players[this.currentPlayerIdx].side === 'OPPONENT') {
+                            this.currentPlayer.drawCard();
+                        }
+                        // For player, we set flag and let UI handle animation & draw
+                        drew = true;
+                    }
+                    return { type: 'DAMAGE', target: { ...targetUnit, index: target.index }, value: bc.value, drew };
+                }
+                return null;
+            },
             'DAMAGE_SELF': (bc, target, source) => {
                 if (source) {
                     this.applyDamage(source, bc.value);

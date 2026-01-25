@@ -93,6 +93,7 @@ const CARD_DATA = [
     { "id": "S025", "name": "普發一萬", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "賦予我方所有隨從+1/+1", "keywords": { "battlecry": { "type": "BUFF_ALL", "value": 1, "stat": "ALL" } }, "image": "assets/images/cards/cash_handout.webp" },
     { "id": "S026", "name": "停班停課", "category": "新聞", "cost": 2, "type": "NEWS", "rarity": "COMMON", "description": "沈默所有場上隨從2回合，如果是勞工賦予+2生命", "keywords": { "battlecry": { "type": "LOCK_ALL_AND_BUFF_CATEGORY", "value": 2, "target_category": "勞工", "buff_stat": "HEALTH", "buff_value": 2 } }, "image": "assets/images/cards/suspension.webp" },
     { "id": "S027", "name": "沉默不是金", "category": "新聞", "cost": 1, "type": "NEWS", "rarity": "COMMON", "description": "擊殺一個沉默中的隨從", "keywords": { "battlecry": { "type": "DESTROY_LOCKED", "target": { "side": "ALL", "type": "MINION" } } }, "image": "assets/images/cards/silence_is_not_gold.webp" },
+    { "id": "S028", "name": "贏了夫人又逃兵", "category": "新聞", "cost": 3, "type": "NEWS", "rarity": "COMMON", "description": "對一名隨從造成3點傷害 如果該隨從死亡 抽一張牌", "keywords": { "battlecry": { "type": "DAMAGE_AND_DRAW_IF_KILL", "value": 3, "target": { "side": "ALL", "type": "MINION" } } }, "image": "assets/images/cards/s028.webp" },
 
     // --- 隨從 (Minions) - 網軍 ---
     { "id": "TW048", "name": "網軍", "category": "平民", "cost": 0, "attack": 1, "health": 1, "type": "MINION", "rarity": "COMMON", "description": "衝鋒", "keywords": { "charge": true }, "image": "assets/images/cards/cyber_army.webp" },
