@@ -362,8 +362,58 @@ function init() {
 
     // --- Mode Selection Listeners ---
     document.getElementById('btn-mode-ai').addEventListener('click', () => {
-        showView('ai-battle-setup');
-        renderAIBattleSetup();
+        const videoOverlay = document.getElementById('video-overlay');
+        const video = document.getElementById('transition-video');
+
+        if (videoOverlay && video) {
+            videoOverlay.style.display = 'flex';
+            video.currentTime = 0;
+            video.play().catch(e => console.error("Video play failed:", e));
+
+            let transitionTriggered = false;
+
+            video.ontimeupdate = () => {
+                const triggerTime = video.duration - 0.6;
+                if (!transitionTriggered && video.currentTime >= triggerTime) {
+                    transitionTriggered = true;
+
+                    // 1. Pre-render content
+                    renderAIBattleSetup();
+
+                    // 2. Show the view instantly (ready behind the video)
+                    showView('ai-battle-setup', true);
+
+                    // 3. Apply staggered fade-in to UI panels
+                    const previewPanel = document.querySelector('.setup-preview-panel');
+                    const optionsPanel = document.querySelector('.setup-options-panel');
+
+                    if (previewPanel) {
+                        previewPanel.classList.remove('animate-fade-in', 'stagger-1');
+                        void previewPanel.offsetWidth; // Trigger reflow
+                        previewPanel.classList.add('animate-fade-in', 'stagger-1');
+                    }
+                    if (optionsPanel) {
+                        optionsPanel.classList.remove('animate-fade-in', 'stagger-2');
+                        void optionsPanel.offsetWidth; // Trigger reflow
+                        optionsPanel.classList.add('animate-fade-in', 'stagger-2');
+                    }
+
+                    // 4. Fade out the video overlay
+                    videoOverlay.classList.add('video-fade-out');
+                }
+            };
+
+            video.onended = () => {
+                // Ensure hard hide after CSS transition
+                videoOverlay.style.display = 'none';
+                videoOverlay.classList.remove('video-fade-out'); // Reset for next time
+                video.ontimeupdate = null;
+            };
+        } else {
+            // Fallback if video elements missing
+            showView('ai-battle-setup');
+            renderAIBattleSetup();
+        }
     });
 
     // --- PvP Mode Listener ---
@@ -2701,7 +2751,7 @@ function hideLoadingIndicator() {
     }
 }
 
-function showView(viewId) {
+function showView(viewId, isInstant = false) {
     const nextView = document.getElementById(viewId);
     if (!nextView) return;
 
@@ -2736,38 +2786,49 @@ function showView(viewId) {
 
     const views = document.querySelectorAll('.view');
 
-    // Identify and transition out all visible views except the target
-    views.forEach(v => {
-        if (v.style.display === 'flex' && v.id !== viewId) {
-            v.classList.add('exit-active');
-            v.classList.remove('enter-active');
-        } else if (v.id !== viewId) {
-            // Immediately hide non-active non-target views
+    if (isInstant) {
+        // Instant switch: hide all, show target
+        views.forEach(v => {
             v.style.display = 'none';
             v.classList.remove('enter-active', 'exit-active');
-        }
-    });
-
-    // Animate target view in
-    nextView.style.display = 'flex';
-    nextView.classList.add('enter-active');
-    nextView.classList.remove('exit-active');
-    nextView.scrollTop = 0;
-
-    const previousViewId = currentViewId;
-    currentViewId = viewId;
-
-    transitionTimeout = setTimeout(() => {
-        const currentViews = document.querySelectorAll('.view');
-        currentViews.forEach(v => {
-            if (v.id !== viewId) {
+        });
+        nextView.style.display = 'flex';
+        nextView.scrollTop = 0;
+        currentViewId = viewId;
+    } else {
+        // Identify and transition out all visible views except the target
+        views.forEach(v => {
+            if (v.style.display === 'flex' && v.id !== viewId) {
+                v.classList.add('exit-active');
+                v.classList.remove('enter-active');
+            } else if (v.id !== viewId) {
+                // Immediately hide non-active non-target views
                 v.style.display = 'none';
-                v.classList.remove('exit-active', 'enter-active');
+                v.classList.remove('enter-active', 'exit-active');
             }
         });
-        nextView.classList.remove('enter-active');
-        transitionTimeout = null;
-    }, 800); // Reduced from 1600ms for snappier transition and less black flash risk
+
+        // Animate target view in
+        nextView.style.display = 'flex';
+        nextView.classList.add('enter-active');
+        nextView.classList.remove('exit-active');
+        nextView.scrollTop = 0;
+
+        const previousViewId = currentViewId;
+        currentViewId = viewId;
+
+        transitionTimeout = setTimeout(() => {
+            const currentViews = document.querySelectorAll('.view');
+            currentViews.forEach(v => {
+                if (v.id !== viewId) {
+                    v.style.display = 'none';
+                    v.classList.remove('exit-active', 'enter-active');
+                }
+            });
+            nextView.classList.remove('enter-active');
+            transitionTimeout = null;
+        }, 800); // Reduced from 1600ms for snappier transition and less black flash risk
+    }
 
     // --- Update Cloud Visibility ---
     if (window.cloudManager) {
@@ -2784,7 +2845,7 @@ function showView(viewId) {
     if (audioManager) {
         if (viewId === 'battle-view') {
             audioManager.play();
-        } else if (previousViewId === 'battle-view' && viewId !== 'battle-view') {
+        } else if (currentViewId !== 'battle-view') {
             audioManager.pause();
         }
     }
