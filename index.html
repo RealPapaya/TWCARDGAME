@@ -462,14 +462,28 @@
 
             <!-- Mode Selection View -->
             <div id="mode-selection" class="view" style="display: none;">
-                <div class="menu-content">
-                    <h2 class="sub-title">選擇對戰模式</h2>
-                    <div class="menu-buttons">
-                        <button id="btn-mode-ai" class="neon-button">電腦對戰</button>
-                        <button id="btn-mode-player" class="neon-button">玩家對戰</button>
-                        <button class="neon-button secondary btn-back">返回</button>
+                <div class="mode-selection-split">
+                    <!-- 電腦對戰 (PvE) -->
+                    <div id="btn-mode-ai" class="mode-panel pve-panel">
+                        <div class="mode-panel-content">
+                            <h2 class="mode-title">電腦對戰</h2>
+                            <p class="mode-desc">挑戰各種不同難度的主題牌組，磨練你的技術。</p>
+                            <div class="mode-tag">單人模式</div>
+                        </div>
+                        <div class="mode-seam-rope"></div>
+                    </div>
+
+                    <!-- 玩家對戰 (PvP) -->
+                    <div id="btn-mode-player" class="mode-panel pvp-panel">
+                        <div class="mode-panel-content">
+                            <h2 class="mode-title">玩家對戰</h2>
+                            <p class="mode-desc">與真實玩家進行線上即時對戰，展現你的實力。</p>
+                            <div class="mode-tag">多人對戰</div>
+                        </div>
                     </div>
                 </div>
+                <!-- 返回按鈕 -->
+                <button class="mode-back-btn btn-back">← 返回</button>
             </div>
 
             <!-- PvP Matchmaking Modal -->
