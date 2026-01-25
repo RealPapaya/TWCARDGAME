@@ -144,7 +144,7 @@ class TutorialManager {
         if (!user.stats) user.stats = {};
         const level = user.level || 1;
         const progress = user.stats.tutorial_progress || 0;
-        console.log(`[Tutorial] Checking status: Lv.\${level}, Progress: \${progress}`);
+        console.log(`[Tutorial] Checking status: Lv.${level}, Progress: ${progress}`);
         if (level === 1 && progress < 17) { // Back to 17 steps (removed 1, added 1)
             this.startTutorial(progress);
         }
@@ -222,9 +222,9 @@ class TutorialManager {
         // We still need guide active
         if (this.guide) this.guide.classList.add('active');
 
-        // [New] Clear old highlights and update dialog immediately so user sees progress
-        this.hideHighlights();
-        this.updateDialog(stepConfig.text);
+        // Do NOT call hideHighlights here to allow smooth gliding between steps
+        // The individual step setup will handle positioning and visibility.
+        this.updateDialog(stepConfig.text || stepConfig.dialog); // Use dialog if text is not present
 
         // Logic for steps
         if (stepIndex === 1) {
@@ -396,8 +396,8 @@ class TutorialManager {
             });
         }
         else if (stepIndex === 15) { // Select Opponent
-            this.waitForElement('#deck-options-container', () => {
-                const selector = '.option-item[data-deck-id="dpp2"]';
+            const selector = '.option-item[data-deck-id="dpp2"]';
+            this.waitForElement(selector, () => {
                 this.setupTarget(selector, stepConfig.text);
                 this.addOneTimeClick(selector, () => {
                     setTimeout(() => this.advance(), 500);
@@ -426,12 +426,14 @@ class TutorialManager {
     createUI() {
         const container = document.createElement('div');
         container.id = 'tutorial-overlay';
+
+        // Add guide and dialog inside container
         container.innerHTML = `
             <div id="mask-top" class="tutorial-mask"></div>
             <div id="mask-bottom" class="tutorial-mask"></div>
             <div id="mask-left" class="tutorial-mask"></div>
             <div id="mask-right" class="tutorial-mask"></div>
-            <div id="tutorial-spotlight" class="tutorial-spotlight-border"></div>
+            <div class="tutorial-spotlight-border"></div>
             
             <div id="tutorial-guide">
                 <img src="assets/images/ko_guide.png" alt="Guide">
@@ -439,9 +441,19 @@ class TutorialManager {
             <div class="tutorial-dialog">
                 <div class="tutorial-dialog-content"></div>
             </div>
+            <div id="tutorial-blockers-container"></div>
         `;
-        // Always append to body for fixed positioning relative to viewport
+
         document.body.appendChild(container);
+
+        this.overlay = container;
+        this.guide = container.querySelector('#tutorial-guide');
+        this.dialog = container.querySelector('.tutorial-dialog');
+        this.masks = Array.from(container.querySelectorAll('.tutorial-mask'));
+        this.spotlightBorder = container.querySelector('.tutorial-spotlight-border');
+
+        // Initial state
+        this.hideHighlights();
     }
 
     blockElement(selector) {
@@ -455,13 +467,8 @@ class TutorialManager {
         blocker.style.width = `${rect.width}px`;
         blocker.style.height = `${rect.height}px`;
 
-        let container = document.getElementById('tutorial-blockers-container');
-        if (!container) {
-            // fallback if UI not updated yet
-            this.overlay.appendChild(document.createElement('div')).id = 'tutorial-blockers-container';
-            container = document.getElementById('tutorial-blockers-container');
-        }
-        container.appendChild(blocker);
+        const container = document.getElementById('tutorial-blockers-container');
+        if (container) container.appendChild(blocker);
     }
 
     clearBlockers() {
@@ -470,31 +477,37 @@ class TutorialManager {
     }
 
     hideHighlights() {
-        if (!this.overlay) return;
-        this.stopTracking(); // Stop loop
-        const masks = this.overlay.querySelectorAll('.tutorial-mask');
-        masks.forEach(m => m.style.display = 'none');
-        const spotlight = this.overlay.querySelector('#tutorial-spotlight');
-        if (spotlight) spotlight.style.display = 'none';
+        if (this.masks) {
+            this.masks.forEach(mask => {
+                mask.style.opacity = '0';
+                mask.style.pointerEvents = 'none';
+            });
+        }
+        if (this.spotlightBorder) {
+            this.spotlightBorder.style.opacity = '0';
+        }
+        this.stopTracking();
         this.targetElement = null;
     }
 
     setupTarget(selector, text) {
-        // Store selector for re-querying if element gets detached
         this.currentSelector = selector;
 
-        // Clean up previous highlight styles (if any remained)
         if (this.targetElement) {
             this.targetElement.classList.remove('tutorial-highlight');
 
-            // Revert modal boost if exists
             const modalParent = this.targetElement.closest('.modal-overlay');
             if (modalParent && modalParent.dataset.originalZIndex !== undefined) {
                 modalParent.style.zIndex = modalParent.dataset.originalZIndex;
                 delete modalParent.dataset.originalZIndex;
             }
 
-            // Restore position if we modified it
+            const viewParent = this.targetElement.closest('.view');
+            if (viewParent && viewParent.dataset.originalZIndex !== undefined) {
+                viewParent.style.zIndex = viewParent.dataset.originalZIndex;
+                delete viewParent.dataset.originalZIndex;
+            }
+
             if (this.targetElement.dataset.originalPosition === 'static') {
                 this.targetElement.style.position = '';
                 delete this.targetElement.dataset.originalPosition;
@@ -504,39 +517,37 @@ class TutorialManager {
         this.targetElement = document.querySelector(selector);
 
         if (this.targetElement) {
-            // Add highlight class to promote z-index
             this.targetElement.classList.add('tutorial-highlight');
 
-            // [Fix] If target is inside a modal-overlay, we MUST boost the modal's z-index too
-            // otherwise the button will be trapped under its parent's stacking context
             const modalParent = this.targetElement.closest('.modal-overlay');
             if (modalParent) {
                 modalParent.dataset.originalZIndex = modalParent.style.zIndex;
-                modalParent.style.zIndex = '100001'; // Above tutorial overlay (99999)
+                modalParent.style.zIndex = '100001';
             }
 
-            // [Fix] Handle positioning for z-index context
+            const viewParent = this.targetElement.closest('.view');
+            if (viewParent) {
+                viewParent.dataset.originalZIndex = viewParent.style.zIndex;
+                viewParent.style.zIndex = '100001';
+            }
+
             const computedStyle = window.getComputedStyle(this.targetElement);
             if (computedStyle.position === 'static') {
                 this.targetElement.dataset.originalPosition = 'static';
                 this.targetElement.style.position = 'relative';
             }
 
-            // Wait a bit for scroll/render, then update mask
             setTimeout(() => this.updateMask(), 300);
 
-            // Add resize listener to keep mask updated
             if (!this.resizeListener) {
                 this.resizeListener = () => this.updateMask();
                 window.addEventListener('resize', this.resizeListener);
                 window.addEventListener('scroll', this.resizeListener);
             }
 
-            // Start animation loop to track moving elements
             this.startTracking();
         } else {
             console.warn(`[Tutorial] Target not found: ${selector}`);
-            // If target not found, maybe just full mask?
             this.resetMask();
         }
 
@@ -564,17 +575,11 @@ class TutorialManager {
     updateMask() {
         if (!this.overlay) return;
 
-        // [Robustness Fix] Check if target is lost/detached and try to recover it
         if ((!this.targetElement || !this.targetElement.isConnected) && this.currentSelector) {
             const freshEl = document.querySelector(this.currentSelector);
             if (freshEl && freshEl !== this.targetElement) {
-                console.log('[Tutorial] Re-acquired detached target:', this.currentSelector);
                 this.targetElement = freshEl;
-
-                // Re-apply highlight class
                 this.targetElement.classList.add('tutorial-highlight');
-
-                // Re-apply positioning fix
                 const computedStyle = window.getComputedStyle(this.targetElement);
                 if (computedStyle.position === 'static') {
                     this.targetElement.dataset.originalPosition = 'static';
@@ -584,87 +589,83 @@ class TutorialManager {
         }
 
         if (!this.targetElement || !this.targetElement.isConnected) {
-            // Target is gone and cannot be found -> Full mask to be safe
+            // During transitions, the old target might disappear before the new one is found.
+            // If we are actively waiting for a new target (currentSelector is set), 
+            // do NOT reset the mask instantly to avoid flickering.
+            if (this.currentSelector) return;
+
             this.resetMask();
             return;
         }
 
         const rect = this.targetElement.getBoundingClientRect();
-        const spotlight = this.overlay.querySelector('#tutorial-spotlight');
-        const masks = this.overlay.querySelectorAll('.tutorial-mask');
 
-        // Ensure visible
-        masks.forEach(m => m.style.display = 'block');
-        spotlight.style.display = 'block';
+        if (rect.width === 0 || rect.height === 0) {
+            if (this.targetElement) return;
+        }
+
+        if (this.masks) {
+            this.masks.forEach(m => {
+                m.style.opacity = '1';
+                m.style.pointerEvents = 'auto';
+            });
+        }
+        if (this.spotlightBorder) {
+            this.spotlightBorder.style.opacity = '1';
+        }
 
         const maskTop = this.overlay.querySelector('#mask-top');
         const maskBottom = this.overlay.querySelector('#mask-bottom');
         const maskLeft = this.overlay.querySelector('#mask-left');
         const maskRight = this.overlay.querySelector('#mask-right');
 
-        const pad = 15; // Increased padding for better clearance
+        const pad = 15;
 
-        // Spotlight Border
-        spotlight.style.top = `${rect.top - pad}px`;
-        spotlight.style.left = `${rect.left - pad}px`;
-        spotlight.style.width = `${rect.width + pad * 2}px`;
-        spotlight.style.height = `${rect.height + pad * 2}px`;
-        spotlight.style.display = 'block';
+        if (this.spotlightBorder) {
+            this.spotlightBorder.style.top = `${rect.top - pad}px`;
+            this.spotlightBorder.style.left = `${rect.left - pad}px`;
+            this.spotlightBorder.style.width = `${rect.width + pad * 2}px`;
+            this.spotlightBorder.style.height = `${rect.height + pad * 2}px`;
+        }
 
-        // Masks Logic
-        // Top: 0 to rect.top-pad
-        maskTop.style.top = '0';
-        maskTop.style.left = '0';
-        maskTop.style.width = '100%';
-        maskTop.style.height = `${Math.max(0, rect.top - pad)}px`;
+        if (maskTop) {
+            maskTop.style.top = '0';
+            maskTop.style.left = '0';
+            maskTop.style.width = '100%';
+            maskTop.style.height = `${Math.max(0, rect.top - pad)}px`;
+        }
 
-        // Bottom: rect.bottom+pad to 100%
-        maskBottom.style.top = `${rect.bottom + pad}px`;
-        maskBottom.style.left = '0';
-        maskBottom.style.width = '100%';
-        maskBottom.style.height = `calc(100vh - ${rect.bottom + pad}px)`;
+        if (maskBottom) {
+            maskBottom.style.top = `${rect.bottom + pad}px`;
+            maskBottom.style.left = '0';
+            maskBottom.style.width = '100%';
+            maskBottom.style.height = `calc(100vh - ${rect.bottom + pad}px)`;
+        }
 
-        // Left: 0 to rect.left-pad (vertical bound by top/bottom masks??)
-        // Simplest strategy: Top/Bottom cover full width. Left/Right cover middle band.
+        if (maskLeft) {
+            maskLeft.style.top = `${rect.top - pad}px`;
+            maskLeft.style.left = '0';
+            maskLeft.style.width = `${Math.max(0, rect.left - pad)}px`;
+            maskLeft.style.height = `${rect.height + pad * 2}px`;
+        }
 
-        maskLeft.style.top = `${rect.top - pad}px`;
-        maskLeft.style.left = '0';
-        maskLeft.style.width = `${Math.max(0, rect.left - pad)}px`;
-        maskLeft.style.height = `${rect.height + pad * 2}px`;
-
-        // Right: rect.right+pad to 100%
-        maskRight.style.top = `${rect.top - pad}px`;
-        maskRight.style.left = `${rect.right + pad}px`;
-        maskRight.style.width = `calc(100vw - ${rect.right + pad}px)`;
-        maskRight.style.height = `${rect.height + pad * 2}px`;
+        if (maskRight) {
+            maskRight.style.top = `${rect.top - pad}px`;
+            maskRight.style.left = `${rect.right + pad}px`;
+            maskRight.style.width = `calc(100vw - ${rect.right + pad}px)`;
+            maskRight.style.height = `${rect.height + pad * 2}px`;
+        }
     }
 
     resetMask() {
-        // Cover everything if no target
-        const maskTop = this.overlay.querySelector('#mask-top');
-        const masks = this.overlay.querySelectorAll('.tutorial-mask');
-        if (maskTop) {
-            // Ensure visible
-            masks.forEach(m => m.style.display = 'block');
-
-            maskTop.style.top = '0';
-            maskTop.style.left = '0';
-            maskTop.style.width = '100vw';
-            maskTop.style.height = '100vh';
-
-            // Hide others to avoid overlaps (though z-index stack is same)
-            const otherMasks = [
-                this.overlay.querySelector('#mask-bottom'),
-                this.overlay.querySelector('#mask-left'),
-                this.overlay.querySelector('#mask-right')
-            ];
-            otherMasks.forEach(m => {
-                if (m) m.style.display = 'none';
+        if (this.masks) {
+            this.masks.forEach(mask => {
+                mask.style.opacity = '0';
+                mask.style.pointerEvents = 'none';
             });
-
-            // Hide spotlight
-            const spotlight = this.overlay.querySelector('#tutorial-spotlight');
-            if (spotlight) spotlight.style.display = 'none';
+        }
+        if (this.spotlightBorder) {
+            this.spotlightBorder.style.opacity = '0';
         }
     }
 
@@ -725,12 +726,17 @@ class TutorialManager {
             const el = document.querySelector(selector);
             if (el) {
                 const style = window.getComputedStyle(el);
-                const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && el.opacity !== '0';
+                // Improved visibility check: include '0' string and very low values
+                const opacity = parseFloat(style.opacity);
+                const isVisible = style.display !== 'none' && style.visibility !== 'hidden' && opacity > 0;
 
-                // offsetParent is null for fixed elements, so we use computed style check
                 if (isVisible) {
-                    callback(el);
-                    return;
+                    const rect = el.getBoundingClientRect();
+                    // Some elements might have width/height during transition but still be small
+                    if (rect.width > 2 && rect.height > 2) {
+                        callback(el);
+                        return;
+                    }
                 }
             }
             requestAnimationFrame(check);
@@ -756,7 +762,7 @@ class TutorialManager {
         // Grant Rewards
         if (AuthManager.currentUser) {
             AuthManager.currentUser.stats.tutorial_progress = 5; // Completed
-            
+
             // User requested 500 gold
             AuthManager.currentUser.gold = (AuthManager.currentUser.gold || 0) + 500;
 
@@ -768,7 +774,7 @@ class TutorialManager {
 
             // Sync and update UI
             AuthManager.saveData();
-            
+
             // Trigger UI updates (Globals from app.js)
             if (window.updatePlayerInfo) window.updatePlayerInfo();
             if (window.updateLevelDisplay) window.updateLevelDisplay();

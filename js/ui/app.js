@@ -372,49 +372,65 @@ function init() {
 
             let transitionTriggered = false;
 
+            const triggerTransition = () => {
+                if (transitionTriggered) return;
+                transitionTriggered = true;
+
+                if (videoOverlay) {
+                    videoOverlay.style.pointerEvents = 'none'; // [修正] 立即放開點擊攔截
+                    videoOverlay.classList.add('video-fade-out');
+                }
+
+                renderAIBattleSetup();
+                showView('ai-battle-setup', true);
+
+                // Apply staggered fade-in
+                const previewPanel = document.querySelector('.setup-preview-panel');
+                const optionsPanel = document.querySelector('.setup-options-panel');
+                if (previewPanel) {
+                    previewPanel.classList.remove('animate-fade-in', 'stagger-1');
+                    void previewPanel.offsetWidth;
+                    previewPanel.classList.add('animate-fade-in', 'stagger-1');
+                }
+                if (optionsPanel) {
+                    optionsPanel.classList.remove('animate-fade-in', 'stagger-2');
+                    void optionsPanel.offsetWidth;
+                    optionsPanel.classList.add('animate-fade-in', 'stagger-2');
+                }
+            };
+
+            // Allow clicking the overlay to skip
+            videoOverlay.addEventListener('click', () => {
+                console.log('[Video] Skip triggered by click');
+                triggerTransition();
+                // We'll let the video continue playing in the background or pause it
+                // To be safe and clean, we can pause it after some time
+                setTimeout(() => {
+                    video.pause();
+                    videoOverlay.style.display = 'none';
+                    videoOverlay.classList.remove('video-fade-out');
+                    video.ontimeupdate = null;
+                }, 500);
+            }, { once: true });
+
             video.ontimeupdate = () => {
                 const triggerTime = video.duration - 0.6;
                 if (!transitionTriggered && video.currentTime >= triggerTime) {
-                    transitionTriggered = true;
-
-                    // 1. Pre-render content
-                    renderAIBattleSetup();
-
-                    // 2. Show the view instantly (ready behind the video)
-                    showView('ai-battle-setup', true);
-
-                    // 3. Apply staggered fade-in to UI panels
-                    const previewPanel = document.querySelector('.setup-preview-panel');
-                    const optionsPanel = document.querySelector('.setup-options-panel');
-
-                    if (previewPanel) {
-                        previewPanel.classList.remove('animate-fade-in', 'stagger-1');
-                        void previewPanel.offsetWidth; // Trigger reflow
-                        previewPanel.classList.add('animate-fade-in', 'stagger-1');
-                    }
-                    if (optionsPanel) {
-                        optionsPanel.classList.remove('animate-fade-in', 'stagger-2');
-                        void optionsPanel.offsetWidth; // Trigger reflow
-                        optionsPanel.classList.add('animate-fade-in', 'stagger-2');
-                    }
-
-                    // 4. Fade out the video overlay
-                    videoOverlay.classList.add('video-fade-out');
+                    triggerTransition();
                 }
             };
 
             video.onended = () => {
-                // Ensure hard hide after CSS transition
                 videoOverlay.style.display = 'none';
-                videoOverlay.classList.remove('video-fade-out'); // Reset for next time
+                videoOverlay.classList.remove('video-fade-out');
                 video.ontimeupdate = null;
             };
         } else {
-            // Fallback if video elements missing
             showView('ai-battle-setup');
             renderAIBattleSetup();
         }
     });
+
 
     // --- PvP Mode Listener ---
     let matchmakingTimer = null;
@@ -3547,7 +3563,7 @@ async function executeOpponentAction(action) {
 
     switch (action.action) {
         case 'PLAY_CARD': {
-            const { cardId, handIndex, targetType, targetIndex, targetSide, insertionIndex } = action.data;
+            const { cardId, handIndex, targetType, targetIndex, targetSide, insertionIndex, resolvedEffect } = action.data;
 
             // 從 CARD_DATA 根據 cardId 查找卡牌資料
             const cardDef = window.CARD_DATA?.find(c => c.id === cardId);
@@ -3595,8 +3611,17 @@ async function executeOpponentAction(action) {
                     opponent.board.splice(insertIdx, 0, minion);
 
                     // 處理戰吼（如果有）
+                    // 【修正】使用 resolvedEffect 避免 desync
                     if (card.keywords?.battlecry) {
-                        gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                        if (resolvedEffect) {
+                            // 使用對方預先計算的效果值
+                            const modifiedBattlecry = { ...card.keywords.battlecry, value: resolvedEffect.value };
+                            gameState.resolveBattlecry(modifiedBattlecry, target, minion);
+                            console.log('[PvP] 使用 resolvedEffect:', resolvedEffect);
+                        } else {
+                            // 舊版相容：本地計算
+                            gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+                        }
                     }
                 } else if (card.type === 'NEWS') {
                     // 新聞牌直接執行效果
@@ -3604,8 +3629,19 @@ async function executeOpponentAction(action) {
 
                     let battlecryResult = null;
                     if (card.keywords?.battlecry) {
-                        card.side = opponent.side; // 確保 News Power 計算正確
-                        battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, card);
+                        card.side = opponent.side;
+
+                        // 【修正】使用 resolvedEffect 避免 desync
+                        if (resolvedEffect) {
+                            // 使用對方預先計算的效果值（含 News Power）
+                            const modifiedBattlecry = { ...card.keywords.battlecry, value: resolvedEffect.value };
+                            battlecryResult = gameState.resolveBattlecry(modifiedBattlecry, target, card);
+                            console.log('[PvP] NEWS 使用 resolvedEffect:', resolvedEffect);
+                        } else {
+                            // 舊版相容：本地計算（可能導致 desync）
+                            console.warn('[PvP] NEWS 無 resolvedEffect，使用本地計算（可能 desync）');
+                            battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, card);
+                        }
                     }
 
                     // 處理戰吼結果（特別是 DISCARD_DRAW 需要抽牌）
@@ -5819,13 +5855,34 @@ async function onDragEnd(e) {
 
                     // PvP 模式：同步出牌動作到 Firebase
                     if (isPvPMode && window.pvpManager) {
+                        // 計算戰吼效果值（含 News Power 加成）
+                        let resolvedEffect = null;
+                        if (playedCard.keywords?.battlecry) {
+                            const bc = playedCard.keywords.battlecry;
+                            const isNews = playedCard.type === 'NEWS';
+                            const isDamage = bc.type.includes('DAMAGE');
+                            const isHeal = bc.type.includes('HEAL') || bc.type.includes('RECOVER');
+                            const isBuff = bc.type.includes('BUFF');
+                            const needsBonus = (isDamage || isHeal || isBuff) && isNews;
+
+                            const bonus = needsBonus ? (gameState.getNewsPower('PLAYER') || 0) : 0;
+                            const effectValue = (bc.value || 0) + bonus;
+
+                            resolvedEffect = {
+                                type: bc.type,
+                                value: effectValue,
+                                stat: bc.stat || 'ALL'
+                            };
+                        }
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: playedCard.id,
                             handIndex: attackerIndex,
                             insertionIndex: currentInsertionIndex,
                             targetType: null,
                             targetIndex: null,
-                            targetSide: null
+                            targetSide: null,
+                            resolvedEffect: resolvedEffect
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
@@ -6261,13 +6318,27 @@ async function onDragEnd(e) {
 
                     // PvP 模式：同步帶目標的新聞牌出牌
                     if (isPvPMode && window.pvpManager) {
+                        // 計算效果值（含 News Power 加成）
+                        let resolvedEffect = null;
+                        if (card.keywords?.battlecry) {
+                            const bc = card.keywords.battlecry;
+                            const bonus = gameState.getNewsPower('PLAYER') || 0;
+                            const effectValue = (bc.value || 0) + bonus;
+                            resolvedEffect = {
+                                type: bc.type,
+                                value: effectValue,
+                                stat: bc.stat || 'ALL'
+                            };
+                        }
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: card.id,
                             handIndex: battlecrySourceIndex,
                             insertionIndex: -1,
                             targetType: target.type,
                             targetIndex: target.index,
-                            targetSide: target.side
+                            targetSide: target.side,
+                            resolvedEffect: resolvedEffect
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
@@ -6280,13 +6351,25 @@ async function onDragEnd(e) {
 
                     // PvP 模式：同步帶目標的戰吼效果
                     if (isPvPMode && window.pvpManager) {
+                        // 計算效果值（隨從戰吼不加 News Power，但仍傳遞以確保一致）
+                        let resolvedEffect = null;
+                        if (minionInfo?.keywords?.battlecry) {
+                            const bc = minionInfo.keywords.battlecry;
+                            resolvedEffect = {
+                                type: bc.type,
+                                value: bc.value || 0,
+                                stat: bc.stat || 'ALL'
+                            };
+                        }
+
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: minionInfo?.id,
                             handIndex: -1, // 已在場上
                             insertionIndex: battlecrySourceIndex,
                             targetType: target.type,
                             targetIndex: target.index,
-                            targetSide: target.side
+                            targetSide: target.side,
+                            resolvedEffect: resolvedEffect
                         });
                         syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
                     }
