@@ -28,8 +28,15 @@
     position: relative;
     z-index: 1;
     width: 1560px;
-    margin: 50px auto;
-    height: 980px;
+    height: 940px;
+    margin: auto;
+    /* 使用 auto 垂直水平居中，確保上下都有留白 */
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    /* 配合 margin: auto 達成絕對居中 */
     display: flex;
     flex-direction: column;
 
@@ -372,6 +379,48 @@
     overflow-y: auto;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 12px;
+    padding-bottom: 80px;
+    /* 大量的內部底部間距 */
+
+    /* ===== 主題風格滾動條 (Themed Scrollbar) ===== */
+    scrollbar-width: thin;
+    scrollbar-color: var(--wood-medium) rgba(0, 0, 0, 0.1);
+}
+
+/* 確保底層有足夠空間的 Spacer */
+.collection-grid::after {
+    content: '';
+    grid-column: 1 / -1;
+    height: 60px;
+    display: block;
+}
+
+/* Chrome, Edge, Safari */
+.collection-grid::-webkit-scrollbar {
+    width: 16px;
+}
+
+.collection-grid::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    margin: 20px 8px;
+    border: 1px solid var(--wood-dark);
+}
+
+.collection-grid::-webkit-scrollbar-thumb {
+    background: linear-gradient(to bottom, var(--gold), var(--gold-dark));
+    border: 3px solid var(--wood-dark);
+    border-radius: 10px;
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.4),
+        0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.collection-grid::-webkit-scrollbar-thumb:hover {
+    background: linear-gradient(to bottom, #fff0c8, var(--gold));
+    box-shadow:
+        inset 0 1px 2px rgba(255, 255, 255, 0.6),
+        0 0 15px rgba(212, 175, 55, 0.5);
 }
 
 .collection-card {
