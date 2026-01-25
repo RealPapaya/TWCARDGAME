@@ -1676,12 +1676,8 @@ function updatePlayerInfo() {
             testBtn.style.display = isAdmin() ? 'block' : 'none';
         }
     } else {
-        // 訪客模式：顯示訪客資訊
-        playerCard.style.display = 'flex';
-        usernameEl.textContent = '訪客模式';
-        avatarEl.style.backgroundImage = '';
-        avatarEl.textContent = '👤';
-        if (titleEl) titleEl.textContent = '#玩家稱號';
+        // 未登入：隱藏資訊卡
+        playerCard.style.display = 'none';
     }
 }
 
@@ -3904,7 +3900,8 @@ function renderDeckBuilder() {
 
         // Add Click to Add
         cardEl.addEventListener('click', async () => {
-            if (deck.cards.length >= 30) {
+            // Admin tests rules bypass
+            if (deck.cards.length >= 30 && !(window.isDebugMode && isAdmin())) {
                 showToast("牌組已滿 (30/30)");
                 return;
             }

@@ -29,7 +29,7 @@ const AuthUI = {
 
         this.btnLogin = document.getElementById("btn-do-login");
         this.btnRegister = document.getElementById("btn-do-register");
-        this.btnGuest = document.getElementById("btn-auth-guest");
+
     },
 
     bindEvents() {
@@ -43,16 +43,12 @@ const AuthUI = {
         // Register Action
         this.btnRegister.addEventListener("click", () => this.handleRegister());
 
-        // Guest Action
-        this.btnGuest.addEventListener("click", () => {
-            if (window.App && typeof window.App.showView === 'function') {
-                window.App.showView("main-menu");
-            } else {
-                // Fallback if App is not yet initialized or structured differently
-                this.view.style.display = "none";
-                document.getElementById("main-menu").style.display = "flex";
-            }
-        });
+        // Enter key support
+        const handleEnter = (e) => {
+            if (e.key === 'Enter') this.handleLogin();
+        };
+        this.loginUsernameField.addEventListener('keydown', handleEnter);
+        this.loginPasswordField.addEventListener('keydown', handleEnter);
     },
 
     switchTab(type) {
