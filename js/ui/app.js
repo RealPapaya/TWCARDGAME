@@ -1045,16 +1045,17 @@ document.getElementById('end-turn-btn').addEventListener('click', async () => {
     try {
         // PvP 模式：同步結束回合到 Firebase
         if (isPvPMode && window.pvpManager) {
-            // 先同步動作
-            await window.pvpManager.syncGameAction('END_TURN', {});
-            // 通知 Firebase 切換回合
-            await window.pvpManager.endTurn();
-
             // 本地結束回合 (不觸發 startTurn，等 Firebase 通知)
             gameState.endTurn(true); // skipStartTurn = true
-            syncLocalStateToFirebase(); // 同步回合結束後的狀態 (Mana, HandSize)
+
+            // ✅ 立即渲染並處理死亡
             render();
             await resolveDeaths();
+
+            // ✅ 在死亡處理後再同步 PVP
+            await window.pvpManager.syncGameAction('END_TURN', {});
+            await window.pvpManager.endTurn();
+            syncLocalStateToFirebase(); // ✅ 同步乾淨的狀態
 
             console.log('[PvP] 已結束回合，等待對手...');
         } else {
@@ -3700,21 +3701,7 @@ async function executeOpponentAction(action) {
                             battlecryResult = gameState.resolveBattlecry(modifiedBattlecry, target, minion);
                             console.log('[PvP] 使用 resolvedEffect:', resolvedEffect);
                         } else {
-<<<<<<< HEAD
-                            battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
-                        }
-
-                        // [Fix] Visualize LOCK (Silence) effect from opponent
-                        if (battlecryResult && battlecryResult.type === 'LOCK' && battlecryResult.target) {
-                            const targetSide = battlecryResult.target.side; // 'PLAYER' or 'OPPONENT'
-                            const targetBoardId = (targetSide === 'PLAYER') ? 'player-board' : 'opp-board';
-                            const tBoard = document.getElementById(targetBoardId);
-                            if (tBoard && tBoard.children[battlecryResult.target.index]) {
-                                triggerCombatEffect(tBoard.children[battlecryResult.target.index], 'LOCK');
-                            }
-=======
                             gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                         }
                     }
                     // board 會由 onGameStateUpdate 進一步確認同步，但本地先加確保流暢與邏輯正確
@@ -3815,15 +3802,20 @@ async function executeOpponentAction(action) {
                 // 切換回原本視角
                 gameState.currentPlayerIdx = originalIdx;
 
+                // ✅ 立即渲染並處理死亡
+                render();
+                await resolveDeaths();
+
                 // 記錄歷史
                 MatchHistory.add('PLAY', {
                     player: "對手",
                     card: card.name
                 });
 
-                // 渲染更新（不需要額外同步，對手會自行同步其狀態）
-                render();
-                await resolveDeaths();
+                // ✅ 確保對手出牌後本地狀態也同步
+                if (isPvPMode && window.pvpManager) {
+                    syncLocalStateToFirebase();
+                }
 
             } catch (e) {
                 console.error('[PvP] 執行對手出牌失敗:', e);
@@ -3917,17 +3909,11 @@ async function executeOpponentAction(action) {
                 } else {
                     console.warn('[PvP] 攻擊目標丟失!', action.data);
                 }
-<<<<<<< HEAD
-=======
-
-                // ✅ 立即同步狀態到 Firebase
-                syncLocalStateToFirebase();
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
 
                 render();
-                await resolveDeaths();  // 先處理死亡
+                await resolveDeaths();  // ✅ 先處理死亡
 
-                // ✅ [Validation] Ensure no dead minions before sync
+                // ✅ [Validation] 驗證沒有殭屍隨從（防禦性編程）
                 const player = gameState.players[0];
                 const deadMinions = player.board.filter(m => m.currentHealth <= 0);
                 if (deadMinions.length > 0) {
@@ -3935,7 +3921,7 @@ async function executeOpponentAction(action) {
                     player.board = player.board.filter(m => m.currentHealth > 0);
                 }
 
-                // 在死亡處理後再同步狀態
+                // ✅ 在死亡處理後再同步狀態（只同步一次）
                 syncLocalStateToFirebase();
 
             } catch (e) {
@@ -6018,7 +6004,28 @@ async function onDragEnd(e) {
                     // [Immediate Feedback] Render as soon as card is played in engine
                     render();
 
-                    // PvP 模式：同步出牌動作到 Firebase
+                    // 3. Trigger Dust and Sound at newly played minion (Capture from fresh DOM)
+                    const boardEl = document.getElementById('player-board');
+                    const newMinionEl = boardEl.children[currentInsertionIndex];
+                    if (newMinionEl && playedCard.type === 'MINION') {
+                        const intensity = playedCard.cost >= 7 ? 2 : 1;
+                        spawnDustEffect(newMinionEl, intensity);
+                    }
+
+                    // 4. Execute Battlecry (if exists)
+                    let battlecryResult = null;
+                    if (playedCard.keywords && playedCard.keywords.battlecry) {
+                        await new Promise(r => setTimeout(r, 300)); // 短暫延遲讓動畫開始
+
+                        const minionOnBoard = gameState.currentPlayer.board[currentInsertionIndex];
+                        battlecryResult = gameState.resolveBattlecry(playedCard.keywords.battlecry, null, minionOnBoard);
+
+                        // ✅ 立即渲染並處理死亡
+                        render();
+                        await resolveDeaths();
+                    }
+
+                    // ✅ 5. PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
                         // 計算戰吼效果值（含 News Power 加成）
                         let resolvedEffect = null;
@@ -6040,7 +6047,7 @@ async function onDragEnd(e) {
                             };
                         }
 
-                        // 獲取剛打出的隨從實例ID (從 board 中獲取)
+                        // 獲取剛打出的隨從實例ID
                         let instanceId = null;
                         if (playedCard.type === 'MINION') {
                             const playedMinion = gameState.currentPlayer.board[currentInsertionIndex];
@@ -6057,269 +6064,213 @@ async function onDragEnd(e) {
                             targetIndex: null,
                             targetSide: null,
                             resolvedEffect: resolvedEffect,
-                            instanceId: instanceId // ✅ 傳遞 instanceId 用於去重
+                            instanceId: instanceId
                         });
-                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
+
+                        syncLocalStateToFirebase(); // ✅ 同步乾淨的狀態
                     }
 
-                    // 3. Trigger Dust and Sound at newly played minion (Capture from fresh DOM)
-                    const boardEl = document.getElementById('player-board');
-                    const newMinionEl = boardEl.children[currentInsertionIndex];
-                    if (newMinionEl && playedCard.type === 'MINION') {
-                        const intensity = playedCard.cost >= 7 ? 2 : 1;
-                        spawnDustEffect(newMinionEl, intensity);
-                    }
+                    // 6. Handle battlecry visual effects (if result exists)
+                    if (battlecryResult) {
+                        const result = battlecryResult;
+                        if (result.type === 'DAMAGE' || result.type === 'HEAL' || result.type === 'BUFF') {
+                            // Find the DOM element for the target
+                            let targetEl = null;
 
-                    // [Responsive Fix] Reduced wait from 0.5s to 0.2s
-                    await new Promise(r => setTimeout(r, 500));
-
-                    // 5. Execute Battlecry manually to get the result/target
-                    if (playedCard.keywords && playedCard.keywords.battlecry) {
-                        const minionOnBoard = gameState.currentPlayer.board[currentInsertionIndex];
-                        const result = gameState.resolveBattlecry(playedCard.keywords.battlecry, null, minionOnBoard);
-
-                        // [Immediate Feedback] Render after battlecry resolution
-                        render();
-                        await resolveDeaths();
-
-                        if (result) {
-                            // 6. Show Visual Effects based on result
-                            if (result.type === 'DAMAGE' || result.type === 'HEAL' || result.type === 'BUFF') {
-                                // Find the DOM element for the target
-                                let targetEl = null;
-
-                                if (result.target) {
-                                    if (result.target.type === 'HERO') {
-                                        targetEl = result.target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
-                                    } else {
-                                        const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                        const board = document.getElementById(boardId);
-                                        if (board) targetEl = board.children[result.target.index];
-                                    }
+                            if (result.target) {
+                                if (result.target.type === 'HERO') {
+                                    targetEl = result.target.side === 'OPPONENT' ? document.getElementById('opp-hero') : document.getElementById('player-hero');
+                                } else {
+                                    const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                    const board = document.getElementById(boardId);
+                                    if (board) targetEl = board.children[result.target.index];
                                 }
+                            }
 
-                                if (playedCard.id === 'S020' && targetEl) {
-                                    triggerPurgeAnimation(targetEl);
-                                }
+                            if (playedCard.id === 'S020' && targetEl) {
+                                triggerPurgeAnimation(targetEl);
+                            }
 
-                                if (targetEl) {
-                                    // Determine arrow color based on battlecry type
-                                    const bcType = playedCard.keywords?.battlecry?.type;
-                                    let arrowColor = '#ff0000'; // Default red for damage
-                                    let effectType = 'DAMAGE';
-
-                                    if (result.type === 'HEAL') {
-                                        arrowColor = '#43e97b';
-                                        effectType = 'HEAL';
-                                    } else if (result.type === 'BUFF') {
-                                        arrowColor = '#ffa500';
-                                        effectType = 'BUFF';
-                                    } else if (result.type === 'DESTROY' || result.type === 'EAT' ||
-                                        bcType === 'DESTROY' || bcType === 'DESTROY_DAMAGED' ||
-                                        bcType === 'DESTROY_LOW_ATTACK' || bcType === 'DESTROY_HIGH_ATTACK' ||
-                                        bcType === 'SET_DEATH_TIMER' || bcType === 'DESTROY_LOCKED') {
-                                        arrowColor = '#000000'; // Black for destroy
-                                        effectType = 'DESTROY';
-                                    }
-
-                                    await animateAbility(newMinionEl, targetEl, arrowColor, true);
-                                    triggerCombatEffect(targetEl, effectType);
-                                }
-
-                                // Log history (moved outside targetEl check so it always logs)
-                                console.log('[BATTLECRY LOG] playedCard:', playedCard.name, 'type:', playedCard.type);
-                                console.log('[BATTLECRY LOG] result:', result);
-
-                                const sourceName = playedCard.name;
-                                const destSide = result.target.side;
-                                const destName = getUnitName(destSide, result.target.index, result.target.type);
-
-                                console.log('[BATTLECRY LOG] sourceName:', sourceName, 'destName:', destName, 'destSide:', destSide);
-
-                                // 區分新聞牌和隨從的記錄
-                                const isNews = playedCard.type === 'NEWS';
-                                console.log('[BATTLECRY LOG] isNews:', isNews, 'result.type:', result.type);
+                            if (targetEl) {
+                                // Determine arrow color based on battlecry type
+                                const bcType = playedCard.keywords?.battlecry?.type;
+                                let arrowColor = '#ff0000'; // Default red for damage
+                                let effectType = 'DAMAGE';
 
                                 if (result.type === 'HEAL') {
-                                    const eventType = isNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
-                                    console.log('[BATTLECRY LOG] Adding HEAL event:', eventType);
-                                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
-                                } else if (result.type === 'DAMAGE') {
-                                    const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
-                                    console.log('[BATTLECRY LOG] Adding DAMAGE event:', eventType, 'value:', result.value);
-                                    MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
+                                    arrowColor = '#43e97b';
+                                    effectType = 'HEAL';
+                                } else if (result.type === 'BUFF') {
+                                    arrowColor = '#ffa500';
+                                    effectType = 'BUFF';
+                                } else if (result.type === 'DESTROY' || result.type === 'EAT' ||
+                                    bcType === 'DESTROY' || bcType === 'DESTROY_DAMAGED' ||
+                                    bcType === 'DESTROY_LOW_ATTACK' || bcType === 'DESTROY_HIGH_ATTACK' ||
+                                    bcType === 'SET_DEATH_TIMER' || bcType === 'DESTROY_LOCKED') {
+                                    arrowColor = '#000000'; // Black for destroy
+                                    effectType = 'DESTROY';
                                 }
-                            } else if (result.type === 'EAT') {
-                                // Find target
-                                const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                const targetEl = document.getElementById(boardId).children[result.target.index];
 
+                                await animateAbility(newMinionEl, targetEl, arrowColor, true);
+                                triggerCombatEffect(targetEl, effectType);
+                            }
+
+                            // Log history (moved outside targetEl check so it always logs)
+                            const sourceName = playedCard.name;
+                            const destSide = result.target?.side;
+                            const destName = destSide ? getUnitName(destSide, result.target.index, result.target.type) : "目標";
+
+                            const isNews = playedCard.type === 'NEWS';
+                            if (result.type === 'HEAL') {
+                                const eventType = isNews ? 'NEWS_HEAL' : 'BATTLECRY_HEAL';
+                                MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
+                            } else if (result.type === 'DAMAGE') {
+                                const eventType = isNews ? 'NEWS_DAMAGE' : 'BATTLECRY_DAMAGE';
+                                MatchHistory.add(eventType, { source: sourceName, target: destName, value: result.value || 0 });
+                            }
+                        } else if (result.type === 'EAT') {
+                            const boardId = result.target.side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                            const targetEl = document.getElementById(boardId).children[result.target.index];
+
+                            if (targetEl) {
+                                await animateAbility(newMinionEl, targetEl, '#000000', true);
+                                triggerCombatEffect(targetEl, 'DESTROY');
+                                await new Promise(r => setTimeout(r, 200));
+                                triggerCombatEffect(newMinionEl, 'BUFF');
+                            }
+                        } else if (result.type === 'HEAL_ALL') {
+                            const isPlayer = result.affected[0]?.unit.side === 'PLAYER';
+                            triggerFullBoardHealAnimation(isPlayer);
+                        } else if (result.type === 'DAMAGE_ALL') {
+                            if (playedCard.id === 'S015') {
+                                triggerPoisonGasAnimation();
+                            } else if (playedCard.id === 'S019') {
+                                triggerRippleDiffusionAnimation(true);
+                            }
+
+                            result.affected.forEach(aff => {
+                                const boardId = aff.unit.side === 'PLAYER' ? 'player-board' : 'opp-board';
+                                const targetEl = document.getElementById(boardId).children[aff.unit.index];
                                 if (targetEl) {
-                                    await animateAbility(newMinionEl, targetEl, '#000000', true); // Black for destroy/eat
-                                    triggerCombatEffect(targetEl, 'DESTROY');
-                                    // Visual delay before buffing self
-                                    await new Promise(r => setTimeout(r, 200));
-                                    triggerCombatEffect(newMinionEl, 'BUFF');
+                                    triggerCombatEffect(targetEl, 'DAMAGE');
                                 }
-                            } else if (result.type === 'HEAL_ALL') {
-                                // Trigger Full Board Visual Effect instead of granular ones
-                                const isPlayer = result.affected[0]?.unit.side === 'PLAYER';
-                                triggerFullBoardHealAnimation(isPlayer);
-                            } else if (result.type === 'DAMAGE_ALL') {
-                                if (playedCard.id === 'S015') { // 武漢肺炎
-                                    triggerPoisonGasAnimation();
-                                } else if (playedCard.id === 'S019') { // 查水表
-                                    triggerRippleDiffusionAnimation(true);
-                                }
+                            });
+                        } else if (result.type === 'BOUNCE_ALL') {
+                            if (result.bounced && result.bounced.length > 0) {
+                                const isOpponentBoard = result.bounced[0].side === 'OPPONENT';
+                                triggerFullBoardBounceAnimation(!isOpponentBoard);
+                            } else {
+                                triggerFullBoardBounceAnimation(false);
+                            }
+                            previousPlayerHandSize = gameState.currentPlayer.hand.length;
 
-                                // Apply individual damage numbers/shake
-                                result.affected.forEach(aff => {
-                                    const boardId = aff.unit.side === 'PLAYER' ? 'player-board' : 'opp-board';
-                                    const targetEl = document.getElementById(boardId).children[aff.unit.index];
-                                    if (targetEl) {
-                                        triggerCombatEffect(targetEl, 'DAMAGE');
-                                    }
-                                });
-                            } else if (result.type === 'BOUNCE_ALL') {
-                                // Tsai Ing-wen or Cabinet Resignation
-                                if (result.bounced && result.bounced.length > 0) {
-                                    const isOpponentBoard = result.bounced[0].side === 'OPPONENT';
-                                    triggerFullBoardBounceAnimation(!isOpponentBoard);
-                                } else {
-                                    triggerFullBoardBounceAnimation(false);
-                                }
-                                // Suppress deck animation for bounced cards
-                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
-
-                                // If pets were summoned (Lele & Xiangxiang), animate them
-                                if (result.summonedCount && result.summonedCount > 0) {
-                                    render();
-                                    setTimeout(() => {
-                                        const boardEl = document.getElementById('player-board');
-                                        const sourceIdx = gameState.currentPlayer.board.findIndex(m => m.id === playedCard.id);
-                                        if (sourceIdx !== -1) {
-                                            // Animate left pet (Lele)
-                                            if (sourceIdx > 0 && boardEl.children[sourceIdx - 1]) {
-                                                boardEl.children[sourceIdx - 1].classList.add('pop-in');
-                                            }
-                                            // Animate right pet (Xiangxiang)
-                                            if (sourceIdx < boardEl.children.length - 1 && boardEl.children[sourceIdx + 1]) {
-                                                boardEl.children[sourceIdx + 1].classList.add('pop-in');
-                                            }
-                                        }
-                                    }, 50);
-                                }
-                            } else if (result.type === 'BOUNCE') {
-                                // Find target
-                                const side = result.target.side || 'OPPONENT';
-                                const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                const board = document.getElementById(boardId);
-                                const targetEl = (board && result.target.index !== undefined) ? board.children[result.target.index] : null;
-
-                                if (targetEl) {
-                                    // Visual arrow
-                                    await animateAbility(newMinionEl, targetEl, '#a335ee', true);
-                                    triggerCombatEffect(targetEl, 'BOUNCE');
-                                    await new Promise(r => setTimeout(r, 400));
-                                    render();
-                                }
-                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
-                            } else if (result.type === 'ADD_CARD') {
-                                // Cards added to hand (e.g., 高端疫苗 from 陳時中)
-                                // Suppress deck animation in renderHands
-                                previousPlayerHandSize = gameState.currentPlayer.hand.length;
-
-                                // Render to create the card elements (they will be visible but we'll apply pop-in)
+                            if (result.summonedCount && result.summonedCount > 0) {
                                 render();
-
-                                // Get hand and apply sequential pop-in
-                                const handEl = document.getElementById('player-hand');
-                                const newCount = result.count || 1;
-                                for (let i = 0; i < newCount; i++) {
-                                    const cardIdx = handEl.children.length - newCount + i;
-                                    const el = handEl.children[cardIdx];
-                                    if (el) {
-                                        el.classList.add('pop-in');
-                                        // Auto-cleanup after animation
-                                        setTimeout(() => el.classList.remove('pop-in'), 600);
-                                        // Small delay for sequential appearance
-                                        await new Promise(r => setTimeout(r, 200));
-                                    }
-                                }
-                            } else if (result.type === 'SUMMON_MULTIPLE') {
-                                render();
-                                // Animate the new minions (assumed to be at the end of the board)
                                 setTimeout(() => {
                                     const boardEl = document.getElementById('player-board');
-                                    const total = boardEl.children.length;
-                                    for (let i = 0; i < result.count; i++) {
-                                        const token = boardEl.children[total - 1 - i];
-                                        if (token) {
-                                            token.classList.add('pop-in');
+                                    const sourceIdx = gameState.currentPlayer.board.findIndex(m => m.id === playedCard.id);
+                                    if (sourceIdx !== -1) {
+                                        if (sourceIdx > 0 && boardEl.children[sourceIdx - 1]) {
+                                            boardEl.children[sourceIdx - 1].classList.add('pop-in');
+                                        }
+                                        if (sourceIdx < boardEl.children.length - 1 && boardEl.children[sourceIdx + 1]) {
+                                            boardEl.children[sourceIdx + 1].classList.add('pop-in');
                                         }
                                     }
                                 }, 50);
-                            } else if (result.type === 'DESTROY_ALL') {
-                                // 921 Earthquake
-                                triggerEarthquakeAnimation();
-                            } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
-                                const handEl = document.getElementById('player-hand');
-                                let discardEls = [];
-                                if (result.indices) {
-                                    discardEls = result.indices.map(idx => handEl.children[idx]).filter(el => el);
-                                } else if (result.index !== undefined) {
-                                    discardEls = [handEl.children[result.index]].filter(el => el);
-                                } else {
-                                    const count = result.count || 1;
-                                    discardEls = Array.from(handEl.children).slice(-count);
-                                }
+                            }
+                        } else if (result.type === 'BOUNCE') {
+                            const side = result.target.side || 'OPPONENT';
+                            const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                            const board = document.getElementById(boardId);
+                            const targetEl = (board && result.target.index !== undefined) ? board.children[result.target.index] : null;
 
-                                // --- PERFECT: DO NOT TOUCH DISCARD_DRAW ANIMATION LOGIC ---
-                                // Sequence: Discard -> Render Hand Gap -> Small Wait -> Draw Loop (Render after each)
-                                if (discardEls.length > 0) {
-                                    await Promise.all(discardEls.map(el => animateDiscard(el)));
-                                    render(); // Close the gap in hand immediately
-                                    await new Promise(r => setTimeout(r, 300));
+                            if (targetEl) {
+                                await animateAbility(newMinionEl, targetEl, '#a335ee', true);
+                                triggerCombatEffect(targetEl, 'BOUNCE');
+                                await new Promise(r => setTimeout(r, 400));
+                                render();
+                            }
+                            previousPlayerHandSize = gameState.currentPlayer.hand.length;
+                        } else if (result.type === 'ADD_CARD') {
+                            previousPlayerHandSize = gameState.currentPlayer.hand.length;
+                            render();
+                            const handEl = document.getElementById('player-hand');
+                            const newCount = result.count || 1;
+                            for (let i = 0; i < newCount; i++) {
+                                const cardIdx = handEl.children.length - newCount + i;
+                                const el = handEl.children[cardIdx];
+                                if (el) {
+                                    el.classList.add('pop-in');
+                                    setTimeout(() => el.classList.remove('pop-in'), 600);
+                                    await new Promise(r => setTimeout(r, 200));
                                 }
-                                if (result.type === 'DISCARD_DRAW' && result.drawCount) {
-                                    for (let i = 0; i < result.drawCount; i++) {
-                                        gameState.currentPlayer.drawCard();
-                                        render();
-                                        await new Promise(r => setTimeout(r, 600));
+                            }
+                        } else if (result.type === 'SUMMON_MULTIPLE') {
+                            render();
+                            setTimeout(() => {
+                                const boardEl = document.getElementById('player-board');
+                                const total = boardEl.children.length;
+                                for (let i = 0; i < result.count; i++) {
+                                    const token = boardEl.children[total - 1 - i];
+                                    if (token) {
+                                        token.classList.add('pop-in');
                                     }
                                 }
-                            } else if (result.type === 'DRAW') {
-                                // Universal sequential draw handling (Matches S001 logic)
-                                const count = result.value || result.count || 1;
-                                for (let i = 0; i < count; i++) {
-                                    gameState.currentPlayer.drawCard(result.cardIndex || -1, result.reduction || 0);
+                            }, 50);
+                        } else if (result.type === 'DESTROY_ALL') {
+                            triggerEarthquakeAnimation();
+                        } else if (result.type === 'DISCARD' || result.type === 'DISCARD_DRAW') {
+                            const handEl = document.getElementById('player-hand');
+                            let discardEls = [];
+                            if (result.indices) {
+                                discardEls = result.indices.map(idx => handEl.children[idx]).filter(el => el);
+                            } else if (result.index !== undefined) {
+                                discardEls = [handEl.children[result.index]].filter(el => el);
+                            } else {
+                                const count = result.count || 1;
+                                discardEls = Array.from(handEl.children).slice(-count);
+                            }
+
+                            if (discardEls.length > 0) {
+                                await Promise.all(discardEls.map(el => animateDiscard(el)));
+                                render();
+                                await new Promise(r => setTimeout(r, 300));
+                            }
+                            if (result.type === 'DISCARD_DRAW' && result.drawCount) {
+                                for (let i = 0; i < result.drawCount; i++) {
+                                    gameState.currentPlayer.drawCard();
                                     render();
                                     await new Promise(r => setTimeout(r, 600));
                                 }
-                            } else if (result.type === 'BUFF_HAND') {
-                                const handEl = document.getElementById('player-hand');
-                                handEl.classList.add('hand-flash');
-                                setTimeout(() => handEl.classList.remove('hand-flash'), 500);
-                            } else if (result.type === 'BUFF_ALL') {
-                                if (result.affected) {
-                                    result.affected.forEach(aff => {
-                                        const side = aff.unit.side || 'PLAYER'; // Default to player if side missing
-                                        const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
-                                        const targetEl = document.getElementById(boardId).children[aff.unit.index];
-                                        if (targetEl) {
-                                            triggerCombatEffect(targetEl, 'BUFF');
-                                        }
-                                    });
-                                }
-                                // Log AOE Buff
-                                MatchHistory.add('PLAY', { player: "你", card: `${playedCard.name} (集體增益)` });
                             }
+                        } else if (result.type === 'DRAW') {
+                            const count = result.value || result.count || 1;
+                            for (let i = 0; i < count; i++) {
+                                gameState.currentPlayer.drawCard(result.cardIndex || -1, result.reduction || 0);
+                                render();
+                                await new Promise(r => setTimeout(r, 600));
+                            }
+                        } else if (result.type === 'BUFF_HAND') {
+                            const handEl = document.getElementById('player-hand');
+                            handEl.classList.add('hand-flash');
+                            setTimeout(() => handEl.classList.remove('hand-flash'), 500);
+                        } else if (result.type === 'BUFF_ALL') {
+                            if (result.affected) {
+                                result.affected.forEach(aff => {
+                                    const side = aff.unit.side || 'PLAYER';
+                                    const boardId = side === 'OPPONENT' ? 'opp-board' : 'player-board';
+                                    const targetEl = document.getElementById(boardId).children[aff.unit.index];
+                                    if (targetEl) {
+                                        triggerCombatEffect(targetEl, 'BUFF');
+                                    }
+                                });
+                            }
+                            MatchHistory.add('PLAY', { player: "你", card: `${playedCard.name} (集體增益)` });
                         }
                     }
 
-
                     await resolveDeaths();
-
                 } catch (err) {
                     logMessage(err.message);
                     render();
@@ -6369,10 +6320,7 @@ async function onDragEnd(e) {
                     });
 
                     // ✅ [修正] 傳遞 side: 'OPPONENT' 確保 engine 能找到目標
-<<<<<<< HEAD
                     // ✅ 修正後的代碼
-=======
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                     gameState.attack(attackerIndex, { type, index, side: 'OPPONENT' });
 
                     render();
@@ -6380,68 +6328,35 @@ async function onDragEnd(e) {
 
                     // ✅ 在死亡結算後再處理 PvP 同步
                     if (isPvPMode && window.pvpManager) {
-<<<<<<< HEAD
                         // 取得攻擊後的狀態（已經過死亡處理）
                         let targetCurrentHealth = 0;
                         let targetInstanceId = null;
-=======
-                        // 取得目標（攻擊前）的狀態用於驗證
-                        let targetCurrentHealth = 0;
-                        let targetInstanceId = null; // ✅ [新增] 用於遠端精確匹配
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
 
                         if (type === 'HERO') {
                             targetCurrentHealth = gameState.players[1].hero.hp;
                         } else if (index !== null) {
-<<<<<<< HEAD
                             // 注意：目標可能已經死亡，需要處理 undefined
                             const targetMinion = gameState.players[1].board[index];
                             if (targetMinion) {
                                 targetCurrentHealth = targetMinion.currentHealth;
                                 targetInstanceId = targetMinion.instanceId;
-=======
-                            const targetMinion = gameState.players[1].board[index];
-                            if (targetMinion) {
-                                targetCurrentHealth = targetMinion.currentHealth;
-                                targetInstanceId = targetMinion.instanceId; // ✅ 獲取實例ID
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                             }
                         }
 
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
-<<<<<<< HEAD
                             targetIndex: index,
                             targetInstanceId: targetInstanceIdBefore || targetInstanceId, // Use early captured ID
-=======
-                            targetIndex: index,  // 英雄時為 null，隨從時為數字
-                            targetInstanceId: targetInstanceId, // ✅ 傳遞實例ID
-                            // [新增] 傳遞實際傷害值，避免 desync
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                             resolvedDamage: {
                                 attackerAttack: attacker ? attacker.attack : 0,
                                 attackerHealth: attacker ? attacker.currentHealth : 0,
                                 targetHealthBefore: targetCurrentHealth,
-<<<<<<< HEAD
                                 damage: damage
                             }
                         });
 
                         syncLocalStateToFirebase();  // ⬅️ 最後同步狀態
-=======
-                                damage: damage // ✅ 明確傳遞造成的傷害
-                            }
-                        });
-                    }
-
-                    render();
-                    await resolveDeaths();
-
-                    // [修正] 在死亡結算後再同步狀態，避免送出 HP<=0 的殭屍隨從
-                    if (isPvPMode && window.pvpManager) {
-                        syncLocalStateToFirebase();
->>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                     }
                 } catch (err) {
                     logMessage(err.message);
@@ -6554,7 +6469,11 @@ async function onDragEnd(e) {
                     const outcome = gameState.playCard(battlecrySourceIndex, target);
                     battlecryResult = outcome.battlecryResult;
 
-                    // PvP 模式：同步帶目標的新聞牌出牌
+                    // ✅ 立即渲染並處理死亡
+                    render();
+                    await resolveDeaths();
+
+                    // ✅ PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
                         // 計算效果值（含 News Power 加成）
                         let resolvedEffect = null;
@@ -6581,7 +6500,8 @@ async function onDragEnd(e) {
                             targetInstanceId: targetInstanceId, // [新增] 傳遞目標實例 ID
                             resolvedEffect: resolvedEffect
                         });
-                        syncLocalStateToFirebase(); // 同步出牌後的狀態 (Mana, HandSize)
+
+                        syncLocalStateToFirebase(); // ✅ 同步乾淨的狀態
                     }
                 } else {
                     // For Minion: It's already pending on board, just resolve battlecry
@@ -6590,7 +6510,11 @@ async function onDragEnd(e) {
                         battlecryResult = gameState.resolveBattlecry(minionInfo.keywords.battlecry, target, minionInfo);
                     }
 
-                    // PvP 模式：同步帶目標的戰吼效果
+                    // ✅ 立即渲染並處理死亡
+                    render();
+                    await resolveDeaths();
+
+                    // ✅ PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
                         // 計算效果值（隨從戰吼不加 News Power，但仍傳遞以確保一致）
                         let resolvedEffect = null;
@@ -6615,6 +6539,8 @@ async function onDragEnd(e) {
                             targetInstanceId: targetInstanceId, // [新增] 傳遞目標實例 ID
                             resolvedEffect: resolvedEffect
                         });
+
+                        syncLocalStateToFirebase(); // ✅ 同步乾淨的狀態
                     }
                 }
 
