@@ -3700,6 +3700,7 @@ async function executeOpponentAction(action) {
                             battlecryResult = gameState.resolveBattlecry(modifiedBattlecry, target, minion);
                             console.log('[PvP] 使用 resolvedEffect:', resolvedEffect);
                         } else {
+<<<<<<< HEAD
                             battlecryResult = gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
                         }
 
@@ -3711,6 +3712,9 @@ async function executeOpponentAction(action) {
                             if (tBoard && tBoard.children[battlecryResult.target.index]) {
                                 triggerCombatEffect(tBoard.children[battlecryResult.target.index], 'LOCK');
                             }
+=======
+                            gameState.resolveBattlecry(card.keywords.battlecry, target, minion);
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                         }
                     }
                     // board 會由 onGameStateUpdate 進一步確認同步，但本地先加確保流暢與邏輯正確
@@ -3913,6 +3917,12 @@ async function executeOpponentAction(action) {
                 } else {
                     console.warn('[PvP] 攻擊目標丟失!', action.data);
                 }
+<<<<<<< HEAD
+=======
+
+                // ✅ 立即同步狀態到 Firebase
+                syncLocalStateToFirebase();
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
 
                 render();
                 await resolveDeaths();  // 先處理死亡
@@ -6359,7 +6369,10 @@ async function onDragEnd(e) {
                     });
 
                     // ✅ [修正] 傳遞 side: 'OPPONENT' 確保 engine 能找到目標
+<<<<<<< HEAD
                     // ✅ 修正後的代碼
+=======
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                     gameState.attack(attackerIndex, { type, index, side: 'OPPONENT' });
 
                     render();
@@ -6367,35 +6380,68 @@ async function onDragEnd(e) {
 
                     // ✅ 在死亡結算後再處理 PvP 同步
                     if (isPvPMode && window.pvpManager) {
+<<<<<<< HEAD
                         // 取得攻擊後的狀態（已經過死亡處理）
                         let targetCurrentHealth = 0;
                         let targetInstanceId = null;
+=======
+                        // 取得目標（攻擊前）的狀態用於驗證
+                        let targetCurrentHealth = 0;
+                        let targetInstanceId = null; // ✅ [新增] 用於遠端精確匹配
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
 
                         if (type === 'HERO') {
                             targetCurrentHealth = gameState.players[1].hero.hp;
                         } else if (index !== null) {
+<<<<<<< HEAD
                             // 注意：目標可能已經死亡，需要處理 undefined
                             const targetMinion = gameState.players[1].board[index];
                             if (targetMinion) {
                                 targetCurrentHealth = targetMinion.currentHealth;
                                 targetInstanceId = targetMinion.instanceId;
+=======
+                            const targetMinion = gameState.players[1].board[index];
+                            if (targetMinion) {
+                                targetCurrentHealth = targetMinion.currentHealth;
+                                targetInstanceId = targetMinion.instanceId; // ✅ 獲取實例ID
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                             }
                         }
 
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
+<<<<<<< HEAD
                             targetIndex: index,
                             targetInstanceId: targetInstanceIdBefore || targetInstanceId, // Use early captured ID
+=======
+                            targetIndex: index,  // 英雄時為 null，隨從時為數字
+                            targetInstanceId: targetInstanceId, // ✅ 傳遞實例ID
+                            // [新增] 傳遞實際傷害值，避免 desync
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                             resolvedDamage: {
                                 attackerAttack: attacker ? attacker.attack : 0,
                                 attackerHealth: attacker ? attacker.currentHealth : 0,
                                 targetHealthBefore: targetCurrentHealth,
+<<<<<<< HEAD
                                 damage: damage
                             }
                         });
 
                         syncLocalStateToFirebase();  // ⬅️ 最後同步狀態
+=======
+                                damage: damage // ✅ 明確傳遞造成的傷害
+                            }
+                        });
+                    }
+
+                    render();
+                    await resolveDeaths();
+
+                    // [修正] 在死亡結算後再同步狀態，避免送出 HP<=0 的殭屍隨從
+                    if (isPvPMode && window.pvpManager) {
+                        syncLocalStateToFirebase();
+>>>>>>> c0c3fec1ee249287f72b65223ae1e21fff6ebdc9
                     }
                 } catch (err) {
                     logMessage(err.message);
