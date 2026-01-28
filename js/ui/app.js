@@ -3223,10 +3223,23 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
 
                 if (oppState && gameState.players[1]) {
                     const opponent = gameState.players[1];
-                    if (oppState.hp !== undefined) {
-                        opponent.currentHealth = oppState.hp;
-                        opponent.health = oppState.maxHp;
+
+                    // ✅ [新增] 時間戳檢查 - 英雄狀態
+                    const localHeroTimestamp = opponent._lastHeroTimestamp || 0;
+                    const remoteHeroTimestamp = oppState.heroTimestamp || oppState.timestamp || 0;
+
+                    // 只在遠端時間戳更新時才更新英雄狀態
+                    if (remoteHeroTimestamp > localHeroTimestamp) {
+                        if (oppState.hp !== undefined) {
+                            opponent.hero.hp = oppState.hp;
+                            opponent.hero.maxHp = oppState.maxHp || 30;
+                            console.log('[PVP] 對手血量已更新:', oppState.hp, '/', oppState.maxHp);
+                        }
+                        opponent._lastHeroTimestamp = remoteHeroTimestamp;
+                    } else {
+                        console.log('[PVP] 跳過舊的英雄狀態更新 (timestamp check)');
                     }
+
                     if (oppState.mana !== undefined) {
                         opponent.mana.current = oppState.mana;
                         opponent.mana.max = oppState.maxMana;
@@ -3251,45 +3264,57 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         opponent._syncedDeckSize = oppState.deckSize;
                     }
 
-                    // [強化] Desync 偵測與強制同步
-                    if (oppState.boardHash !== undefined) {
-                        // 計算本地對手場面雜湊
-                        const localBoardHash = opponent.board && opponent.board.length > 0
-                            ? opponent.board.map(m => `${m.id}:${m.attack}:${m.currentHealth}`).join('|')
-                            : 'empty';
+                    // ✅ [修正] 場面同步 - 增加時間戳檢查
+                    const localBoardTimestamp = opponent._lastBoardTimestamp || 0;
+                    const remoteBoardTimestamp = oppState.boardTimestamp || oppState.timestamp || 0;
 
-                        if (localBoardHash !== oppState.boardHash) {
-                            console.warn('[PvP Desync 偵測] 對手場面雜湊不一致！');
-                            console.warn('[PvP] 本地:', localBoardHash);
-                            console.warn('[PvP] 遠端:', oppState.boardHash);
+                    if (remoteBoardTimestamp > localBoardTimestamp) {
+                        // [強化] Desync 偵測與強制同步
+                        if (oppState.boardHash !== undefined) {
+                            // 計算本地對手場面雜湊
+                            const localBoardHash = opponent.board && opponent.board.length > 0
+                                ? opponent.board.map(m => `${m.id}:${m.attack}:${m.currentHealth}`).join('|')
+                                : 'empty';
 
-                            // 強制使用遠端狀態覆蓋本地
-                            if (oppState.board && Array.isArray(oppState.board)) {
-                                console.log('[PvP] 強制同步對手場面...');
-                                opponent.board = oppState.board.map(remoteMinion => {
-                                    const minion = JSON.parse(JSON.stringify(remoteMinion));
-                                    minion.side = 'OPPONENT';
-                                    return minion;
-                                });
-                                console.log('[PvP] 強制同步完成，新場面:', opponent.board.length, '個隨從');
+                            if (localBoardHash !== oppState.boardHash) {
+                                console.warn('[PVP Desync 偵測] 對手場面雜湊不一致！');
+                                console.warn('[PVP] 本地:', localBoardHash);
+                                console.warn('[PVP] 遠端:', oppState.boardHash);
+
+                                // 強制使用遠端狀態覆蓋本地
+                                if (oppState.board && Array.isArray(oppState.board)) {
+                                    console.log('[PVP] 強制同步對手場面...');
+                                    opponent.board = oppState.board.map(remoteMinion => {
+                                        const minion = JSON.parse(JSON.stringify(remoteMinion));
+                                        minion.side = 'OPPONENT';
+                                        return minion;
+                                    });
+                                    console.log('[PVP] 強制同步完成，新場面:', opponent.board.length, '個隨從');
+                                }
+                            } else {
+                                // ✅ [修正] 雜湊一致時，只更新關鍵屬性，避免完全覆蓋
+                                console.log('[PVP] 場面雜湊一致，執行增量更新');
+                                if (oppState.board && Array.isArray(oppState.board)) {
+                                    oppState.board.forEach((remoteMinion, idx) => {
+                                        const localMinion = opponent.board[idx];
+                                        if (localMinion && localMinion.id === remoteMinion.id) {
+                                            // 只更新可能變化的屬性
+                                            localMinion.attack = remoteMinion.attack;
+                                            localMinion.currentHealth = remoteMinion.currentHealth;
+                                            localMinion.health = remoteMinion.health;
+                                            localMinion.keywords = remoteMinion.keywords;
+                                            localMinion.lockedTurns = remoteMinion.lockedTurns;
+                                            localMinion.sleeping = remoteMinion.sleeping;
+                                            localMinion.canAttack = remoteMinion.canAttack;
+                                        }
+                                    });
+                                }
                             }
                         }
-                    }
 
-                    // 同步場面上隨從的具體狀態（即使沒有 desync 也更新關鍵屬性）
-                    if (oppState.board && Array.isArray(oppState.board)) {
-                        oppState.board.forEach((remoteMinion, idx) => {
-                            const localMinion = opponent.board[idx];
-                            if (localMinion && localMinion.id === remoteMinion.id) {
-                                localMinion.attack = remoteMinion.attack;
-                                localMinion.currentHealth = remoteMinion.currentHealth;
-                                localMinion.health = remoteMinion.health;
-                                localMinion.keywords = remoteMinion.keywords;
-                                localMinion.lockedTurns = remoteMinion.lockedTurns;
-                                localMinion.sleeping = remoteMinion.sleeping;
-                                localMinion.canAttack = remoteMinion.canAttack;
-                            }
-                        });
+                        opponent._lastBoardTimestamp = remoteBoardTimestamp;
+                    } else {
+                        console.log('[PVP] 跳過舊的場面狀態更新 (timestamp check)');
                     }
 
                     // Render to show updated stats
@@ -3519,16 +3544,21 @@ async function syncLocalStateToFirebase() {
         // [新增] 為英雄血量生成 hash
         const heroHash = `${player.hero.hp}/${player.hero.maxHp}`;
 
+        // ✅ [修正] 為不同類型的狀態添加獨立時間戳，防止粗粒度覆蓋
+        const now = Date.now();
+
         const stateUpdate = {
             hp: player.hero.hp ?? 30,
             maxHp: player.hero.maxHp ?? 30,
-            heroHash: heroHash, // ✅ 新增
+            heroHash: heroHash,
+            heroTimestamp: now, // ✅ 英雄狀態專用時間戳
             mana: player.mana?.current ?? 0,
             maxMana: player.mana?.max ?? 0,
             handSize: player.hand?.length ?? 0,
             deckSize: player.deck?.length ?? 0,
             // [新增] 場面雜湊用於 desync 偵測
             boardHash: calcBoardHash(player.board),
+            boardTimestamp: now, // ✅ 場面狀態專用時間戳
             // 同步當前手牌（保存 ID）
             hand: player.hand?.map(card => card.id) ?? [],
             // 同步場面上的所有隨從
@@ -3558,8 +3588,7 @@ async function syncLocalStateToFirebase() {
                     instanceId: minion.instanceId // ✅ 用於精確匹配
                 });
             }) ?? [],
-            // ✅ 新增:時間戳用於檢測過時數據
-            timestamp: Date.now()
+            timestamp: now // 保留全局時間戳作為備用
         };
 
         console.log('[PvP] 準備同步狀態:', stateUpdate);
@@ -3828,13 +3857,13 @@ async function executeOpponentAction(action) {
 
             const attacker = opponent.board[attackerIndex];
             if (!attacker) {
-                console.warn('[PvP] 找不到對手攻擊者:', attackerIndex);
+                console.warn('[PVP] 找不到對手攻擊者:', attackerIndex);
                 return;
             }
 
             // [修正] 強制使用遠端的攻擊者數值，避免 desync
             if (resolvedDamage) {
-                console.log('[PvP] 攻擊前強制同步攻擊者數值:', resolvedDamage);
+                console.log('[PVP] 攻擊前強制同步攻擊者數值:', resolvedDamage);
                 attacker.attack = resolvedDamage.attackerAttack;
                 attacker.currentHealth = resolvedDamage.attackerHealth;
             }
@@ -3855,26 +3884,23 @@ async function executeOpponentAction(action) {
             }
 
             try {
-                // [修正] 不切換視角，直接執行對手攻擊我方
-                // 對手發送的攻擊目標是我方(從他視角是OPPONENT)
-                // 我們這邊對手是player[1]，目標需要手動處理
+                const { targetInstanceId } = action.data;
 
                 // 強制設置攻擊者為可攻擊狀態
                 attacker.canAttack = true;
                 attacker.sleeping = false;
 
-                // 手動執行攻擊邏輯（不使用gameState.attack以避免視角混亂）
+                // 手動執行攻擊邏輯
                 let targetUnit = null;
-                const { targetInstanceId } = action.data; // ✅ [新增] 讀取 targetInstanceId
 
                 if (targetType === 'HERO') {
                     targetUnit = gameState.players[0].hero;
                 } else if (targetType === 'MINION') {
-                    // ✅ [新增] 優先嘗試使用 instanceId 查找目標，避免 index 錯位
+                    // 優先使用 instanceId 查找目標
                     if (targetInstanceId) {
                         targetUnit = gameState.players[0].board.find(m => m.instanceId === targetInstanceId);
                         if (!targetUnit) {
-                            console.warn(`[PvP] 無法通過 instanceId 找到目標: ${targetInstanceId}，嘗試回退到 index`);
+                            console.warn(`[PVP] 無法通過 instanceId 找到目標: ${targetInstanceId}，嘗試回退到 index`);
                         }
                     }
 
@@ -3885,15 +3911,14 @@ async function executeOpponentAction(action) {
                 }
 
                 if (targetUnit) {
-                    // ✅ [修正] 優先使用遠端確定的傷害值 resolvedDamage.damage
-                    // 如果沒有傳遞 damage，則回退到 attacker.attack (可能不一致)
+                    // 使用遠端確定的傷害值
                     const attackerAtk = (resolvedDamage && resolvedDamage.damage !== undefined)
                         ? resolvedDamage.damage
                         : attacker.attack;
 
                     const targetAtk = (targetType === 'MINION' && targetUnit) ? (targetUnit.attack || 0) : 0;
 
-                    console.log(`[PvP] 執行傷害應用: 攻擊者=${attackerAtk}, 目標反擊=${targetAtk}`);
+                    console.log(`[PVP] 執行傷害應用: 攻擊者=${attackerAtk}, 目標反擊=${targetAtk}`);
 
                     // 對目標造成傷害
                     gameState.applyDamage(targetUnit, attackerAtk);
@@ -3907,25 +3932,28 @@ async function executeOpponentAction(action) {
                     attacker.canAttack = false;
                     attacker.attacksThisTurn = (attacker.attacksThisTurn || 0) + 1;
                 } else {
-                    console.warn('[PvP] 攻擊目標丟失!', action.data);
+                    console.warn('[PVP] 攻擊目標丟失!', action.data);
                 }
 
-                render();
-                await resolveDeaths();  // ✅ 先處理死亡
+                // ✅ [修正] 先處理死亡
+                await resolveDeaths();
 
-                // ✅ [Validation] 驗證沒有殭屍隨從（防禦性編程）
+                // ✅ [Validation] 驗證沒有殭屍隨從
                 const player = gameState.players[0];
                 const deadMinions = player.board.filter(m => m.currentHealth <= 0);
                 if (deadMinions.length > 0) {
-                    console.error('[PvP Opponent Attack] Found dead minions not cleaned up:', deadMinions);
+                    console.error('[PVP Opponent Attack] Found dead minions not cleaned up:', deadMinions);
                     player.board = player.board.filter(m => m.currentHealth > 0);
                 }
 
-                // ✅ 在死亡處理後再同步狀態（只同步一次）
+                // ✅ [修正] 死亡處理後才渲染
+                render();
+
+                // ✅ [修正] 只同步一次最終狀態
                 syncLocalStateToFirebase();
 
             } catch (e) {
-                console.error('[PvP] 執行對手攻擊失敗:', e);
+                console.error('[PVP] 執行對手攻擊失敗:', e);
             }
             break;
         }
@@ -6288,8 +6316,6 @@ async function onDragEnd(e) {
         const targetData = targetEl?.closest('[data-type]');
         if (targetData) {
             const type = targetData.dataset.type;
-            // 修復：當目標是英雄時，index 為 undefined，parseInt 會返回 NaN
-            // 改為攻擊英雄時設為 null
             const index = targetData.dataset.index ? parseInt(targetData.dataset.index) : null;
             const targetInstanceIdBefore = targetData.dataset.minionId || null;
 
@@ -6304,6 +6330,7 @@ async function onDragEnd(e) {
                     const attacker = gameState.currentPlayer.board[attackerIndex];
                     const damage = attacker ? attacker.attack : 0;
 
+                    // ✅ 修正 1: 先播放動畫
                     if (sourceEl && targetData) {
                         await animateAttack(sourceEl, targetData, damage);
                     }
@@ -6319,47 +6346,50 @@ async function onDragEnd(e) {
                         damage: damage
                     });
 
-                    // ✅ [修正] 傳遞 side: 'OPPONENT' 確保 engine 能找到目標
-                    // ✅ 修正後的代碼
-                    gameState.attack(attackerIndex, { type, index, side: 'OPPONENT' });
-
-                    render();
-                    await resolveDeaths();  // ⬅️ 先處理死亡
-
-                    // ✅ 在死亡結算後再處理 PvP 同步
+                    // ✅ 修正 2: PVP 模式下先發送動作（在執行本地邏輯前）
                     if (isPvPMode && window.pvpManager) {
-                        // 取得攻擊後的狀態（已經過死亡處理）
-                        let targetCurrentHealth = 0;
-                        let targetInstanceId = null;
+                        let targetInstanceId = targetInstanceIdBefore;
 
-                        if (type === 'HERO') {
-                            targetCurrentHealth = gameState.players[1].hero.hp;
-                        } else if (index !== null) {
-                            // 注意：目標可能已經死亡，需要處理 undefined
+                        if (!targetInstanceId && type === 'MINION' && index !== null) {
                             const targetMinion = gameState.players[1].board[index];
                             if (targetMinion) {
-                                targetCurrentHealth = targetMinion.currentHealth;
                                 targetInstanceId = targetMinion.instanceId;
                             }
                         }
 
+                        // 先發送攻擊動作到對手
                         await window.pvpManager.syncGameAction('ATTACK', {
                             attackerIndex: attackerIndex,
                             targetType: type,
                             targetIndex: index,
-                            targetInstanceId: targetInstanceIdBefore || targetInstanceId, // Use early captured ID
+                            targetInstanceId: targetInstanceId,
                             resolvedDamage: {
                                 attackerAttack: attacker ? attacker.attack : 0,
                                 attackerHealth: attacker ? attacker.currentHealth : 0,
-                                targetHealthBefore: targetCurrentHealth,
                                 damage: damage
                             }
                         });
 
-                        syncLocalStateToFirebase();  // ⬅️ 最後同步狀態
+                        console.log('[PVP] 攻擊動作已發送，準備執行本地邏輯');
                     }
+
+                    // ✅ 修正 3: 然後執行本地攻擊邏輯
+                    gameState.attack(attackerIndex, { type, index, side: 'OPPONENT' });
+
+                    // ✅ 修正 4: 先處理死亡，不立即渲染
+                    await resolveDeaths();
+
+                    // ✅ 修正 5: 死亡處理後才渲染
+                    render();
+
+                    // ✅ 修正 6: 最後同步最終狀態（在 PVP 模式）
+                    if (isPvPMode && window.pvpManager) {
+                        syncLocalStateToFirebase();
+                    }
+
                 } catch (err) {
                     logMessage(err.message);
+                    render(); // 錯誤時才渲染
                 }
             }
         }
