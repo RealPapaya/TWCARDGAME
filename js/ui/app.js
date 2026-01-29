@@ -135,6 +135,7 @@ let selectedThemeId = 'dpp'; // Default theme
 let editingDeckIdx = -1;
 let pendingViewMode = 'BATTLE'; // 'BATTLE', 'BUILDER', or 'DEBUG'
 let isDebugMode = false;
+let lastProcessedTurnNumber = 0; // ✅ [新增] 追蹤已處理的最新的回合序號落點
 window.isDebugMode = isDebugMode; // 暴露出全域變數供其他模組存取
 
 // Debug Command: Kill Opponent
@@ -1047,6 +1048,10 @@ document.getElementById('end-turn-btn').addEventListener('click', async () => {
         if (isPvPMode && window.pvpManager) {
             // 本地結束回合 (不觸發 startTurn，等 Firebase 通知)
             gameState.endTurn(true); // skipStartTurn = true
+
+            // ✅ [新增] 樂觀更新處理過的序號，防止舊狀態觸發回滾
+            lastProcessedTurnNumber++;
+            console.log('[PvP] 已本地結束回合，預計下一回合序號:', lastProcessedTurnNumber);
 
             // ✅ 立即渲染並處理死亡
             render();
@@ -2958,7 +2963,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
     console.log('[PvP] 開始對戰初始化...', { roomId, playerId, deckSize: myDeckCards.length });
 
     // 等待對手資料
-    const roomData = window.pvpManager?.currentRoom;
+    let roomData = window.pvpManager?.currentRoom;
     if (!roomData) {
         showToast('無法取得房間資料');
         return;
@@ -2989,6 +2994,11 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
         window.gameState = gameState;
         // Store initial deck for Deck View
         gameState.players[0].initialDeckIds = [...myDeckCards];
+
+        // ✅ [新增] 初始化回合序號
+        lastProcessedTurnNumber = roomData?.gameState?.turnNumber || 1;
+        console.log('[PvP] 遊戲初始化完成，起始回合序號:', lastProcessedTurnNumber);
+
         showView('battle-view');
 
         // PvP 模式標記
@@ -3000,7 +3010,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
         }
 
         // ===== 檢查是否需要 Mulligan（重連判斷）=====
-        const roomData = window.pvpManager?.currentRoom;
+        roomData = window.pvpManager?.currentRoom;
         const mulliganStatus = roomData?.gameState?.mulliganStatus;
         const myMulliganDone = mulliganStatus?.[pvpPlayerId];
         const bothCompleted = mulliganStatus?.player1 && mulliganStatus?.player2;
@@ -3269,7 +3279,7 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                     const remoteBoardTimestamp = oppState.boardTimestamp || oppState.timestamp || 0;
 
                     if (remoteBoardTimestamp > localBoardTimestamp) {
-                        // [強化] Desync 偵測與強制同步
+                        // [強化] Desync 偵測與選擇性同步
                         if (oppState.boardHash !== undefined) {
                             // 計算本地對手場面雜湊
                             const localBoardHash = opponent.board && opponent.board.length > 0
@@ -3277,19 +3287,34 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                                 : 'empty';
 
                             if (localBoardHash !== oppState.boardHash) {
-                                console.warn('[PVP Desync 偵測] 對手場面雜湊不一致！');
+                                console.warn('[PVP Desync 偵測] 對手場面雜湊不一致，但僅同步特定屬性！');
                                 console.warn('[PVP] 本地:', localBoardHash);
                                 console.warn('[PVP] 遠端:', oppState.boardHash);
 
-                                // 強制使用遠端狀態覆蓋本地
+                                // ✅ [關鍵修正] 不再完全覆蓋，改為選擇性同步
                                 if (oppState.board && Array.isArray(oppState.board)) {
-                                    console.log('[PVP] 強制同步對手場面...');
-                                    opponent.board = oppState.board.map(remoteMinion => {
-                                        const minion = JSON.parse(JSON.stringify(remoteMinion));
-                                        minion.side = 'OPPONENT';
-                                        return minion;
+                                    console.log('[PVP] 執行選擇性同步（所有屬性）...');
+                                    oppState.board.forEach((remoteMinion) => {
+                                        // 使用 instanceId 精確匹配
+                                        const localMinion = opponent.board.find(m => m.instanceId === remoteMinion.instanceId);
+                                        if (localMinion) {
+                                            // ✅ [修正] 同步所有屬性，包含 buff、health、keywords
+                                            localMinion.attack = remoteMinion.attack;
+                                            localMinion.health = remoteMinion.health;
+                                            localMinion.currentHealth = remoteMinion.currentHealth;
+                                            localMinion.keywords = remoteMinion.keywords;
+                                            localMinion.deathTimer = remoteMinion.deathTimer;
+                                            localMinion.questTurns = remoteMinion.questTurns;
+                                            localMinion.lockedTurns = remoteMinion.lockedTurns;
+                                            localMinion.sleeping = remoteMinion.sleeping;
+                                            localMinion.canAttack = remoteMinion.canAttack;
+                                            localMinion.attacksThisTurn = remoteMinion.attacksThisTurn;
+                                            console.log(`[PVP] 同步隨從 ${localMinion.name}: ${localMinion.attack}/${localMinion.currentHealth}, deathTimer=${localMinion.deathTimer}, questTurns=${localMinion.questTurns}`);
+                                        } else {
+                                            console.warn('[PVP] 本地找不到 instanceId:', remoteMinion.instanceId, '- 可能是新隨從未同步');
+                                        }
                                     });
-                                    console.log('[PVP] 強制同步完成，新場面:', opponent.board.length, '個隨從');
+                                    console.log('[PVP] 選擇性同步完成');
                                 }
                             } else {
                                 // ✅ [修正] 雜湊一致時，只更新關鍵屬性，避免完全覆蓋
@@ -3303,9 +3328,12 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                                             localMinion.currentHealth = remoteMinion.currentHealth;
                                             localMinion.health = remoteMinion.health;
                                             localMinion.keywords = remoteMinion.keywords;
+                                            localMinion.deathTimer = remoteMinion.deathTimer;
+                                            localMinion.questTurns = remoteMinion.questTurns;
                                             localMinion.lockedTurns = remoteMinion.lockedTurns;
                                             localMinion.sleeping = remoteMinion.sleeping;
                                             localMinion.canAttack = remoteMinion.canAttack;
+                                            localMinion.attacksThisTurn = remoteMinion.attacksThisTurn;
                                         }
                                     });
                                 }
@@ -3333,30 +3361,43 @@ async function startPvPGame(roomId, playerId, myDeckCards) {
                         isMyTurn,
                         localIdx,
                         prevIdx,
-                        willSwitch: prevIdx !== localIdx
+                        willSwitch: prevIdx !== localIdx,
+                        turnNumber: remoteState.turnNumber,
+                        lastProcessed: lastProcessedTurnNumber
                     });
 
-                    // 只有在回合真正切換時才顯示提示和執行回合邏輯
-                    if (prevIdx !== localIdx) {
-                        console.log('[PvP] 回合切換:', isMyTurn ? '輪到我' : '對手回合');
-                        gameState.currentPlayerIdx = localIdx;
+                    // ✅ [關鍵修正] 只有當 Firebase 的回合序號大於我們最後處理的序號時，才處理回合切換
+                    if (remoteState.turnNumber !== undefined && remoteState.turnNumber > lastProcessedTurnNumber) {
+                        console.log(`[PvP] 回合序號推進: ${lastProcessedTurnNumber} -> ${remoteState.turnNumber}`);
+                        lastProcessedTurnNumber = remoteState.turnNumber;
 
-                        if (isMyTurn && !gameState.gameOver) {
-                            // 輪到自己，開始回合
-                            console.log('[PvP] 執行 startTurn()，回合前手牌數:', gameState.players[0].hand.length);
-                            gameState.startTurn();
-                            console.log('[PvP] startTurn() 完成，回合後手牌數:', gameState.players[0].hand.length);
-                            showTurnAnnouncement('你的回合！');
+                        if (prevIdx !== localIdx) {
+                            console.log('[PvP] 回合實質切換:', isMyTurn ? '輪到我' : '對手回合');
+                            gameState.currentPlayerIdx = localIdx;
 
-                            // 同步回合開始後的狀態 (Mana增加, 抽牌後)
-                            syncLocalStateToFirebase();
-                        } else if (!gameState.gameOver) {
-                            // 對手回合：不調用 startTurn，避免對手也增加 mana 和抽牌
-                            showTurnAnnouncement('對手回合');
+                            if (isMyTurn && !gameState.gameOver) {
+                                // 輪到自己，開始回合
+                                console.log('[PvP] 執行 startTurn()，回合前手牌數:', gameState.players[0].hand.length);
+                                gameState.startTurn();
+                                console.log('[PvP] startTurn() 完成，回合後手牌數:', gameState.players[0].hand.length);
+                                showTurnAnnouncement('你的回合！');
+
+                                // 同步回合開始後的狀態 (Mana增加, 抽牌後)
+                                syncLocalStateToFirebase();
+                            } else if (!gameState.gameOver) {
+                                // 對手回合：不調用 startTurn，避免對手也增加 mana 和抽牌
+                                showTurnAnnouncement('對手回合');
+                            }
+                            render();
+                            // 回合切換後檢查死亡（處理上一回合的計時器到期）
+                            await resolveDeaths();
                         }
-                        render();
-                        // 回合切換後檢查死亡（處理上一回合的計時器到期）
-                        await resolveDeaths();
+                    } else {
+                        // 如果序號等於或小於當前處理過的序號，則忽略回合切換邏輯
+                        // 這通常發生在樂觀更新後收到舊的 Firebase 狀態通知
+                        if (remoteState.turnNumber !== undefined && remoteState.turnNumber < lastProcessedTurnNumber) {
+                            console.log('[PvP] 忽略舊的回合狀態通知 (remoteNumber < lastProcessed)');
+                        }
                     }
                     // 如果 currentPlayerIdx 沒變化，表示只是對手在其回合中的動作，不需要顯示提示
                 }
@@ -3581,6 +3622,7 @@ async function syncLocalStateToFirebase() {
                     attacksThisTurn: minion.attacksThisTurn,
                     lockedTurns: minion.lockedTurns,
                     deathTimer: minion.deathTimer,
+                    questTurns: minion.questTurns,  // ✅ 新增：同步任務倒數
                     tempBuffs: minion.tempBuffs,
                     baseAttackOverride: minion.baseAttackOverride,
                     ongoingStats: minion.ongoingStats,
@@ -3686,11 +3728,14 @@ async function executeOpponentAction(action) {
                 // 注意：不需要手動從手牌移除，因為 onGameStateUpdate 會通過 handSize 同步自動調整
                 console.log('[PvP] 執行對手出牌，當前對手手牌數:', opponent.hand.length);
 
-                // 1. 扣除 mana（使用卡牌實際費用）
+                // ✅ 1. 扣除 mana（使用卡牌實際費用）- 統一處理 Minion 和 News
                 const actualCost = gameState.getCardActualCost ? gameState.getCardActualCost(card) : card.cost;
                 opponent.mana.current = Math.max(0, opponent.mana.current - actualCost);
+                console.log('[PvP] 扣除 mana:', actualCost, '剩餘:', opponent.mana.current);
 
-                // 2. 如果是隨從，這時加入 board 並處理戰吼
+                // 2. 根據卡牌類型執行邏輯
+                let battlecryResult = null;
+
                 if (card.type === 'MINION') {
                     // [修正] 防止重複：先檢查 board 是否已經有此隨從（由 onGameStateUpdate 同步過）
                     // 使用 instanceId（如果有的話）或簡單的機制（這回合剛加入的？）
@@ -3710,6 +3755,12 @@ async function executeOpponentAction(action) {
                         // 如果對方有提供 instanceId，強制使用它，以便後續匹配
                         if (providedInstanceId) {
                             minion.instanceId = providedInstanceId;
+                        }
+
+                        // ✅ 新增：處理臨時隨從（如側翼出動的網軍）
+                        if (card.keywords?.battlecry?.isTemporary) {
+                            minion.deathTimer = 1;
+                            console.log('[PvP] 設置臨時隨從 deathTimer:', minion.name);
                         }
 
                         // 加入 board
@@ -3834,6 +3885,16 @@ async function executeOpponentAction(action) {
                 // ✅ 立即渲染並處理死亡
                 render();
                 await resolveDeaths();
+
+                // ✅ 雙重保險：強制清理所有死亡單位
+                gameState.players.forEach(p => {
+                    const before = p.board.length;
+                    p.board = p.board.filter(m => m.currentHealth > 0);
+                    const after = p.board.length;
+                    if (before !== after) {
+                        console.warn('[PVP] 接收方 PLAY_CARD 後強制移除', before - after, '個死亡單位');
+                    }
+                });
 
                 // 記錄歷史
                 MatchHistory.add('PLAY', {
@@ -3961,12 +4022,35 @@ async function executeOpponentAction(action) {
         case 'END_TURN': {
             console.log('[PvP] 對手結束回合');
 
-            // 只處理計時器倒數，不切換 currentPlayerIdx
-            // 完整的回合切換邏輯由 onGameStateUpdate 處理
-            gameState.processEndOfTurnTimers();
+            // ✅ [修正] 明確處理所有玩家的計時器
+            gameState.players.forEach((player, pIdx) => {
+                player.board.forEach(minion => {
+                    // 處理死亡計時器
+                    if (minion.deathTimer !== undefined && minion.deathTimer > 0) {
+                        minion.deathTimer--;
+                        console.log(`[PVP] ${pIdx === 0 ? '己方' : '對手'} ${minion.name} 倒數器: ${minion.deathTimer + 1} -> ${minion.deathTimer}`);
+                        if (minion.deathTimer === 0) {
+                            console.log(`[PVP] ${minion.name} 倒數計時結束，標記為待死亡`);
+                        }
+                    }
+
+                    // 處理任務計時器
+                    if (minion.questTurns !== undefined) {
+                        minion.questTurns++;
+                    }
+
+                    // 處理鎖定計時器
+                    if (minion.lockedTurns !== undefined && minion.lockedTurns > 0) {
+                        minion.lockedTurns--;
+                        if (minion.lockedTurns === 0) {
+                            minion.justUnlocked = true;
+                            console.log(`[PVP] ${minion.name} 解除鎖定`);
+                        }
+                    }
+                });
+            });
 
             // 顯式調用 Buff 清理邏輯，確保「凍蒜」等暫時性 Buff 在視覺上正確移除
-            // 因為我們不調用 gameState.endTurn()，所以必須手動觸發這部分
             if (gameState.cleanupTemporaryBuffs) {
                 console.log('[PvP] 執行 END_TURN 清理暫時性 Buff');
                 gameState.cleanupTemporaryBuffs();
@@ -3974,6 +4058,12 @@ async function executeOpponentAction(action) {
 
             // 確保死亡結算完成
             await resolveDeaths();
+
+            // ✅ [新增] 同步狀態（確保倒數器更新傳遞給對方）
+            if (isPvPMode && window.pvpManager) {
+                syncLocalStateToFirebase();
+            }
+
             render();
             break;
         }
@@ -6503,6 +6593,16 @@ async function onDragEnd(e) {
                     render();
                     await resolveDeaths();
 
+                    // ✅ 雙重保險：強制清理所有死亡單位
+                    gameState.players.forEach(p => {
+                        const before = p.board.length;
+                        p.board = p.board.filter(m => m.currentHealth > 0);
+                        const after = p.board.length;
+                        if (before !== after) {
+                            console.warn('[PVP] 發送方 PLAY_CARD(News) 後強制移除', before - after, '個死亡單位');
+                        }
+                    });
+
                     // ✅ PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
                         // 計算效果值（含 News Power 加成）
@@ -6544,6 +6644,16 @@ async function onDragEnd(e) {
                     render();
                     await resolveDeaths();
 
+                    // ✅ 雙重保險：強制清理所有死亡單位
+                    gameState.players.forEach(p => {
+                        const before = p.board.length;
+                        p.board = p.board.filter(m => m.currentHealth > 0);
+                        const after = p.board.length;
+                        if (before !== after) {
+                            console.warn('[PVP] 發送方 PLAY_CARD(Minion) 後強制移除', before - after, '個死亡單位');
+                        }
+                    });
+
                     // ✅ PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
                         // 計算效果值（隨從戰吼不加 News Power，但仍傳遞以確保一致）
@@ -6558,11 +6668,13 @@ async function onDragEnd(e) {
                         }
 
                         const targetInstanceId = target.instanceId || (target.index !== -1 ? (gameState.players[target.side === 'PLAYER' ? 0 : 1].board[target.index]?.instanceId) : null);
+                        const minionInstanceId = minionInfo?.instanceId;  // ✅ 新增：取得隨從實例ID
 
                         await window.pvpManager.syncGameAction('PLAY_CARD', {
                             cardId: minionInfo?.id,
                             handIndex: -1, // 已在場上
                             insertionIndex: battlecrySourceIndex,
+                            instanceId: minionInstanceId,  // ✅ 新增：傳遞隨從實例ID
                             targetType: target.type,
                             targetIndex: target.index,
                             targetSide: target.side,
