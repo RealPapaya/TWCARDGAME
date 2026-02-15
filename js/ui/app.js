@@ -703,6 +703,7 @@ function init() {
                 }
                 tempDeck = null;
                 editingThemeIdx = -1;
+                editingDeckIdx = -1;
                 showView('test-mode-selection');
             } else {
                 // Editing player deck - 返回個人頁面而非牌組選擇
@@ -715,11 +716,13 @@ function init() {
                     if (!confirmed) return;
                 }
                 tempDeck = null;
+                editingDeckIdx = -1;
                 showView('profile-view');
                 updateProfilePage();
             }
         } else {
             // 無編輯中的牌組，也返回個人頁面
+            editingDeckIdx = -1;
             showView('profile-view');
             updateProfilePage();
         }
@@ -2108,7 +2111,6 @@ function renderProfileDeckList() {
             <div class="add-deck-text">建立新牌組</div>
         `;
         addItem.addEventListener('click', () => {
-            if (editingDeckIdx !== -1) return;
             showDeckCreationOptions();
         });
         container.appendChild(addItem);
