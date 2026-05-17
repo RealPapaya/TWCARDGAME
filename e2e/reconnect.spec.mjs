@@ -17,7 +17,7 @@
 
 import { chromium } from "playwright";
 
-const WEB_URL = "http://localhost:5173";
+const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
 const TIMEOUT = 30_000;
 
 function log(tag, msg) { console.log(`[${tag}] ${msg}`); }
@@ -32,11 +32,11 @@ const INIT_SCRIPT = `
   ];
   window.__el = [];
   window.__eq = 0;
-  var seen = new WeakSet();
+  var seen = new Set();
   function processNode(node) {
-    if (seen.has(node)) return;
-    seen.add(node);
     var text = node.textContent || "";
+    if (seen.has(text)) return;
+    seen.add(text);
     for (var i = 0; i < ALL_TYPES.length; i++) {
       if (text.indexOf(ALL_TYPES[i]) === 0) {
         window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
@@ -226,6 +226,10 @@ async function getConnectedStatus(page, side) {
       pass("Scenario 3: GAME_FINISHED received after disconnect timeout");
 
       // Verify status is finished in public state
+      await q1.waitForFunction(() => {
+        var el = document.querySelector(".status");
+        return el && /Status:\s*(finished|abandoned)/.test(el.textContent || "");
+      }, { timeout: TIMEOUT });
       var status = await q1.evaluate(() => {
         var el = document.querySelector(".status");
         return el ? el.textContent : "";

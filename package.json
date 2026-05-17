@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "validate:cards": "tsx packages/cards/src/cli.ts",
-    "test:e2e": "node e2e/game-loop.spec.mjs",
+    "test:e2e": "node e2e/game-loop.spec.mjs && node e2e/action-seq.spec.mjs",
     "test:reconnect": "node e2e/reconnect.spec.mjs",
     "dev:server": "npm run dev -w @twcardgame/server",
     "dev:web": "npm run dev -w @twcardgame/web"

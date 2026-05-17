@@ -108,6 +108,12 @@ export type GameCommand =
   | { type: "concede" }
   | { type: "reconnect"; matchId: string };
 
+export interface ClientCommandMessage {
+  commandId: string;
+  expectedActionSeq: number;
+  command: GameCommand;
+}
+
 export interface CommandEnvelope {
   commandId: string;
   seat: Seat;

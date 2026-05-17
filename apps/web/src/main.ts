@@ -1,6 +1,6 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { CARD_CATALOG } from "@twcardgame/cards";
-import type { GameCommand, HandCardView, Seat, TargetRef } from "@twcardgame/shared";
+import type { ClientCommandMessage, GameCommand, HandCardView, Seat, TargetRef } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
 import "./styles.css";
 
@@ -91,18 +91,20 @@ async function joinRoom(event: Event): Promise<void> {
     hand = message.cards;
     render();
   });
-  joined.onMessage("events", (message: Array<{ type: string; payload?: unknown }>) => {
-    events = [...message.map((item) => `${item.type} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 50);
+  joined.onMessage("events", (message: Array<{ seq?: number; type: string; payload?: unknown }>) => {
+    events = [...message.map((item) => `${item.type}#${item.seq ?? "?"} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 50);
     render();
   });
 }
 
 function send(command: GameCommand): void {
   if (!room) return;
-  room.send("command", {
+  const message: ClientCommandMessage = {
     commandId: `${mySeat ?? "client"}-${crypto.randomUUID()}`,
+    expectedActionSeq: state?.turn?.actionSeq ?? 0,
     command
-  });
+  };
+  room.send("command", message);
 }
 
 function renderGame(): string {

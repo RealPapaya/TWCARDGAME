@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeCard, effectHandlers, nextInstanceId, reduce, toHandView, toPublicState, validateDeck } from "./index.js";
 import { createInitialMatch } from "./engine.js";
 import type { MatchState } from "./types.js";
-import type { Seat } from "@twcardgame/shared";
+import { opponentOf, type Seat } from "@twcardgame/shared";
 
 describe("rules architecture", () => {
   it("has handlers for every current battlecry effect", () => {
@@ -79,6 +79,42 @@ describe("rules architecture", () => {
     expect(result.state.players.player2.hero.hp).toBe(27);
     expect(result.state.players.player1.hand).toHaveLength(0);
     expect(result.events.some((event) => event.type === "DAMAGE")).toBe(true);
+  });
+
+  it("ignores duplicate command ids without mutating state or emitting events", () => {
+    const state = startMatch(77);
+    const envelope = {
+      commandId: "duplicate-end-turn",
+      seat: state.turn.activeSeat,
+      nowMs: 2000,
+      command: { type: "endTurn" as const }
+    };
+
+    const first = reduce(state, envelope, CARD_CATALOG);
+    const beforeReplay = JSON.stringify(first.state);
+    const replay = reduce(first.state, envelope, CARD_CATALOG);
+
+    expect(replay.events).toEqual([]);
+    expect(JSON.stringify(replay.state)).toBe(beforeReplay);
+  });
+
+  it("rejects out-of-turn commands without advancing the turn", () => {
+    const state = startMatch(78);
+    const activeSeat = state.turn.activeSeat;
+    const result = reduce(
+      state,
+      {
+        commandId: "out-of-turn-end",
+        seat: opponentOf(activeSeat),
+        nowMs: 2000,
+        command: { type: "endTurn" }
+      },
+      CARD_CATALOG
+    );
+
+    expect(result.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
+    expect(result.state.turn.activeSeat).toBe(activeSeat);
+    expect(result.state.turn.number).toBe(state.turn.number);
   });
 });
 

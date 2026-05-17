@@ -17,7 +17,7 @@
 
 import { chromium } from "playwright";
 
-const WEB_URL = "http://localhost:5173";
+const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
 const TIMEOUT = 30_000;
 
 // ─── logging ─────────────────────────────────────────────────────────────────
@@ -34,18 +34,18 @@ function log(tag, msg) { console.log(`[${tag}] ${msg}`); }
 const INIT_SCRIPT = `
 (function () {
   var ALL_TYPES = [
-    "CARD_PLAYED","MINION_SUMMONED","ATTACK_RESOLVED","DAMAGE_DEALT",
-    "MINION_DIED","MATCH_ENDED","TURN_STARTED","TURN_ENDED",
+    "CARD_PLAYED","MINION_SUMMONED","DAMAGE","DESTROY",
+    "GAME_FINISHED","TURN_STARTED","TURN_ENDED",
     "MULLIGAN_SUBMITTED","COMMAND_REJECTED","CARD_DRAWN"
   ];
   window.__el = [];   // [{type, seq}]
   window.__eq = 0;    // sequence counter
-  var seen = new WeakSet();
+  var seen = new Set();
 
   function processNode(node) {
-    if (seen.has(node)) return;
-    seen.add(node);
     var text = node.textContent || "";
+    if (seen.has(text)) return;
+    seen.add(text);
     for (var i = 0; i < ALL_TYPES.length; i++) {
       if (text.indexOf(ALL_TYPES[i]) === 0) {
         window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
@@ -245,6 +245,9 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
   for (var attempt = 0; attempt < 15; attempt++) {
     // Pick the cheapest MINION by cost
     var idx = await actPage.evaluate(function () {
+      var status = document.querySelector(".player.me .hero");
+      var manaMatch = status && status.textContent ? status.textContent.match(/Mana\s+(\d+)/) : null;
+      var mana = manaMatch ? parseInt(manaMatch[1], 10) : 0;
       var cards = Array.from(document.querySelectorAll(".hand .card"));
       var bestIdx = -1, bestCost = Infinity;
       for (var i = 0; i < cards.length; i++) {
@@ -253,6 +256,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
         var cm = t.match(/Cost\s+(\d+)/);
         if (!cm) continue;
         var cost = parseInt(cm[1], 10);
+        if (cost > mana) continue;
         if (cost < bestCost) { bestCost = cost; bestIdx = i; }
       }
       return bestIdx;
@@ -476,20 +480,14 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     log(actTag, "Attack Target clicked");
 
     await Promise.all([
-      waitEvent(p1, "ATTACK_RESOLVED", ck4a, "P1"),
-      waitEvent(p2, "ATTACK_RESOLVED", ck4b, "P2"),
+      waitEvent(p1, "DAMAGE", ck4a, "P1"),
+      waitEvent(p2, "DAMAGE", ck4b, "P2"),
     ]);
-    pass("Step 4: ATTACK_RESOLVED on both pages");
+    pass("Step 4: DAMAGE on both pages");
 
-    await Promise.all([
-      waitEvent(p1, "DAMAGE_DEALT", ck4a, "P1"),
-      waitEvent(p2, "DAMAGE_DEALT", ck4b, "P2"),
-    ]);
-    pass("Step 4: DAMAGE_DEALT on both pages");
-
-    var minionDied = await hadEvent(actPage, "MINION_DIED", ck4a);
+    var minionDied = await hadEvent(actPage, "DESTROY", ck4a);
     if (minionDied) {
-      pass("Step 4: MINION_DIED event present");
+      pass("Step 4: DESTROY event present");
     } else {
       var hpAfter = await actPage.evaluate(function () {
         var btn = document.querySelector(".player:not(.me) .board button.minion");
@@ -530,16 +528,16 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     await actPage.click("#concede");
 
     await Promise.all([
-      waitEvent(p1, "MATCH_ENDED", ck5a, "P1"),
-      waitEvent(p2, "MATCH_ENDED", ck5b, "P2"),
+      waitEvent(p1, "GAME_FINISHED", ck5a, "P1"),
+      waitEvent(p2, "GAME_FINISHED", ck5b, "P2"),
     ]);
-    pass("Step 5: MATCH_ENDED on both pages");
+    pass("Step 5: GAME_FINISHED on both pages");
 
     await Promise.all([
-      waitEvent(p1, "MATCH_ENDED", ck5a, "P1"),
-      waitEvent(p2, "MATCH_ENDED", ck5b, "P2"),
+      waitEvent(p1, "GAME_FINISHED", ck5a, "P1"),
+      waitEvent(p2, "GAME_FINISHED", ck5b, "P2"),
     ]);
-    pass("Step 5: Status = finished on both pages (MATCH_ENDED confirmed)");
+    pass("Step 5: Status = finished on both pages (GAME_FINISHED confirmed)");
 
   } catch (err) {
     fail("Unexpected error", err);

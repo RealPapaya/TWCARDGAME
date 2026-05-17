@@ -10,6 +10,8 @@ export interface DatabaseConfig {
 export interface MatchHistoryRow {
   id: string;
   card_catalog_version: string;
+  player1_user_id?: string | null;
+  player2_user_id?: string | null;
   winner_seat?: Seat;
   result_reason: string;
   final_state: PublicGameState;

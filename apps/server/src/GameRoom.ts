@@ -7,8 +7,10 @@ import {
   validateDeck,
   type MatchState
 } from "@twcardgame/rules";
-import type { CommandEnvelope, GameCommand, Seat } from "@twcardgame/shared";
+import type { ClientCommandMessage, CommandEnvelope, GameEvent, Seat } from "@twcardgame/shared";
 import { Room, type Client } from "colyseus";
+import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
+import { createMatchResultPersistenceFromEnv, type MatchResultPersistence } from "./persistence.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
 interface JoinOptions {
@@ -17,23 +19,26 @@ interface JoinOptions {
   deckIds?: string[];
 }
 
-interface CommandMessage {
-  commandId?: string;
-  command: GameCommand;
-}
-
 const TURN_TIME_LIMIT_MS = 60_000;
 const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "60000", 10);
+const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "10000", 10);
 
 export class GameRoom extends Room<{ state: GameStateSchema }> {
   maxClients = 2;
   private match?: MatchState;
   private seats = new Map<string, Seat>();
   private setup = new Map<Seat, Required<JoinOptions>>();
+  private cleanupScheduled = false;
+  private readonly finalizer: MatchResultFinalizer;
+
+  constructor(persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv()) {
+    super();
+    this.finalizer = new MatchResultFinalizer(persistence);
+  }
 
   onCreate(): void {
     this.setState(new GameStateSchema());
-    this.onMessage<CommandMessage>("command", (client, message) => this.handleCommand(client, message));
+    this.onMessage<ClientCommandMessage>("command", (client, message) => this.handleCommand(client, message));
   }
 
   onJoin(client: Client, options: JoinOptions = {}): void {
@@ -52,7 +57,12 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   async onLeave(client: Client): Promise<void> {
     const seat = this.seats.get(client.sessionId);
     this.seats.delete(client.sessionId);
-    if (!seat || !this.match) return;
+    if (!seat) return;
+    if (!this.match) {
+      this.setup.delete(seat);
+      return;
+    }
+    if (isMatchComplete(this.match)) return;
 
     this.match.players[seat].connected = false;
     this.match.players[seat].reconnectUntilMs = Date.now() + RECONNECT_WINDOW_MS;
@@ -69,11 +79,28 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
         this.sendPrivateState(reconnecting);
       }
     } catch {
-      if (!this.match || this.match.status === "finished") return;
-      this.match.status = "finished";
-      this.match.result = { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" };
+      if (!this.match || isMatchComplete(this.match)) return;
+      const events = this.finalizer.finish(this.match, { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" }, seat);
       this.syncPublicState();
+      if (events.length > 0) this.broadcast("events", events);
+      this.afterMatchComplete();
     }
+  }
+
+  async onDispose(): Promise<void> {
+    if (!this.match) return;
+    if (!isMatchComplete(this.match)) {
+      this.finalizer.finish(this.match, { reason: "abandoned" });
+    }
+    await this.finalizer.persistOnce(this.match);
+  }
+
+  onBeforeShutdown(): void {
+    if (!this.match || isMatchComplete(this.match)) return;
+    const events = this.finalizer.finish(this.match, { reason: "abandoned" });
+    this.syncPublicState();
+    if (events.length > 0) this.broadcast("events", events);
+    this.afterMatchComplete();
   }
 
   private assignSeat(client: Client): Seat {
@@ -101,12 +128,13 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       ]
     });
     this.match = created.state;
+    void this.lock();
     this.syncPublicState();
     this.broadcast("events", created.events);
     this.sendAllPrivateState();
   }
 
-  private handleCommand(client: Client, message: CommandMessage): void {
+  private handleCommand(client: Client, message: ClientCommandMessage): void {
     if (!this.match) {
       client.send("error", { message: "Match is not ready." });
       return;
@@ -116,8 +144,19 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       client.send("error", { message: "No seat assigned." });
       return;
     }
+    if (!message || typeof message.commandId !== "string" || !message.command) {
+      this.rejectCommand(seat, "Invalid command message.");
+      return;
+    }
+    if (this.match.private.processedCommandIds.includes(message.commandId)) {
+      return;
+    }
+    if (requiresActionSeq(message.command.type) && message.expectedActionSeq !== this.match.turn.actionSeq) {
+      this.rejectCommand(seat, "Command sequence is stale.");
+      return;
+    }
     const envelope: CommandEnvelope = {
-      commandId: message.commandId ?? `${client.sessionId}:${this.match.turn.actionSeq + 1}`,
+      commandId: message.commandId,
       seat,
       nowMs: Date.now(),
       command: message.command
@@ -127,6 +166,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.syncPublicState();
     if (result.events.length > 0) this.broadcast("events", result.events);
     this.sendAllPrivateState();
+    this.afterMatchComplete();
   }
 
   private syncPublicState(): void {
@@ -143,6 +183,32 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     const seat = this.seats.get(client.sessionId);
     if (!seat) return;
     client.send("hand", { seat, cards: toHandView(this.match, seat) });
+  }
+
+  private rejectCommand(seat: Seat, reason: string): void {
+    if (!this.match) return;
+    const event: GameEvent = {
+      seq: this.match.private.nextEventSeq++,
+      type: "COMMAND_REJECTED",
+      seat,
+      payload: { reason }
+    };
+    this.match.private.eventLog.push(event);
+    this.broadcast("events", [event]);
+  }
+
+  private afterMatchComplete(): void {
+    if (!this.match || !isMatchComplete(this.match)) return;
+    void this.finalizer.persistOnce(this.match);
+    this.scheduleCleanup();
+  }
+
+  private scheduleCleanup(): void {
+    if (this.cleanupScheduled) return;
+    this.cleanupScheduled = true;
+    this.clock.setTimeout(() => {
+      void this.disconnect();
+    }, Math.max(0, MATCH_CLEANUP_DELAY_MS));
   }
 }
 
@@ -168,4 +234,8 @@ function seedFromRoomId(roomId: string): number {
     seed = Math.imul(seed, 16777619);
   }
   return seed >>> 0;
+}
+
+function requiresActionSeq(commandType: ClientCommandMessage["command"]["type"]): boolean {
+  return commandType !== "submitMulligan" && commandType !== "reconnect";
 }

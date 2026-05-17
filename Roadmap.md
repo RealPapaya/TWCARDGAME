@@ -94,7 +94,7 @@ What was completed
 
 
 Phase 3 — Multiplayer Reliability
-Status: ⬜ Pending
+Status: ✅ Complete
 
 Goal: the server handles all real-world network conditions without corrupting match state.
 
@@ -107,6 +107,15 @@ Tasks
  Server restart strategy (graceful shutdown, match state recovery)
  Match result persistence to Supabase on game end
  Colyseus scaling strategy documented (Redis presence driver for multi-instance)
+
+What was completed
+
+ Client command sequencing via expectedActionSeq, with duplicate commandId idempotency preserved
+ Out-of-turn and stale/future command rejection covered by tests and e2e
+ Reconnect timeout now emits GAME_FINISHED, syncs public status, and schedules room cleanup
+ Match finalization centralized with best-effort, once-only Supabase match_history persistence
+ Graceful Colyseus shutdown drains rooms and marks unfinished matches abandoned
+ Phase 3 reliability/scaling notes added in docs/phase3-multiplayer-reliability.md
 
 
 Phase 4 — Account, Deck & Collection
