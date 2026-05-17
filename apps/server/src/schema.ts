@@ -155,20 +155,9 @@ function syncPlayer(target: PublicPlayerSchema, player: PublicPlayer): void {
   target.deckCount = player.deckCount;
   target.graveyardCount = player.graveyardCount;
   target.mulliganReady = player.mulliganReady;
-  // Reconcile board in-place: update existing slots, then push or pop to match length.
-  // Colyseus ArraySchema#splice forbids insertCount > deleteCount, so we never use
-  // splice for growth — we push new items one-by-one instead.
   const incoming = player.board.map(toMinionSchema);
-  for (let i = 0; i < incoming.length; i++) {
-    if (i < target.board.length) {
-      copyMinionSchema(target.board[i], incoming[i]);
-    } else {
-      target.board.push(incoming[i]);
-    }
-  }
-  while (target.board.length > incoming.length) {
-    target.board.splice(target.board.length - 1, 1);
-  }
+  // Rebuild the ArraySchema so Colyseus keeps typed array item metadata intact.
+  target.board = new ArraySchema<PublicMinionSchema>(...incoming);
 }
 
 function toMinionSchema(minion: PublicMinion): PublicMinionSchema {

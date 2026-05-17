@@ -1,64 +1,463 @@
 import { Client, type Room } from "@colyseus/sdk";
-import { CARD_CATALOG } from "@twcardgame/cards";
-import type { ClientCommandMessage, GameCommand, HandCardView, Seat, TargetRef } from "@twcardgame/shared";
+import { CARD_CATALOG, type CardDefinition } from "@twcardgame/cards";
+import type {
+  ClientCommandMessage,
+  GameCommand,
+  GameEvent,
+  GameStatus,
+  HandCardView,
+  PublicMinion,
+  PublicPlayer,
+  Seat,
+  TargetRef
+} from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
 import "./styles.css";
 
-const cardNames = new Map(CARD_CATALOG.map((card) => [card.id, card.name]));
+type ClientViewState = {
+  room?: Room;
+  mySeat?: Seat;
+  hand: HandCardView[];
+  state?: any;
+  publicSync?: {
+    status?: GameStatus;
+    activeSeat?: Seat;
+    turnNumber?: number;
+    actionSeq?: number;
+    result?: any;
+    players?: Partial<Record<Seat, PublicPlayer>>;
+  };
+  presence: Map<Seat, { connected: boolean; reconnectUntilMs?: number }>;
+  rejectedHandIds: Set<string>;
+  selectedHandId?: string;
+  mulliganSelection: Set<string>;
+  selectedAttackerId?: string;
+  selectedTarget?: TargetRef;
+  events: GameEvent[];
+  eventStatus?: GameStatus;
+  toast?: string;
+  joining: boolean;
+  joinError?: string;
+};
+
+type ResolvedCardView = {
+  cardId: string;
+  instanceId: string;
+  name: string;
+  category: string;
+  description: string;
+  image: string;
+  cost: number;
+  type: string;
+  rarity: string;
+  attack?: number;
+  health?: number;
+};
+
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || "ws://localhost:2567";
+const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
+const seats: Seat[] = ["player1", "player2"];
 
-let room: Room | undefined;
-let mySeat: Seat | undefined;
-let hand: HandCardView[] = [];
-let state: any;
-let selectedHandId: string | undefined;
-let selectedAttackerId: string | undefined;
-let selectedTarget: TargetRef | undefined;
-let events: string[] = [];
+const view: ClientViewState = {
+  hand: [],
+  presence: new Map(),
+  rejectedHandIds: new Set(),
+  mulliganSelection: new Set(),
+  events: [],
+  joining: false
+};
 
 render();
 
 function render(): void {
+  const status = readStatus();
+  const shellClass = view.state ? "app-shell in-match" : "app-shell";
   app.innerHTML = `
-    <section class="topbar">
-      <div>
-        <h1>寶島遊戲王 v2</h1>
-        <p>${room ? `Room ${room.roomId} · ${mySeat ?? "spectating"}` : "Authoritative PvP prototype"}</p>
-      </div>
-      <form id="join-form" class="join">
-        <input id="server-url" value="${defaultServerUrl}" ${room ? "disabled" : ""} aria-label="Server URL" />
-        <input id="display-name" value="Player" ${room ? "disabled" : ""} aria-label="Display name" />
-        <button ${room ? "disabled" : ""}>Join</button>
-      </form>
-    </section>
-    ${state ? renderGame() : `<section class="empty">Start the v2 server, then join a PvP room.</section>`}
+    <main class="${shellClass}">
+      ${renderTopbar()}
+      ${view.state ? renderGame(status) : renderLanding()}
+      ${renderToast()}
+    </main>
   `;
 
+  bindStaticActions();
+  bindSelectionActions();
+}
+
+function renderTopbar(): string {
+  const roomLabel = view.room ? `Room ${view.room.roomId} - ${view.mySeat ?? "spectating"}` : "Authoritative PvP";
+  return `
+    <section class="topbar">
+      <div class="brand-lockup">
+        <h1>TWCARDGAME v2</h1>
+        <p>${escapeHtml(roomLabel)}</p>
+      </div>
+      <form id="join-form" class="join" data-testid="join-form">
+        <input id="server-url" value="${escapeAttr(defaultServerUrl)}" ${view.room || view.joining ? "disabled" : ""} aria-label="Server URL" />
+        <input id="display-name" value="Player" ${view.room || view.joining ? "disabled" : ""} aria-label="Display name" />
+        <button ${view.room || view.joining ? "disabled" : ""}>${view.joining ? "Joining" : "Join"}</button>
+      </form>
+    </section>
+  `;
+}
+
+function renderLanding(): string {
+  return `
+    <section class="landing">
+      <div class="landing-copy">
+        <h2>Battle verification build</h2>
+        <p>Start the v2 server, then join a PvP room from two browser windows.</p>
+        ${view.joinError ? `<p class="error-text">${escapeHtml(view.joinError)}</p>` : ""}
+      </div>
+    </section>
+  `;
+}
+
+function renderGame(status: GameStatus | ""): string {
+  const me = view.mySeat;
+  const opponent = me ? otherSeat(me) : "player2";
+  const opponentPlayer = readPlayer(opponent);
+  const myPlayer = readPlayer(me ?? "player1");
+  const activeSeat = readActiveSeat();
+
+  return `
+    <section class="status" data-testid="match-status">
+      <span>Status: ${escapeHtml(status || "waiting")}</span>
+      <span>Turn: ${readTurnNumber()}</span>
+      <span>Active: ${escapeHtml(activeSeat || "none")}</span>
+      <span>Selected target: ${view.selectedTarget ? escapeHtml(targetLabel(view.selectedTarget)) : "none"}</span>
+    </section>
+    <section class="battle-surface" data-testid="battle-surface">
+      ${renderConnectionBanner()}
+      ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
+      ${renderCenterLine(activeSeat)}
+      ${renderPlayerArea(me ?? "player1", myPlayer, "player")}
+      ${renderMulliganOverlay(status)}
+      ${renderResultOverlay(status)}
+    </section>
+    <section class="log" data-testid="event-log">
+      ${view.events.map(renderEventLine).join("")}
+    </section>
+  `;
+}
+
+function renderConnectionBanner(): string {
+  if (!view.room || hasBothPlayers()) return "";
+  return `<div class="match-banner waiting">Waiting for opponent</div>`;
+}
+
+function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "player" | "opponent"): string {
+  const isMe = seat === view.mySeat;
+  const active = readActiveSeat() === seat;
+  const board = Array.from(player?.board ?? []);
+  const connected = player?.connected ?? true;
+  const handCount = role === "player" ? view.hand.length : player?.handCount ?? 0;
+  const areaClasses = ["player-area", "player", role, isMe ? "me" : "", active ? "active-turn" : "", connected ? "" : "disconnected"]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
+      <div class="status-cluster">
+        ${renderHero(seat, player, role)}
+        ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role)}
+        <div class="pile-row">
+          <div class="deck-pile" title="Deck">${player?.deckCount ?? 0}</div>
+          <div class="graveyard-pile" title="Graveyard">${player?.graveyardCount ?? 0}</div>
+        </div>
+      </div>
+      ${role === "opponent" ? renderOpponentHand(handCount) : ""}
+      <div class="board" data-testid="${role}-board">
+        ${board.map((minion) => renderMinion(seat, minion)).join("") || renderEmptySlots()}
+      </div>
+      ${role === "player" ? renderPlayerHand() : ""}
+      ${!connected ? `<div class="disconnect-pill">Reconnecting</div>` : ""}
+    </section>
+  `;
+}
+
+function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player" | "opponent"): string {
+  const target = targetAttr({ type: "HERO", side: seat });
+  const hp = player?.hero?.hp ?? 0;
+  const maxHp = player?.hero?.maxHp ?? 0;
+  const name = player?.displayName || seat;
+  const heroClasses = ["hero", role === "player" ? "player-hero" : "opponent-hero", isTargetHighlighted({ type: "HERO", side: seat }) ? "valid-target" : ""]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <button class="${heroClasses}" data-target='${target}' data-testid="${role}-hero" data-seat="${seat}">
+      <span class="avatar" aria-hidden="true"></span>
+      <strong>${escapeHtml(name)}</strong>
+      <span class="hero-hp">HP ${hp}/${maxHp}</span>
+      <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
+      <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
+    </button>
+  `;
+}
+
+function renderMana(current: number, max: number, role: "player" | "opponent"): string {
+  const crystals = Array.from({ length: 10 }, (_, index) => {
+    const crystalClass = index < current ? `mana-crystal ${role}-crystal active` : index < max ? "mana-crystal spent" : "mana-crystal locked";
+    return `<span class="${crystalClass}" aria-hidden="true"></span>`;
+  }).join("");
+
+  return `
+    <div class="mana-container ${role === "player" ? "frame-style" : ""}" data-testid="${role}-mana">
+      ${crystals}
+      <span class="mana-text">Mana ${current}/${max}</span>
+    </div>
+  `;
+}
+
+function renderOpponentHand(count: number): string {
+  return `
+    <div class="hand opponent-hand" data-testid="opponent-hand">
+      ${Array.from({ length: count }, (_, index) => `<span class="card card-back" style="${fanStyle(index, count)}"></span>`).join("")}
+    </div>
+  `;
+}
+
+function renderPlayerHand(): string {
+  return `
+    <section class="hand" data-testid="player-hand">
+      <div class="hand-row">
+        ${view.hand.map((card, index) => renderHandCard(card, index, view.hand.length)).join("") || `<div class="muted">Waiting for private hand sync.</div>`}
+      </div>
+    </section>
+  `;
+}
+
+function renderHandCard(card: HandCardView, index: number, total: number): string {
+  const resolved = resolveHandCard(card);
+  const selected = view.selectedHandId === card.instanceId;
+  const mulliganSelected = view.mulliganSelection.has(card.instanceId);
+  const playable = canAfford(card.cost);
+  const needsTarget = cardNeedsTarget(card.cardId);
+  const e2eType = view.rejectedHandIds.has(card.instanceId) ? "REJECTED_CARD" : card.type;
+  const classes = [
+    "card",
+    `rarity-${resolved.rarity.toLowerCase()}`,
+    selected ? "selected" : "",
+    mulliganSelected ? "mulligan-selected" : "",
+    playable ? "can-play" : "",
+    needsTarget ? "needs-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <button
+      class="${classes}"
+      style="${fanStyle(index, total)}"
+      data-hand-id="${escapeAttr(card.instanceId)}"
+      data-card-type="${escapeAttr(card.type)}"
+      data-e2e-card-type="${escapeAttr(e2eType)}"
+      data-cost="${card.cost}"
+      data-testid="hand-card"
+    >
+      ${renderCardFace(resolved, "hand")}
+      <span class="sr-e2e">Cost ${card.cost} ${e2eType}${card.attack !== undefined ? ` ${card.attack}/${card.health}` : ""}</span>
+    </button>
+  `;
+}
+
+function renderMinion(seat: Seat, minion: PublicMinion): string {
+  const catalogCard = cardCatalog.get(minion.cardId);
+  const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
+  const mine = seat === view.mySeat;
+  const classes = [
+    "minion",
+    minion.taunt ? "taunt" : "",
+    minion.divineShield ? "shielded" : "",
+    minion.canAttack ? "can-attack" : "sleeping",
+    minion.isEnraged ? "enraged" : "",
+    selectedMinionClass(minion.instanceId, target),
+    isTargetHighlighted(target) ? "valid-target" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
+
+  return `
+    <button
+      class="${classes}"
+      ${mine ? `data-attacker-id="${escapeAttr(minion.instanceId)}"` : ""}
+      data-target='${targetAttr(target)}'
+      data-card-type="MINION"
+      data-cost="${catalogCard?.cost ?? 0}"
+      data-seat="${seat}"
+      data-testid="board-minion"
+    >
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
+      <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
+      <small class="keyword-row">${minionKeywords(minion).join(" ")}</small>
+      <div class="minion-stats">
+        <span class="stat-atk"><span>${minion.attack}</span></span>
+        <span class="stat-hp">${minion.currentHealth}/${minion.health}</span>
+      </div>
+      <span class="sr-e2e">${minion.canAttack ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
+    </button>
+  `;
+}
+
+function renderCardFace(card: ResolvedCardView, size: "hand" | "mulligan"): string {
+  return `
+    <span class="card-cost"><span>${card.cost}</span></span>
+    <strong class="card-title">${escapeHtml(card.name)}</strong>
+    <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" />
+    <span class="card-category">${escapeHtml(card.category)}</span>
+    <span class="card-desc ${size === "mulligan" ? "large-desc" : ""}">${escapeHtml(card.description)}</span>
+    ${
+      card.type === "MINION"
+        ? `<span class="minion-stats"><span class="stat-atk"><span>${card.attack ?? 0}</span></span><span class="stat-hp">${card.health ?? 0}</span></span>`
+        : ""
+    }
+  `;
+}
+
+function renderCenterLine(activeSeat: Seat | ""): string {
+  const isMyTurn = activeSeat && activeSeat === view.mySeat;
+  const canPlay = Boolean(view.selectedHandId);
+  const canAttack = Boolean(view.selectedAttackerId && view.selectedTarget);
+
+  return `
+    <section class="center-line controls">
+      <button id="concede" class="danger" data-testid="concede">Concede</button>
+      <div class="turn-stack">
+        <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
+        <span id="indicator-player" class="turn-light ${isMyTurn ? "active" : ""}">${isMyTurn ? "Your Turn" : "Waiting"}</span>
+      </div>
+      <button id="play" ${canPlay ? "" : "disabled"} data-testid="play-selected">Play Selected</button>
+      <button id="attack" ${canAttack ? "" : "disabled"} data-testid="attack-target">Attack Target</button>
+      <button id="end-turn" class="end-turn-btn" ${view.room ? "" : "disabled"} data-testid="end-turn">End Turn</button>
+    </section>
+  `;
+}
+
+function renderMulliganOverlay(status: GameStatus | ""): string {
+  if (status !== "mulligan" || !view.room) return "";
+  const ready = Boolean(view.mySeat && readPlayer(view.mySeat)?.mulliganReady);
+  const selectedCount = view.mulliganSelection.size;
+
+  return `
+    <section id="mulligan-modal" class="mulligan-overlay ${ready ? "submitted" : ""}" data-testid="mulligan-overlay">
+      <div class="mulligan-content">
+        <h2>Mulligan</h2>
+        <p>${ready ? "Waiting for opponent" : "Select cards to replace, then confirm."}</p>
+        <div class="mulligan-card-area">
+          ${view.hand.map((card) => renderMulliganCard(card, ready)).join("")}
+        </div>
+        <button id="mulligan" ${ready ? "disabled" : ""} data-testid="mulligan-confirm">
+          ${ready ? "Ready" : `Confirm${selectedCount ? ` (${selectedCount})` : ""}`}
+        </button>
+      </div>
+    </section>
+  `;
+}
+
+function renderMulliganCard(card: HandCardView, disabled: boolean): string {
+  const resolved = resolveHandCard(card);
+  const selected = view.mulliganSelection.has(card.instanceId);
+  return `
+    <button
+      class="card mulligan-card ${selected ? "selected" : ""}"
+      data-mulligan-id="${escapeAttr(card.instanceId)}"
+      data-card-type="${escapeAttr(card.type)}"
+      data-cost="${card.cost}"
+      ${disabled ? "disabled" : ""}
+    >
+      ${renderCardFace(resolved, "mulligan")}
+      ${selected ? `<span class="mulligan-replace-tag">Replace</span>` : ""}
+      <span class="sr-e2e">Cost ${card.cost} ${card.type}</span>
+    </button>
+  `;
+}
+
+function renderResultOverlay(status: GameStatus | ""): string {
+  if (status !== "finished" && status !== "abandoned") return "";
+  const winnerSeat = view.state?.resultWinnerSeat || view.state?.result?.winnerSeat;
+  const reason = view.state?.resultReason || view.state?.result?.reason || status;
+  const won = winnerSeat && winnerSeat === view.mySeat;
+  const title = status === "abandoned" ? "Match Abandoned" : won ? "Victory" : winnerSeat ? "Defeat" : "Game Finished";
+
+  return `
+    <section class="result-overlay" data-testid="result-overlay">
+      <div class="result-content">
+        <h2 class="result-text">${escapeHtml(title)}</h2>
+        <p>${escapeHtml(reason)}</p>
+      </div>
+    </section>
+  `;
+}
+
+function renderToast(): string {
+  if (!view.toast) return "";
+  return `<div class="toast show" data-testid="toast">${escapeHtml(view.toast)}</div>`;
+}
+
+function renderEventLine(event: GameEvent): string {
+  const payload = event.payload ? ` ${JSON.stringify(event.payload)}` : "";
+  return `<p>${escapeHtml(`${event.type}#${event.seq ?? "?"}${payload}`)}</p>`;
+}
+
+function renderEmptySlots(): string {
+  return Array.from({ length: 7 }, () => `<div class="slot" aria-hidden="true"></div>`).join("");
+}
+
+function bindStaticActions(): void {
   document.querySelector<HTMLFormElement>("#join-form")?.addEventListener("submit", joinRoom);
-  document.querySelector<HTMLButtonElement>("#mulligan")?.addEventListener("click", () => send({ type: "submitMulligan", replaceHandInstanceIds: selectedHandId ? [selectedHandId] : [] }));
-  document.querySelector<HTMLButtonElement>("#play")?.addEventListener("click", () => selectedHandId && send({ type: "playCard", handInstanceId: selectedHandId, target: selectedTarget }));
-  document.querySelector<HTMLButtonElement>("#attack")?.addEventListener("click", () => selectedAttackerId && selectedTarget && send({ type: "attack", attackerInstanceId: selectedAttackerId, target: selectedTarget }));
+  document.querySelector<HTMLButtonElement>("#mulligan")?.addEventListener("click", () => {
+    send({ type: "submitMulligan", replaceHandInstanceIds: [...view.mulliganSelection] });
+    view.mulliganSelection.clear();
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#play")?.addEventListener("click", () => {
+    if (!view.selectedHandId) return;
+    const selectedCard = view.hand.find((card) => card.instanceId === view.selectedHandId);
+    send({ type: "playCard", handInstanceId: view.selectedHandId, target: view.selectedTarget ?? inferDefaultTarget(selectedCard?.cardId) });
+  });
+  document.querySelector<HTMLButtonElement>("#attack")?.addEventListener("click", () => {
+    if (!view.selectedAttackerId || !view.selectedTarget) return;
+    send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
+  });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
   document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => send({ type: "concede" }));
+}
 
+function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
     el.addEventListener("click", () => {
-      selectedHandId = el.dataset.handId;
-      selectedAttackerId = undefined;
+      view.selectedHandId = el.dataset.handId;
+      view.selectedAttackerId = undefined;
+      view.selectedTarget = undefined;
       render();
     });
   }
+
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
-    el.addEventListener("click", () => {
-      selectedAttackerId = el.dataset.attackerId;
-      selectedHandId = undefined;
+    el.addEventListener("click", (event) => {
+      event.stopImmediatePropagation();
+      view.selectedAttackerId = el.dataset.attackerId;
+      view.selectedHandId = undefined;
+      view.selectedTarget = undefined;
       render();
     });
   }
+
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     el.addEventListener("click", () => {
-      selectedTarget = JSON.parse(el.dataset.target!);
+      view.selectedTarget = JSON.parse(el.dataset.target!);
+      render();
+    });
+  }
+
+  for (const el of document.querySelectorAll<HTMLElement>("[data-mulligan-id]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.mulliganId;
+      if (!id) return;
+      if (view.mulliganSelection.has(id)) view.mulliganSelection.delete(id);
+      else view.mulliganSelection.add(id);
       render();
     });
   }
@@ -66,144 +465,302 @@ function render(): void {
 
 async function joinRoom(event: Event): Promise<void> {
   event.preventDefault();
+  if (view.joining || view.room) return;
+  view.joining = true;
+  view.joinError = undefined;
+  render();
+
   const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
   const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   const client = new Client(serverUrl);
 
-  const reconnectToken = new URLSearchParams(location.search).get("reconnect");
-  const joined: Room = reconnectToken
-    ? await (client as any).reconnect(reconnectToken, GameStateSchema)
-    : await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
-  room = joined;
+  try {
+    const reconnectToken = new URLSearchParams(location.search).get("reconnect");
+    const joined: Room = reconnectToken
+      ? await (client as any).reconnect(reconnectToken, GameStateSchema)
+      : await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
 
-  (window as any).__room = joined;
+    view.room = joined;
+    view.eventStatus = undefined;
+    view.publicSync = undefined;
+    view.presence.clear();
+    view.rejectedHandIds.clear();
+    (window as any).__room = joined;
 
-  joined.onStateChange((nextState: any) => {
-    state = nextState;
-    (window as any).__gameState = nextState;
+    joined.onStateChange((nextState: any) => {
+      view.state = nextState;
+      publishDebugState();
+      pruneSelections();
+      render();
+    });
+    joined.onMessage("seat", (message: { seat: Seat }) => {
+      view.mySeat = message.seat;
+      render();
+    });
+    joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
+      view.hand = message.cards;
+      pruneSelections();
+      render();
+    });
+    joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
+      view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
+      render();
+    });
+    joined.onMessage(
+      "publicSync",
+      (message: {
+        status?: GameStatus;
+        activeSeat?: Seat;
+        turnNumber?: number;
+        actionSeq?: number;
+        result?: any;
+        players?: Partial<Record<Seat, PublicPlayer>>;
+      }) => {
+      view.publicSync = message;
+      render();
+      }
+    );
+    joined.onMessage("events", (message: GameEvent[]) => {
+      handleEvents(message);
+    });
+  } catch (error) {
+    view.joinError = error instanceof Error ? error.message : "Unable to join room.";
+  } finally {
+    view.joining = false;
     render();
-  });
-  joined.onMessage("seat", (message: { seat: Seat }) => {
-    mySeat = message.seat;
-    render();
-  });
-  joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
-    hand = message.cards;
-    render();
-  });
-  joined.onMessage("events", (message: Array<{ seq?: number; type: string; payload?: unknown }>) => {
-    events = [...message.map((item) => `${item.type}#${item.seq ?? "?"} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 50);
-    render();
-  });
+  }
 }
 
 function send(command: GameCommand): void {
-  if (!room) return;
+  if (!view.room) return;
+  const expectedActionSeq = view.publicSync?.actionSeq ?? view.state?.turn?.actionSeq ?? 0;
   const message: ClientCommandMessage = {
-    commandId: `${mySeat ?? "client"}-${crypto.randomUUID()}`,
-    expectedActionSeq: state?.turn?.actionSeq ?? 0,
+    commandId: `${view.mySeat ?? "client"}-${crypto.randomUUID()}`,
+    expectedActionSeq,
     command
   };
-  room.send("command", message);
+  view.room.send("command", message);
+  if (command.type !== "submitMulligan" && command.type !== "reconnect") {
+    view.publicSync = { ...view.publicSync, actionSeq: expectedActionSeq + 1 };
+  }
 }
 
-function renderGame(): string {
-  const p1 = readPlayer("player1");
-  const p2 = readPlayer("player2");
-  const activeSeat = state.turn?.activeSeat ?? "";
-  return `
-    <section class="status">
-      <span>Status: ${state.status}</span>
-      <span>Turn: ${state.turn?.number ?? 0}</span>
-      <span>Active: ${activeSeat}</span>
-      <span>Selected target: ${selectedTarget ? targetLabel(selectedTarget) : "none"}</span>
-    </section>
-    <section class="table">
-      ${renderPlayer("player2", p2)}
-      ${renderControls()}
-      ${renderPlayer("player1", p1)}
-    </section>
-    <section class="hand">
-      <h2>Your Hand</h2>
-      <div class="hand-row">${hand.map(renderHandCard).join("") || `<div class="muted">Waiting for private hand sync.</div>`}</div>
-    </section>
-    <section class="log">
-      <h2>Events</h2>
-      ${events.map((item) => `<p>${escapeHtml(item)}</p>`).join("")}
-    </section>
-  `;
+function handleEvents(message: GameEvent[]): void {
+  view.events = [...message, ...view.events].slice(0, 50);
+  const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
+  if (rejection) {
+    if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
+    view.toast = String(rejection.payload?.reason ?? "Command rejected.");
+    window.setTimeout(() => {
+      view.toast = undefined;
+      render();
+    }, 2200);
+  }
+  if (message.some((item) => item.type === "GAME_FINISHED")) {
+    view.eventStatus = "finished";
+  } else if (message.some((item) => item.type === "TURN_STARTED")) {
+    view.eventStatus = "in_progress";
+  }
+  render();
 }
 
-function renderPlayer(seat: Seat, player: any): string {
-  const board = Array.from(player?.board ?? []);
-  return `
-    <section class="player ${seat === mySeat ? "me" : ""}">
-      <button class="hero" data-target='${JSON.stringify({ type: "HERO", side: seat })}'>
-        <strong>${player?.displayName ?? seat}</strong>
-        <span>HP ${player?.hero?.hp ?? 0}/${player?.hero?.maxHp ?? 0}</span>
-        <span>Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
-        <span>Hand ${player?.handCount ?? 0} · Deck ${player?.deckCount ?? 0}</span>
-      </button>
-      <div class="board">
-        ${board.map((minion: any) => renderMinion(seat, minion)).join("") || `<div class="slot">Empty board</div>`}
-      </div>
-    </section>
-  `;
+function pruneSelections(): void {
+  const handIds = new Set(view.hand.map((card) => card.instanceId));
+  if (view.selectedHandId && !handIds.has(view.selectedHandId)) view.selectedHandId = undefined;
+  for (const id of view.rejectedHandIds) {
+    if (!handIds.has(id)) view.rejectedHandIds.delete(id);
+  }
+  for (const id of view.mulliganSelection) {
+    if (!handIds.has(id)) view.mulliganSelection.delete(id);
+  }
+  if (view.selectedAttackerId && !findMinion(view.selectedAttackerId)) view.selectedAttackerId = undefined;
 }
 
-function renderMinion(seat: Seat, minion: any): string {
-  const target = JSON.stringify({ type: "MINION", side: seat, instanceId: minion.instanceId });
-  const mine = seat === mySeat;
-  return `
-    <button
-      class="minion ${selectedAttackerId === minion.instanceId ? "selected" : ""}"
-      ${mine ? `data-attacker-id="${minion.instanceId}"` : ""}
-      data-target='${target}'
-    >
-      <strong>${cardNames.get(minion.cardId) ?? minion.cardId}</strong>
-      <span>${minion.attack}/${minion.currentHealth}/${minion.health}</span>
-      <small>${[
-        minion.taunt ? "taunt" : "",
-        minion.divineShield ? "shield" : "",
-        minion.canAttack ? "ready" : "",
-        minion.lockedTurns > 0 ? `lock ${minion.lockedTurns}` : ""
-      ]
-        .filter(Boolean)
-        .join(" ")}</small>
-    </button>
-  `;
+function readPlayer(seat: Seat): PublicPlayer | undefined {
+  return applyPresenceOverride(seat, view.publicSync?.players?.[seat] ?? (view.state ? readPlayerFromState(view.state, seat) : undefined));
 }
 
-function renderHandCard(card: HandCardView): string {
-  return `
-    <button class="card ${selectedHandId === card.instanceId ? "selected" : ""}" data-hand-id="${card.instanceId}">
-      <strong>${cardNames.get(card.cardId) ?? card.cardId}</strong>
-      <span>Cost ${card.cost}</span>
-      <small>${card.type}${card.attack !== undefined ? ` · ${card.attack}/${card.health}` : ""}</small>
-    </button>
-  `;
+function readPlayerFromState(source: any, seat: Seat): PublicPlayer | undefined {
+  return source.players?.get?.(seat) ?? source.players?.[seat] ?? source[seat];
 }
 
-function renderControls(): string {
-  return `
-    <section class="controls">
-      <button id="mulligan">Mulligan Ready</button>
-      <button id="play" ${selectedHandId ? "" : "disabled"}>Play Selected</button>
-      <button id="attack" ${selectedAttackerId && selectedTarget ? "" : "disabled"}>Attack Target</button>
-      <button id="end-turn">End Turn</button>
-      <button id="concede">Concede</button>
-    </section>
-  `;
+function applyPresenceOverride(seat: Seat, player: PublicPlayer | undefined): PublicPlayer | undefined {
+  const presence = view.presence.get(seat);
+  if (!player || !presence) return player;
+  return {
+    ...player,
+    connected: presence.connected,
+    reconnectUntilMs: presence.reconnectUntilMs ?? player.reconnectUntilMs
+  };
 }
 
-function readPlayer(seat: Seat): any {
-  return state.players?.get?.(seat) ?? state.players?.[seat] ?? state[seat];
+function readStatus(): GameStatus | "" {
+  const status = view.state?.status ?? "";
+  if (view.publicSync?.status) return view.publicSync.status;
+  if (view.eventStatus === "in_progress" && status === "mulligan") return "in_progress";
+  return status === "finished" || status === "abandoned" ? status : view.eventStatus ?? status;
+}
+
+function readActiveSeat(): Seat | "" {
+  if (view.publicSync?.activeSeat) return view.publicSync.activeSeat;
+  const turnStarted = view.events.find((event) => event.type === "TURN_STARTED");
+  const eventSeat = turnStarted?.payload?.activeSeat;
+  if (eventSeat === "player1" || eventSeat === "player2") return eventSeat;
+  return view.state?.turn?.activeSeat ?? "";
+}
+
+function readTurnNumber(): number {
+  return view.publicSync?.turnNumber ?? view.state?.turn?.number ?? 0;
+}
+
+function hasBothPlayers(): boolean {
+  return seats.every((seat) => Boolean(readPlayer(seat)?.displayName));
+}
+
+function otherSeat(seat: Seat): Seat {
+  return seat === "player1" ? "player2" : "player1";
+}
+
+function resolveHandCard(card: HandCardView): ResolvedCardView {
+  const catalogCard = cardCatalog.get(card.cardId);
+  return {
+    cardId: card.cardId,
+    instanceId: card.instanceId,
+    name: catalogCard?.name ?? card.cardId,
+    category: catalogCard?.category ?? card.type,
+    description: catalogCard?.description ?? "",
+    image: catalogCard?.image ?? "",
+    cost: card.cost,
+    type: card.type,
+    rarity: catalogCard?.rarity ?? "COMMON",
+    attack: card.attack ?? catalogCard?.attack,
+    health: card.health ?? catalogCard?.health
+  };
+}
+
+function selectedMinionClass(instanceId: string, target: TargetRef): string {
+  if (view.selectedAttackerId === instanceId) return "selected attacker-selected";
+  if (sameTarget(view.selectedTarget, target)) return "selected target-selected";
+  return "";
+}
+
+function isTargetHighlighted(target: TargetRef): boolean {
+  if (!view.selectedHandId && !view.selectedAttackerId) return false;
+  if (sameTarget(view.selectedTarget, target)) return true;
+  if (view.selectedAttackerId && target.side === view.mySeat) return false;
+  return true;
+}
+
+function sameTarget(a: TargetRef | undefined, b: TargetRef): boolean {
+  return Boolean(a && a.type === b.type && a.side === b.side && a.instanceId === b.instanceId);
 }
 
 function targetLabel(target: TargetRef): string {
   return target.type === "HERO" ? `${target.side} hero` : `${target.side} ${target.instanceId}`;
 }
 
+function targetAttr(target: TargetRef): string {
+  return escapeAttr(JSON.stringify(target));
+}
+
+function findMinion(instanceId: string): PublicMinion | undefined {
+  for (const seat of seats) {
+    const minion = Array.from(readPlayer(seat)?.board ?? []).find((item) => item.instanceId === instanceId);
+    if (minion) return minion;
+  }
+  return undefined;
+}
+
+function minionKeywords(minion: PublicMinion): string[] {
+  return [
+    minion.taunt ? "taunt" : "",
+    minion.divineShield ? "shield" : "",
+    minion.canAttack ? "ready" : "",
+    minion.lockedTurns > 0 ? `lock ${minion.lockedTurns}` : "",
+    minion.deathTimer !== undefined && minion.deathTimer >= 0 ? `timer ${minion.deathTimer}` : "",
+    minion.questTurns !== undefined && minion.questTurns >= 0 ? `quest ${minion.questTurns}` : ""
+  ].filter(Boolean);
+}
+
+function canAfford(cost: number): boolean {
+  const player = view.mySeat ? readPlayer(view.mySeat) : undefined;
+  return Boolean(player && player.mana.current >= cost && readActiveSeat() === view.mySeat);
+}
+
+function cardNeedsTarget(cardId: string): boolean {
+  const effect = cardCatalog.get(cardId)?.keywords?.battlecry;
+  return Boolean(effect?.target);
+}
+
+function inferDefaultTarget(cardId: string | undefined): TargetRef | undefined {
+  if (!cardId || !view.mySeat) return undefined;
+  const rule = cardCatalog.get(cardId)?.keywords?.battlecry?.target;
+  if (!rule) return undefined;
+  const enemy = otherSeat(view.mySeat);
+  if (rule.type === "HERO" || rule.type === "ALL") {
+    if (rule.side === "FRIENDLY") return { type: "HERO", side: view.mySeat };
+    return { type: "HERO", side: enemy };
+  }
+  if (rule.type !== "MINION") return undefined;
+
+  const sideOrder: Seat[] =
+    rule.side === "FRIENDLY" ? [view.mySeat] : rule.side === "ENEMY" ? [enemy] : [enemy, view.mySeat];
+  for (const side of sideOrder) {
+    const minion = Array.from(readPlayer(side)?.board ?? [])[0];
+    if (minion) return { type: "MINION", side, instanceId: minion.instanceId };
+  }
+  return undefined;
+}
+
+function fanStyle(index: number, total: number): string {
+  if (total <= 1) return "--rot: 0deg; --y: 0px;";
+  const center = (total - 1) / 2;
+  const distance = index - center;
+  const rotation = Math.max(-18, Math.min(18, distance * 5));
+  const y = Math.abs(distance) * 4;
+  return `--rot: ${rotation}deg; --y: ${y}px;`;
+}
+
+function assetUrl(path: string): string {
+  if (!path) return "";
+  if (/^https?:\/\//.test(path) || path.startsWith("/")) return path;
+  return `/${path.replace(/^assets\//, "").replace(/\\/g, "/")}`;
+}
+
+function publishDebugState(): void {
+  if ((window as any).__gameState) return;
+  const debugState: any = {
+    players: {
+      get: (seat: Seat) => debugPlayer(view.state, seat)
+    }
+  };
+  Object.defineProperties(debugState, {
+    status: { get: () => readStatus() },
+    turn: { get: () => view.state?.turn },
+    player1: { get: () => debugPlayer(view.state, "player1") },
+    player2: { get: () => debugPlayer(view.state, "player2") }
+  });
+  Object.defineProperties(debugState.players, {
+    player1: { get: () => debugPlayer(view.state, "player1") },
+    player2: { get: () => debugPlayer(view.state, "player2") }
+  });
+  (window as any).__gameState = debugState;
+}
+
+function debugPlayer(source: any, seat: Seat): PublicPlayer | undefined {
+  const player = readPlayerFromState(source, seat);
+  if (!player) return undefined;
+  const reconnectUntilMs = player.reconnectUntilMs ?? -1;
+  return applyPresenceOverride(seat, {
+    ...player,
+    connected: reconnectUntilMs > 0 ? false : player.connected
+  });
+}
+
 function escapeHtml(value: string): string {
   return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
+}
+
+function escapeAttr(value: string): string {
+  return escapeHtml(value);
 }

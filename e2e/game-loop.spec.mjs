@@ -248,14 +248,12 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       var status = document.querySelector(".player.me .hero");
       var manaMatch = status && status.textContent ? status.textContent.match(/Mana\s+(\d+)/) : null;
       var mana = manaMatch ? parseInt(manaMatch[1], 10) : 0;
-      var cards = Array.from(document.querySelectorAll(".hand .card"));
+      var cards = Array.from(document.querySelectorAll('[data-testid="hand-card"]'));
       var bestIdx = -1, bestCost = Infinity;
       for (var i = 0; i < cards.length; i++) {
-        var t = cards[i].textContent || "";
-        if (t.indexOf("MINION") === -1) continue;
-        var cm = t.match(/Cost\s+(\d+)/);
-        if (!cm) continue;
-        var cost = parseInt(cm[1], 10);
+        if (cards[i].dataset.e2eCardType !== "MINION") continue;
+        var cost = parseInt(cards[i].dataset.cost || "", 10);
+        if (!Number.isFinite(cost)) continue;
         if (cost > mana) continue;
         if (cost < bestCost) { bestCost = cost; bestIdx = i; }
       }
@@ -263,13 +261,13 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     });
 
     if (idx !== -1) {
-      var cardText = await actPage.locator(".hand .card").nth(idx).textContent();
+      var cardText = await actPage.locator('[data-testid="hand-card"]').nth(idx).textContent();
       log(actTag, "attempt " + attempt + ": playing [" + idx + "] " + (cardText || "").trim().replace(/\s+/g, " ").slice(0, 60));
 
       var ck1 = await snap(snapPage1);
       var ck2 = await snap(snapPage2);
 
-      await actPage.locator(".hand .card").nth(idx).click();
+      await actPage.locator('[data-testid="hand-card"]').nth(idx).click();
       var playEnabled = await actPage.evaluate(function () {
         return !document.querySelector("#play").hasAttribute("disabled");
       });

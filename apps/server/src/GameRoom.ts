@@ -67,6 +67,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.match.players[seat].connected = false;
     this.match.players[seat].reconnectUntilMs = Date.now() + RECONNECT_WINDOW_MS;
     this.syncPublicState();
+    this.broadcast("presence", { seat, connected: false, reconnectUntilMs: this.match.players[seat].reconnectUntilMs });
 
     try {
       const reconnecting = await this.allowReconnection(client, RECONNECT_WINDOW_MS / 1000);
@@ -76,12 +77,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
         this.match.players[reconnectSeat].connected = true;
         this.match.players[reconnectSeat].reconnectUntilMs = undefined;
         this.syncPublicState();
+        this.broadcast("presence", { seat: reconnectSeat, connected: true });
         this.sendPrivateState(reconnecting);
       }
     } catch {
       if (!this.match || isMatchComplete(this.match)) return;
       const events = this.finalizer.finish(this.match, { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" }, seat);
       this.syncPublicState();
+      this.broadcastPublicSync();
       if (events.length > 0) this.broadcast("events", events);
       this.afterMatchComplete();
     }
@@ -99,6 +102,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (!this.match || isMatchComplete(this.match)) return;
     const events = this.finalizer.finish(this.match, { reason: "abandoned" });
     this.syncPublicState();
+    this.broadcastPublicSync();
     if (events.length > 0) this.broadcast("events", events);
     this.afterMatchComplete();
   }
@@ -130,6 +134,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.match = created.state;
     void this.lock();
     this.syncPublicState();
+    this.broadcastPublicSync();
     this.broadcast("events", created.events);
     this.sendAllPrivateState();
   }
@@ -164,6 +169,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     const result = reduce(this.match, envelope, CARD_CATALOG);
     this.match = result.state;
     this.syncPublicState();
+    this.broadcastPublicSync();
     if (result.events.length > 0) this.broadcast("events", result.events);
     this.sendAllPrivateState();
     this.afterMatchComplete();
@@ -172,6 +178,19 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   private syncPublicState(): void {
     if (!this.match) return;
     syncSchemaFromPublic(this.state, toPublicState(this.match));
+  }
+
+  private broadcastPublicSync(): void {
+    if (!this.match) return;
+    const publicState = toPublicState(this.match);
+    this.broadcast("publicSync", {
+      status: this.match.status,
+      activeSeat: this.match.turn.activeSeat,
+      turnNumber: this.match.turn.number,
+      actionSeq: this.match.turn.actionSeq,
+      result: this.match.result,
+      players: publicState.players
+    });
   }
 
   private sendAllPrivateState(): void {
@@ -194,6 +213,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       payload: { reason }
     };
     this.match.private.eventLog.push(event);
+    this.broadcastPublicSync();
     this.broadcast("events", [event]);
   }
 
