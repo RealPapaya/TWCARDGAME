@@ -1,67 +1,33 @@
-# 寶島保護戰 (Treasure Island Duel) - 開發指南 v0.4.0
+# TWCARDGAME v2
 
-## 如何新增卡牌
+This repository root now contains the v2 parallel rewrite workspace.
 
-新增卡牌需要修改 `app.js` 中的 `CARD_DATA` 陣列，並將圖片放入 `img/` 資料夾。
+The original static/v1 project has been moved into `LEGACY/` for reference.
 
-### 1. 準備圖片
-- 格式：建議使用 `.webp` 或 `.jpg`
-- 命名：遵循 `twXXX.webp` (例如 `tw017.webp`)
-- 路徑：`d:\Google AI\TWCARDGAME\img\`
+## v2 Commands
 
-### 2. 在 `app.js` 中新增資料
-將以下模板複製到 `CARD_DATA` 陣列的最尾端：
-
-#### 隨從卡 (Minion) 模板
-```javascript
-{ 
-    "id": "", 
-    "name": "", 
-    "category": "", 
-    "cost": , 
-    "attack": , 
-    "health": , 
-    "type": "MINION", 
-    "rarity": "COMMON/RARE/EPIC/LEGENDARY",
-    "keywords": {}, 
-    "description": "", 
-    "image": "" 
-}
+```bash
+npm install
+npm run validate:cards
+npm test
+npm run check
+npm run build
+npm run start -w @twcardgame/server
+npm run dev -w @twcardgame/web
 ```
 
-#### 新聞卡 (News) 模板
-```javascript
-{ 
-    "id": "twXXX", 
-    "name": "", 
-    "category": "新聞", 
-    "cost": , 
-    "type": "NEWS", 
-    "rarity": "COMMON/RARE/EPIC/LEGENDARY", 
-    "keywords": {}
-    "description": "", 
-    "image": "" 
-}
-```
+## Layout
 
-### 3. 常見關鍵字與效果類型
-- **Keywords**:
-    - `taunt`: 嘲諷（敵人必須先攻擊此單位）
-    - `charge`: 衝鋒（下場即可攻擊）
-    - `battlecry`: 戰吼（下場立即執行的效果）
-- **Effect Types (`battlecry.type`)**:
-    - `DAMAGE`: 造成傷害
-    - `DAMAGE_SELF`: 對自己造成傷害
-    - `HEAL`: 回復生命
-    - `FULL_HEAL`: 生命回復全滿
-    - `BUFF_ALL`: 強化全場我方單位
-    - `DRAW`: 抽牌
-    - `DESTROY`: 直接摧毀單位
-    - `BOUNCE_ALL_ENEMY`: 將對手全場單位回傳手牌
-    - `DAMAGE_NON_CATEGORY`: 對非指定類別的單位造成傷害
-    - `DAMAGE_ALL_NON_CATEGORIES`: 對所有非指定類別列表的單位造成傷害
-    - `BUFF_CATEGORY`: 強化指定類別的單位
+- `apps/server`: Colyseus authoritative PvP server.
+- `apps/web`: Vite vanilla TypeScript client.
+- `packages/cards`: source-controlled card catalog and validation.
+- `packages/rules`: deterministic gameplay engine.
+- `packages/db`: Supabase helpers and migrations.
+- `packages/shared`: shared command/state/event contracts.
+- `LEGACY`: original v1 app, assets, scripts, and old tests.
 
-發放初始卡牌窮鬼包
-user.ownedCards = AuthManager.generateStarterCollection();
-console.log("新生成的卡牌:", user.ownedCards);
+## Documentation And Skill
+
+- Chinese build/maintenance guide: `docs/製作.md`
+- Repo copy of the Codex skill: `skills/twcardgame-v2/SKILL.md`
+- Local installed skill path: `%USERPROFILE%/.codex/skills/twcardgame-v2/SKILL.md`

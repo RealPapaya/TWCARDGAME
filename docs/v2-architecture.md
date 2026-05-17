@@ -1,6 +1,6 @@
 # TWCARDGAME v2 Architecture
 
-This folder is a parallel rewrite scaffold. The existing v1 static app remains intact.
+This folder is a parallel rewrite scaffold. The existing v1 static app is preserved under `LEGACY/`.
 
 ## Commands
 

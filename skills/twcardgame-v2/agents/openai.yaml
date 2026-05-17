@@ -1,0 +1,7 @@
+interface:
+  display_name: "TWCARDGAME v2"
+  short_description: "Work on the authoritative TypeScript card game rewrite."
+  default_prompt: "Use $twcardgame-v2 to implement or review a TWCARDGAME v2 gameplay, server, card, or web change."
+
+policy:
+  allow_implicit_invocation: true
