@@ -316,6 +316,14 @@ class GameState {
                 });
                 return { type: 'DAMAGE_ALL', affected };
             },
+            'AOE_ENEMY_DAMAGE': (bc) => {
+                const affected = [];
+                this.opponent.board.forEach((m, i) => {
+                    this.applyDamage(m, bc.value);
+                    affected.push({ unit: { ...m, index: i, side: this.opponent.side }, value: bc.value });
+                });
+                return { type: 'DAMAGE_ALL', affected };
+            },
             'HEAL': (bc, target) => {
                 const targetUnit = this.getTargetUnit(target);
                 if (targetUnit) {

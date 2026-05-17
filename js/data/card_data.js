@@ -127,7 +127,8 @@ const CARD_DATA = [
     { "id": "TW072", "name": "TOYZ", "category": "公眾人物", "cost": 5, "attack": 7, "health": 8, "type": "MINION", "rarity": "RARE", "description": "戰吼: 沈默自己6回合", "keywords": { "battlecry": { "type": "LOCK_SELF", "value": 6 } }, "image": "assets/images/cards/toyz.webp" },
     { "id": "TW073", "name": "卡車司機", "category": "勞工", "cost": 8, "attack": 6, "health": 8, "type": "MINION", "rarity": "COMMON", "description": "激怒: +1攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 1 } }, "image": "assets/images/cards/TW073.webp" },
     { "id": "TW074", "name": "王ADEN", "category": "公眾人物", "cost": 3, "attack": 2, "health": 4, "type": "MINION", "rarity": "RARE", "description": "激怒: +2攻擊", "keywords": { "enrage": { "type": "BUFF_STAT", "stat": "ATTACK", "value": 2 } }, "image": "assets/images/cards/TW074.webp" },
-    { "id": "TW075", "name": "豬大哥", "category": "公眾人物", "cost": 5, "attack": 1, "health": 1, "type": "MINION", "rarity": "EPIC", "description": "豬大哥沒有死\n遺志: 原地復活", "keywords": { "deathrattle": { "type": "SUMMON", "cardId": "TW075" } }, "image": "assets/images/cards/TW075.webp" }
+    { "id": "TW075", "name": "豬大哥", "category": "公眾人物", "cost": 5, "attack": 1, "health": 1, "type": "MINION", "rarity": "EPIC", "description": "豬大哥沒有死\n遺志: 原地復活", "keywords": { "deathrattle": { "type": "SUMMON", "cardId": "TW075" } }, "image": "assets/images/cards/TW075.webp" },
+    { "id": "TW077", "name": "統神", "category": "公眾人物", "cost": 6, "attack": 5, "health": 6, "type": "MINION", "rarity": "LEGENDARY", "description": "戰吼: 對所有敵方隨從造成 2 點傷害（神罰）", "keywords": { "battlecry": { "type": "AOE_ENEMY_DAMAGE", "value": 2 } }, "image": "assets/images/cards/godtone.webp" }
 ];
 
 // Export for browser
