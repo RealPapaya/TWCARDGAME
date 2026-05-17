@@ -1,0 +1,21 @@
+{
+  "name": "@twcardgame/cards",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false",
+    "validate": "tsx src/cli.ts"
+  },
+  "dependencies": {
+    "@twcardgame/shared": "file:../shared",
+    "zod": "^4.4.3"
+  }
+}

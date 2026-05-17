@@ -1,0 +1,184 @@
+import type { CardDefinition } from "@twcardgame/cards";
+import { opponentOf, type GameEvent, type HandCardView, type PublicGameState, type Seat, type TargetRef } from "@twcardgame/shared";
+import { createRuntimeCard } from "./deck.js";
+import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "./types.js";
+
+export function cloneState(state: MatchState): MatchState {
+  return structuredClone(state);
+}
+
+export function nextInstanceId(state: MatchState, prefix = "inst"): string {
+  const id = `${prefix}_${state.private.nextInstanceSeq}`;
+  state.private.nextInstanceSeq += 1;
+  return id;
+}
+
+export function addEvent(state: MatchState, events: GameEvent[], type: GameEvent["type"], payload?: Record<string, unknown>, seat?: Seat): void {
+  const event: GameEvent = {
+    seq: state.private.nextEventSeq++,
+    type,
+    seat,
+    payload
+  };
+  events.push(event);
+  state.private.eventLog.push(event);
+}
+
+export function activePlayer(state: MatchState): PlayerState {
+  return state.players[state.turn.activeSeat];
+}
+
+export function opponentPlayer(state: MatchState): PlayerState {
+  return state.players[opponentOf(state.turn.activeSeat)];
+}
+
+export function toPublicState(state: MatchState): PublicGameState {
+  return {
+    matchId: state.matchId,
+    schemaVersion: state.schemaVersion,
+    cardCatalogVersion: state.cardCatalogVersion,
+    status: state.status,
+    turn: structuredClone(state.turn),
+    players: {
+      player1: toPublicPlayer(state.players.player1),
+      player2: toPublicPlayer(state.players.player2)
+    },
+    pendingPrompt: state.pendingPrompt ? structuredClone(state.pendingPrompt) : undefined,
+    result: state.result ? structuredClone(state.result) : undefined
+  };
+}
+
+export function toPublicPlayer(player: PlayerState) {
+  return {
+    userId: player.userId,
+    displayName: player.displayName,
+    connected: player.connected,
+    reconnectUntilMs: player.reconnectUntilMs,
+    hero: structuredClone(player.hero),
+    mana: structuredClone(player.mana),
+    handCount: player.hand.length,
+    deckCount: player.deck.length,
+    graveyardCount: player.graveyard.length,
+    mulliganReady: player.mulliganReady,
+    board: player.board.map(toPublicMinion)
+  };
+}
+
+export function toPublicMinion(minion: RuntimeMinion) {
+  return {
+    instanceId: minion.instanceId,
+    cardId: minion.cardId,
+    ownerSeat: minion.ownerSeat,
+    attack: minion.attack,
+    baseAttack: minion.baseAttack,
+    health: minion.health,
+    currentHealth: minion.currentHealth,
+    taunt: !!minion.keywords.taunt,
+    charge: !!minion.keywords.charge,
+    divineShield: !!minion.keywords.divineShield,
+    lockedTurns: minion.lockedTurns,
+    deathTimer: minion.deathTimer,
+    sleeping: minion.sleeping,
+    canAttack: minion.canAttack,
+    isEnraged: minion.isEnraged,
+    questTurns: minion.questTurns,
+    temporaryUntilTurn: minion.temporaryUntilTurn
+  };
+}
+
+export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
+  return state.players[seat].hand.map((card) => ({
+    instanceId: card.instanceId,
+    cardId: card.cardId,
+    cost: getCardActualCost(state, seat, card),
+    type: card.type,
+    attack: card.attack,
+    health: card.health
+  }));
+}
+
+export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCard): number {
+  let cost = card.cost;
+  if (card.type === "NEWS") {
+    for (const minion of state.players[seat].board) {
+      if (minion.keywords.ongoing?.type === "REDUCE_NEWS_COST") {
+        cost -= minion.keywords.ongoing.value ?? 0;
+      }
+    }
+  }
+  return Math.max(0, cost);
+}
+
+export function createMinionFromCard(state: MatchState, card: RuntimeCard, ownerSeat: Seat): RuntimeMinion {
+  if (typeof card.attack !== "number" || typeof card.health !== "number") {
+    throw new Error(`${card.cardId} is not a minion card.`);
+  }
+  const minion: RuntimeMinion = {
+    instanceId: nextInstanceId(state, "minion"),
+    cardId: card.cardId,
+    ownerSeat,
+    name: card.name,
+    category: card.category,
+    cost: card.cost,
+    type: "MINION",
+    rarity: card.rarity,
+    attack: card.attack,
+    baseAttack: card.attack,
+    health: card.health,
+    currentHealth: card.health,
+    keywords: structuredClone(card.keywords ?? {}),
+    sleeping: true,
+    canAttack: false,
+    isEnraged: false,
+    lockedTurns: 0,
+    auraAttack: 0,
+    auraHealth: 0,
+    auraTaunt: false,
+    tempBuffs: [],
+    bounce_bonus: card.bounce_bonus,
+    hanBounceBonus: card.hanBounceBonus
+  };
+
+  if (minion.keywords.taunt) minion.keywords.baseTaunt = true;
+  if (minion.keywords.charge) {
+    minion.sleeping = false;
+    minion.canAttack = true;
+  }
+  if (minion.keywords.quest) minion.questTurns = 0;
+  return minion;
+}
+
+export function createCardForHand(state: MatchState, def: CardDefinition, ownerSeat: Seat): RuntimeCard {
+  return createRuntimeCard(def, ownerSeat, nextInstanceId(state, "card"));
+}
+
+export function findCardInHand(player: PlayerState, handInstanceId: string): { card: RuntimeCard; index: number } | undefined {
+  const index = player.hand.findIndex((card) => card.instanceId === handInstanceId);
+  return index === -1 ? undefined : { card: player.hand[index], index };
+}
+
+export function findMinion(player: PlayerState, instanceId: string): { minion: RuntimeMinion; index: number } | undefined {
+  const index = player.board.findIndex((minion) => minion.instanceId === instanceId);
+  return index === -1 ? undefined : { minion: player.board[index], index };
+}
+
+export function getTargetUnit(state: MatchState, activeSeatValue: Seat, target?: TargetRef): TargetUnitRef | undefined {
+  if (!target) return undefined;
+  const side = target.side ?? (target.type === "HERO" ? opponentOf(activeSeatValue) : undefined);
+  if (!side) return undefined;
+  const owner = state.players[side];
+  if (target.type === "HERO") return { owner, kind: "HERO", unit: owner.hero };
+  if (!target.instanceId) return undefined;
+  const found = findMinion(owner, target.instanceId);
+  return found ? { owner, kind: "MINION", unit: found.minion } : undefined;
+}
+
+export function removeMinion(owner: PlayerState, minion: RuntimeMinion): RuntimeMinion | undefined {
+  const index = owner.board.findIndex((item) => item.instanceId === minion.instanceId);
+  if (index === -1) return undefined;
+  return owner.board.splice(index, 1)[0];
+}
+
+export function currentNewsPower(state: MatchState, seat: Seat): number {
+  return state.players[seat].board.reduce((sum, minion) => sum + (minion.keywords.newsPower ?? 0), 0);
+}

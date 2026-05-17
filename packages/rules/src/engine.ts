@@ -1,0 +1,305 @@
+import type { CardDefinition } from "@twcardgame/cards";
+import { opponentOf, type CommandEnvelope, type GameEvent, type Seat, type TargetRef } from "@twcardgame/shared";
+import { createRuntimeCard, validateDeck } from "./deck.js";
+import {
+  drawCards,
+  finishIfHeroDead,
+  handlePlayNews,
+  applyDamage,
+  processEndOfTurn,
+  resolveEffect,
+  resolvePostAction,
+  startTurn
+} from "./effects.js";
+import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
+import {
+  activePlayer,
+  addEvent,
+  cloneState,
+  createMinionFromCard,
+  findCardInHand,
+  findMinion,
+  getCardActualCost,
+  getTargetUnit,
+  nextInstanceId,
+  opponentPlayer,
+  toHandView,
+  toPublicState
+} from "./state.js";
+import type { CreateMatchInput, MatchState, PlayerSetup, PlayerState, RulesResult } from "./types.js";
+
+export const SCHEMA_VERSION = 1;
+export const DEFAULT_TURN_TIME_LIMIT_MS = 60_000;
+
+export function createInitialMatch(input: CreateMatchInput): RulesResult {
+  const catalog = new Map(input.catalog.map((card) => [card.id, card]));
+  const errors = input.players.flatMap((player) => {
+    const validation = validateDeck(player.deckIds, input.catalog, player.ownedCardIds);
+    return validation.errors.map((error) => `${player.seat}: ${error}`);
+  });
+  if (errors.length > 0) throw new Error(errors.join("\n"));
+
+  const state: MatchState = {
+    matchId: input.matchId,
+    schemaVersion: SCHEMA_VERSION,
+    cardCatalogVersion: input.cardCatalogVersion,
+    status: "mulligan",
+    turn: {
+      activeSeat: "player1",
+      number: 0,
+      startedAtMs: input.nowMs,
+      deadlineAtMs: input.nowMs + (input.turnTimeLimitMs ?? DEFAULT_TURN_TIME_LIMIT_MS),
+      actionSeq: 0
+    },
+    players: {
+      player1: createPlayer(input.players[0]),
+      player2: createPlayer(input.players[1])
+    },
+    private: {
+      rngState: normalizeSeed(input.seed),
+      nextInstanceSeq: 1,
+      nextEventSeq: 1,
+      processedCommandIds: [],
+      actionLog: [],
+      eventLog: []
+    }
+  };
+
+  const events: GameEvent[] = [];
+
+  for (const setup of input.players) {
+    const player = state.players[setup.seat];
+    player.deck = setup.deckIds.map((cardId) => {
+      const def = catalog.get(cardId);
+      if (!def) throw new Error(`Unknown card ${cardId}`);
+      return createRuntimeCard(def, setup.seat, nextInstanceId(state, "card"));
+    });
+    state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+    drawCards(state, player, 3, events);
+  }
+
+  const firstRoll = nextInt(state.private.rngState, 2);
+  state.private.rngState = firstRoll.state;
+  const first = firstRoll.value === 0 ? "player1" : "player2";
+  state.turn.activeSeat = first;
+
+  addEvent(state, events, "MATCH_CREATED", { firstSeat: first });
+  return { state, events };
+}
+
+export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInput: readonly CardDefinition[]): RulesResult {
+  if (state.private.processedCommandIds.includes(envelope.commandId)) {
+    return { state, events: [] };
+  }
+
+  const next = cloneState(state);
+  const catalog = new Map(catalogInput.map((card) => [card.id, card]));
+  const events: GameEvent[] = [];
+
+  next.private.processedCommandIds.push(envelope.commandId);
+  next.private.actionLog.push(envelope);
+  next.turn.actionSeq += 1;
+
+  if (envelope.command.type === "reconnect") {
+    next.players[envelope.seat].connected = true;
+    next.players[envelope.seat].reconnectUntilMs = undefined;
+    return { state: next, events };
+  }
+
+  if (next.status === "finished" || next.status === "abandoned") {
+    reject(next, events, envelope.seat, "Match is already complete.");
+    return { state: next, events };
+  }
+
+  if (envelope.command.type === "concede") {
+    next.status = "finished";
+    next.result = { winnerSeat: opponentOf(envelope.seat), reason: "concede" };
+    addEvent(next, events, "GAME_FINISHED", { ...next.result }, envelope.seat);
+    return { state: next, events };
+  }
+
+  if (envelope.command.type === "submitMulligan") {
+    submitMulligan(next, envelope.seat, envelope.command.replaceHandInstanceIds, envelope.nowMs, events, catalog);
+    return { state: next, events };
+  }
+
+  if (next.status !== "in_progress") {
+    reject(next, events, envelope.seat, "Match has not started.");
+    return { state: next, events };
+  }
+
+  if (next.turn.activeSeat !== envelope.seat) {
+    reject(next, events, envelope.seat, "It is not your turn.");
+    return { state: next, events };
+  }
+
+  if (envelope.command.type === "playCard") {
+    playCard(next, envelope.seat, envelope.command.handInstanceId, envelope.command.target, envelope.command.boardIndex, events, catalog);
+  } else if (envelope.command.type === "attack") {
+    attack(next, envelope.seat, envelope.command.attackerInstanceId, envelope.command.target, events, catalog);
+  } else if (envelope.command.type === "endTurn") {
+    endTurn(next, envelope.nowMs, events, catalog);
+  }
+
+  return { state: next, events };
+}
+
+export { toHandView, toPublicState };
+
+function createPlayer(setup: PlayerSetup): PlayerState {
+  return {
+    seat: setup.seat,
+    userId: setup.userId,
+    displayName: setup.displayName,
+    connected: true,
+    hero: { hp: 30, maxHp: 30 },
+    mana: { current: 0, max: 0 },
+    hand: [],
+    deck: [],
+    graveyard: [],
+    board: [],
+    mulliganReady: false
+  };
+}
+
+function submitMulligan(
+  state: MatchState,
+  seat: Seat,
+  replaceHandInstanceIds: string[],
+  nowMs: number,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  if (state.status !== "mulligan") {
+    reject(state, events, seat, "Mulligan phase is over.");
+    return;
+  }
+
+  const player = state.players[seat];
+  if (player.mulliganReady) return;
+
+  const replace = new Set(replaceHandInstanceIds);
+  const returning = player.hand.filter((card) => replace.has(card.instanceId));
+  player.hand = player.hand.filter((card) => !replace.has(card.instanceId));
+  player.deck.push(...returning);
+  state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+  drawCards(state, player, returning.length, events);
+  player.mulliganReady = true;
+  addEvent(state, events, "MULLIGAN_SUBMITTED", { replaced: returning.length }, seat);
+
+  if (state.players.player1.mulliganReady && state.players.player2.mulliganReady) {
+    startTurn(state, nowMs, events);
+  }
+}
+
+function playCard(
+  state: MatchState,
+  seat: Seat,
+  handInstanceId: string,
+  target: TargetRef | undefined,
+  boardIndex: number | undefined,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  const player = state.players[seat];
+  const found = findCardInHand(player, handInstanceId);
+  if (!found) {
+    reject(state, events, seat, "Card is not in hand.");
+    return;
+  }
+  const { card, index } = found;
+  const actualCost = getCardActualCost(state, seat, card);
+  if (player.mana.current < actualCost) {
+    reject(state, events, seat, "Not enough mana.");
+    return;
+  }
+  if (card.type === "MINION" && player.board.length >= 7) {
+    reject(state, events, seat, "Board is full.");
+    return;
+  }
+  if (card.keywords.battlecry?.type === "DISCARD_RANDOM" && player.hand.length <= (card.keywords.battlecry.value ?? 1)) {
+    reject(state, events, seat, "Not enough other cards to discard.");
+    return;
+  }
+
+  player.mana.current -= actualCost;
+  player.hand.splice(index, 1);
+  addEvent(state, events, "CARD_PLAYED", { cardId: card.cardId, handInstanceId }, seat);
+
+  if (card.type === "MINION") {
+    const minion = createMinionFromCard(state, card, seat);
+    const insertion = typeof boardIndex === "number" ? Math.max(0, Math.min(boardIndex, player.board.length)) : player.board.length;
+    player.board.splice(insertion, 0, minion);
+    addEvent(state, events, "MINION_SUMMONED", { cardId: minion.cardId, target: minion.instanceId }, seat);
+    resolveEffect(minion.keywords.battlecry, { state, activeSeat: seat, source: minion, target, events, catalog });
+  } else {
+    if (card.cardId === "S002" && card.keywords.battlecry) {
+      card.keywords.battlecry.value = player.deck.length === 0 ? 20 : 10;
+    }
+    resolveEffect(card.keywords.battlecry, { state, activeSeat: seat, source: card, target, events, catalog });
+    handlePlayNews(state, player, events);
+  }
+
+  resolvePostAction(state, events, catalog);
+}
+
+function attack(
+  state: MatchState,
+  seat: Seat,
+  attackerInstanceId: string,
+  target: TargetRef,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  const player = state.players[seat];
+  const enemy = state.players[opponentOf(seat)];
+  const found = findMinion(player, attackerInstanceId);
+  if (!found) {
+    reject(state, events, seat, "Attacker is not on board.");
+    return;
+  }
+  const attacker = found.minion;
+  if (attacker.sleeping || !attacker.canAttack) {
+    reject(state, events, seat, "Attacker cannot attack.");
+    return;
+  }
+  if (attacker.lockedTurns > 0) {
+    reject(state, events, seat, "Attacker is locked.");
+    return;
+  }
+  if (attacker.attack <= 0) {
+    reject(state, events, seat, "Attacker has no attack.");
+    return;
+  }
+  const taunts = enemy.board.filter((minion) => minion.keywords.taunt);
+  if (taunts.length > 0 && !(target?.type === "MINION" && taunts.some((minion) => minion.instanceId === target.instanceId))) {
+    reject(state, events, seat, "Taunt minions must be attacked first.");
+    return;
+  }
+  const ref = getTargetUnit(state, seat, target);
+  if (!ref || ref.owner.seat !== enemy.seat) {
+    reject(state, events, seat, "Invalid attack target.");
+    return;
+  }
+
+  const targetAttack = ref.kind === "MINION" ? (ref.unit as { attack: number }).attack : 0;
+  const attackerRef = { owner: player, kind: "MINION" as const, unit: attacker };
+  applyDamage(state, ref, attacker.attack, events);
+  if (ref.kind === "MINION") applyDamage(state, attackerRef, targetAttack, events);
+  attacker.canAttack = false;
+  resolvePostAction(state, events, catalog);
+  finishIfHeroDead(state, events);
+}
+
+function endTurn(state: MatchState, nowMs: number, events: GameEvent[], catalog: Map<string, CardDefinition>): void {
+  const previousSeat = state.turn.activeSeat;
+  addEvent(state, events, "TURN_ENDED", { turn: state.turn.number }, previousSeat);
+  processEndOfTurn(state, events, catalog);
+  if (state.status === "finished") return;
+  state.turn.activeSeat = opponentPlayer(state).seat;
+  startTurn(state, nowMs, events);
+}
+
+function reject(state: MatchState, events: GameEvent[], seat: Seat, reason: string): void {
+  addEvent(state, events, "COMMAND_REJECTED", { reason }, seat);
+}

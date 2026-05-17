@@ -1,0 +1,25 @@
+{
+  "name": "twcardgame-v2-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "tsc -b && npm run build -w @twcardgame/web",
+    "check": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "validate:cards": "tsx packages/cards/src/cli.ts",
+    "dev:server": "npm run dev -w @twcardgame/server",
+    "dev:web": "npm run dev -w @twcardgame/web"
+  },
+  "devDependencies": {
+    "@types/node": "^25.8.0",
+    "tsx": "^4.22.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6"
+  }
+}

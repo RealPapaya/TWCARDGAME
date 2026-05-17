@@ -1,0 +1,21 @@
+{
+  "name": "@twcardgame/test-utils",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false"
+  },
+  "dependencies": {
+    "@twcardgame/cards": "file:../cards",
+    "@twcardgame/rules": "file:../rules",
+    "@twcardgame/shared": "file:../shared"
+  }
+}

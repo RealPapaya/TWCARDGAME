@@ -1,0 +1,21 @@
+{
+  "name": "@twcardgame/server",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@colyseus/monitor": "^0.17.7",
+    "@colyseus/schema": "^4.0.25",
+    "@twcardgame/cards": "file:../../packages/cards",
+    "@twcardgame/db": "file:../../packages/db",
+    "@twcardgame/rules": "file:../../packages/rules",
+    "@twcardgame/shared": "file:../../packages/shared",
+    "colyseus": "^0.17.10",
+    "express": "^5.1.0"
+  }
+}
