@@ -23,7 +23,7 @@ interface CommandMessage {
 }
 
 const TURN_TIME_LIMIT_MS = 60_000;
-const RECONNECT_WINDOW_MS = 60_000;
+const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "60000", 10);
 
 export class GameRoom extends Room<{ state: GameStateSchema }> {
   maxClients = 2;

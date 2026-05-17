@@ -1,4 +1,4 @@
-import type { CardDefinition } from "@twcardgame/cards";
+import type { CardDefinition, EffectDefinition } from "@twcardgame/cards";
 import { opponentOf, type CommandEnvelope, type GameEvent, type Seat, type TargetRef } from "@twcardgame/shared";
 import { createRuntimeCard, validateDeck } from "./deck.js";
 import {
@@ -192,6 +192,21 @@ function submitMulligan(
   }
 }
 
+function validatePlayTarget(state: MatchState, seat: Seat, battlecry: EffectDefinition, target: TargetRef | undefined): string | null {
+  const rule = battlecry.target;
+  if (!rule || rule.type === "ALL") return null;
+  if (!target) return "This card requires a target.";
+  if (rule.type === "MINION" && target.type !== "MINION") return "Must target a minion.";
+  if (rule.type === "HERO" && target.type !== "HERO") return "Must target a hero.";
+  const expectedSide = rule.side === "ENEMY" ? opponentOf(seat) : rule.side === "FRIENDLY" ? seat : null;
+  if (expectedSide && target.side !== expectedSide) return rule.side === "ENEMY" ? "Must target an enemy." : "Must target a friendly.";
+  if (target.type === "MINION") {
+    if (!target.side || !target.instanceId) return "Invalid minion target.";
+    if (!state.players[target.side]?.board.some((m) => m.instanceId === target.instanceId)) return "Target minion is not on the board.";
+  }
+  return null;
+}
+
 function playCard(
   state: MatchState,
   seat: Seat,
@@ -220,6 +235,13 @@ function playCard(
   if (card.keywords.battlecry?.type === "DISCARD_RANDOM" && player.hand.length <= (card.keywords.battlecry.value ?? 1)) {
     reject(state, events, seat, "Not enough other cards to discard.");
     return;
+  }
+  if (card.keywords.battlecry) {
+    const targetError = validatePlayTarget(state, seat, card.keywords.battlecry, target);
+    if (targetError) {
+      reject(state, events, seat, targetError);
+      return;
+    }
   }
 
   player.mana.current -= actualCost;

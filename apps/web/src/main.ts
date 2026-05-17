@@ -69,21 +69,29 @@ async function joinRoom(event: Event): Promise<void> {
   const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
   const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   const client = new Client(serverUrl);
-  room = await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
 
-  room.onStateChange((nextState: any) => {
+  const reconnectToken = new URLSearchParams(location.search).get("reconnect");
+  const joined: Room = reconnectToken
+    ? await (client as any).reconnect(reconnectToken, GameStateSchema)
+    : await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
+  room = joined;
+
+  (window as any).__room = joined;
+
+  joined.onStateChange((nextState: any) => {
     state = nextState;
+    (window as any).__gameState = nextState;
     render();
   });
-  room.onMessage("seat", (message: { seat: Seat }) => {
+  joined.onMessage("seat", (message: { seat: Seat }) => {
     mySeat = message.seat;
     render();
   });
-  room.onMessage("hand", (message: { cards: HandCardView[] }) => {
+  joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
     hand = message.cards;
     render();
   });
-  room.onMessage("events", (message: Array<{ type: string; payload?: unknown }>) => {
+  joined.onMessage("events", (message: Array<{ type: string; payload?: unknown }>) => {
     events = [...message.map((item) => `${item.type} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 50);
     render();
   });

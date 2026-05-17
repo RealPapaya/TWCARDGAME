@@ -177,7 +177,7 @@ function toMinionSchema(minion: PublicMinion): PublicMinionSchema {
   return schema;
 }
 
-function copyMinionSchema(target: PublicMinionSchema, minion: PublicMinion): void {
+function copyMinionSchema(target: PublicMinionSchema, minion: PublicMinion | PublicMinionSchema): void {
   target.instanceId = minion.instanceId;
   target.cardId = minion.cardId;
   target.ownerSeat = minion.ownerSeat;

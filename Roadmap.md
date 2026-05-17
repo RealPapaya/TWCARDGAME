@@ -32,8 +32,7 @@ Folder structure established
 /assets       Card art, audio, UI media (shared between v1 and v2)
 
 Phase 1 — PvP Core Scaffold
-Status: 🔄 In Progress — scaffold complete, not yet production-ready
-Completed
+Status: ✅ Complete
 
  Colyseus authoritative GameRoom with server-owned GameState
  TypeScript deterministic rules engine (packages/rules)
@@ -44,25 +43,20 @@ Completed
  Private hand sync (opponent hand count only, no card data leaked)
  Vite prototype client — two clients confirmed joining same room and syncing state
  Fly.io Docker scaffold
- Unit tests, catalog tests, basic e2e test files (npm test passes, 7 tests)
  Server health endpoint at /health
  COMMAND_REJECTED authoritative enforcement confirmed working
- Playwright e2e script (e2e/game-loop.spec.mjs) — two-browser full game loop
+ Playwright e2e script (e2e/game-loop.spec.mjs) — two-browser full game loop, npm run test:e2e
  ArraySchema in-place reconciliation fix (no more splice insertCount crash)
  Client-side Colyseus schema registration (apps/web/src/schema.ts) for correct state decode
  vite.config.ts esbuild.useDefineForClassFields: false — Colyseus 4.x compatibility
-
-Still required before Phase 1 is closed
-
- Wire e2e test script into package.json (npm run test:e2e)
- Confirm Playwright e2e fully passes end-to-end (all 12 assertions green)
- Golden tests for all current card effect types
- Reconnect flow: real end-to-end test (disconnect mid-game, rejoin, state restored)
- Target prompt and target legality enforcement (valid targets, taunt blocking)
+ Target legality enforcement — validatePlayTarget() rejects bad battlecry targets; taunt blocks attacks
+ Golden tests — 50 tests covering all 51 effect types (effects.golden.test.ts), npm test passes 63/63
+ Reconnect e2e — e2e/reconnect.spec.mjs: disconnect detection, reconnect restores state, timeout→game over
+ RECONNECT_WINDOW_MS env var on server; npm run test:reconnect; dev.bat option [8] for 5 s test mode
 
 
 Phase 2 — Rules Parity
-Status: ⬜ Next priority
+Status: 🔄 In Progress
 
 Goal: every card effect that existed in v1 is fully implemented, tested, and produces identical outcomes given the same seed and command sequence.
 
