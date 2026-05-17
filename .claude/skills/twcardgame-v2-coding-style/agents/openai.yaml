@@ -1,0 +1,7 @@
+interface:
+  display_name: "TWCARDGAME v2 Coding Style"
+  short_description: "Project coding style and module-boundary rules."
+  default_prompt: "Use $twcardgame-v2-coding-style to implement this change in the TWCARDGAME v2 style."
+
+policy:
+  allow_implicit_invocation: true

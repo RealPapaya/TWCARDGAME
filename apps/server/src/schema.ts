@@ -155,27 +155,44 @@ function syncPlayer(target: PublicPlayerSchema, player: PublicPlayer): void {
   target.deckCount = player.deckCount;
   target.graveyardCount = player.graveyardCount;
   target.mulliganReady = player.mulliganReady;
-  target.board.splice(0, target.board.length, ...player.board.map(toMinionSchema));
+  // Reconcile board in-place: update existing slots, then push or pop to match length.
+  // Colyseus ArraySchema#splice forbids insertCount > deleteCount, so we never use
+  // splice for growth — we push new items one-by-one instead.
+  const incoming = player.board.map(toMinionSchema);
+  for (let i = 0; i < incoming.length; i++) {
+    if (i < target.board.length) {
+      copyMinionSchema(target.board[i], incoming[i]);
+    } else {
+      target.board.push(incoming[i]);
+    }
+  }
+  while (target.board.length > incoming.length) {
+    target.board.splice(target.board.length - 1, 1);
+  }
 }
 
 function toMinionSchema(minion: PublicMinion): PublicMinionSchema {
   const schema = new PublicMinionSchema();
-  schema.instanceId = minion.instanceId;
-  schema.cardId = minion.cardId;
-  schema.ownerSeat = minion.ownerSeat;
-  schema.attack = minion.attack;
-  schema.baseAttack = minion.baseAttack;
-  schema.health = minion.health;
-  schema.currentHealth = minion.currentHealth;
-  schema.taunt = minion.taunt;
-  schema.charge = minion.charge;
-  schema.divineShield = minion.divineShield;
-  schema.lockedTurns = minion.lockedTurns;
-  schema.deathTimer = minion.deathTimer ?? -1;
-  schema.sleeping = minion.sleeping;
-  schema.canAttack = minion.canAttack;
-  schema.isEnraged = minion.isEnraged;
-  schema.questTurns = minion.questTurns ?? -1;
-  schema.temporaryUntilTurn = minion.temporaryUntilTurn ?? -1;
+  copyMinionSchema(schema, minion);
   return schema;
+}
+
+function copyMinionSchema(target: PublicMinionSchema, minion: PublicMinion): void {
+  target.instanceId = minion.instanceId;
+  target.cardId = minion.cardId;
+  target.ownerSeat = minion.ownerSeat;
+  target.attack = minion.attack;
+  target.baseAttack = minion.baseAttack;
+  target.health = minion.health;
+  target.currentHealth = minion.currentHealth;
+  target.taunt = minion.taunt;
+  target.charge = minion.charge;
+  target.divineShield = minion.divineShield;
+  target.lockedTurns = minion.lockedTurns;
+  target.deathTimer = minion.deathTimer ?? -1;
+  target.sleeping = minion.sleeping;
+  target.canAttack = minion.canAttack;
+  target.isEnraged = minion.isEnraged;
+  target.questTurns = minion.questTurns ?? -1;
+  target.temporaryUntilTurn = minion.temporaryUntilTurn ?? -1;
 }

@@ -1,6 +1,7 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { CARD_CATALOG } from "@twcardgame/cards";
 import type { GameCommand, HandCardView, Seat, TargetRef } from "@twcardgame/shared";
+import { GameStateSchema } from "./schema.js";
 import "./styles.css";
 
 const cardNames = new Map(CARD_CATALOG.map((card) => [card.id, card.name]));
@@ -68,7 +69,7 @@ async function joinRoom(event: Event): Promise<void> {
   const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
   const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   const client = new Client(serverUrl);
-  room = await client.joinOrCreate("pvp", { displayName });
+  room = await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
 
   room.onStateChange((nextState: any) => {
     state = nextState;
@@ -83,7 +84,7 @@ async function joinRoom(event: Event): Promise<void> {
     render();
   });
   room.onMessage("events", (message: Array<{ type: string; payload?: unknown }>) => {
-    events = [...message.map((item) => `${item.type} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 8);
+    events = [...message.map((item) => `${item.type} ${item.payload ? JSON.stringify(item.payload) : ""}`), ...events].slice(0, 50);
     render();
   });
 }

@@ -6,5 +6,8 @@ export default defineConfig({
   },
   build: {
     outDir: "dist-public"
+  },
+  esbuild: {
+    useDefineForClassFields: false
   }
 });

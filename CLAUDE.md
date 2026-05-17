@@ -63,10 +63,15 @@ The client never mutates state; it sends `CommandEnvelope`s and renders synced s
 
 ## Workflow expectations
 
-The repo's own skill ([skills/twcardgame-v2/SKILL.md](skills/twcardgame-v2/SKILL.md)) prescribes the validation cadence:
+The repo's own skills document the project workflow and coding style:
+
+- General project workflow: [.claude/skills/twcardgame-v2/SKILL.md](.claude/skills/twcardgame-v2/SKILL.md)
+- Coding style and module boundaries: [.claude/skills/twcardgame-v2-coding-style/SKILL.md](.claude/skills/twcardgame-v2-coding-style/SKILL.md)
+
+Validation cadence:
 
 - After meaningful changes: `npm run validate:cards && npm test && npm run check`.
 - After server/web changes: also `npm run build`.
 - Card or rules changes: update or add tests before declaring done — rules behavior is exercised in [packages/rules/src/rules.test.ts](packages/rules/src/rules.test.ts) and the catalog in [packages/cards/src/catalog.test.ts](packages/cards/src/catalog.test.ts).
 
-The README references `docs/製作.md` (Chinese build guide) but the file is not currently checked in — only [docs/v2-architecture.md](docs/v2-architecture.md) exists.
+The Chinese build guide is [docs/製作.md](docs/製作.md), and the architecture overview is [docs/v2-architecture.md](docs/v2-architecture.md).
