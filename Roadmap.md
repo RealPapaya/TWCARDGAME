@@ -6,7 +6,7 @@ Last updated: 2026-05-17
 
 
 Phase Overview
-PhaseNameStatus0Architecture Setup & Legacy Isolation✅ Complete1PvP Core Scaffold🔄 In Progress2Rules Parity⬜ Next3Multiplayer Reliability⬜ Pending4Account, Deck & Collection⬜ Pending5Real UI / UX⬜ Pending6Production Launch⬜ Pending
+PhaseNameStatus0Architecture Setup & Legacy Isolation✅ Complete1PvP Core Scaffold✅ Complete2Rules Parity✅ Complete3Multiplayer Reliability⬜ Pending4Account, Deck & Collection⬜ Pending5Real UI / UX⬜ Pending6Production Launch⬜ Pending
 
 Phase 0 — Architecture Setup & Legacy Isolation
 Status: ✅ Complete
@@ -50,19 +50,19 @@ Status: ✅ Complete
  Client-side Colyseus schema registration (apps/web/src/schema.ts) for correct state decode
  vite.config.ts esbuild.useDefineForClassFields: false — Colyseus 4.x compatibility
  Target legality enforcement — validatePlayTarget() rejects bad battlecry targets; taunt blocks attacks
- Golden tests — 50 tests covering all 51 effect types (effects.golden.test.ts), npm test passes 63/63
+ Golden tests — all supported battlecry/effect handlers covered (effects.golden.test.ts)
  Reconnect e2e — e2e/reconnect.spec.mjs: disconnect detection, reconnect restores state, timeout→game over
  RECONNECT_WINDOW_MS env var on server; npm run test:reconnect; dev.bat option [8] for 5 s test mode
 
 
 Phase 2 — Rules Parity
-Status: 🔄 In Progress
+Status: ✅ Complete
 
 Goal: every card effect that existed in v1 is fully implemented, tested, and produces identical outcomes given the same seed and command sequence.
 
 Effect families to cover
 
- DAMAGE / DAMAGE_SELF / DAMAGE_ALL / DAMAGE_NON_CATEGORY / DAMAGE_ALL_NON_CATEGORIES
+ DAMAGE / DAMAGE_SELF / DAMAGE_ALL_ENEMY_MINIONS / DAMAGE_ALL_NON_CATEGORIES / DAMAGE_NON_CATEGORY
  HEAL / FULL_HEAL
  BUFF_ALL / BUFF_CATEGORY
  DRAW
@@ -82,6 +82,15 @@ Testing requirements
  Every card in the 104-card catalog has a corresponding behavior test or is covered by its effect type test
  Cross-reference legacy/js/engine/game_engine.js line by line for behavioral parity
  Replay determinism test: same seed + same command log → identical final state and event sequence
+
+What was completed
+
+ Golden coverage expanded for supported handlers, including currently-unused catalog-safe handlers
+ Phase 2 parity mechanics tests added for deathrattles, auras, enrage, quests, lock/death timers, discard triggers, newsPower, and NEWS cost reduction
+ Catalog coverage assertion added for all 104 current cards
+ Legacy parity audit documented in docs/phase2-rules-parity-audit.md
+ BOUNCE_SELF deathrattle parity fixed so returned hand cards use original catalog stats
+ Validation passed: npm run validate:cards, npm test, npm run check
 
 
 Phase 3 — Multiplayer Reliability

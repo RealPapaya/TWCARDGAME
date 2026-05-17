@@ -185,6 +185,15 @@ describe("effect golden tests", () => {
     expect(after.keywords.taunt).toBe(true);
   });
 
+  it("BUFF_STAT_TARGET — buffs a single target stat", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "BUFF_STAT_TARGET", stat: "ATTACK", value: 2, target: { side: "FRIENDLY", type: "MINION" } } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    const m = placeMinion(state, seat);
+    const { state: next } = play(state, catalog, card, { type: "MINION", side: seat, instanceId: m.instanceId });
+    expect(next.players[seat].board[0]!.attack).toBe(m.attack + 2);
+  });
+
   it("BUFF_STAT_TARGET_CATEGORY_BONUS — buffs more for matching category", () => {
     const card = NEWS_CARD("C", { battlecry: { type: "BUFF_STAT_TARGET_CATEGORY_BONUS", stat: "ATTACK", value: 1, bonus_value: 3, target_category_includes: "test", target: { side: "FRIENDLY", type: "MINION" } } });
     const { state, catalog } = makeMatch([card]);
@@ -431,6 +440,16 @@ describe("effect golden tests", () => {
     const m = placeMinion(state, seat);
     const { state: next } = play(state, catalog, card, { type: "MINION", side: seat, instanceId: m.instanceId });
     expect(next.players[seat].board[0]!.keywords.divineShield).toBe(true);
+  });
+
+  it("GIVE_DIVINE_SHIELD_ALL — gives divine shield to every friendly minion", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "GIVE_DIVINE_SHIELD_ALL" } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    placeMinion(state, seat);
+    placeMinion(state, seat);
+    const { state: next } = play(state, catalog, card);
+    expect(next.players[seat].board.every((minion) => minion.keywords.divineShield)).toBe(true);
   });
 
   it("GIVE_DIVINE_SHIELD_CATEGORY — gives divine shield to all matching friendly minions", () => {
