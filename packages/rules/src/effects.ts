@@ -762,7 +762,8 @@ function resolveDeathrattle(
     if (def) summonCard(state, player, def, events);
   }
   if (deathrattle.type === "BOUNCE_SELF") {
-    const card = minionToCard(state, deadMinion);
+    const original = catalog.get(deadMinion.cardId);
+    const card = original ? createCardForHand(state, original, player.seat) : minionToCard(state, deadMinion);
     if (player.hand.length < 10) player.hand.push(card);
   }
   if (deathrattle.type === "DRAW") {
