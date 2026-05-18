@@ -1,5 +1,5 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
-import { createSupabaseServerClient, getAuthenticatedUser, getOwnedDeck } from "@twcardgame/db";
+import { createSupabaseServerClient, getAuthenticatedUser, getOwnedDeck, listUserCollection } from "@twcardgame/db";
 import { validateDeck } from "@twcardgame/rules";
 
 export interface JoinOptions {
@@ -39,7 +39,12 @@ export function createAccountDeckStoreFromEnv(env: NodeJS.ProcessEnv = process.e
         throw new Error(`Deck ${deck.id} uses unsupported card catalog ${deck.card_catalog_version}.`);
       }
 
-      const validation = validateDeck(deck.card_ids, CARD_CATALOG);
+      const collection = await listUserCollection(client, { userId: user.id, cardCatalogVersion: CARD_CATALOG_VERSION });
+      const validation = validateDeck(
+        deck.card_ids,
+        CARD_CATALOG,
+        collection.map((card) => ({ cardId: card.card_id, quantity: card.quantity }))
+      );
       if (!validation.valid) throw new Error(`Deck ${deck.id} is illegal: ${validation.errors.join(" ")}`);
 
       return {

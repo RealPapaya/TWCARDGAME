@@ -7,14 +7,21 @@ export interface DeckValidationResult {
   errors: string[];
 }
 
+export interface OwnedCardQuantity {
+  cardId: string;
+  quantity: number;
+}
+
+type OwnedCardsInput = readonly string[] | readonly OwnedCardQuantity[] | ReadonlyMap<string, number>;
+
 export function validateDeck(
   deckIds: readonly string[],
   catalog: readonly CardDefinition[],
-  ownedCardIds?: readonly string[]
+  ownedCardIds?: OwnedCardsInput
 ): DeckValidationResult {
   const errors: string[] = [];
   const cardById = new Map(catalog.map((card) => [card.id, card]));
-  const owned = ownedCardIds ? new Set(ownedCardIds) : undefined;
+  const ownership = normalizeOwnership(ownedCardIds);
   const counts = new Map<string, number>();
 
   if (deckIds.length !== 30) errors.push(`Deck must contain exactly 30 cards; got ${deckIds.length}.`);
@@ -25,7 +32,6 @@ export function validateDeck(
       errors.push(`Unknown card id: ${id}`);
       continue;
     }
-    if (owned && !owned.has(id)) errors.push(`Card not owned: ${id}`);
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
@@ -34,6 +40,11 @@ export function validateDeck(
     if (!card) continue;
     const limit = card.rarity === "LEGENDARY" ? 1 : 2;
     if (count > limit) errors.push(`${id} exceeds copy limit ${limit}; got ${count}.`);
+    const ownedQuantity = ownership?.get(id);
+    if (ownership && ownedQuantity === undefined) errors.push(`Card not owned: ${id}`);
+    else if (ownedQuantity !== undefined && count > ownedQuantity) {
+      errors.push(`${id} exceeds owned quantity ${ownedQuantity}; got ${count}.`);
+    }
   }
 
   return { valid: errors.length === 0, errors };
@@ -56,4 +67,20 @@ export function createRuntimeCard(card: CardDefinition, ownerSeat: Seat, instanc
     keywords: structuredClone(card.keywords ?? {}),
     bounce_bonus: card.bounce_bonus
   };
+}
+
+function normalizeOwnership(input: OwnedCardsInput | undefined): ReadonlyMap<string, number> | undefined {
+  if (!input) return undefined;
+
+  const ownership = new Map<string, number>();
+  if (input instanceof Map) {
+    for (const [cardId, quantity] of input) ownership.set(cardId, quantity);
+    return ownership;
+  }
+
+  for (const item of input as readonly (string | OwnedCardQuantity)[]) {
+    if (typeof item === "string") ownership.set(item, Number.POSITIVE_INFINITY);
+    else ownership.set(item.cardId, item.quantity);
+  }
+  return ownership;
 }

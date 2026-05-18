@@ -11,10 +11,12 @@
   },
   "scripts": {
     "build": "tsc -b",
-    "check": "tsc -b --pretty false"
+    "check": "tsc -b --pretty false",
+    "publish:catalog": "tsx src/publishCatalog.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
+    "@twcardgame/cards": "file:../cards",
     "@twcardgame/shared": "file:../shared"
   }
 }

@@ -1,5 +1,6 @@
 import { Client, type Room } from "@colyseus/sdk";
-import { CARD_CATALOG, type CardDefinition } from "@twcardgame/cards";
+import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
+import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
 import type {
   ClientCommandMessage,
   GameCommand,
@@ -38,6 +39,16 @@ type ClientViewState = {
   toast?: string;
   joining: boolean;
   joinError?: string;
+  accountLoading: boolean;
+  accountError?: string;
+  accountMessage?: string;
+  session?: Session | null;
+  profile?: ProfileRow;
+  decks: DeckRow[];
+  collection: CollectionRow[];
+  matchHistory: MatchHistoryRow[];
+  selectedDeckId?: string;
+  editingDeck?: Partial<DeckRow> & Pick<DeckRow, "name" | "card_ids">;
 };
 
 type ResolvedCardView = {
@@ -54,8 +65,44 @@ type ResolvedCardView = {
   health?: number;
 };
 
+type ProfileRow = {
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+};
+
+type DeckRow = {
+  id: string;
+  user_id: string;
+  name: string;
+  card_catalog_version: string;
+  card_ids: string[];
+  updated_at?: string;
+};
+
+type CollectionRow = {
+  card_id: string;
+  quantity: number;
+};
+
+type MatchHistoryRow = {
+  id: string;
+  winner_seat?: Seat | null;
+  result_reason: string;
+  created_at?: string;
+  finished_at?: string;
+};
+
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || "ws://localhost:2567";
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const supabase: SupabaseClient | undefined =
+  supabaseUrl && supabaseAnonKey
+    ? createClient(supabaseUrl, supabaseAnonKey, {
+        auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
+      })
+    : undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const seats: Seat[] = ["player1", "player2"];
 
@@ -65,10 +112,16 @@ const view: ClientViewState = {
   rejectedHandIds: new Set(),
   mulliganSelection: new Set(),
   events: [],
-  joining: false
+  joining: false,
+  accountLoading: false,
+  session: undefined,
+  decks: [],
+  collection: [],
+  matchHistory: []
 };
 
 render();
+void initializeAccount();
 
 function render(): void {
   const status = readStatus();
@@ -87,6 +140,9 @@ function render(): void {
 
 function renderTopbar(): string {
   const roomLabel = view.room ? `Room ${view.room.roomId} - ${view.mySeat ?? "spectating"}` : "Authoritative PvP";
+  const accountMode = Boolean(supabase);
+  const displayName = view.profile?.display_name ?? "Player";
+  const joinDisabled = view.room || view.joining || (accountMode && (!view.session || !view.selectedDeckId));
   return `
     <section class="topbar">
       <div class="brand-lockup">
@@ -95,14 +151,17 @@ function renderTopbar(): string {
       </div>
       <form id="join-form" class="join" data-testid="join-form">
         <input id="server-url" value="${escapeAttr(defaultServerUrl)}" ${view.room || view.joining ? "disabled" : ""} aria-label="Server URL" />
-        <input id="display-name" value="Player" ${view.room || view.joining ? "disabled" : ""} aria-label="Display name" />
-        <button ${view.room || view.joining ? "disabled" : ""}>${view.joining ? "Joining" : "Join"}</button>
+        <input id="display-name" value="${escapeAttr(displayName)}" ${view.room || view.joining || accountMode ? "disabled" : ""} aria-label="Display name" />
+        <button ${joinDisabled ? "disabled" : ""}>${view.joining ? "Joining" : "Join"}</button>
       </form>
     </section>
   `;
 }
 
 function renderLanding(): string {
+  if (supabase && view.session) return renderAccountLobby();
+  if (supabase) return renderAuthPanel();
+
   return `
     <section class="landing">
       <div class="landing-copy">
@@ -111,6 +170,138 @@ function renderLanding(): string {
         ${view.joinError ? `<p class="error-text">${escapeHtml(view.joinError)}</p>` : ""}
       </div>
     </section>
+  `;
+}
+
+function renderAuthPanel(): string {
+  return `
+    <section class="landing account-landing">
+      <div class="account-panel auth-panel">
+        <h2>Account Login</h2>
+        <p>Sign in to save decks, sync your collection, and record PvP history.</p>
+        ${view.accountError ? `<p class="error-text">${escapeHtml(view.accountError)}</p>` : ""}
+        ${view.accountMessage ? `<p class="success-text">${escapeHtml(view.accountMessage)}</p>` : ""}
+        <form id="auth-form" class="auth-form">
+          <input id="auth-email" type="email" autocomplete="email" placeholder="Email" required />
+          <input id="auth-password" type="password" autocomplete="current-password" placeholder="Password" required />
+          <div class="button-row">
+            <button type="submit" data-auth-mode="signin" ${view.accountLoading ? "disabled" : ""}>Sign In</button>
+            <button type="button" id="sign-up" ${view.accountLoading ? "disabled" : ""}>Create Account</button>
+            <button type="button" id="google-sign-in" ${view.accountLoading ? "disabled" : ""}>Google</button>
+          </div>
+        </form>
+      </div>
+    </section>
+  `;
+}
+
+function renderAccountLobby(): string {
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  return `
+    <section class="account-lobby">
+      <div class="account-toolbar">
+        <div>
+          <h2>${escapeHtml(view.profile?.display_name ?? "Player")}</h2>
+          <p>${view.collection.length} owned cards - Catalog ${escapeHtml(CARD_CATALOG_VERSION)}</p>
+        </div>
+        <div class="button-row">
+          <button id="sync-collection">Sync Collection</button>
+          <button id="new-deck">New Deck</button>
+          <button id="refresh-account">Refresh</button>
+          <button id="sign-out">Sign Out</button>
+        </div>
+      </div>
+      ${view.accountError ? `<p class="error-text account-status">${escapeHtml(view.accountError)}</p>` : ""}
+      ${view.accountMessage ? `<p class="success-text account-status">${escapeHtml(view.accountMessage)}</p>` : ""}
+      ${view.joinError ? `<p class="error-text account-status">${escapeHtml(view.joinError)}</p>` : ""}
+      <div class="account-grid">
+        <section class="account-panel deck-panel">
+          <h3>Saved Decks</h3>
+          <div class="deck-list">
+            ${view.decks.map(renderSavedDeck).join("") || `<p class="muted">No saved decks yet.</p>`}
+          </div>
+          <p class="muted">${selectedDeck ? `Selected: ${escapeHtml(selectedDeck.name)}` : "Select a legal deck before joining PvP."}</p>
+        </section>
+        <section class="account-panel editor-panel">
+          ${renderDeckEditor()}
+        </section>
+        <section class="account-panel history-panel">
+          <h3>Match History</h3>
+          <div class="history-list">
+            ${view.matchHistory.map(renderMatchHistoryRow).join("") || `<p class="muted">No completed matches yet.</p>`}
+          </div>
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function renderSavedDeck(deck: DeckRow): string {
+  const selected = deck.id === view.selectedDeckId;
+  return `
+    <div class="saved-deck ${selected ? "selected" : ""}">
+      <button class="deck-select" data-select-deck="${escapeAttr(deck.id)}">
+        <strong>${escapeHtml(deck.name)}</strong>
+        <span>${deck.card_ids.length} cards</span>
+      </button>
+      <button data-edit-deck="${escapeAttr(deck.id)}">Edit</button>
+      <button class="danger" data-delete-deck="${escapeAttr(deck.id)}">Delete</button>
+    </div>
+  `;
+}
+
+function renderDeckEditor(): string {
+  const deck = view.editingDeck;
+  const selectedCounts = countCards(deck?.card_ids ?? []);
+  const selectedTotal = deck?.card_ids.length ?? 0;
+  const cards = CARD_CATALOG.filter((card) => card.collectible !== false);
+  const collectionReady = hasCollectionRows();
+
+  return `
+    <form id="deck-form" class="deck-editor">
+      <div class="editor-heading">
+        <h3>${deck?.id ? "Edit Deck" : "New Deck"}</h3>
+        <span>${selectedTotal}/30</span>
+      </div>
+      <input id="deck-name" value="${escapeAttr(deck?.name ?? "New Deck")}" aria-label="Deck name" />
+      ${
+        collectionReady
+          ? ""
+          : `<p class="muted">Collection is still syncing. You can build now; Save Deck will confirm ownership with Supabase.</p>`
+      }
+      <div class="editor-actions">
+        <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>Save Deck</button>
+        <button type="button" id="autofill-deck">Autofill</button>
+        <button type="button" id="clear-deck">Clear</button>
+      </div>
+      <div class="deck-card-list">
+        ${cards.map((card) => renderDeckBuilderCard(card, selectedCounts.get(card.id) ?? 0)).join("")}
+      </div>
+    </form>
+  `;
+}
+
+function renderDeckBuilderCard(card: CardDefinition, count: number): string {
+  const owned = ownedQuantity(card.id);
+  const limit = Math.min(owned, card.rarity === "LEGENDARY" ? 1 : 2);
+  return `
+    <div class="deck-builder-card">
+      <button type="button" data-add-card="${escapeAttr(card.id)}" ${count >= limit ? "disabled" : ""} title="${limit <= 0 ? "Not owned yet" : "Add card"}">+</button>
+      <button type="button" data-remove-card="${escapeAttr(card.id)}" ${count <= 0 ? "disabled" : ""}>-</button>
+      <span class="deck-card-name">${escapeHtml(card.name)}</span>
+      <span>${count}/${limit}</span>
+    </div>
+  `;
+}
+
+function renderMatchHistoryRow(row: MatchHistoryRow): string {
+  const finished = row.finished_at ? new Date(row.finished_at).toLocaleString() : row.id;
+  return `
+    <div class="history-row">
+      <strong>${escapeHtml(row.result_reason)}</strong>
+      <span>${escapeHtml(row.winner_seat ?? "no winner")}</span>
+      <small>${escapeHtml(finished)}</small>
+    </div>
   `;
 }
 
@@ -407,6 +598,16 @@ function renderEmptySlots(): string {
 
 function bindStaticActions(): void {
   document.querySelector<HTMLFormElement>("#join-form")?.addEventListener("submit", joinRoom);
+  document.querySelector<HTMLFormElement>("#auth-form")?.addEventListener("submit", (event) => void signInWithPassword(event));
+  document.querySelector<HTMLButtonElement>("#sign-up")?.addEventListener("click", () => void signUpWithPassword());
+  document.querySelector<HTMLButtonElement>("#google-sign-in")?.addEventListener("click", () => void signInWithGoogle());
+  document.querySelector<HTMLButtonElement>("#sign-out")?.addEventListener("click", () => void signOut());
+  document.querySelector<HTMLButtonElement>("#refresh-account")?.addEventListener("click", () => void loadAccountData());
+  document.querySelector<HTMLButtonElement>("#sync-collection")?.addEventListener("click", () => void syncCollection());
+  document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => startNewDeck());
+  document.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
+  document.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
+  document.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
   document.querySelector<HTMLButtonElement>("#mulligan")?.addEventListener("click", () => {
     send({ type: "submitMulligan", replaceHandInstanceIds: [...view.mulliganSelection] });
     view.mulliganSelection.clear();
@@ -423,6 +624,29 @@ function bindStaticActions(): void {
   });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
   document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => send({ type: "concede" }));
+
+  for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
+    el.addEventListener("click", () => {
+      view.selectedDeckId = el.dataset.selectDeck;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-edit-deck]")) {
+    el.addEventListener("click", () => {
+      const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
+      if (deck) view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-delete-deck]")) {
+    el.addEventListener("click", () => void deleteDeck(el.dataset.deleteDeck));
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-add-card]")) {
+    el.addEventListener("click", () => addCardToEditor(el.dataset.addCard));
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-remove-card]")) {
+    el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
+  }
 }
 
 function bindSelectionActions(): void {
@@ -475,10 +699,19 @@ async function joinRoom(event: Event): Promise<void> {
   const client = new Client(serverUrl);
 
   try {
+    if (supabase && !view.session) throw new Error("Sign in before joining PvP.");
+    if (supabase && !view.selectedDeckId) throw new Error("Select a saved deck before joining PvP.");
     const reconnectToken = new URLSearchParams(location.search).get("reconnect");
+    const joinOptions = supabase
+      ? {
+          displayName: view.profile?.display_name ?? displayName,
+          accessToken: view.session?.access_token,
+          deckId: view.selectedDeckId
+        }
+      : { displayName };
     const joined: Room = reconnectToken
       ? await (client as any).reconnect(reconnectToken, GameStateSchema)
-      : await client.joinOrCreate("pvp", { displayName }, GameStateSchema);
+      : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
 
     view.room = joined;
     view.eventStatus = undefined;
@@ -529,6 +762,288 @@ async function joinRoom(event: Event): Promise<void> {
     view.joining = false;
     render();
   }
+}
+
+async function initializeAccount(): Promise<void> {
+  if (!supabase) return;
+  const { data } = await supabase.auth.getSession();
+  view.session = data.session;
+  if (view.session) await loadAccountData();
+  supabase.auth.onAuthStateChange((_event, session) => {
+    view.session = session;
+    if (session) void loadAccountData();
+    else {
+      view.profile = undefined;
+      view.decks = [];
+      view.collection = [];
+      view.matchHistory = [];
+      view.selectedDeckId = undefined;
+      view.editingDeck = undefined;
+      render();
+    }
+  });
+  render();
+}
+
+async function signInWithPassword(event: Event): Promise<void> {
+  event.preventDefault();
+  if (!supabase) return;
+  const credentials = readAuthFields();
+  await withAccountLoading(async () => {
+    const { error } = await supabase.auth.signInWithPassword(credentials);
+    if (error) throw error;
+    view.accountMessage = "Signed in.";
+  });
+}
+
+async function signUpWithPassword(): Promise<void> {
+  if (!supabase) return;
+  const { email, password } = readAuthFields();
+  await withAccountLoading(async () => {
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { display_name: email.split("@")[0] || "Player" } }
+    });
+    if (error) throw error;
+    view.accountMessage = "Account created. Confirm email if your Supabase project requires it, then sign in.";
+  });
+}
+
+async function signInWithGoogle(): Promise<void> {
+  if (!supabase) return;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: { redirectTo: location.origin + location.pathname }
+    });
+    if (error) throw error;
+  });
+}
+
+async function signOut(): Promise<void> {
+  if (!supabase) return;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    view.accountMessage = "Signed out.";
+  });
+}
+
+async function loadAccountData(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  await withAccountLoading(async () => {
+    await ensureProfile();
+    await ensureCollection();
+
+    const userId = view.session!.user.id;
+    const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
+      supabase.from("profiles").select("user_id,display_name,avatar_url").eq("user_id", userId).single(),
+      supabase
+        .from("decks")
+        .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
+        .eq("user_id", userId)
+        .order("updated_at", { ascending: false }),
+      supabase
+        .from("card_collections")
+        .select("card_id,quantity")
+        .eq("user_id", userId)
+        .eq("card_catalog_version", CARD_CATALOG_VERSION)
+        .order("card_id", { ascending: true }),
+      supabase
+        .from("match_history")
+        .select("id,winner_seat,result_reason,created_at,finished_at")
+        .order("finished_at", { ascending: false })
+        .limit(20)
+    ]);
+
+    if (profileResult.error) throw profileResult.error;
+    if (decksResult.error) throw decksResult.error;
+    if (collectionResult.error) throw collectionResult.error;
+    if (historyResult.error) throw historyResult.error;
+
+    view.profile = profileResult.data as ProfileRow;
+    view.decks = (decksResult.data ?? []) as DeckRow[];
+    view.collection = (collectionResult.data ?? []) as CollectionRow[];
+    view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+    if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
+      view.selectedDeckId = view.decks[0]?.id;
+    }
+    if (!view.editingDeck) startNewDeck(false);
+  });
+}
+
+async function syncCollection(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  await withAccountLoading(async () => {
+    await ensureCollection();
+    view.accountMessage = "Collection synced.";
+    await loadAccountDataRaw();
+  });
+}
+
+async function loadAccountDataRaw(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  const userId = view.session.user.id;
+  const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
+    supabase.from("profiles").select("user_id,display_name,avatar_url").eq("user_id", userId).single(),
+    supabase
+      .from("decks")
+      .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
+      .eq("user_id", userId)
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("card_collections")
+      .select("card_id,quantity")
+      .eq("user_id", userId)
+      .eq("card_catalog_version", CARD_CATALOG_VERSION)
+      .order("card_id", { ascending: true }),
+    supabase
+      .from("match_history")
+      .select("id,winner_seat,result_reason,created_at,finished_at")
+      .order("finished_at", { ascending: false })
+      .limit(20)
+  ]);
+
+  if (profileResult.error) throw profileResult.error;
+  if (decksResult.error) throw decksResult.error;
+  if (collectionResult.error) throw collectionResult.error;
+  if (historyResult.error) throw historyResult.error;
+
+  view.profile = profileResult.data as ProfileRow;
+  view.decks = (decksResult.data ?? []) as DeckRow[];
+  view.collection = (collectionResult.data ?? []) as CollectionRow[];
+  view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+  if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
+    view.selectedDeckId = view.decks[0]?.id;
+  }
+  if (!view.editingDeck) startNewDeck(false);
+}
+
+async function ensureCollection(): Promise<void> {
+  if (!supabase) return;
+  const { error } = await supabase.rpc("ensure_full_seed_collection", {
+    target_version: CARD_CATALOG_VERSION
+  });
+  if (error) throw error;
+}
+
+async function ensureProfile(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  const user = view.session.user;
+  const metadata = user.user_metadata ?? {};
+  const displayName =
+    (typeof metadata.display_name === "string" && metadata.display_name) ||
+    (typeof metadata.name === "string" && metadata.name) ||
+    user.email?.split("@")[0] ||
+    "Player";
+  const { error } = await supabase.from("profiles").upsert({
+    user_id: user.id,
+    display_name: displayName,
+    avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null
+  });
+  if (error) throw error;
+}
+
+async function saveEditingDeck(event: Event): Promise<void> {
+  event.preventDefault();
+  if (!supabase || !view.editingDeck) return;
+  const name = (document.querySelector<HTMLInputElement>("#deck-name")?.value ?? view.editingDeck.name).trim();
+  const cardIds = view.editingDeck.card_ids;
+  await withAccountLoading(async () => {
+    const { data, error } = await supabase.rpc("save_user_deck", {
+      p_deck_id: view.editingDeck?.id ?? null,
+      p_name: name,
+      p_card_catalog_version: CARD_CATALOG_VERSION,
+      p_card_ids: cardIds
+    });
+    if (error) throw error;
+    const saved = data as DeckRow;
+    view.accountMessage = `Saved ${saved.name}.`;
+    view.selectedDeckId = saved.id;
+    view.editingDeck = { ...saved, card_ids: [...saved.card_ids] };
+    await loadAccountData();
+  });
+}
+
+async function deleteDeck(deckId: string | undefined): Promise<void> {
+  if (!supabase || !deckId) return;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.rpc("delete_user_deck", { p_deck_id: deckId });
+    if (error) throw error;
+    view.accountMessage = "Deck deleted.";
+    if (view.selectedDeckId === deckId) view.selectedDeckId = undefined;
+    if (view.editingDeck?.id === deckId) startNewDeck(false);
+    await loadAccountData();
+  });
+}
+
+function startNewDeck(doRender = true): void {
+  view.editingDeck = { name: "New Deck", card_ids: [] };
+  if (doRender) render();
+}
+
+function autofillDeck(): void {
+  if (!view.editingDeck) startNewDeck(false);
+  const ids: string[] = [];
+  for (const card of CARD_CATALOG) {
+    if (card.collectible === false) continue;
+    const copies = Math.min(ownedQuantity(card.id), card.rarity === "LEGENDARY" ? 1 : 2);
+    for (let i = 0; i < copies && ids.length < 30; i++) ids.push(card.id);
+    if (ids.length >= 30) break;
+  }
+  view.editingDeck = { ...view.editingDeck!, card_ids: ids };
+  render();
+}
+
+function clearDeck(): void {
+  if (!view.editingDeck) return;
+  view.editingDeck = { ...view.editingDeck, card_ids: [] };
+  render();
+}
+
+function addCardToEditor(cardId: string | undefined): void {
+  if (!cardId) return;
+  if (!view.editingDeck) startNewDeck(false);
+  const card = cardCatalog.get(cardId);
+  if (!card) return;
+  const counts = countCards(view.editingDeck!.card_ids);
+  const limit = Math.min(ownedQuantity(cardId), card.rarity === "LEGENDARY" ? 1 : 2);
+  if ((counts.get(cardId) ?? 0) >= limit || view.editingDeck!.card_ids.length >= 30) return;
+  view.editingDeck = { ...view.editingDeck!, card_ids: [...view.editingDeck!.card_ids, cardId] };
+  render();
+}
+
+function removeCardFromEditor(cardId: string | undefined): void {
+  if (!cardId || !view.editingDeck) return;
+  const index = view.editingDeck.card_ids.indexOf(cardId);
+  if (index < 0) return;
+  const cardIds = [...view.editingDeck.card_ids];
+  cardIds.splice(index, 1);
+  view.editingDeck = { ...view.editingDeck, card_ids: cardIds };
+  render();
+}
+
+async function withAccountLoading(action: () => Promise<void>): Promise<void> {
+  view.accountLoading = true;
+  view.accountError = undefined;
+  view.accountMessage = undefined;
+  render();
+  try {
+    await action();
+  } catch (error) {
+    view.accountError = error instanceof Error ? error.message : "Account action failed.";
+  } finally {
+    view.accountLoading = false;
+    render();
+  }
+}
+
+function readAuthFields(): { email: string; password: string } {
+  const email = document.querySelector<HTMLInputElement>("#auth-email")?.value.trim() ?? "";
+  const password = document.querySelector<HTMLInputElement>("#auth-password")?.value ?? "";
+  if (!email || !password) throw new Error("Email and password are required.");
+  return { email, password };
 }
 
 function send(command: GameCommand): void {
@@ -710,6 +1225,24 @@ function inferDefaultTarget(cardId: string | undefined): TargetRef | undefined {
     if (minion) return { type: "MINION", side, instanceId: minion.instanceId };
   }
   return undefined;
+}
+
+function countCards(cardIds: readonly string[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const id of cardIds) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return counts;
+}
+
+function ownedQuantity(cardId: string): number {
+  const owned = view.collection.find((item) => item.card_id === cardId)?.quantity;
+  if (owned !== undefined) return owned;
+  const card = cardCatalog.get(cardId);
+  if (!card || card.collectible === false) return 0;
+  return card.rarity === "LEGENDARY" ? 1 : 2;
+}
+
+function hasCollectionRows(): boolean {
+  return view.collection.length > 0;
 }
 
 function fanStyle(index: number, total: number): string {

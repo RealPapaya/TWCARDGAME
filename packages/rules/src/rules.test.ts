@@ -28,6 +28,20 @@ describe("rules architecture", () => {
     expect(validateDeck(illegal, CARD_CATALOG).valid).toBe(false);
   });
 
+  it("enforces collection quantities during deck validation", () => {
+    const legal = legalDeckIds();
+    const doubledCardId = legal.find((id, index) => legal.indexOf(id) !== index)!;
+    const collection = Array.from(new Set(legal)).map((cardId) => ({
+      cardId,
+      quantity: cardId === doubledCardId ? 1 : 2
+    }));
+
+    const result = validateDeck(legal, CARD_CATALOG, collection);
+
+    expect(result.valid).toBe(false);
+    expect(result.errors).toContain(`${doubledCardId} exceeds owned quantity 1; got 2.`);
+  });
+
   it("does not expose hands or deck order through public state", () => {
     const { state } = createSeededMatch(1234);
     const publicState = toPublicState(state);

@@ -10,8 +10,10 @@ The original static/v1 project has been moved into `LEGACY/` for reference.
 npm install
 npm run validate:cards
 npm test
+npm run test:rls
 npm run check
 npm run build
+npm run publish:catalog
 npm run start -w @twcardgame/server
 npm run dev -w @twcardgame/web
 ```

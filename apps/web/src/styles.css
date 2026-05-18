@@ -169,6 +169,185 @@ input {
   color: #ffb7aa !important;
 }
 
+.success-text {
+  margin-top: 12px;
+  color: #a8ffc0 !important;
+}
+
+.account-landing {
+  align-items: center;
+}
+
+.account-lobby {
+  position: relative;
+  z-index: 1;
+  min-height: calc(100vh - 74px);
+  padding: 18px;
+  overflow: auto;
+}
+
+.account-toolbar,
+.account-panel {
+  border: 1px solid rgba(215, 178, 77, 0.34);
+  border-radius: 8px;
+  background: rgba(14, 9, 6, 0.84);
+  box-shadow: 0 12px 34px rgba(0, 0, 0, 0.34);
+}
+
+.account-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px;
+}
+
+.account-toolbar p,
+.account-panel p,
+.history-row small,
+.saved-deck span {
+  color: var(--ink-muted);
+}
+
+.account-grid {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.9fr) minmax(420px, 1.6fr) minmax(260px, 0.8fr);
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.account-panel {
+  min-width: 0;
+  padding: 14px;
+}
+
+.account-panel h3 {
+  margin: 0 0 12px;
+}
+
+.auth-panel {
+  display: grid;
+  gap: 12px;
+  width: min(560px, 92vw);
+}
+
+.auth-form {
+  display: grid;
+  gap: 10px;
+}
+
+.button-row,
+.editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button-row button,
+.editor-actions button,
+.saved-deck button,
+.deck-builder-card button {
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.deck-list,
+.history-list,
+.deck-card-list {
+  display: grid;
+  gap: 8px;
+}
+
+.deck-card-list {
+  max-height: calc(100vh - 260px);
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.saved-deck,
+.history-row,
+.deck-builder-card {
+  display: grid;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.saved-deck {
+  grid-template-columns: 1fr auto auto;
+  padding: 8px;
+}
+
+.saved-deck.selected {
+  border-color: var(--cyan);
+  box-shadow: inset 0 0 18px rgba(32, 214, 242, 0.12);
+}
+
+.deck-select {
+  display: grid;
+  justify-items: start;
+  background: transparent;
+  color: var(--ink);
+  border: 0;
+  box-shadow: none;
+}
+
+.deck-select:active:not(:disabled) {
+  transform: none;
+  box-shadow: none;
+}
+
+.deck-editor {
+  display: grid;
+  gap: 10px;
+}
+
+.editor-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.editor-heading span {
+  color: var(--cyan);
+  font-weight: 900;
+}
+
+.deck-builder-card {
+  grid-template-columns: 38px 38px minmax(0, 1fr) 56px;
+  padding: 7px;
+}
+
+.deck-card-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.history-row {
+  grid-template-columns: 1fr auto;
+  padding: 10px;
+}
+
+.history-row small {
+  grid-column: 1 / -1;
+}
+
+.account-status {
+  position: relative;
+  z-index: 1;
+  margin: 10px 0 0;
+}
+
+.danger {
+  background: linear-gradient(to bottom, #7d2a1e, #4a1510);
+  color: #ffd7d1;
+}
+
 .status {
   display: flex;
   flex-wrap: wrap;
@@ -959,6 +1138,14 @@ input {
   .controls button {
     min-width: 84px;
     font-size: 12px;
+  }
+
+  .account-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .deck-card-list {
+    max-height: 520px;
   }
 }
 

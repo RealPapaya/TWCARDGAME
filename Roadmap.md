@@ -6,7 +6,15 @@ Last updated: 2026-05-17
 
 
 Phase Overview
-PhaseNameStatus0Architecture Setup & Legacy Isolation✅ Complete1PvP Core Scaffold✅ Complete2Rules Parity✅ Complete3Multiplayer Reliability⬜ Pending4Account, Deck & Collection⬜ Pending5Real UI / UX⬜ Pending6Production Launch⬜ Pending
+| Phase | Name | Status |
+| --- | --- | --- |
+| 0 | Architecture Setup & Legacy Isolation | Complete |
+| 1 | PvP Core Scaffold | Complete |
+| 2 | Rules Parity | Complete |
+| 3 | Multiplayer Reliability | Complete |
+| 4 | Account, Deck & Collection | Complete |
+| 5 | Real UI / UX | Pending |
+| 6 | Production Launch | Pending |
 
 Phase 0 — Architecture Setup & Legacy Isolation
 Status: ✅ Complete
@@ -119,20 +127,29 @@ What was completed
 
 
 Phase 4 — Account, Deck & Collection
-Status: ⬜ Pending — Supabase scaffold only
+Status: ✅ Complete
 
 Goal: players have real accounts, can build and save decks, and match history is recorded.
 
 Tasks
 
- Supabase Auth integration (email + OAuth)
+ Supabase Auth integration (email/password + Google OAuth)
  Player profile creation on first login
- Deck CRUD — create, read, update, delete saved decks
- Deck ownership check enforced server-side before match start
+ Deck CRUD — create, read, update, delete saved decks via authenticated Supabase RPC
+ Deck ownership, catalog version, legality, and collection quantity enforced server-side before match start
  Card catalog snapshot publish pipeline (repo files → Supabase table versioned)
- Match history write on game end
- Card collection system (which cards the player owns)
- Row Level Security (RLS) policies tested for all browser-exposed tables
+ Match history write on game end and browser history read through RLS
+ Card collection system with full current-catalog starter grants
+ Row Level Security (RLS) policy coverage tested for all browser-exposed tables
+
+What was completed
+
+ Web account lobby added for Supabase auth, profile, collection count, deck CRUD, deck selection, and match history
+ Production PvP joins now pass Supabase accessToken + saved deckId; dev mode still supports displayName/deckIds fallback
+ Server validates saved deck ownership, current catalog version, 30-card legality, copy limits, and owned quantities
+ Supabase RPCs added for ensure_full_seed_collection, save_user_deck, and delete_user_deck
+ npm run publish:catalog publishes CARD_CATALOG_VERSION + CARD_CATALOG to card_catalog_snapshots
+ npm run test:rls statically verifies Phase 4 RLS/RPC migration coverage
 
 
 Phase 5 — Real UI / UX
