@@ -18,9 +18,14 @@
 import { chromium } from "playwright";
 
 const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
+const SERVER_URL = process.env.SERVER_URL || "";
 const TIMEOUT = 30_000;
 
 function log(tag, msg) { console.log(`[${tag}] ${msg}`); }
+
+function devAuthUrl(extra = "") {
+  return WEB_URL + (WEB_URL.indexOf("?") === -1 ? "?" : "&") + "auth=dev" + extra;
+}
 
 // ─── event accumulator (same as game-loop.spec.mjs) ─────────────────────────
 const INIT_SCRIPT = `
@@ -85,8 +90,9 @@ async function waitEvent(page, eventType, after, tag) {
 // ─── helpers ────────────────────────────────────────────────────────────────
 
 async function joinAndMulligan(p, name) {
-  await p.goto(WEB_URL);
+  await p.goto(devAuthUrl());
   await p.waitForSelector("#join-form");
+  if (SERVER_URL) await p.fill("#server-url", SERVER_URL);
   await p.fill("#display-name", name);
   await p.click("#join-form button");
   await p.waitForSelector("#mulligan", { timeout: TIMEOUT });
@@ -168,8 +174,9 @@ async function getConnectedStatus(page, side) {
         var p2b = await ctx2.newPage();
         p2b.on("pageerror", (e) => console.error("[P2b]", e.message));
         await injectEventAccumulator(p2b);
-        await p2b.goto(WEB_URL + "?reconnect=" + encodeURIComponent(token));
+        await p2b.goto(devAuthUrl("&reconnect=" + encodeURIComponent(token)));
         await p2b.waitForSelector("#join-form");
+        if (SERVER_URL) await p2b.fill("#server-url", SERVER_URL);
         await p2b.click("#join-form button"); // triggers joinRoom which detects ?reconnect
         await p2b.waitForTimeout(3000);
 

@@ -9,7 +9,12 @@
 import { chromium } from "playwright";
 
 const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
+const SERVER_URL = process.env.SERVER_URL || "";
 const TIMEOUT = 30_000;
+
+function devAuthUrl() {
+  return WEB_URL + (WEB_URL.indexOf("?") === -1 ? "?" : "&") + "auth=dev";
+}
 
 const INIT_SCRIPT = `
 (function () {
@@ -50,8 +55,9 @@ const INIT_SCRIPT = `
 `;
 
 async function joinAndMulligan(page, name) {
-  await page.goto(WEB_URL);
+  await page.goto(devAuthUrl());
   await page.waitForSelector("#join-form");
+  if (SERVER_URL) await page.fill("#server-url", SERVER_URL);
   await page.fill("#display-name", name);
   await page.click("#join-form button");
   await page.waitForSelector("#mulligan", { timeout: TIMEOUT });
@@ -93,13 +99,14 @@ async function waitEvent(page, eventType, after) {
       });
     });
     await waitEvent(p1, "COMMAND_REJECTED", count);
+    await p1.waitForSelector('[data-testid="toast"]', { timeout: 5000 });
     var after = await p1.evaluate(() => window.__gameState.turn.actionSeq);
 
     if (after !== before) {
       throw new Error("stale command changed actionSeq from " + before + " to " + after);
     }
 
-    console.log("PASS action-seq: stale expectedActionSeq was rejected without advancing actionSeq");
+    console.log("PASS action-seq: stale expectedActionSeq was rejected without advancing actionSeq and displayed toast feedback");
     await browser.close();
     process.exit(0);
   } catch (error) {

@@ -13,7 +13,19 @@ import type {
   TargetRef
 } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
+import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle } from "./ui.js";
 import "./styles.css";
+
+type AnimationKind = "play" | "summon" | "attack" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
+
+type AnimationCue = {
+  id: string;
+  kind: AnimationKind;
+  text: string;
+  seat?: Seat;
+  targetKey?: string;
+  cardId?: string;
+};
 
 type ClientViewState = {
   room?: Room;
@@ -35,6 +47,7 @@ type ClientViewState = {
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
   events: GameEvent[];
+  animationCues: AnimationCue[];
   eventStatus?: GameStatus;
   toast?: string;
   joining: boolean;
@@ -97,8 +110,9 @@ const app = document.querySelector<HTMLDivElement>("#app")!;
 const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || "ws://localhost:2567";
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
+const forceDevAuth = isLocalDevHost() && new URLSearchParams(location.search).get("auth") === "dev";
 const supabase: SupabaseClient | undefined =
-  supabaseUrl && supabaseAnonKey
+  !forceDevAuth && supabaseUrl && supabaseAnonKey
     ? createClient(supabaseUrl, supabaseAnonKey, {
         auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
       })
@@ -112,6 +126,7 @@ const view: ClientViewState = {
   rejectedHandIds: new Set(),
   mulliganSelection: new Set(),
   events: [],
+  animationCues: [],
   joining: false,
   accountLoading: false,
   session: undefined,
@@ -310,19 +325,32 @@ function renderGame(status: GameStatus | ""): string {
   const opponentPlayer = readPlayer(opponent);
   const myPlayer = readPlayer(me ?? "player1");
   const activeSeat = readActiveSeat();
+  const selectedCard = selectedHandCard();
+  const targetHint = selectedCard
+    ? cardNeedsTarget(selectedCard.cardId)
+      ? view.selectedTarget
+        ? `Target: ${targetLabel(view.selectedTarget)}`
+        : "Choose target"
+      : "Ready to play"
+    : view.selectedAttackerId
+      ? view.selectedTarget
+        ? `Target: ${targetLabel(view.selectedTarget)}`
+        : "Choose attack target"
+      : "No selection";
 
   return `
     <section class="status" data-testid="match-status">
       <span>Status: ${escapeHtml(status || "waiting")}</span>
       <span>Turn: ${readTurnNumber()}</span>
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
-      <span>Selected target: ${view.selectedTarget ? escapeHtml(targetLabel(view.selectedTarget)) : "none"}</span>
+      <span>${escapeHtml(targetHint)}</span>
     </section>
-    <section class="battle-surface" data-testid="battle-surface">
+    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""}" data-testid="battle-surface">
       ${renderConnectionBanner()}
       ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
       ${renderCenterLine(activeSeat)}
       ${renderPlayerArea(me ?? "player1", myPlayer, "player")}
+      ${renderEventCues()}
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
     </section>
@@ -343,9 +371,8 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
   const board = Array.from(player?.board ?? []);
   const connected = player?.connected ?? true;
   const handCount = role === "player" ? view.hand.length : player?.handCount ?? 0;
-  const areaClasses = ["player-area", "player", role, isMe ? "me" : "", active ? "active-turn" : "", connected ? "" : "disconnected"]
-    .filter(Boolean)
-    .join(" ");
+  const areaClasses = classNames(["player-area", "player", role, isMe && "me", active && "active-turn", !connected && "disconnected"]);
+  const boardClasses = classNames(["board", activeTargeting() && "targeting-board"]);
 
   return `
     <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
@@ -358,7 +385,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
         </div>
       </div>
       ${role === "opponent" ? renderOpponentHand(handCount) : ""}
-      <div class="board" data-testid="${role}-board">
+      <div class="${boardClasses}" data-testid="${role}-board">
         ${board.map((minion) => renderMinion(seat, minion)).join("") || renderEmptySlots()}
       </div>
       ${role === "player" ? renderPlayerHand() : ""}
@@ -372,9 +399,16 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   const hp = player?.hero?.hp ?? 0;
   const maxHp = player?.hero?.maxHp ?? 0;
   const name = player?.displayName || seat;
-  const heroClasses = ["hero", role === "player" ? "player-hero" : "opponent-hero", isTargetHighlighted({ type: "HERO", side: seat }) ? "valid-target" : ""]
-    .filter(Boolean)
-    .join(" ");
+  const targetRef: TargetRef = { type: "HERO", side: seat };
+  const targetKey = targetKeyFor(targetRef);
+  const heroClasses = classNames([
+    "hero",
+    role === "player" ? "player-hero" : "opponent-hero",
+    isTargetHighlighted(targetRef) && "valid-target",
+    sameTarget(view.selectedTarget, targetRef) && "target-selected",
+    hasCue(targetKey, "damage") && "taking-damage",
+    hasCue(targetKey, "heal") && "receiving-heal"
+  ]);
 
   return `
     <button class="${heroClasses}" data-target='${target}' data-testid="${role}-hero" data-seat="${seat}">
@@ -425,17 +459,17 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   const mulliganSelected = view.mulliganSelection.has(card.instanceId);
   const playable = canAfford(card.cost);
   const needsTarget = cardNeedsTarget(card.cardId);
+  const rejected = view.rejectedHandIds.has(card.instanceId);
   const e2eType = view.rejectedHandIds.has(card.instanceId) ? "REJECTED_CARD" : card.type;
-  const classes = [
+  const classes = classNames([
     "card",
     `rarity-${resolved.rarity.toLowerCase()}`,
-    selected ? "selected" : "",
-    mulliganSelected ? "mulligan-selected" : "",
-    playable ? "can-play" : "",
-    needsTarget ? "needs-target" : ""
-  ]
-    .filter(Boolean)
-    .join(" ");
+    selected && "selected",
+    mulliganSelected && "mulligan-selected",
+    playable && "can-play",
+    needsTarget && "needs-target",
+    rejected && "rejected-card"
+  ]);
 
   return `
     <button
@@ -445,7 +479,9 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
       data-card-type="${escapeAttr(card.type)}"
       data-e2e-card-type="${escapeAttr(e2eType)}"
       data-cost="${card.cost}"
+      data-needs-target="${needsTarget ? "true" : "false"}"
       data-testid="hand-card"
+      aria-pressed="${selected ? "true" : "false"}"
     >
       ${renderCardFace(resolved, "hand")}
       <span class="sr-e2e">Cost ${card.cost} ${e2eType}${card.attack !== undefined ? ` ${card.attack}/${card.health}` : ""}</span>
@@ -457,17 +493,20 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
   const catalogCard = cardCatalog.get(minion.cardId);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
-  const classes = [
+  const targetKey = targetKeyFor(target);
+  const classes = classNames([
     "minion",
-    minion.taunt ? "taunt" : "",
-    minion.divineShield ? "shielded" : "",
+    minion.taunt && "taunt",
+    minion.divineShield && "shielded",
     minion.canAttack ? "can-attack" : "sleeping",
-    minion.isEnraged ? "enraged" : "",
+    minion.isEnraged && "enraged",
     selectedMinionClass(minion.instanceId, target),
-    isTargetHighlighted(target) ? "valid-target" : ""
-  ]
-    .filter(Boolean)
-    .join(" ");
+    isTargetHighlighted(target) && "valid-target",
+    hasCue(targetKey, "damage") && "taking-damage",
+    hasCue(targetKey, "heal") && "receiving-heal",
+    hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "destroy") && "being-destroyed"
+  ]);
 
   return `
     <button
@@ -477,7 +516,9 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
       data-card-type="MINION"
       data-cost="${catalogCard?.cost ?? 0}"
       data-seat="${seat}"
+      data-target-key="${escapeAttr(targetKey)}"
       data-testid="board-minion"
+      aria-pressed="${view.selectedAttackerId === minion.instanceId || sameTarget(view.selectedTarget, target) ? "true" : "false"}"
     >
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
@@ -508,8 +549,11 @@ function renderCardFace(card: ResolvedCardView, size: "hand" | "mulligan"): stri
 
 function renderCenterLine(activeSeat: Seat | ""): string {
   const isMyTurn = activeSeat && activeSeat === view.mySeat;
-  const canPlay = Boolean(view.selectedHandId);
-  const canAttack = Boolean(view.selectedAttackerId && view.selectedTarget);
+  const selectedCard = selectedHandCard();
+  const selectedNeedsTarget = selectedCard ? cardNeedsTarget(selectedCard.cardId) : false;
+  const canPlay = Boolean(selectedCard && canAfford(selectedCard.cost) && (!selectedNeedsTarget || view.selectedTarget));
+  const canAttack = Boolean(view.selectedAttackerId && view.selectedTarget && isLegalAttackTarget(view.selectedTarget));
+  const primaryLabel = selectedCard ? (selectedNeedsTarget && !view.selectedTarget ? "Choose Target" : "Play Selected") : "Play Selected";
 
   return `
     <section class="center-line controls">
@@ -518,7 +562,7 @@ function renderCenterLine(activeSeat: Seat | ""): string {
         <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
         <span id="indicator-player" class="turn-light ${isMyTurn ? "active" : ""}">${isMyTurn ? "Your Turn" : "Waiting"}</span>
       </div>
-      <button id="play" ${canPlay ? "" : "disabled"} data-testid="play-selected">Play Selected</button>
+      <button id="play" ${canPlay ? "" : "disabled"} data-testid="play-selected">${primaryLabel}</button>
       <button id="attack" ${canAttack ? "" : "disabled"} data-testid="attack-target">Attack Target</button>
       <button id="end-turn" class="end-turn-btn" ${view.room ? "" : "disabled"} data-testid="end-turn">End Turn</button>
     </section>
@@ -566,8 +610,8 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
 
 function renderResultOverlay(status: GameStatus | ""): string {
   if (status !== "finished" && status !== "abandoned") return "";
-  const winnerSeat = view.state?.resultWinnerSeat || view.state?.result?.winnerSeat;
-  const reason = view.state?.resultReason || view.state?.result?.reason || status;
+  const winnerSeat = view.publicSync?.result?.winnerSeat || view.state?.resultWinnerSeat || view.state?.result?.winnerSeat;
+  const reason = view.publicSync?.result?.reason || view.state?.resultReason || view.state?.result?.reason || status;
   const won = winnerSeat && winnerSeat === view.mySeat;
   const title = status === "abandoned" ? "Match Abandoned" : won ? "Victory" : winnerSeat ? "Defeat" : "Game Finished";
 
@@ -580,6 +624,42 @@ function renderResultOverlay(status: GameStatus | ""): string {
       </div>
     </section>
   `;
+}
+
+function renderEventCues(): string {
+  if (view.animationCues.length === 0) return "";
+  return `
+    <div class="event-layer" data-testid="event-layer" aria-hidden="true">
+      ${view.animationCues.map(renderEventCue).join("")}
+    </div>
+  `;
+}
+
+function renderEventCue(cue: AnimationCue): string {
+  const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
+  if (cue.kind === "play" && card) {
+    return `
+      <div class="event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}">
+        ${renderCardFace(
+          {
+            cardId: card.id,
+            instanceId: cue.id,
+            name: card.name,
+            category: card.category,
+            description: card.description,
+            image: card.image,
+            cost: card.cost,
+            type: card.type,
+            rarity: card.rarity,
+            attack: card.attack,
+            health: card.health
+          },
+          "mulligan"
+        )}
+      </div>
+    `;
+  }
+  return `<div class="event-cue event-${cue.kind}">${escapeHtml(cue.text)}</div>`;
 }
 
 function renderToast(): string {
@@ -653,7 +733,7 @@ function bindStaticActions(): void {
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
     el.addEventListener("click", () => {
-      view.selectedHandId = el.dataset.handId;
+      view.selectedHandId = view.selectedHandId === el.dataset.handId ? undefined : el.dataset.handId;
       view.selectedAttackerId = undefined;
       view.selectedTarget = undefined;
       render();
@@ -672,7 +752,15 @@ function bindSelectionActions(): void {
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     el.addEventListener("click", () => {
-      view.selectedTarget = JSON.parse(el.dataset.target!);
+      const target = JSON.parse(el.dataset.target!) as TargetRef;
+      if (!isTargetHighlighted(target)) return;
+      if (confirmSelectedTarget(target)) {
+        view.selectedAttackerId = undefined;
+        view.selectedHandId = undefined;
+        view.selectedTarget = undefined;
+      } else {
+        view.selectedTarget = target;
+      }
       render();
     });
   }
@@ -702,6 +790,7 @@ async function backToLobby(): Promise<void> {
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
   view.events = [];
+  view.animationCues = [];
   view.eventStatus = undefined;
   view.toast = undefined;
   if (room) {
@@ -718,12 +807,12 @@ async function backToLobby(): Promise<void> {
 async function joinRoom(event: Event): Promise<void> {
   event.preventDefault();
   if (view.joining || view.room) return;
+  const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
+  const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   view.joining = true;
   view.joinError = undefined;
   render();
 
-  const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
-  const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   const client = new Client(serverUrl);
 
   try {
@@ -1090,6 +1179,7 @@ function send(command: GameCommand): void {
 
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
+  enqueueEventCues(message);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
@@ -1107,6 +1197,40 @@ function handleEvents(message: GameEvent[]): void {
   render();
 }
 
+function enqueueEventCues(events: GameEvent[]): void {
+  const cues = events.map(eventToCue).filter((cue): cue is AnimationCue => Boolean(cue));
+  if (cues.length === 0) return;
+  view.animationCues = [...cues, ...view.animationCues].slice(0, 6);
+  for (const cue of cues) {
+    window.setTimeout(() => {
+      view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
+      render();
+    }, cue.kind === "play" ? 1050 : 900);
+  }
+}
+
+function eventToCue(event: GameEvent): AnimationCue | undefined {
+  const payload = event.payload ?? {};
+  const target = typeof payload.target === "string" ? payload.target : undefined;
+  const amount = typeof payload.amount === "number" ? payload.amount : undefined;
+  const cardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
+  const id = `${event.seq}-${event.type}-${crypto.randomUUID()}`;
+  if (event.type === "CARD_PLAYED") {
+    const playedCardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
+    return { id, kind: "play", text: cardName(playedCardId) ?? "Card played", seat: event.seat, cardId: playedCardId };
+  }
+  if (event.type === "MINION_SUMMONED") {
+    return { id, kind: "summon", text: "Summoned", seat: event.seat, targetKey: target, cardId };
+  }
+  if (event.type === "DAMAGE") return { id, kind: "damage", text: amount ? `-${amount}` : "Damage", seat: event.seat, targetKey: target };
+  if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target };
+  if (event.type === "BUFF" || event.type === "SHIELD_POPPED") return { id, kind: "buff", text: "Buff", seat: event.seat, targetKey: target };
+  if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
+  if (event.type === "TURN_STARTED") return { id, kind: "turn", text: event.seat === view.mySeat ? "Your Turn" : "Opponent Turn", seat: event.seat };
+  if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "Command rejected"), seat: event.seat };
+  return undefined;
+}
+
 function pruneSelections(): void {
   const handIds = new Set(view.hand.map((card) => card.instanceId));
   if (view.selectedHandId && !handIds.has(view.selectedHandId)) view.selectedHandId = undefined;
@@ -1117,6 +1241,13 @@ function pruneSelections(): void {
     if (!handIds.has(id)) view.mulliganSelection.delete(id);
   }
   if (view.selectedAttackerId && !findMinion(view.selectedAttackerId)) view.selectedAttackerId = undefined;
+  if (view.selectedTarget) {
+    const target = view.selectedTarget;
+    if (view.selectedAttackerId && !isLegalAttackTarget(target)) view.selectedTarget = undefined;
+    if (view.selectedHandId && cardNeedsTarget(selectedHandCard()?.cardId ?? "") && !isLegalCardTarget(target)) {
+      view.selectedTarget = undefined;
+    }
+  }
 }
 
 function readPlayer(seat: Seat): PublicPlayer | undefined {
@@ -1188,10 +1319,79 @@ function selectedMinionClass(instanceId: string, target: TargetRef): string {
 }
 
 function isTargetHighlighted(target: TargetRef): boolean {
-  if (!view.selectedHandId && !view.selectedAttackerId) return false;
   if (sameTarget(view.selectedTarget, target)) return true;
-  if (view.selectedAttackerId && target.side === view.mySeat) return false;
-  return true;
+  if (view.selectedAttackerId) return isLegalAttackTarget(target);
+  if (view.selectedHandId) return isLegalCardTarget(target);
+  return false;
+}
+
+function activeTargeting(): boolean {
+  return Boolean(view.selectedAttackerId || (selectedHandCard() && cardNeedsTarget(selectedHandCard()!.cardId)));
+}
+
+function selectedHandCard(): HandCardView | undefined {
+  return view.hand.find((card) => card.instanceId === view.selectedHandId);
+}
+
+function isLegalAttackTarget(target: TargetRef): boolean {
+  if (!view.mySeat || !view.selectedAttackerId || target.side === view.mySeat) return false;
+  const attacker = Array.from(readPlayer(view.mySeat)?.board ?? []).find((minion) => minion.instanceId === view.selectedAttackerId);
+  if (!attacker?.canAttack) return false;
+  const enemy = otherSeat(view.mySeat);
+  const enemyTaunts = Array.from(readPlayer(enemy)?.board ?? []).filter((minion) => minion.taunt);
+  if (enemyTaunts.length === 0) return target.side === enemy;
+  return target.side === enemy && target.type === "MINION" && enemyTaunts.some((minion) => minion.instanceId === target.instanceId);
+}
+
+function isLegalCardTarget(target: TargetRef): boolean {
+  const card = selectedHandCard();
+  if (!card || !view.mySeat) return false;
+  const rule = cardCatalog.get(card.cardId)?.keywords?.battlecry?.target;
+  if (!rule) return false;
+  const expectedSides = targetRuleSides(rule.side);
+  const expectedTypes = targetRuleTypes(rule.type);
+  return Boolean(target.side && expectedSides.includes(target.side) && expectedTypes.includes(target.type));
+}
+
+function targetRuleSides(side: "FRIENDLY" | "ENEMY" | "ALL" | undefined): Seat[] {
+  if (!view.mySeat) return [];
+  if (side === "FRIENDLY") return [view.mySeat];
+  if (side === "ENEMY") return [otherSeat(view.mySeat)];
+  return [view.mySeat, otherSeat(view.mySeat)];
+}
+
+function targetRuleTypes(type: "MINION" | "HERO" | "ALL" | undefined): Array<TargetRef["type"]> {
+  if (type === "MINION") return ["MINION"];
+  if (type === "HERO") return ["HERO"];
+  return ["HERO", "MINION"];
+}
+
+function confirmSelectedTarget(target: TargetRef): boolean {
+  if (!sameTarget(view.selectedTarget, target)) return false;
+  if (view.selectedAttackerId && isLegalAttackTarget(target)) {
+    send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target });
+    return true;
+  }
+  const card = selectedHandCard();
+  if (card && isLegalCardTarget(target)) {
+    send({ type: "playCard", handInstanceId: card.instanceId, target });
+    return true;
+  }
+  return false;
+}
+
+function targetKeyFor(target: TargetRef): string {
+  if (target.type === "HERO") return `${target.side}:hero`;
+  return target.instanceId ?? "";
+}
+
+function hasCue(targetKey: string | undefined, kind?: AnimationKind): boolean {
+  if (!targetKey) return false;
+  return view.animationCues.some((cue) => cue.targetKey === targetKey && (!kind || cue.kind === kind));
+}
+
+function cardName(cardId: string | undefined): string | undefined {
+  return cardId ? cardCatalog.get(cardId)?.name ?? cardId : undefined;
 }
 
 function sameTarget(a: TargetRef | undefined, b: TargetRef): boolean {
@@ -1282,19 +1482,8 @@ function errorMessage(error: unknown): string {
   return "Account action failed. Check Supabase configuration and browser console.";
 }
 
-function fanStyle(index: number, total: number): string {
-  if (total <= 1) return "--rot: 0deg; --y: 0px;";
-  const center = (total - 1) / 2;
-  const distance = index - center;
-  const rotation = Math.max(-18, Math.min(18, distance * 5));
-  const y = Math.abs(distance) * 4;
-  return `--rot: ${rotation}deg; --y: ${y}px;`;
-}
-
-function assetUrl(path: string): string {
-  if (!path) return "";
-  if (/^https?:\/\//.test(path) || path.startsWith("/")) return path;
-  return `/${path.replace(/^assets\//, "").replace(/\\/g, "/")}`;
+function isLocalDevHost(): boolean {
+  return ["localhost", "127.0.0.1", "0.0.0.0", ""].includes(location.hostname);
 }
 
 function publishDebugState(): void {
@@ -1325,12 +1514,4 @@ function debugPlayer(source: any, seat: Seat): PublicPlayer | undefined {
     ...player,
     connected: reconnectUntilMs > 0 ? false : player.connected
   });
-}
-
-function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
-}
-
-function escapeAttr(value: string): string {
-  return escapeHtml(value);
 }

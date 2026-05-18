@@ -18,7 +18,12 @@
 import { chromium } from "playwright";
 
 const WEB_URL = process.env.WEB_URL || "http://localhost:5173";
+const SERVER_URL = process.env.SERVER_URL || "";
 const TIMEOUT = 30_000;
+
+function devAuthUrl() {
+  return WEB_URL + (WEB_URL.indexOf("?") === -1 ? "?" : "&") + "auth=dev";
+}
 
 // ─── logging ─────────────────────────────────────────────────────────────────
 
@@ -319,11 +324,14 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
   try {
     // ── JOIN ────────────────────────────────────────────────────────────────
     log("TEST", "Joining...");
-    await Promise.all([p1.goto(WEB_URL), p2.goto(WEB_URL)]);
+    await Promise.all([p1.goto(devAuthUrl()), p2.goto(devAuthUrl())]);
     await Promise.all([
       p1.waitForSelector("#join-form"),
       p2.waitForSelector("#join-form"),
     ]);
+    if (SERVER_URL) {
+      await Promise.all([p1.fill("#server-url", SERVER_URL), p2.fill("#server-url", SERVER_URL)]);
+    }
     await p1.fill("#display-name", "Alice");
     await p2.fill("#display-name", "Bob");
     await Promise.all([
@@ -338,6 +346,12 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       p1.waitForSelector("#mulligan", { timeout: TIMEOUT }),
       p2.waitForSelector("#mulligan", { timeout: TIMEOUT }),
     ]);
+    await p1.locator("[data-mulligan-id]").first().click();
+    await p1.waitForFunction(function () {
+      var card = document.querySelector("[data-mulligan-id]");
+      return card && card.classList.contains("selected");
+    }, null, { timeout: 5000 });
+    pass("Mulligan selection visually marks a replacement card");
     await Promise.all([p1.click("#mulligan"), p2.click("#mulligan")]);
     // Wait for TURN_STARTED event (fired by startTurn after both mulligans submitted)
     // instead of checking state.status which may be undefined due to Colyseus 4.x
@@ -451,6 +465,10 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     // Select attacker (my minion)
     await actPage.locator(".player.me .board button.minion").first().click();
     log(actTag, "attacker selected");
+    await actPage.waitForFunction(function () {
+      return document.querySelectorAll(".valid-target").length > 0;
+    }, null, { timeout: 5000 });
+    pass("Step 4: Selecting attacker highlights valid targets");
 
     // Select target (enemy minion)
     var enemyLoc = actPage.locator(".player:not(.me) .board button.minion").first();
@@ -536,6 +554,11 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       waitEvent(p2, "GAME_FINISHED", ck5b, "P2"),
     ]);
     pass("Step 5: Status = finished on both pages (GAME_FINISHED confirmed)");
+    await Promise.all([
+      p1.waitForSelector('[data-testid="result-overlay"]', { timeout: TIMEOUT }),
+      p2.waitForSelector('[data-testid="result-overlay"]', { timeout: TIMEOUT }),
+    ]);
+    pass("Step 5: Result overlay is visible on both pages");
 
   } catch (err) {
     fail("Unexpected error", err);

@@ -1,7 +1,7 @@
 import { defineConfig } from "vite";
 
 export default defineConfig({
-  publicDir: "../../LEGACY/assets",
+  publicDir: "../../legacy/assets",
   server: {
     port: 5173
   },
