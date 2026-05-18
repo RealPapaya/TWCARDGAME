@@ -282,11 +282,10 @@ function renderDeckEditor(): string {
 }
 
 function renderDeckBuilderCard(card: CardDefinition, count: number): string {
-  const owned = ownedQuantity(card.id);
-  const limit = Math.min(owned, card.rarity === "LEGENDARY" ? 1 : 2);
+  const limit = deckCopyLimit(card);
   return `
     <div class="deck-builder-card">
-      <button type="button" data-add-card="${escapeAttr(card.id)}" ${count >= limit ? "disabled" : ""} title="${limit <= 0 ? "Not owned yet" : "Add card"}">+</button>
+      <button type="button" data-add-card="${escapeAttr(card.id)}" ${count >= limit ? "disabled" : ""} title="Add card">+</button>
       <button type="button" data-remove-card="${escapeAttr(card.id)}" ${count <= 0 ? "disabled" : ""}>-</button>
       <span class="deck-card-name">${escapeHtml(card.name)}</span>
       <span>${count}/${limit}</span>
@@ -577,6 +576,7 @@ function renderResultOverlay(status: GameStatus | ""): string {
       <div class="result-content">
         <h2 class="result-text">${escapeHtml(title)}</h2>
         <p>${escapeHtml(reason)}</p>
+        <button id="back-to-lobby" data-testid="back-to-lobby">Back to Lobby</button>
       </div>
     </section>
   `;
@@ -624,6 +624,7 @@ function bindStaticActions(): void {
   });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
   document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => send({ type: "concede" }));
+  document.querySelector<HTMLButtonElement>("#back-to-lobby")?.addEventListener("click", () => void backToLobby());
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
     el.addEventListener("click", () => {
@@ -685,6 +686,33 @@ function bindSelectionActions(): void {
       render();
     });
   }
+}
+
+async function backToLobby(): Promise<void> {
+  const room = view.room;
+  view.room = undefined;
+  view.mySeat = undefined;
+  view.hand = [];
+  view.state = undefined;
+  view.publicSync = undefined;
+  view.presence.clear();
+  view.rejectedHandIds.clear();
+  view.selectedHandId = undefined;
+  view.mulliganSelection.clear();
+  view.selectedAttackerId = undefined;
+  view.selectedTarget = undefined;
+  view.events = [];
+  view.eventStatus = undefined;
+  view.toast = undefined;
+  if (room) {
+    try {
+      await room.leave(true);
+    } catch {
+      // The room may already be closed after match cleanup.
+    }
+  }
+  if (supabase && view.session) await loadAccountData();
+  else render();
 }
 
 async function joinRoom(event: Event): Promise<void> {
@@ -988,7 +1016,7 @@ function autofillDeck(): void {
   const ids: string[] = [];
   for (const card of CARD_CATALOG) {
     if (card.collectible === false) continue;
-    const copies = Math.min(ownedQuantity(card.id), card.rarity === "LEGENDARY" ? 1 : 2);
+    const copies = deckCopyLimit(card);
     for (let i = 0; i < copies && ids.length < 30; i++) ids.push(card.id);
     if (ids.length >= 30) break;
   }
@@ -1008,7 +1036,7 @@ function addCardToEditor(cardId: string | undefined): void {
   const card = cardCatalog.get(cardId);
   if (!card) return;
   const counts = countCards(view.editingDeck!.card_ids);
-  const limit = Math.min(ownedQuantity(cardId), card.rarity === "LEGENDARY" ? 1 : 2);
+  const limit = deckCopyLimit(card);
   if ((counts.get(cardId) ?? 0) >= limit || view.editingDeck!.card_ids.length >= 30) return;
   view.editingDeck = { ...view.editingDeck!, card_ids: [...view.editingDeck!.card_ids, cardId] };
   render();
@@ -1032,7 +1060,7 @@ async function withAccountLoading(action: () => Promise<void>): Promise<void> {
   try {
     await action();
   } catch (error) {
-    view.accountError = error instanceof Error ? error.message : "Account action failed.";
+    view.accountError = errorMessage(error);
   } finally {
     view.accountLoading = false;
     render();
@@ -1233,16 +1261,25 @@ function countCards(cardIds: readonly string[]): Map<string, number> {
   return counts;
 }
 
-function ownedQuantity(cardId: string): number {
-  const owned = view.collection.find((item) => item.card_id === cardId)?.quantity;
-  if (owned !== undefined) return owned;
-  const card = cardCatalog.get(cardId);
-  if (!card || card.collectible === false) return 0;
+function deckCopyLimit(card: CardDefinition): number {
+  if (card.collectible === false) return 0;
   return card.rarity === "LEGENDARY" ? 1 : 2;
 }
 
 function hasCollectionRows(): boolean {
   return view.collection.length > 0;
+}
+
+function errorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message;
+  if (error && typeof error === "object") {
+    const maybe = error as { message?: unknown; error_description?: unknown; details?: unknown; hint?: unknown };
+    const parts = [maybe.message, maybe.error_description, maybe.details, maybe.hint]
+      .filter((part): part is string => typeof part === "string" && part.trim().length > 0);
+    if (parts.length > 0) return parts.join(" ");
+  }
+  if (typeof error === "string" && error.trim()) return error;
+  return "Account action failed. Check Supabase configuration and browser console.";
 }
 
 function fanStyle(index: number, total: number): string {

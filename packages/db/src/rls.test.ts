@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 
 const coreMigration = readFileSync(new URL("../migrations/0001_v2_core.sql", import.meta.url), "utf8");
 const phase4Migration = readFileSync(new URL("../migrations/0002_phase4_account_deck_collection.sql", import.meta.url), "utf8");
+const grantsMigration = readFileSync(new URL("../migrations/0003_phase4_browser_table_grants.sql", import.meta.url), "utf8");
+const serviceRoleGrantsMigration = readFileSync(new URL("../migrations/0004_phase4_service_role_grants.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -20,10 +22,25 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("exposes authenticated Phase 4 RPCs without anonymous write grants", () => {
-    expect(phase4Migration).toContain("grant execute on function public.ensure_full_seed_collection(text) to authenticated;");
-    expect(phase4Migration).toContain("grant execute on function public.save_user_deck(uuid, text, text, text[]) to authenticated;");
-    expect(phase4Migration).toContain("grant execute on function public.delete_user_deck(uuid) to authenticated;");
+    expect(phase4Migration + grantsMigration).toContain("grant execute on function public.ensure_full_seed_collection(text) to authenticated;");
+    expect(phase4Migration + grantsMigration).toContain("grant execute on function public.save_user_deck(uuid, text, text, text[]) to authenticated;");
+    expect(phase4Migration + grantsMigration).toContain("grant execute on function public.delete_user_deck(uuid) to authenticated;");
     expect(phase4Migration).not.toContain("to anon");
+  });
+
+  it("grants browser table privileges required before RLS policies are evaluated", () => {
+    expect(grantsMigration).toContain("grant select, insert, update on public.profiles to authenticated;");
+    expect(grantsMigration).toContain("grant select on public.card_catalog_snapshots to anon, authenticated;");
+    expect(grantsMigration).toContain("grant select on public.decks to authenticated;");
+    expect(grantsMigration).toContain("grant select on public.card_collections to authenticated;");
+    expect(grantsMigration).toContain("grant select on public.match_history to authenticated;");
+  });
+
+  it("grants service-role table privileges for server-side match authorization and persistence", () => {
+    expect(serviceRoleGrantsMigration).toContain("grant usage on schema public to service_role;");
+    expect(serviceRoleGrantsMigration).toContain("grant select, insert, update, delete on public.decks to service_role;");
+    expect(serviceRoleGrantsMigration).toContain("grant select, insert, update, delete on public.card_collections to service_role;");
+    expect(serviceRoleGrantsMigration).toContain("grant select, insert, update, delete on public.match_history to service_role;");
   });
 
   it("validates saved decks against catalog, copy limits, and owned collection quantity", () => {

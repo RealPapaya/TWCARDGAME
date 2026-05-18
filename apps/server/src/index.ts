@@ -8,7 +8,13 @@ const gameServer = new Server({
   gracefullyShutdown: true,
   express: (app) => {
     app.get("/health", (_req: unknown, res: { json: (body: unknown) => void }) => {
-      res.json({ ok: true, service: "twcardgame-v2-server" });
+      res.json({
+        ok: true,
+        service: "twcardgame-v2-server",
+        supabase: {
+          configured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+        }
+      });
     });
     app.use("/colyseus", monitor());
   }
