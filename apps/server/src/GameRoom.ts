@@ -4,20 +4,20 @@ import {
   reduce,
   toHandView,
   toPublicState,
-  validateDeck,
   type MatchState
 } from "@twcardgame/rules";
 import type { ClientCommandMessage, CommandEnvelope, GameEvent, Seat } from "@twcardgame/shared";
 import { Room, type Client } from "colyseus";
+import {
+  createAccountDeckStoreFromEnv,
+  resolvePlayerSetup,
+  type AccountDeckStore,
+  type JoinOptions,
+  type PlayerSetup
+} from "./accounts.js";
 import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
 import { createMatchResultPersistenceFromEnv, type MatchResultPersistence } from "./persistence.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
-
-interface JoinOptions {
-  userId?: string;
-  displayName?: string;
-  deckIds?: string[];
-}
 
 const TURN_TIME_LIMIT_MS = 60_000;
 const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "60000", 10);
@@ -27,11 +27,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   maxClients = 2;
   private match?: MatchState;
   private seats = new Map<string, Seat>();
-  private setup = new Map<Seat, Required<JoinOptions>>();
+  private setup = new Map<Seat, PlayerSetup>();
   private cleanupScheduled = false;
   private readonly finalizer: MatchResultFinalizer;
 
-  constructor(persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv()) {
+  constructor(
+    persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv(),
+    private readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv()
+  ) {
     super();
     this.finalizer = new MatchResultFinalizer(persistence);
   }
@@ -41,10 +44,15 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.onMessage<ClientCommandMessage>("command", (client, message) => this.handleCommand(client, message));
   }
 
-  onJoin(client: Client, options: JoinOptions = {}): void {
+  async onAuth(client: Client, options: JoinOptions = {}): Promise<PlayerSetup> {
+    return resolvePlayerSetup(client.sessionId, options, this.accountStore);
+  }
+
+  async onJoin(client: Client, options: JoinOptions = {}, auth?: PlayerSetup): Promise<void> {
+    const setup = auth ?? (await resolvePlayerSetup(client.sessionId, options, this.accountStore));
     const seat = this.assignSeat(client);
     this.seats.set(client.sessionId, seat);
-    this.setup.set(seat, normalizeJoinOptions(client, options));
+    this.setup.set(seat, setup);
     client.send("seat", { seat });
 
     if (!this.match && this.setup.size === 2) {
@@ -230,21 +238,6 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       void this.disconnect();
     }, Math.max(0, MATCH_CLEANUP_DELAY_MS));
   }
-}
-
-function normalizeJoinOptions(client: Client, options: JoinOptions): Required<JoinOptions> {
-  const deckIds = validateDeck(options.deckIds ?? [], CARD_CATALOG).valid ? options.deckIds! : defaultDeckIds();
-  return {
-    userId: options.userId || client.sessionId,
-    displayName: options.displayName || `Player ${client.sessionId.slice(0, 4)}`,
-    deckIds
-  };
-}
-
-function defaultDeckIds(): string[] {
-  return CARD_CATALOG.filter((card) => card.rarity !== "LEGENDARY" && card.collectible !== false)
-    .slice(0, 15)
-    .flatMap((card) => [card.id, card.id]);
 }
 
 function seedFromRoomId(roomId: string): number {
