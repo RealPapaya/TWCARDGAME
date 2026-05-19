@@ -16,32 +16,49 @@ import {
   type PlayerSetup
 } from "./accounts.js";
 import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
-import { createMatchResultPersistenceFromEnv, type MatchResultPersistence } from "./persistence.js";
+import { createMatchResultPersistenceFromEnv, type MatchPersistenceMetadata, type MatchResultPersistence } from "./persistence.js";
+import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoinCodeForRoom } from "./privateRooms.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
 const TURN_TIME_LIMIT_MS = 60_000;
 const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "60000", 10);
 const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "10000", 10);
 
+export interface GameRoomCreateOptions {
+  joinCode?: string;
+  private?: boolean;
+}
+
 export class GameRoom extends Room<{ state: GameStateSchema }> {
   maxClients = 2;
-  private match?: MatchState;
-  private seats = new Map<string, Seat>();
-  private setup = new Map<Seat, PlayerSetup>();
+  protected match?: MatchState;
+  protected seats = new Map<string, Seat>();
+  protected setup = new Map<Seat, PlayerSetup>();
   private cleanupScheduled = false;
-  private readonly finalizer: MatchResultFinalizer;
+  protected readonly finalizer: MatchResultFinalizer;
+  private registeredJoinCode?: string;
 
   constructor(
     persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv(),
-    private readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv()
+    protected readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv()
   ) {
     super();
     this.finalizer = new MatchResultFinalizer(persistence);
   }
 
-  onCreate(): void {
+  onCreate(options: GameRoomCreateOptions = {}): void {
     this.setState(new GameStateSchema());
     this.onMessage<ClientCommandMessage>("command", (client, message) => this.handleCommand(client, message));
+
+    const incomingCode = options.joinCode ? normalizeJoinCode(options.joinCode) : undefined;
+    if (incomingCode || options.private) {
+      const code = incomingCode ?? generateUniqueJoinCode();
+      registerJoinCode(code, this.roomId);
+      this.registeredJoinCode = code;
+      this.setPrivate(true);
+      this.setMetadata({ joinCode: code });
+      this.broadcast("joinCode", { code });
+    }
   }
 
   async onAuth(client: Client, options: JoinOptions = {}): Promise<PlayerSetup> {
@@ -99,6 +116,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   }
 
   async onDispose(): Promise<void> {
+    releaseJoinCodeForRoom(this.roomId);
     if (!this.match) return;
     if (!isMatchComplete(this.match)) {
       this.finalizer.finish(this.match, { reason: "abandoned" });
@@ -122,7 +140,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     return this.seats.size === 0 ? "player1" : "player2";
   }
 
-  private createMatch(): void {
+  protected createMatch(): void {
     const player1 = this.setup.get("player1");
     const player2 = this.setup.get("player2");
     if (!player1 || !player2) return;
@@ -145,6 +163,12 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.broadcastPublicSync();
     this.broadcast("events", created.events);
     this.sendAllPrivateState();
+    this.afterMatchCreated();
+  }
+
+  /** Hook for subclasses; runs once after the initial match state is built. */
+  protected afterMatchCreated(): void {
+    // no-op in the base PvP room.
   }
 
   private handleCommand(client: Client, message: ClientCommandMessage): void {
@@ -174,6 +198,16 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       nowMs: Date.now(),
       command: message.command
     };
+    this.applyEnvelope(envelope);
+  }
+
+  /**
+   * Inner command-application path shared by the WebSocket handler and
+   * subclasses that need to inject server-driven commands (e.g. `BotRoom`).
+   * The caller is responsible for sequence validation when applicable.
+   */
+  protected applyEnvelope(envelope: CommandEnvelope): void {
+    if (!this.match) return;
     const result = reduce(this.match, envelope, CARD_CATALOG);
     this.match = result.state;
     this.syncPublicState();
@@ -181,6 +215,12 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (result.events.length > 0) this.broadcast("events", result.events);
     this.sendAllPrivateState();
     this.afterMatchComplete();
+    this.afterCommandApplied(envelope);
+  }
+
+  /** Hook for subclasses; runs after a successful command application. */
+  protected afterCommandApplied(_envelope: CommandEnvelope): void {
+    // no-op in the base PvP room.
   }
 
   private syncPublicState(): void {
@@ -225,10 +265,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.broadcast("events", [event]);
   }
 
-  private afterMatchComplete(): void {
+  protected afterMatchComplete(): void {
     if (!this.match || !isMatchComplete(this.match)) return;
-    void this.finalizer.persistOnce(this.match);
+    void this.finalizer.persistOnce(this.match, this.getMatchPersistenceMetadata());
     this.scheduleCleanup();
+  }
+
+  protected getMatchPersistenceMetadata(): MatchPersistenceMetadata | undefined {
+    return undefined;
   }
 
   private scheduleCleanup(): void {

@@ -2,6 +2,9 @@ export type Seat = "player1" | "player2";
 export type GameStatus = "mulligan" | "in_progress" | "finished" | "abandoned";
 export type CardType = "MINION" | "NEWS";
 export type Rarity = "COMMON" | "RARE" | "EPIC" | "LEGENDARY" | "REPIC";
+export type AiDifficulty = "easy" | "normal" | "hard";
+
+export const AI_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"] as const;
 
 export const SEATS: readonly Seat[] = ["player1", "player2"] as const;
 

@@ -1,6 +1,11 @@
 import type { GameEvent, MatchResult, Seat } from "@twcardgame/shared";
 import type { MatchState } from "@twcardgame/rules";
-import { safePersistMatchResult, type MatchResultLogger, type MatchResultPersistence } from "./persistence.js";
+import {
+  safePersistMatchResult,
+  type MatchPersistenceMetadata,
+  type MatchResultLogger,
+  type MatchResultPersistence
+} from "./persistence.js";
 
 export class MatchResultFinalizer {
   private persistedMatchIds = new Set<string>();
@@ -26,10 +31,10 @@ export class MatchResultFinalizer {
     return [event];
   }
 
-  async persistOnce(match: MatchState): Promise<void> {
+  async persistOnce(match: MatchState, metadata?: MatchPersistenceMetadata): Promise<void> {
     if (!isMatchComplete(match) || this.persistedMatchIds.has(match.matchId)) return;
     this.persistedMatchIds.add(match.matchId);
-    await safePersistMatchResult(this.persistence, match, this.logger);
+    await safePersistMatchResult(this.persistence, match, this.logger, metadata);
   }
 }
 

@@ -2,6 +2,7 @@ import { Client, type Room } from "@colyseus/sdk";
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
 import type {
+  AiDifficulty,
   ClientCommandMessage,
   GameCommand,
   GameEvent,
@@ -19,7 +20,30 @@ import "./styles.css";
 
 type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 
-type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor";
+type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
+
+type FriendRow = {
+  friend_user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  wins_count: number;
+};
+
+type LeaderboardRow = {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  wins_count: number;
+};
+
+type ShopItemRow = {
+  id: string;
+  kind: string;
+  display_name: string;
+  description?: string | null;
+  contents: { cards?: string[] };
+};
 type CollectionFilter = "all" | "owned" | "missing";
 type MatchmakingState = {
   startedAtMs: number;
@@ -82,6 +106,20 @@ type ClientViewState = {
   pinnedCollectionCardId?: string;
   avatarPickerOpen?: boolean;
   editingDisplayName?: string;
+  friends: FriendRow[];
+  friendsLoading?: boolean;
+  friendsMessage?: string;
+  friendsError?: string;
+  leaderboard: LeaderboardRow[];
+  leaderboardLoading?: boolean;
+  leaderboardError?: string;
+  shopItems: ShopItemRow[];
+  shopLoading?: boolean;
+  shopMessage?: string;
+  shopError?: string;
+  aiDifficulty: AiDifficulty;
+  privateJoinCode?: string;
+  privateJoinCodeInput?: string;
 };
 
 type ResolvedCardView = {
@@ -156,7 +194,11 @@ const view: ClientViewState = {
   collection: [],
   matchHistory: [],
   menuScreen: "main",
-  collectionFilter: "all"
+  collectionFilter: "all",
+  friends: [],
+  leaderboard: [],
+  shopItems: [],
+  aiDifficulty: "normal"
 };
 
 ensureDragLayer();
@@ -216,6 +258,14 @@ function renderMenu(): string {
       return renderCollectionScreen();
     case "deckEditor":
       return renderDeckEditorScreen();
+    case "friends":
+      return renderFriendsScreen();
+    case "leaderboard":
+      return renderLeaderboardScreen();
+    case "shop":
+      return renderShopScreen();
+    case "ai":
+      return renderAiScreen();
     case "main":
     default:
       return renderMainMenu();
@@ -286,9 +336,12 @@ function renderMainMenu(): string {
         ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
         <nav class="menu-buttons" aria-label="Main menu">
           <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥<small>Enter Battle</small></button>
+          <button class="menu-button" data-menu-screen="ai" data-testid="menu-ai">電腦對戰<small>VS Computer</small></button>
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面<small>Profile</small></button>
           <button class="menu-button" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>卡片收藏<small>Collection</small></button>
-          <button class="menu-button menu-disabled" disabled title="Coming soon">商店<small>Shop · Coming Soon</small></button>
+          <button class="menu-button" data-menu-screen="friends" data-testid="menu-friends" ${accountMode ? "" : "disabled title='Sign in required'"}>好友<small>Friends</small></button>
+          <button class="menu-button" data-menu-screen="leaderboard" data-testid="menu-leaderboard">排行榜<small>Leaderboard</small></button>
+          <button class="menu-button" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled title='Sign in required'"}>商店<small>Shop</small></button>
         </nav>
       </div>
       <aside class="player-info-card" data-testid="player-chip">
@@ -334,6 +387,15 @@ function renderBattleScreen(): string {
           <button id="find-match" class="primary-action" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
             ${view.joining ? "Joining…" : "Find Match"}
           </button>
+          <div class="private-room-section">
+            <h4>私人房間</h4>
+            <button id="create-private-room" class="ghost-button" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間並取得代碼</button>
+            <form id="private-join-form" class="private-join-form">
+              <input id="private-join-input" placeholder="輸入 6 碼代碼" maxlength="10" />
+              <button type="submit" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
+            </form>
+            ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
+          </div>
           <details class="advanced-disclosure">
             <summary>進階設定 · Advanced</summary>
             <form id="join-form-advanced" class="advanced-form">
@@ -1191,6 +1253,64 @@ function bindStaticActions(): void {
       view.editingDisplayName = displayInput.value;
     });
   }
+  document.querySelector<HTMLFormElement>("#add-friend-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = document.querySelector<HTMLInputElement>("#add-friend-input");
+    void sendFriendRequest(input?.value ?? "");
+  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-remove-friend]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.removeFriend;
+      if (id) void removeFriend(id);
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-challenge-friend]")) {
+    el.addEventListener("click", () => {
+      void createPrivateChallenge();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-copy-code]")) {
+    el.addEventListener("click", () => {
+      const code = el.dataset.copyCode ?? "";
+      if (!code) return;
+      void navigator.clipboard?.writeText(code).catch(() => {
+        // Clipboard might be blocked in some browsers; the code is visible on-screen.
+      });
+      view.friendsMessage = `已複製代碼 ${code}`;
+      render();
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#cancel-private-room")?.addEventListener("click", () => {
+    void cancelMatchmaking();
+    view.privateJoinCode = undefined;
+    render();
+  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-claim-shop]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.claimShop;
+      if (id) void claimShopItem(id);
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
+    el.addEventListener("change", () => {
+      const value = el.value as AiDifficulty;
+      if (value === "easy" || value === "normal" || value === "hard") {
+        view.aiDifficulty = value;
+        render();
+      }
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#start-ai-match")?.addEventListener("click", () => {
+    void startAiMatch();
+  });
+  document.querySelector<HTMLFormElement>("#private-join-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const input = document.querySelector<HTMLInputElement>("#private-join-input");
+    void joinPrivateByCode(input?.value ?? "");
+  });
+  document.querySelector<HTMLButtonElement>("#create-private-room")?.addEventListener("click", () => {
+    void createPrivateChallenge();
+  });
 }
 
 function navigateToScreen(target: MenuScreen): void {
@@ -1202,7 +1322,478 @@ function navigateToScreen(target: MenuScreen): void {
   view.avatarPickerOpen = false;
   view.pinnedCollectionCardId = undefined;
   if (target !== "profile") view.editingDisplayName = undefined;
+  if (target === "friends") void loadFriends();
+  if (target === "leaderboard") void loadLeaderboard();
+  if (target === "shop") void loadShopItems();
   render();
+}
+
+// ─── Phase 5 screens ──────────────────────────────────────────────────────────
+
+function renderFriendsScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode || !view.session) {
+    return signInRequiredScreen("好友 · Friends");
+  }
+  const friends = view.friends;
+  return `
+    <section class="screen friends-screen" data-screen="friends">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>好友 · Friends</h2>
+      </header>
+      ${view.friendsError ? `<p class="error-text menu-status">${escapeHtml(view.friendsError)}</p>` : ""}
+      ${view.friendsMessage ? `<p class="success-text menu-status">${escapeHtml(view.friendsMessage)}</p>` : ""}
+      <div class="friends-grid">
+        <section class="parchment-card friends-add">
+          <h3>新增好友</h3>
+          <form id="add-friend-form" class="friends-add-form">
+            <label>對方的顯示名稱
+              <input id="add-friend-input" placeholder="顯示名稱" maxlength="32" required />
+            </label>
+            <button type="submit" data-testid="add-friend-submit">送出好友邀請</button>
+          </form>
+          <p class="muted">輸入完整的顯示名稱後送出，雙方會立即成為好友。</p>
+        </section>
+        <section class="parchment-card friends-list-card">
+          <h3>我的好友 (${friends.length})</h3>
+          ${view.friendsLoading ? `<p class="muted">載入中…</p>` : friends.length === 0
+            ? `<p class="muted">還沒有好友。先邀請一位玩家吧！</p>`
+            : `<ul class="friends-list">
+                ${friends.map((friend) => renderFriendRow(friend)).join("")}
+              </ul>`}
+        </section>
+      </div>
+      ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
+    </section>
+  `;
+}
+
+function renderFriendRow(friend: FriendRow): string {
+  const avatar = friend.avatar_url || "/images/avatars/avatar1.webp";
+  return `
+    <li class="friend-row" data-testid="friend-row">
+      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <div class="friend-meta">
+        <strong>${escapeHtml(friend.display_name)}</strong>
+        <span class="muted">Wins ${friend.wins_count}</span>
+      </div>
+      <div class="friend-actions">
+        <button class="ghost-button" data-challenge-friend="${escapeAttr(friend.friend_user_id)}" data-testid="challenge-friend">挑戰</button>
+        <button class="danger" data-remove-friend="${escapeAttr(friend.friend_user_id)}" data-testid="remove-friend">移除</button>
+      </div>
+    </li>
+  `;
+}
+
+function renderPrivateCodeBanner(code: string): string {
+  return `
+    <div class="private-code-banner parchment-card" data-testid="private-code-banner">
+      <p>分享這個房間代碼給好友：</p>
+      <code class="private-code">${escapeHtml(code)}</code>
+      <button class="ghost-button" data-copy-code="${escapeAttr(code)}">複製</button>
+      <button class="danger" id="cancel-private-room">取消房間</button>
+    </div>
+  `;
+}
+
+function renderLeaderboardScreen(): string {
+  return `
+    <section class="screen leaderboard-screen" data-screen="leaderboard">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>排行榜 · Leaderboard</h2>
+      </header>
+      ${view.leaderboardError ? `<p class="error-text menu-status">${escapeHtml(view.leaderboardError)}</p>` : ""}
+      <section class="parchment-card leaderboard-card">
+        ${view.leaderboardLoading
+          ? `<p class="muted">載入中…</p>`
+          : view.leaderboard.length === 0
+            ? `<p class="muted">目前還沒有任何上榜紀錄。</p>`
+            : `<table class="leaderboard-table" data-testid="leaderboard-table">
+                <thead><tr><th>#</th><th>玩家</th><th>勝場</th></tr></thead>
+                <tbody>
+                  ${view.leaderboard.map((row) => `
+                    <tr>
+                      <td class="leaderboard-rank">${row.rank}</td>
+                      <td>${escapeHtml(row.display_name)}</td>
+                      <td class="leaderboard-wins">${row.wins_count}</td>
+                    </tr>
+                  `).join("")}
+                </tbody>
+              </table>`}
+      </section>
+    </section>
+  `;
+}
+
+function renderShopScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode || !view.session) {
+    return signInRequiredScreen("商店 · Shop");
+  }
+  return `
+    <section class="screen shop-screen" data-screen="shop">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>商店 · Shop <span class="muted shop-stub-pill">(free stub)</span></h2>
+      </header>
+      ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
+      ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
+      <div class="shop-grid">
+        ${view.shopLoading
+          ? `<p class="muted">載入中…</p>`
+          : view.shopItems.length === 0
+            ? `<p class="muted">目前沒有可購買的商品。</p>`
+            : view.shopItems.map(renderShopItem).join("")}
+      </div>
+    </section>
+  `;
+}
+
+function renderShopItem(item: ShopItemRow): string {
+  const cardIds = item.contents?.cards ?? [];
+  const sampleNames = cardIds
+    .slice(0, 4)
+    .map((id) => cardCatalog.get(id)?.name ?? id)
+    .join("、");
+  return `
+    <section class="parchment-card shop-item" data-testid="shop-item">
+      <h3>${escapeHtml(item.display_name)}</h3>
+      ${item.description ? `<p class="muted">${escapeHtml(item.description)}</p>` : ""}
+      <p class="shop-item-cards"><strong>內容：</strong>${escapeHtml(sampleNames || "—")}</p>
+      <button class="primary-action" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop">免費領取</button>
+    </section>
+  `;
+}
+
+function renderAiScreen(): string {
+  const accountMode = Boolean(supabase);
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  const startDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string; description: string }[] = [
+    { value: "easy", label: "簡單", description: "隨機合法行動，初學者練習用。" },
+    { value: "normal", label: "普通", description: "啟發式決策，會優先換掉低血量隨從。" },
+    { value: "hard", label: "困難", description: "前瞻一步模擬，會盡量贏。" }
+  ];
+  return `
+    <section class="screen ai-screen" data-screen="ai">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>電腦對戰 · VS Computer</h2>
+      </header>
+      ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
+      <div class="ai-grid">
+        <section class="parchment-card ai-deck-pick">
+          <h3>選擇牌組</h3>
+          <div class="deck-list" data-testid="ai-deck-list">
+            ${accountMode
+              ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">尚未建立牌組。請先在「進入戰鬥」建立牌組。</p>`)
+              : `<p class="muted">Dev mode：伺服器會給你預設牌組。</p>`}
+          </div>
+        </section>
+        <section class="parchment-card ai-difficulty">
+          <h3>難度</h3>
+          <div class="ai-difficulty-options">
+            ${difficulties.map((option) => `
+              <label class="ai-difficulty-option ${view.aiDifficulty === option.value ? "selected" : ""}">
+                <input type="radio" name="ai-difficulty" value="${option.value}" ${view.aiDifficulty === option.value ? "checked" : ""} />
+                <strong>${option.label}</strong>
+                <small>${option.description}</small>
+              </label>
+            `).join("")}
+          </div>
+          <button id="start-ai-match" class="primary-action" data-testid="start-ai-match" ${startDisabled ? "disabled" : ""}>
+            ${view.joining ? "Joining…" : "開始對戰"}
+          </button>
+          ${selectedDeck ? `<p class="muted">使用牌組：${escapeHtml(selectedDeck.name)}</p>` : ""}
+        </section>
+      </div>
+    </section>
+  `;
+}
+
+function signInRequiredScreen(title: string): string {
+  return `
+    <section class="screen friends-screen" data-screen="friends">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>${escapeHtml(title)}</h2>
+      </header>
+      <div class="parchment-card center-card">
+        <p>請先登入以使用此功能。</p>
+      </div>
+    </section>
+  `;
+}
+
+async function loadFriends(): Promise<void> {
+  if (!supabase || !view.session) return;
+  view.friendsLoading = true;
+  view.friendsError = undefined;
+  render();
+  try {
+    const { data, error } = await supabase.rpc("list_friends");
+    if (error) throw error;
+    view.friends = (data as FriendRow[]) ?? [];
+  } catch (error) {
+    view.friendsError = error instanceof Error ? error.message : "Failed to load friends.";
+  } finally {
+    view.friendsLoading = false;
+    render();
+  }
+}
+
+async function sendFriendRequest(displayName: string): Promise<void> {
+  if (!supabase || !view.session) return;
+  const target = displayName.trim();
+  if (!target) {
+    view.friendsError = "Display name is required.";
+    render();
+    return;
+  }
+  view.friendsLoading = true;
+  view.friendsError = undefined;
+  view.friendsMessage = undefined;
+  render();
+  try {
+    const { error } = await supabase.rpc("send_friend_request", { p_target_display_name: target });
+    if (error) throw error;
+    view.friendsMessage = `已將 ${target} 加為好友。`;
+    await loadFriends();
+  } catch (error) {
+    view.friendsError = error instanceof Error ? error.message : "Failed to add friend.";
+    view.friendsLoading = false;
+    render();
+  }
+}
+
+async function removeFriend(friendUserId: string): Promise<void> {
+  if (!supabase || !view.session) return;
+  view.friendsError = undefined;
+  view.friendsMessage = undefined;
+  try {
+    const { error } = await supabase.rpc("remove_friend", { p_friend_user_id: friendUserId });
+    if (error) throw error;
+    view.friendsMessage = "好友已移除。";
+    await loadFriends();
+  } catch (error) {
+    view.friendsError = error instanceof Error ? error.message : "Failed to remove friend.";
+    render();
+  }
+}
+
+async function loadLeaderboard(): Promise<void> {
+  if (!supabase) {
+    view.leaderboard = [];
+    return;
+  }
+  view.leaderboardLoading = true;
+  view.leaderboardError = undefined;
+  render();
+  try {
+    const { data, error } = await supabase.rpc("get_leaderboard", { p_limit: 50 });
+    if (error) throw error;
+    view.leaderboard = (data as LeaderboardRow[]) ?? [];
+  } catch (error) {
+    view.leaderboardError = error instanceof Error ? error.message : "Failed to load leaderboard.";
+  } finally {
+    view.leaderboardLoading = false;
+    render();
+  }
+}
+
+async function loadShopItems(): Promise<void> {
+  if (!supabase || !view.session) return;
+  view.shopLoading = true;
+  view.shopError = undefined;
+  render();
+  try {
+    const { data, error } = await supabase
+      .from("shop_items")
+      .select("id,kind,display_name,description,contents")
+      .eq("active", true)
+      .order("display_name", { ascending: true });
+    if (error) throw error;
+    view.shopItems = (data as ShopItemRow[]) ?? [];
+  } catch (error) {
+    view.shopError = error instanceof Error ? error.message : "Failed to load shop.";
+  } finally {
+    view.shopLoading = false;
+    render();
+  }
+}
+
+async function claimShopItem(itemId: string): Promise<void> {
+  if (!supabase || !view.session) return;
+  view.shopError = undefined;
+  view.shopMessage = undefined;
+  render();
+  try {
+    const { error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
+    if (error) throw error;
+    view.shopMessage = "領取成功！卡片已加入收藏。";
+    await loadAccountDataRaw();
+    render();
+  } catch (error) {
+    view.shopError = error instanceof Error ? error.message : "Failed to claim shop item.";
+    render();
+  }
+}
+
+async function startAiMatch(): Promise<void> {
+  if (view.joining || view.room) return;
+  if (supabase && (!view.session || !view.selectedDeckId)) {
+    view.joinError = "Select a saved deck before starting a match.";
+    render();
+    return;
+  }
+  const serverUrl = defaultServerUrl;
+  view.joining = true;
+  view.joinError = undefined;
+  render();
+  try {
+    const client = new Client(serverUrl);
+    const joinOptions: Record<string, unknown> = supabase
+      ? {
+          displayName: view.profile?.display_name,
+          accessToken: view.session?.access_token,
+          deckId: view.selectedDeckId,
+          difficulty: view.aiDifficulty
+        }
+      : { displayName: view.profile?.display_name ?? "Player", difficulty: view.aiDifficulty };
+    const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
+    bindRoomMessages(room);
+  } catch (error) {
+    view.joinError = error instanceof Error ? error.message : "Unable to start AI match.";
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
+async function createPrivateChallenge(): Promise<void> {
+  if (view.joining || view.room) return;
+  if (supabase && (!view.session || !view.selectedDeckId)) {
+    view.joinError = "Select a saved deck before challenging a friend.";
+    render();
+    return;
+  }
+  view.joining = true;
+  view.joinError = undefined;
+  render();
+  try {
+    const client = new Client(defaultServerUrl);
+    const joinOptions: Record<string, unknown> = supabase
+      ? {
+          displayName: view.profile?.display_name,
+          accessToken: view.session?.access_token,
+          deckId: view.selectedDeckId,
+          private: true
+        }
+      : { displayName: view.profile?.display_name ?? "Player", private: true };
+    const room = await client.create("pvp", joinOptions, GameStateSchema);
+    bindRoomMessages(room);
+    room.onMessage("joinCode", (message: { code: string }) => {
+      view.privateJoinCode = message.code;
+      render();
+    });
+  } catch (error) {
+    view.joinError = error instanceof Error ? error.message : "Unable to create private room.";
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
+async function joinPrivateByCode(rawCode: string): Promise<void> {
+  if (view.joining || view.room) return;
+  const code = rawCode.trim().toUpperCase();
+  if (!code) {
+    view.joinError = "請輸入房間代碼。";
+    render();
+    return;
+  }
+  if (supabase && (!view.session || !view.selectedDeckId)) {
+    view.joinError = "Select a saved deck before joining a private match.";
+    render();
+    return;
+  }
+  view.joining = true;
+  view.joinError = undefined;
+  render();
+  try {
+    const client = new Client(defaultServerUrl);
+    const joinOptions: Record<string, unknown> = supabase
+      ? {
+          displayName: view.profile?.display_name,
+          accessToken: view.session?.access_token,
+          deckId: view.selectedDeckId,
+          joinCode: code
+        }
+      : { displayName: view.profile?.display_name ?? "Player", joinCode: code };
+    const room = await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
+    bindRoomMessages(room);
+  } catch (error) {
+    view.joinError = error instanceof Error ? error.message : "找不到對應的房間代碼。";
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
+function bindRoomMessages(joined: Room): void {
+  view.room = joined;
+  view.eventStatus = undefined;
+  view.publicSync = undefined;
+  view.presence.clear();
+  view.rejectedHandIds.clear();
+  view.matchmaking = undefined;
+  view.privateJoinCode = undefined;
+  stopMatchmakingTick();
+  (window as any).__room = joined;
+
+  joined.onStateChange((nextState: any) => {
+    view.state = nextState;
+    publishDebugState();
+    pruneSelections();
+    render();
+  });
+  joined.onMessage("seat", (message: { seat: Seat }) => {
+    view.mySeat = message.seat;
+    render();
+  });
+  joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
+    view.hand = message.cards;
+    pruneSelections();
+    render();
+  });
+  joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
+    view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
+    render();
+  });
+  joined.onMessage(
+    "publicSync",
+    (message: {
+      status?: GameStatus;
+      activeSeat?: Seat;
+      turnNumber?: number;
+      actionSeq?: number;
+      result?: any;
+      players?: Partial<Record<Seat, PublicPlayer>>;
+    }) => {
+      view.publicSync = message;
+      render();
+    }
+  );
+  joined.onMessage("events", (message: GameEvent[]) => {
+    handleEvents(message);
+  });
 }
 
 async function startMatchmaking(): Promise<void> {

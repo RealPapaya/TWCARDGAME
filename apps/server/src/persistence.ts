@@ -1,9 +1,15 @@
-import { createSupabaseServerClient, persistMatchHistory, type MatchHistoryRow } from "@twcardgame/db";
+import { createSupabaseServerClient, persistMatchHistory, recordPvpWin, type MatchHistoryRow } from "@twcardgame/db";
 import { toPublicState, type MatchState } from "@twcardgame/rules";
+import type { AiDifficulty } from "@twcardgame/shared";
+
+export interface MatchPersistenceMetadata {
+  isVsAi?: boolean;
+  aiDifficulty?: AiDifficulty;
+}
 
 export interface MatchResultPersistence {
   enabled: boolean;
-  persist(state: MatchState): Promise<void>;
+  persist(state: MatchState, metadata?: MatchPersistenceMetadata): Promise<void>;
 }
 
 export interface MatchResultLogger {
@@ -20,7 +26,12 @@ export function createMatchResultPersistenceFromEnv(
   const client = createSupabaseServerClient({ url, serviceRoleKey });
   return {
     enabled: true,
-    persist: (state) => persistMatchHistory(client, buildMatchHistoryRow(state))
+    persist: async (state, metadata) => {
+      await persistMatchHistory(client, buildMatchHistoryRow(state, new Date(), metadata));
+      if (!metadata?.isVsAi && state.result?.winnerSeat) {
+        await recordPvpWin(client, state.matchId);
+      }
+    }
   };
 }
 
@@ -32,17 +43,22 @@ export const noopMatchResultPersistence: MatchResultPersistence = {
 export async function safePersistMatchResult(
   persistence: MatchResultPersistence,
   state: MatchState,
-  logger: MatchResultLogger = console
+  logger: MatchResultLogger = console,
+  metadata?: MatchPersistenceMetadata
 ): Promise<void> {
   if (!persistence.enabled) return;
   try {
-    await persistence.persist(state);
+    await persistence.persist(state, metadata);
   } catch (error) {
     logger.warn("[match-history] Failed to persist match result.", error);
   }
 }
 
-export function buildMatchHistoryRow(state: MatchState, finishedAt = new Date()): MatchHistoryRow {
+export function buildMatchHistoryRow(
+  state: MatchState,
+  finishedAt = new Date(),
+  metadata?: MatchPersistenceMetadata
+): MatchHistoryRow {
   return {
     id: state.matchId,
     card_catalog_version: state.cardCatalogVersion,
@@ -51,6 +67,8 @@ export function buildMatchHistoryRow(state: MatchState, finishedAt = new Date())
     winner_seat: state.result?.winnerSeat,
     result_reason: state.result?.reason ?? "abandoned",
     final_state: toPublicState(state),
+    is_vs_ai: metadata?.isVsAi ?? false,
+    ai_difficulty: metadata?.aiDifficulty ?? null,
     finished_at: finishedAt.toISOString()
   };
 }

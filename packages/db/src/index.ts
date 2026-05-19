@@ -15,6 +15,8 @@ export interface MatchHistoryRow {
   winner_seat?: Seat;
   result_reason: string;
   final_state: PublicGameState;
+  is_vs_ai?: boolean;
+  ai_difficulty?: "easy" | "normal" | "hard" | null;
   created_at?: string;
   finished_at?: string;
 }
@@ -80,6 +82,11 @@ export function createSupabaseServerClient(config: DatabaseConfig): SupabaseClie
 
 export async function persistMatchHistory(client: SupabaseClient, row: MatchHistoryRow): Promise<void> {
   const { error } = await client.from("match_history").upsert(row);
+  if (error) throw error;
+}
+
+export async function recordPvpWin(client: SupabaseClient, matchId: string): Promise<void> {
+  const { error } = await client.rpc("record_pvp_win", { p_match_id: matchId });
   if (error) throw error;
 }
 
