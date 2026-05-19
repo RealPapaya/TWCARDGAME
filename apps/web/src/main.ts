@@ -190,7 +190,6 @@ function render(): void {
   const shellClass = view.state ? "app-shell in-match" : "app-shell";
   app.innerHTML = `
     <main class="${shellClass}">
-      ${renderTopbar()}
       ${view.state ? renderGame(status) : renderLanding()}
       ${renderToast()}
     </main>
@@ -199,28 +198,6 @@ function render(): void {
   bindStaticActions();
   bindSelectionActions();
   applyPostRenderEffects();
-}
-
-function renderTopbar(): string {
-  const roomLabel = view.room ? `Room ${view.room.roomId} - ${view.mySeat ?? "spectating"}` : "寶島遊戲王 v2";
-  const accountMode = Boolean(supabase);
-  const displayName = view.profile?.display_name ?? "Player";
-  const joinDisabled = view.room || view.joining || (accountMode && (!view.session || !view.selectedDeckId));
-  const hideJoinForm = view.room || (accountMode && view.session);
-  return `
-    <section class="topbar ${hideJoinForm ? "topbar-minimal" : ""}">
-      <div class="brand-lockup">
-        <h1>寶島遊戲王 v2</h1>
-        <p>${escapeHtml(roomLabel)}</p>
-      </div>
-      ${hideJoinForm ? "" : `
-      <form id="join-form" class="join" data-testid="join-form">
-        <input id="server-url" value="${escapeAttr(defaultServerUrl)}" ${view.room || view.joining ? "disabled" : ""} aria-label="Server URL" />
-        <input id="display-name" value="${escapeAttr(displayName)}" ${view.room || view.joining || accountMode ? "disabled" : ""} aria-label="Display name" />
-        <button ${joinDisabled ? "disabled" : ""}>${view.joining ? "Joining" : "Join"}</button>
-      </form>`}
-    </section>
-  `;
 }
 
 function renderLanding(): string {
@@ -245,7 +222,7 @@ function renderMenu(): string {
     case "shop":
       return renderShopScreen();
     case "ai":
-      return renderAiScreen();
+      return renderBattleScreen();
     case "main":
     default:
       return renderMainMenu();
@@ -299,37 +276,52 @@ function renderMainMenu(): string {
   const displayName = view.profile?.display_name ?? "Player";
   const avatarUrl = view.profile?.avatar_url || "/images/avatars/avatar1.webp";
   const stats = computeMatchStats();
-  const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
   const ownedCount = view.collection.filter((row) => row.quantity > 0).length;
   const totalCatalog = CARD_CATALOG.filter((card) => card.collectible !== false).length;
   const accountMode = Boolean(supabase);
+  const xpFraction = stats.total > 0 ? Math.min((stats.wins % 10) / 10, 1) : 0;
+  const level = Math.floor(stats.wins / 10) + 1;
+  const playerTitle = "#菜鳥";
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
-      <div class="main-menu-inner">
-        <div class="game-title-block">
-          <h1 class="game-title">寶島遊戲王 v2</h1>
-          <span class="version-pill">Catalog ${escapeHtml(CARD_CATALOG_VERSION)}</span>
-        </div>
+      <div class="main-menu-center">
+        <h1 class="game-title">寶島遊戲王</h1>
+        <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
         ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
         ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
         ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
         <nav class="menu-buttons" aria-label="Main menu">
-          <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥<small>Enter Battle</small></button>
-          <button class="menu-button" data-menu-screen="ai" data-testid="menu-ai">電腦對戰<small>VS Computer</small></button>
-          <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面<small>Profile</small></button>
-          <button class="menu-button" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>卡片收藏<small>Collection</small></button>
-          <button class="menu-button" data-menu-screen="friends" data-testid="menu-friends" ${accountMode ? "" : "disabled title='Sign in required'"}>好友<small>Friends</small></button>
-          <button class="menu-button" data-menu-screen="leaderboard" data-testid="menu-leaderboard">排行榜<small>Leaderboard</small></button>
-          <button class="menu-button" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled title='Sign in required'"}>商店<small>Shop</small></button>
+          <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
+          <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
+          <button class="menu-button menu-patch" data-testid="menu-patch" disabled>更新內容</button>
         </nav>
       </div>
+      <nav class="menu-icon-rail" aria-label="側邊功能">
+        <button class="menu-icon-btn" data-menu-screen="profile" data-testid="menu-settings" title="設定" ${accountMode ? "" : "disabled"}>⚙️</button>
+        <button class="menu-icon-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">🏆</button>
+        <button class="menu-icon-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>🤝</button>
+      </nav>
+      <nav class="menu-corner-rail" aria-label="底部功能">
+        <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
+          <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="卡牌庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <span class="corner-icon-emoji" style="display:none">🃏</span>
+          <span class="corner-label">卡牌庫</span>
+        </button>
+        <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
+          <img class="corner-icon" src="/images/ui/shop_logo.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+          <span class="corner-icon-emoji" style="display:none">💰</span>
+          <span class="corner-label">商店</span>
+        </button>
+      </nav>
       <aside class="player-info-card" data-testid="player-chip">
         <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
         <div class="player-info-text">
           <strong>${escapeHtml(displayName)}</strong>
-          <span class="player-stats">W ${stats.wins} · L ${stats.losses} · ${winRateLabel}</span>
-          <span class="player-stats muted">${ownedCount}/${totalCatalog} cards</span>
+          <span class="player-title-text">${escapeHtml(playerTitle)}</span>
+          <span class="player-level-row">Lv.${level} <span class="player-card-count">${ownedCount}/${totalCatalog}</span></span>
+          <div class="xp-bar-track"><div class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></div></div>
+          <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
         </div>
         ${accountMode ? `<button id="sign-out" class="player-chip-action" title="Sign out">⎋</button>` : ""}
       </aside>
@@ -341,12 +333,18 @@ function renderBattleScreen(): string {
   const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
   const accountMode = Boolean(supabase);
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const aiDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string }[] = [
+    { value: "easy", label: "簡單" },
+    { value: "normal", label: "普通" },
+    { value: "hard", label: "困難" }
+  ];
   return `
     <section class="screen battle-pick" data-screen="battle">
       ${renderCloudLayer()}
       <header class="screen-header">
         <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回主選單</button>
-        <h2>準備戰鬥 · Battle Setup</h2>
+        <h2>進入戰鬥</h2>
       </header>
       ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
       ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
@@ -357,35 +355,51 @@ function renderBattleScreen(): string {
             <button id="new-deck" class="ghost-button">+ 新牌組</button>
           </div>
           <div class="deck-list" data-testid="battle-deck-list">
-            ${accountMode ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">No saved decks yet. Create one to enter PvP.</p>`) : `<p class="muted">Dev mode: server will assign a default deck.</p>`}
+            ${accountMode ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">尚未建立牌組，請先新增一組。</p>`) : `<p class="muted">Dev mode: server will assign a default deck.</p>`}
           </div>
-          <p class="muted">${selectedDeck ? `Selected: ${escapeHtml(selectedDeck.name)}` : accountMode ? "Select a legal 30-card deck." : "No deck selection needed in dev mode."}</p>
+          <p class="muted">${selectedDeck ? `已選：${escapeHtml(selectedDeck.name)}` : accountMode ? "請選擇一套合法的 30 張牌組。" : "Dev mode 不需選牌組。"}</p>
         </section>
-        <section class="parchment-card match-panel">
-          <h3>對戰</h3>
-          <p>準備好就出發 — 系統會配對另一位玩家進入競技場。</p>
-          <button id="find-match" class="primary-action" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
-            ${view.joining ? "Joining…" : "Find Match"}
-          </button>
-          <div class="private-room-section">
-            <h4>私人房間</h4>
-            <button id="create-private-room" class="ghost-button" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間並取得代碼</button>
-            <form id="private-join-form" class="private-join-form">
-              <input id="private-join-input" placeholder="輸入 6 碼代碼" maxlength="10" />
-              <button type="submit" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
-            </form>
-            ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
-          </div>
-          <details class="advanced-disclosure">
-            <summary>進階設定 · Advanced</summary>
-            <form id="join-form-advanced" class="advanced-form">
-              <label>Server URL
-                <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
-              </label>
-              ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
-            </form>
-          </details>
-        </section>
+        <div class="battle-mode-panels">
+          <section class="parchment-card match-panel">
+            <h3>⚔️ 玩家對戰</h3>
+            <p class="muted">系統自動配對另一位玩家。</p>
+            <button id="find-match" class="primary-action" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
+              ${view.joining ? "配對中…" : "開始配對"}
+            </button>
+            <div class="private-room-section">
+              <h4>私人房間</h4>
+              <button id="create-private-room" class="ghost-button" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間並取得代碼</button>
+              <form id="private-join-form" class="private-join-form">
+                <input id="private-join-input" placeholder="輸入 6 碼代碼" maxlength="10" />
+                <button type="submit" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
+              </form>
+              ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
+            </div>
+            <details class="advanced-disclosure">
+              <summary>進階設定</summary>
+              <form id="join-form-advanced" class="advanced-form">
+                <label>Server URL
+                  <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
+                </label>
+                ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
+              </form>
+            </details>
+          </section>
+          <section class="parchment-card match-panel">
+            <h3>🤖 電腦對戰</h3>
+            <div class="ai-difficulty-options">
+              ${difficulties.map((opt) => `
+                <label class="ai-difficulty-option ${view.aiDifficulty === opt.value ? "selected" : ""}">
+                  <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficulty === opt.value ? "checked" : ""} />
+                  <strong>${opt.label}</strong>
+                </label>
+              `).join("")}
+            </div>
+            <button id="start-ai-match" class="primary-action" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
+              ${view.joining ? "連線中…" : "開始對戰"}
+            </button>
+          </section>
+        </div>
       </div>
       ${renderMatchmakingOverlay()}
     </section>
@@ -1450,52 +1464,6 @@ function renderShopItem(item: ShopItemRow): string {
   `;
 }
 
-function renderAiScreen(): string {
-  const accountMode = Boolean(supabase);
-  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
-  const startDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
-  const difficulties: { value: AiDifficulty; label: string; description: string }[] = [
-    { value: "easy", label: "簡單", description: "隨機合法行動，初學者練習用。" },
-    { value: "normal", label: "普通", description: "啟發式決策，會優先換掉低血量隨從。" },
-    { value: "hard", label: "困難", description: "前瞻一步模擬，會盡量贏。" }
-  ];
-  return `
-    <section class="screen ai-screen" data-screen="ai">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-        <h2>電腦對戰 · VS Computer</h2>
-      </header>
-      ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
-      <div class="ai-grid">
-        <section class="parchment-card ai-deck-pick">
-          <h3>選擇牌組</h3>
-          <div class="deck-list" data-testid="ai-deck-list">
-            ${accountMode
-              ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">尚未建立牌組。請先在「進入戰鬥」建立牌組。</p>`)
-              : `<p class="muted">Dev mode：伺服器會給你預設牌組。</p>`}
-          </div>
-        </section>
-        <section class="parchment-card ai-difficulty">
-          <h3>難度</h3>
-          <div class="ai-difficulty-options">
-            ${difficulties.map((option) => `
-              <label class="ai-difficulty-option ${view.aiDifficulty === option.value ? "selected" : ""}">
-                <input type="radio" name="ai-difficulty" value="${option.value}" ${view.aiDifficulty === option.value ? "checked" : ""} />
-                <strong>${option.label}</strong>
-                <small>${option.description}</small>
-              </label>
-            `).join("")}
-          </div>
-          <button id="start-ai-match" class="primary-action" data-testid="start-ai-match" ${startDisabled ? "disabled" : ""}>
-            ${view.joining ? "Joining…" : "開始對戰"}
-          </button>
-          ${selectedDeck ? `<p class="muted">使用牌組：${escapeHtml(selectedDeck.name)}</p>` : ""}
-        </section>
-      </div>
-    </section>
-  `;
-}
 
 function signInRequiredScreen(title: string): string {
   return `
