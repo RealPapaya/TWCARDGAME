@@ -1477,8 +1477,13 @@ input {
 }
 
 @media (max-width: 720px), (orientation: portrait) {
+  html,
   body {
-    overflow: auto;
+    overflow-x: hidden;
+  }
+
+  body {
+    overflow-y: auto;
   }
 
   .app-shell {
@@ -1512,7 +1517,8 @@ input {
     grid-template-rows: minmax(176px, auto) auto minmax(230px, auto);
     gap: 4px;
     padding: 6px 8px 0;
-    overflow: visible;
+    overflow-x: clip;
+    overflow-y: visible;
   }
 
   .player-area {
