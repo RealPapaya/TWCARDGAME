@@ -14,6 +14,7 @@ import type {
 } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
 import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle } from "./ui.js";
+import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } from "./drag.js";
 import "./styles.css";
 
 type AnimationKind = "play" | "summon" | "attack" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
@@ -135,6 +136,7 @@ const view: ClientViewState = {
   matchHistory: []
 };
 
+ensureDragLayer();
 render();
 void initializeAccount();
 
@@ -411,10 +413,10 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   ]);
 
   return `
-    <button class="${heroClasses}" data-target='${target}' data-testid="${role}-hero" data-seat="${seat}">
+    <button class="${heroClasses}" data-target='${target}' data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
       <span class="avatar" aria-hidden="true"></span>
       <strong>${escapeHtml(name)}</strong>
-      <span class="hero-hp">HP ${hp}/${maxHp}</span>
+      <span class="hero-hp">${hp}/${maxHp}</span>
       <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
       <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
     </button>
@@ -738,6 +740,7 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
+    el.addEventListener("pointerdown", (event) => attachHandPointerDrag(event, el));
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
@@ -748,6 +751,7 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
+    el.addEventListener("pointerdown", (event) => attachAttackerPointerDrag(event, el));
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
@@ -774,6 +778,184 @@ function bindSelectionActions(): void {
       render();
     });
   }
+}
+
+const DRAG_THRESHOLD_PX = 6;
+
+function suppressNextClick(): void {
+  const handler = (event: Event) => {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    document.removeEventListener("click", handler, true);
+  };
+  document.addEventListener("click", handler, true);
+  window.setTimeout(() => document.removeEventListener("click", handler, true), 500);
+}
+
+function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const handId = sourceEl.dataset.handId;
+  if (!handId) return;
+  const card = view.hand.find((item) => item.instanceId === handId);
+  if (!card) return;
+  if (!canAfford(card.cost)) return;
+  const cardDef = cardCatalog.get(card.cardId);
+  const isMinion = (cardDef?.type ?? card.type) === "MINION";
+  const needsTarget = cardNeedsTarget(card.cardId);
+  const lineKind = classifyEffectKind(cardDef?.keywords?.battlecry?.type);
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const pointerId = event.pointerId;
+
+  const onMove = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    const dx = moveEvent.clientX - startX;
+    const dy = moveEvent.clientY - startY;
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onCancel);
+    window.removeEventListener("pointercancel", onCancel);
+
+    view.selectedHandId = handId;
+    view.selectedAttackerId = undefined;
+    view.selectedTarget = undefined;
+    suppressNextClick();
+    render();
+
+    const refreshedSource =
+      document.querySelector<HTMLElement>(`[data-hand-id="${cssEscape(handId)}"]`) ?? sourceEl;
+    const playerBoardEl = document.querySelector<HTMLElement>('[data-testid="player-board"]');
+
+    beginHandDrag({
+      pointerId,
+      startX,
+      startY,
+      sourceEl: refreshedSource,
+      lineKind,
+      needsTarget,
+      isMinion,
+      playerBoardEl,
+      isEligibleTarget: (targetEl) => {
+        const target = parseTargetAttr(targetEl);
+        return Boolean(target && isLegalCardTarget(target));
+      },
+      onResolve: ({ insertionIndex, targetEl }) => {
+        const target = targetEl ? parseTargetAttr(targetEl) : undefined;
+        if (needsTarget && !target) {
+          finalizeHandDrag(undefined);
+          return;
+        }
+        if (!needsTarget && isMinion && insertionIndex < 0) {
+          finalizeHandDrag(undefined);
+          return;
+        }
+        send({
+          type: "playCard",
+          handInstanceId: handId,
+          target: target ?? inferDefaultTarget(card.cardId),
+          boardIndex: isMinion && insertionIndex >= 0 ? insertionIndex : undefined
+        });
+        finalizeHandDrag(handId);
+      },
+      onCancel: () => finalizeHandDrag(undefined)
+    });
+  };
+
+  const onCancel = (cancelEvent: PointerEvent) => {
+    if (cancelEvent.pointerId !== pointerId) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onCancel);
+    window.removeEventListener("pointercancel", onCancel);
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onCancel);
+  window.addEventListener("pointercancel", onCancel);
+}
+
+function finalizeHandDrag(_handIdConsumed: string | undefined): void {
+  view.selectedHandId = undefined;
+  view.selectedTarget = undefined;
+  render();
+}
+
+function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const attackerId = sourceEl.dataset.attackerId;
+  if (!attackerId) return;
+  const minion = findMinion(attackerId);
+  if (!minion?.canAttack) return;
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const pointerId = event.pointerId;
+
+  const onMove = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    const dx = moveEvent.clientX - startX;
+    const dy = moveEvent.clientY - startY;
+    if (Math.hypot(dx, dy) < DRAG_THRESHOLD_PX) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onCancel);
+    window.removeEventListener("pointercancel", onCancel);
+
+    view.selectedAttackerId = attackerId;
+    view.selectedHandId = undefined;
+    view.selectedTarget = undefined;
+    suppressNextClick();
+    render();
+
+    beginAttackDrag({
+      pointerId,
+      startX,
+      startY,
+      sourceEl,
+      isEligibleTarget: (targetEl) => {
+        const target = parseTargetAttr(targetEl);
+        return Boolean(target && isLegalAttackTarget(target));
+      },
+      onResolve: (targetEl) => {
+        const target = parseTargetAttr(targetEl);
+        if (target && isLegalAttackTarget(target)) {
+          send({ type: "attack", attackerInstanceId: attackerId, target });
+        }
+        view.selectedAttackerId = undefined;
+        view.selectedTarget = undefined;
+        render();
+      },
+      onCancel: () => {
+        view.selectedAttackerId = undefined;
+        view.selectedTarget = undefined;
+        render();
+      }
+    });
+  };
+
+  const onCancel = (cancelEvent: PointerEvent) => {
+    if (cancelEvent.pointerId !== pointerId) return;
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onCancel);
+    window.removeEventListener("pointercancel", onCancel);
+  };
+
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onCancel);
+  window.addEventListener("pointercancel", onCancel);
+}
+
+function parseTargetAttr(el: HTMLElement | null): TargetRef | undefined {
+  if (!el) return undefined;
+  const raw = el.getAttribute("data-target");
+  if (!raw) return undefined;
+  try {
+    return JSON.parse(raw) as TargetRef;
+  } catch {
+    return undefined;
+  }
+}
+
+function cssEscape(value: string): string {
+  if (typeof (window as any).CSS?.escape === "function") return (window as any).CSS.escape(value);
+  return value.replace(/[^a-zA-Z0-9_-]/g, (ch) => `\\${ch}`);
 }
 
 async function backToLobby(): Promise<void> {
