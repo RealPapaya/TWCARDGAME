@@ -83,6 +83,7 @@ type ClientViewState = {
   matchmaking?: MatchmakingState;
   matchmakingTimer?: number;
   collectionFilter: CollectionFilter;
+  collectionSearch: string;
   pinnedCollectionCardId?: string;
   avatarPickerOpen?: boolean;
   editingDisplayName?: string;
@@ -175,6 +176,7 @@ const view: ClientViewState = {
   matchHistory: [],
   menuScreen: "main",
   collectionFilter: "all",
+  collectionSearch: "",
   friends: [],
   leaderboard: [],
   shopItems: [],
@@ -504,49 +506,89 @@ function renderCollectionScreen(): string {
   const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
   const filter = view.collectionFilter;
+  const search = view.collectionSearch.trim().toLowerCase();
   const filtered = collectibles.filter((card) => {
     const qty = collectionMap.get(card.id) ?? 0;
-    if (filter === "owned") return qty > 0;
-    if (filter === "missing") return qty === 0;
+    if (filter === "owned" && qty <= 0) return false;
+    if (filter === "missing" && qty > 0) return false;
+    if (search) {
+      return (
+        card.name.toLowerCase().includes(search) ||
+        card.category.toLowerCase().includes(search) ||
+        card.description.toLowerCase().includes(search)
+      );
+    }
     return true;
   });
   const ownedTotal = collectibles.filter((card) => (collectionMap.get(card.id) ?? 0) > 0).length;
   return `
     <section class="screen collection-screen" data-screen="collection">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-        <h2>卡片收藏 · Collection</h2>
-        <span class="collection-summary">${ownedTotal}/${collectibles.length} owned</span>
-      </header>
-      ${accountMode ? "" : `<p class="muted center-card">Sign in to see your collection. Showing catalog only.</p>`}
-      <div class="collection-filters" role="tablist">
-        ${(["all", "owned", "missing"] as CollectionFilter[]).map((value) => `
-          <button class="collection-filter ${filter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
-            ${value === "all" ? "All" : value === "owned" ? "Owned" : "Missing"}
-          </button>
-        `).join("")}
-      </div>
-      <div class="collection-grid" data-testid="collection-grid">
-        ${filtered.length === 0 ? `<p class="muted">Nothing matches this filter.</p>` : filtered.map((card) => {
-          const qty = collectionMap.get(card.id) ?? 0;
-          return renderCollectionTile(card, qty);
-        }).join("")}
+      <div class="collection-container">
+        <header class="collection-header">
+          <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回</button>
+          <h2 class="collection-title">卡牌圖鑑</h2>
+        </header>
+        <div class="collection-controls-bar">
+          <div class="controls-left">
+            <span id="collection-progress">已收集卡片種類: ${ownedTotal}/${collectibles.length}</span>
+          </div>
+          <div class="controls-center collection-filters" role="tablist">
+            ${(["all", "owned", "missing"] as CollectionFilter[]).map((value) => `
+              <button class="collection-filter ${filter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
+                ${collectionFilterLabel(value)}
+              </button>
+            `).join("")}
+          </div>
+          <div class="controls-right">
+            <label class="search-box" aria-label="搜尋卡牌">
+              <input id="collection-search-input" value="${escapeAttr(view.collectionSearch)}" placeholder="搜尋卡牌名稱..." autocomplete="off" />
+              <span class="search-icon">⌕</span>
+            </label>
+            <div class="collection-stats" title="持有消費券">
+              <span id="collection-vouchers"><span class="voucher-icon">券</span>20</span>
+            </div>
+          </div>
+        </div>
+        ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
+        <div class="collection-grid" data-testid="collection-grid">
+          ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
+            const qty = collectionMap.get(card.id) ?? 0;
+            return renderCollectionTile(card, qty);
+          }).join("")}
+        </div>
       </div>
       ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
     </section>
   `;
 }
 
+function collectionFilterLabel(filter: CollectionFilter): string {
+  if (filter === "owned") return "已擁有";
+  if (filter === "missing") return "未擁有";
+  return "全部";
+}
+
 function renderCollectionTile(card: CardDefinition, quantity: number): string {
-  const grayscale = quantity === 0;
-  const limit = deckCopyLimit(card);
+  const owned = quantity > 0;
+  const resolved: ResolvedCardView = {
+    cardId: card.id,
+    instanceId: `collection-${card.id}`,
+    name: card.name,
+    category: card.category,
+    description: card.description,
+    image: card.image,
+    cost: card.cost,
+    type: card.type,
+    rarity: card.rarity,
+    attack: card.attack,
+    health: card.health
+  };
   return `
-    <button type="button" class="collection-tile rarity-${card.rarity.toLowerCase()} ${grayscale ? "grayscale" : ""}" data-collection-card="${escapeAttr(card.id)}" data-testid="collection-tile">
-      <div class="collection-tile-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
-      <span class="collection-tile-name">${escapeHtml(card.name)}</span>
-      <span class="collection-tile-cost">${card.cost}</span>
-      <span class="collection-tile-qty">${quantity}/${limit}</span>
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned"])}" data-collection-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}">
+      <span class="card-count-badge">x${quantity}</span>
+      <div class="card rarity-${card.rarity.toLowerCase()}">
+        ${renderCardFace(resolved, "mulligan")}
+      </div>
     </button>
   `;
 }
@@ -1231,6 +1273,16 @@ function bindStaticActions(): void {
       render();
     });
   }
+  document.querySelector<HTMLInputElement>("#collection-search-input")?.addEventListener("input", (event) => {
+    const input = event.currentTarget as HTMLInputElement;
+    view.collectionSearch = input.value;
+    render();
+    requestAnimationFrame(() => {
+      const nextInput = document.querySelector<HTMLInputElement>("#collection-search-input");
+      nextInput?.focus();
+      nextInput?.setSelectionRange(nextInput.value.length, nextInput.value.length);
+    });
+  });
   for (const el of document.querySelectorAll<HTMLElement>("[data-collection-card]")) {
     el.addEventListener("click", () => {
       view.pinnedCollectionCardId = el.dataset.collectionCard;
