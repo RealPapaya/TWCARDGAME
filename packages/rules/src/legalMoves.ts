@@ -1,4 +1,3 @@
-import type { CardDefinition } from "@twcardgame/cards";
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
 import { getCardActualCost } from "./state.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
@@ -128,5 +127,3 @@ function canAttackerSwing(minion: RuntimeMinion): boolean {
   if (minion.attack <= 0) return false;
   return true;
 }
-
-export type { CardDefinition };

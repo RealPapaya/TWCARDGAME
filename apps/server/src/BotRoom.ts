@@ -1,9 +1,9 @@
 import { CARD_CATALOG } from "@twcardgame/cards";
-import { decide, legalMoves, type BotRngState } from "@twcardgame/rules";
-import { opponentOf, type AiDifficulty, type CommandEnvelope, type Seat } from "@twcardgame/shared";
+import { decide, legalMoves, normalizeSeed, type BotRngState } from "@twcardgame/rules";
+import { type AiDifficulty, type CommandEnvelope, type Seat } from "@twcardgame/shared";
 import { type Client } from "colyseus";
 import { GameRoom, type GameRoomCreateOptions } from "./GameRoom.js";
-import { type JoinOptions, type PlayerSetup } from "./accounts.js";
+import { defaultDeckIds, type JoinOptions, type PlayerSetup } from "./accounts.js";
 import type { MatchPersistenceMetadata } from "./persistence.js";
 
 const BOT_THINK_DELAY_MS = parseInt(process.env.BOT_THINK_DELAY_MS ?? "600", 10);
@@ -25,7 +25,10 @@ export class BotRoom extends GameRoom {
   private difficulty: AiDifficulty = "normal";
   private botSeat: Seat = "player2";
   private humanSeat: Seat = "player1";
-  private readonly botRng: BotRngState = { state: (Math.random() * 2 ** 31) >>> 0 };
+  // RNG seeded deterministically from the roomId so a recorded command log
+  // replays identically. Kept separate from the match rngState because the
+  // bot's choices must not perturb gameplay randomness.
+  private botRng: BotRngState = { state: 0 };
   private commandCounter = 0;
   private botStepScheduled = false;
 
@@ -34,6 +37,7 @@ export class BotRoom extends GameRoom {
     if (options.difficulty && ALLOWED_DIFFICULTIES.includes(options.difficulty)) {
       this.difficulty = options.difficulty;
     }
+    this.botRng = { state: normalizeSeed(seedFromString(`${this.roomId}:${this.difficulty}`)) };
     this.setMetadata({ ...(this.metadata ?? {}), mode: "pve", difficulty: this.difficulty });
   }
 
@@ -46,12 +50,11 @@ export class BotRoom extends GameRoom {
 
     this.seats.set(client.sessionId, this.humanSeat);
     this.setup.set(this.humanSeat, humanSetup);
-    this.setup.set(this.botSeat, this.buildBotSetup(humanSetup));
+    this.setup.set(this.botSeat, this.buildBotSetup());
     client.send("seat", { seat: this.humanSeat });
     client.send("bot", { seat: this.botSeat, difficulty: this.difficulty });
 
     this.createMatch();
-    this.sendPrivateStateTo(client);
   }
 
   override async onLeave(client: Client): Promise<void> {
@@ -75,22 +78,14 @@ export class BotRoom extends GameRoom {
     return { isVsAi: true, aiDifficulty: this.difficulty };
   }
 
-  private buildBotSetup(human: PlayerSetup): PlayerSetup {
+  private buildBotSetup(): PlayerSetup {
     return {
       userId: `bot-${this.roomId}`,
       displayName: BOT_NAMES[this.difficulty],
-      // The bot plays the same legal deck as the human. Avoids needing a
-      // separate AI deck catalog while still exercising the full rules engine.
-      deckIds: [...human.deckIds]
+      // Static AI deck (the canonical dev fallback) so the bot doesn't mirror
+      // the human and matches don't always devolve into the same lines.
+      deckIds: defaultDeckIds()
     };
-  }
-
-  private sendPrivateStateTo(client: Client): void {
-    // GameRoom.sendPrivateState is private; we route through sendAllPrivateState
-    // by reusing the broadcast that fires on every applyEnvelope. For the
-    // initial join, broadcastPublicSync + sendAllPrivateState already ran via
-    // createMatch → afterMatchCreated path. This method exists for clarity.
-    void client;
   }
 
   private scheduleBotStep(): void {
@@ -172,6 +167,11 @@ export class BotRoom extends GameRoom {
   }
 }
 
-// Touch the import so TS knows it's used (opponentOf is intentionally exported in case
-// future heuristics need it from this module).
-void opponentOf;
+function seedFromString(input: string): number {
+  let seed = 2166136261;
+  for (let i = 0; i < input.length; i++) {
+    seed ^= input.charCodeAt(i);
+    seed = Math.imul(seed, 16777619);
+  }
+  return seed >>> 0;
+}

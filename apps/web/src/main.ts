@@ -4,13 +4,16 @@ import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcard
 import type {
   AiDifficulty,
   ClientCommandMessage,
+  FriendRow,
   GameCommand,
   GameEvent,
   GameStatus,
   HandCardView,
+  LeaderboardRow,
   PublicMinion,
   PublicPlayer,
   Seat,
+  ShopItemRow,
   TargetRef
 } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
@@ -21,29 +24,6 @@ import "./styles.css";
 type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 
 type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
-
-type FriendRow = {
-  friend_user_id: string;
-  display_name: string;
-  avatar_url?: string | null;
-  wins_count: number;
-};
-
-type LeaderboardRow = {
-  rank: number;
-  user_id: string;
-  display_name: string;
-  avatar_url?: string | null;
-  wins_count: number;
-};
-
-type ShopItemRow = {
-  id: string;
-  kind: string;
-  display_name: string;
-  description?: string | null;
-  contents: { cards?: string[] };
-};
 type CollectionFilter = "all" | "owned" | "missing";
 type MatchmakingState = {
   startedAtMs: number;

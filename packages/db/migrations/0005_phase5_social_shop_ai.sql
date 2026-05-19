@@ -151,6 +151,12 @@ as $$
   order by p.display_name;
 $$;
 
+-- PHASE 5 STUB — no claim limit, no price check, no currency, no idempotency.
+-- A user may claim any active shop_item an unlimited number of times. This is
+-- deliberate so the inventory-grant pipeline is exercised end-to-end without
+-- waiting on an economy design. Before going to production: add a per-user
+-- claim ledger (e.g. shop_claims with UNIQUE(user_id, item_id, day)), a price
+-- column on shop_items, and a currency deduction inside this function.
 create or replace function public.purchase_shop_item(p_item_id text)
 returns integer
 language plpgsql

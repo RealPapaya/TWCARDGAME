@@ -6,6 +6,32 @@ export type AiDifficulty = "easy" | "normal" | "hard";
 
 export const AI_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"] as const;
 
+// Phase 5 social/economy row shapes. Defined here (not in the web client) so
+// other clients or admin tools can consume the same DTOs.
+
+export interface FriendRow {
+  friend_user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  wins_count: number;
+}
+
+export interface LeaderboardRow {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  wins_count: number;
+}
+
+export interface ShopItemRow {
+  id: string;
+  kind: string;
+  display_name: string;
+  description?: string | null;
+  contents: { cards?: string[] };
+}
+
 export const SEATS: readonly Seat[] = ["player1", "player2"] as const;
 
 export function opponentOf(seat: Seat): Seat {
