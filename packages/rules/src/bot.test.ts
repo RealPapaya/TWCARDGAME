@@ -127,6 +127,7 @@ describe("bot.decide", () => {
     // budget the bot plays at least one card AND ends its turn.
     let state = startedMatch(505);
     const botSeat = state.turn.activeSeat;
+    state.players[botSeat].mana = { current: 3, max: 3 };
     let playedCount = 0;
     let endedTurn = false;
     const rng: { state: number } = { state: 7 };

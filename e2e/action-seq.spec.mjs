@@ -56,10 +56,12 @@ const INIT_SCRIPT = `
 
 async function joinAndMulligan(page, name) {
   await page.goto(devAuthUrl());
-  await page.waitForSelector("#join-form");
-  if (SERVER_URL) await page.fill("#server-url", SERVER_URL);
-  await page.fill("#display-name", name);
-  await page.click("#join-form button");
+  await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
+  await page.click('[data-testid="menu-battle"]');
+  await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
+  if (SERVER_URL) await page.fill("#server-url-advanced", SERVER_URL);
+  await page.fill("#display-name-advanced", name);
+  await page.click('[data-testid="find-match"]');
   await page.waitForSelector("#mulligan", { timeout: TIMEOUT });
   await page.click("#mulligan");
 }

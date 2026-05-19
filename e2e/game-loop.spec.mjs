@@ -89,6 +89,20 @@ async function injectEventAccumulator(page) {
   await page.addInitScript(INIT_SCRIPT);
 }
 
+async function openBattleScreen(page, name) {
+  await page.goto(devAuthUrl());
+  await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
+  await page.click('[data-testid="menu-battle"]');
+  await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
+  if (SERVER_URL) await page.fill("#server-url-advanced", SERVER_URL);
+  await page.fill("#display-name-advanced", name);
+}
+
+async function startMatchmaking(page) {
+  await page.click('[data-testid="find-match"]');
+  await page.waitForSelector("#mulligan", { timeout: TIMEOUT });
+}
+
 /** Returns current log length — use as a before-action checkpoint. */
 async function snap(page) {
   return page.evaluate(() => window.__el ? window.__el.length : 0);
@@ -324,19 +338,13 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
   try {
     // ── JOIN ────────────────────────────────────────────────────────────────
     log("TEST", "Joining...");
-    await Promise.all([p1.goto(devAuthUrl()), p2.goto(devAuthUrl())]);
     await Promise.all([
-      p1.waitForSelector("#join-form"),
-      p2.waitForSelector("#join-form"),
+      openBattleScreen(p1, "Alice"),
+      openBattleScreen(p2, "Bob"),
     ]);
-    if (SERVER_URL) {
-      await Promise.all([p1.fill("#server-url", SERVER_URL), p2.fill("#server-url", SERVER_URL)]);
-    }
-    await p1.fill("#display-name", "Alice");
-    await p2.fill("#display-name", "Bob");
     await Promise.all([
-      p1.click("#join-form button"),
-      p2.click("#join-form button"),
+      startMatchmaking(p1),
+      startMatchmaking(p2),
     ]);
     pass("Both players joined");
 
@@ -542,6 +550,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     log("TEST", "Step 5 – concede");
     var ck5a = await snap(p1), ck5b = await snap(p2);
     await actPage.click("#concede");
+    await actPage.waitForSelector('[data-testid="concede-confirm"]', { timeout: 5000 });
+    await actPage.click('[data-testid="concede-confirm"]');
 
     await Promise.all([
       waitEvent(p1, "GAME_FINISHED", ck5a, "P1"),

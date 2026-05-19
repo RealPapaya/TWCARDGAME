@@ -22,6 +22,7 @@ import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } f
 import "./styles.css";
 
 type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
+type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
 
 type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
 type CollectionFilter = "all" | "owned" | "missing";
@@ -98,9 +99,12 @@ type ClientViewState = {
   shopLoading?: boolean;
   shopMessage?: string;
   shopError?: string;
+  packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
+  packOpeningFlipped?: boolean[];
   aiDifficulty: AiDifficulty;
   privateJoinCode?: string;
   privateJoinCodeInput?: string;
+  audioEnabled: boolean;
 };
 
 type ResolvedCardView = {
@@ -160,6 +164,22 @@ const supabase: SupabaseClient | undefined =
     : undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const seats: Seat[] = ["player1", "player2"];
+const audioPreferenceKey = "twcardgame.audioEnabled";
+const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
+const sfxPaths: Record<SoundCue, string> = {
+  cardPlay: "/audio/sfx/LowCostMionion.mp3",
+  attack: "/audio/sfx/HeavyHit.mp3",
+  damage: "/audio/sfx/LightHit.mp3",
+  heal: "/audio/sfx/card-draw.mp3",
+  death: "/audio/sfx/MionionDeath.mp3",
+  turn: "/audio/sfx/heavy_sandstone_click.mp3",
+  reject: "/audio/sfx/Retreat.mp3",
+  packFlip: "/audio/sfx/card-draw.mp3"
+};
+let audioUnlocked = false;
+const rarityLabel: Record<string, string> = {
+  COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說", REPIC: "特殊"
+};
 
 const view: ClientViewState = {
   hand: [],
@@ -180,10 +200,12 @@ const view: ClientViewState = {
   friends: [],
   leaderboard: [],
   shopItems: [],
-  aiDifficulty: "normal"
+  aiDifficulty: "normal",
+  audioEnabled: readStoredAudioPreference()
 };
 
 ensureDragLayer();
+installAudioUnlock();
 render();
 void initializeAccount();
 
@@ -194,12 +216,89 @@ function render(): void {
     <main class="${shellClass}">
       ${view.state ? renderGame(status) : renderLanding()}
       ${renderToast()}
+      ${renderPackOpeningOverlay()}
     </main>
   `;
 
   bindStaticActions();
   bindSelectionActions();
   applyPostRenderEffects();
+  ensureBgm();
+}
+
+function readStoredAudioPreference(): boolean {
+  try {
+    return localStorage.getItem(audioPreferenceKey) !== "false";
+  } catch {
+    return true;
+  }
+}
+
+function installAudioUnlock(): void {
+  bgmTrack.loop = true;
+  bgmTrack.preload = "auto";
+  bgmTrack.volume = 0.22;
+  const unlock = () => {
+    audioUnlocked = true;
+    ensureBgm();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
+function toggleAudio(): void {
+  view.audioEnabled = !view.audioEnabled;
+  try {
+    localStorage.setItem(audioPreferenceKey, String(view.audioEnabled));
+  } catch {
+    // Ignore blocked storage; the in-memory preference still works.
+  }
+  if (view.audioEnabled) {
+    audioUnlocked = true;
+    playSfx("turn", 0.45);
+    ensureBgm();
+  } else {
+    bgmTrack.pause();
+  }
+  render();
+}
+
+function ensureBgm(): void {
+  if (!view.audioEnabled || !audioUnlocked) return;
+  if (!bgmTrack.paused) return;
+  void bgmTrack.play().catch(() => {
+    // Browsers may still block playback until a stronger user gesture.
+  });
+}
+
+function playSfx(cue: SoundCue, volume = 0.72): void {
+  if (!view.audioEnabled || !audioUnlocked) return;
+  const audio = new Audio(sfxPaths[cue]);
+  audio.preload = "auto";
+  audio.volume = volume;
+  void audio.play().catch(() => {
+    // Missing files or browser autoplay policy should never break gameplay.
+  });
+}
+
+function playEventAudio(events: GameEvent[]): void {
+  const played = new Set<SoundCue>();
+  for (const event of events) {
+    const cue =
+      event.type === "CARD_PLAYED" || event.type === "MINION_SUMMONED" ? "cardPlay"
+      : event.type === "ATTACK" ? "attack"
+      : event.type === "DAMAGE" ? "damage"
+      : event.type === "HEAL" ? "heal"
+      : event.type === "DESTROY" ? "death"
+      : event.type === "TURN_STARTED" ? "turn"
+      : event.type === "COMMAND_REJECTED" ? "reject"
+      : undefined;
+    if (!cue || played.has(cue)) continue;
+    played.add(cue);
+    playSfx(cue);
+  }
 }
 
 function renderLanding(): string {
@@ -303,6 +402,7 @@ function renderMainMenu(): string {
         <button class="menu-icon-btn" data-menu-screen="profile" data-testid="menu-settings" title="設定" ${accountMode ? "" : "disabled"}>⚙️</button>
         <button class="menu-icon-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">🏆</button>
         <button class="menu-icon-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>🤝</button>
+        <button id="audio-toggle" class="menu-icon-btn audio-toggle ${view.audioEnabled ? "audio-on" : "audio-off"}" data-testid="audio-toggle" title="${view.audioEnabled ? "Sound on" : "Sound off"}" aria-pressed="${view.audioEnabled}">${view.audioEnabled ? "♪" : "×"}</button>
       </nav>
       <nav class="menu-corner-rail" aria-label="底部功能">
         <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
@@ -1337,6 +1437,21 @@ function bindStaticActions(): void {
       if (id) void claimShopItem(id);
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-flip-index]")) {
+    el.addEventListener("click", () => {
+      if (!view.packOpeningFlipped || !view.packOpeningCards) return;
+      const idx = parseInt(el.dataset.flipIndex ?? "-1", 10);
+      if (idx < 0 || view.packOpeningFlipped[idx]) return;
+      view.packOpeningFlipped[idx] = true;
+      playSfx("packFlip", 0.6);
+      render();
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#btn-pack-done")?.addEventListener("click", () => {
+    view.packOpeningCards = undefined;
+    view.packOpeningFlipped = undefined;
+    render();
+  });
   for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
     el.addEventListener("change", () => {
       const value = el.value as AiDifficulty;
@@ -1356,6 +1471,9 @@ function bindStaticActions(): void {
   });
   document.querySelector<HTMLButtonElement>("#create-private-room")?.addEventListener("click", () => {
     void createPrivateChallenge();
+  });
+  document.querySelector<HTMLButtonElement>("#audio-toggle")?.addEventListener("click", () => {
+    toggleAudio();
   });
 }
 
@@ -1482,19 +1600,25 @@ function renderShopScreen(): string {
   }
   return `
     <section class="screen shop-screen" data-screen="shop">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-        <h2>商店 · Shop <span class="muted shop-stub-pill">(free stub)</span></h2>
-      </header>
-      ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
-      ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
-      <div class="shop-grid">
-        ${view.shopLoading
-          ? `<p class="muted">載入中…</p>`
-          : view.shopItems.length === 0
-            ? `<p class="muted">目前沒有可購買的商品。</p>`
-            : view.shopItems.map(renderShopItem).join("")}
+      <div class="shop-container">
+        <header class="shop-header">
+          <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
+          <h2 class="shop-title">商店</h2>
+          <div class="shop-gold-display">
+            <img class="gold-icon" src="/images/ui/gold_coin.webp" alt="金幣"
+              onerror="this.style.display='none'">
+            <span id="shop-gold-amount">--</span>
+          </div>
+        </header>
+        ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
+        ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
+        <div class="shop-products">
+          ${view.shopLoading
+            ? `<p class="muted">載入中…</p>`
+            : view.shopItems.length === 0
+              ? `<p class="muted">目前沒有可購買的商品。</p>`
+              : view.shopItems.map(renderShopItem).join("")}
+        </div>
       </div>
     </section>
   `;
@@ -1502,20 +1626,88 @@ function renderShopScreen(): string {
 
 function renderShopItem(item: ShopItemRow): string {
   const cardIds = item.contents?.cards ?? [];
-  const sampleNames = cardIds
-    .slice(0, 4)
-    .map((id) => cardCatalog.get(id)?.name ?? id)
-    .join("、");
+  const cards = cardIds.map((id) => cardCatalog.get(id)).filter(Boolean) as CardDefinition[];
+  const icon = item.kind === "CARD_PACK" ? "📖" : "✨";
+
+  const ratesHtml = cards.length > 0 ? `
+    <div class="product-rates-side">
+      <div class="rates-title">內容</div>
+      <div class="product-drop-rates">
+        ${cards.map((card) => `
+          <div class="rate-row ${card.rarity.toLowerCase()}">
+            <span>${escapeHtml(card.name)}</span>
+            <span class="rate-val">${escapeHtml(rarityLabel[card.rarity] ?? card.rarity)}</span>
+          </div>
+        `).join("")}
+      </div>
+    </div>
+  ` : "";
+
   return `
-    <section class="parchment-card shop-item" data-testid="shop-item">
-      <h3>${escapeHtml(item.display_name)}</h3>
-      ${item.description ? `<p class="muted">${escapeHtml(item.description)}</p>` : ""}
-      <p class="shop-item-cards"><strong>內容：</strong>${escapeHtml(sampleNames || "—")}</p>
-      <button class="primary-action" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop">免費領取</button>
+    <section class="product-card" data-testid="shop-item">
+      <div class="product-top-row">
+        <div class="product-image">${icon}</div>
+        <h3>${escapeHtml(item.display_name)}</h3>
+      </div>
+      <div class="product-details-bottom">
+        <div class="product-info-side">
+          ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
+          <div class="product-price">
+            <img class="price-coin" src="/images/ui/gold_coin.webp" alt="金幣"
+              onerror="this.style.display='none'">
+            <span>免費</span>
+          </div>
+          <button class="btn-buy" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop">免費領取</button>
+        </div>
+        ${ratesHtml}
+      </div>
     </section>
   `;
 }
 
+
+function renderPackOpeningOverlay(): string {
+  if (!view.packOpeningCards || view.packOpeningCards.length === 0) return "";
+  const cards = view.packOpeningCards;
+  const flipped = view.packOpeningFlipped ?? cards.map(() => false);
+  const allFlipped = flipped.every(Boolean);
+
+  const cardItems = cards.map((card, i) => {
+    const imgSrc = escapeAttr(assetUrl(card.image));
+    const rarity = card.rarity.toUpperCase();
+    const rarityClass = card.rarity.toLowerCase();
+    const label = rarityLabel[card.rarity] ?? card.rarity;
+    return `
+      <div class="pack-card-wrapper${flipped[i] ? ` flipped ${rarity}` : ""}"
+        data-flip-index="${i}" role="button" aria-label="翻開卡牌">
+        <div class="pack-card-inner">
+          <div class="pack-card-back">
+            <img src="/images/ui/card_back.webp" alt="card back"
+              onerror="this.src='/images/card_back.webp'">
+          </div>
+          <div class="pack-card-front">
+            <div class="pack-card-content rarity-${rarityClass}">
+              <div class="pack-card-img-wrap">
+                <img src="${imgSrc}" alt="${escapeAttr(card.name)}"
+                  onerror="this.style.display='none'">
+              </div>
+              <div class="pack-card-name">${escapeHtml(card.name)}</div>
+              <div class="pack-card-rarity">${escapeHtml(label)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="pack-overlay" id="pack-opening-overlay" data-testid="pack-overlay">
+      <h2 class="pack-title">開包！</h2>
+      <div class="pack-cards-container">${cardItems}</div>
+      <button id="btn-pack-done" class="${allFlipped ? "visible" : ""}">完成</button>
+    </div>
+  `;
+}
 
 function signInRequiredScreen(title: string): string {
   return `
@@ -1637,7 +1829,16 @@ async function claimShopItem(itemId: string): Promise<void> {
   try {
     const { error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
     if (error) throw error;
-    view.shopMessage = "領取成功！卡片已加入收藏。";
+    const item = view.shopItems.find((i) => i.id === itemId);
+    const cardIds = item?.contents?.cards ?? [];
+    view.packOpeningCards = cardIds
+      .map((id) => {
+        const card = cardCatalog.get(id);
+        if (!card) return undefined;
+        return { cardId: card.id, name: card.name, rarity: card.rarity, image: card.image };
+      })
+      .filter(Boolean) as Array<{ cardId: string; name: string; rarity: string; image: string }>;
+    view.packOpeningFlipped = view.packOpeningCards.map(() => false);
     await loadAccountDataRaw();
     render();
   } catch (error) {
@@ -2607,6 +2808,7 @@ function send(command: GameCommand): void {
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
   enqueueEventCues(message);
+  playEventAudio(message);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);

@@ -13,7 +13,7 @@ Phase Overview
 | 2 | Rules Parity | Complete |
 | 3 | Multiplayer Reliability | Complete |
 | 4 | Account, Deck & Collection | Complete |
-| 5 | Real UI / UX | Pending |
+| 5 | Real UI / UX | Complete |
 | 6 | Production Launch | Pending |
 
 Phase 0 — Architecture Setup & Legacy Isolation
@@ -153,7 +153,7 @@ What was completed
 
 
 Phase 5 — Real UI / UX
-Status: 🔄 In Progress
+Status: ✅ Complete
 
 Goal: the game looks and feels like 寶島保護戰, not a developer scaffold.
 
@@ -182,30 +182,38 @@ What was completed (commit 2b07d36)
  Card hover tooltip — desktop hover (≥220 ms) shows full-size card detail popup, dismissed on leave / drag
  Concede confirmation modal — overlay with Stay / Concede intercepts accidental surrender
 
-Remaining tasks — v1 parity gap
+Completed Phase 5 parity gap
 
 Main menu & navigation
  Main menu page — game title logo, arena background, cloud animation, Enter Battle / Profile / Shop / Collection buttons
  View transition animations — slide-up / fade between lobby → game → result screens
 
 Battle UI polish
- Audio system — background music and sound effects for attacks, plays, deaths, turn change
+ Audio system — background music and sound effects for attacks, plays, deaths, turn change, rejects, and pack opening
  Custom cursor — webp cursor sprite on desktop (see legacy/css/style.css); optional / desktop-only
 
 Account & profile
- Player profile page — level display, XP bar, win/loss stats, avatar, title; currently only shows display_name
- Card collection gallery — filterable card grid (all / owned / not owned) with card art; currently only shows count
+ Player profile page — level display, XP bar, win/loss stats, avatar, title
+ Card collection gallery — filterable card grid (all / owned / not owned) with card art
  Matchmaking waiting UI — animated searching state, elapsed time counter, cancel matchmaking button
 
 Single-player mode
- AI opponent (at least Normal difficulty) — fixed theme deck vs rules engine; no new rules-engine work needed
+ AI opponent — server-side BotRoom with easy / normal / hard difficulties and rules-engine decisions
  Difficulty and theme deck selection screen
 
 Store & progression (lower priority)
- Shop page — card pack purchase UI, gold currency display
+ Shop page — card pack purchase UI, gold currency display, free Phase 5 grant stub
  Pack opening animation
  Leaderboard page
- Friends system — friend list, invitations, online status dot
+ Friends system — friend list, invitations, private challenge code flow
+
+Before Phase 6 starts
+
+ Phase 5 implementation is code-complete in web/server/rules/db.
+ Run the full validation suite on the final tree: npm run validate:cards, npm test, npm run check, npm run build, npm run test:e2e, npm run test:rls.
+ Apply packages/db/migrations/0005_phase5_social_shop_ai.sql to the dev Supabase project and verify the RPCs manually.
+ Manual browser pass: menu navigation, audio toggle, cursor, PvP matchmaking cancel, private room code join, AI match, profile edit/avatar, collection filters, shop claim/pack open, leaderboard, friends.
+ Decide Phase 6 production choices: Vercel project, Fly app, production Supabase project, monitoring provider, load-test target, beta testers, rollback/DNS plan.
 
 
 Phase 6 — Production Launch
