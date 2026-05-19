@@ -19,6 +19,13 @@ import "./styles.css";
 
 type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 
+type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor";
+type CollectionFilter = "all" | "owned" | "missing";
+type MatchmakingState = {
+  startedAtMs: number;
+  status: "searching" | "joining" | "error";
+};
+
 type AnimationCue = {
   id: string;
   kind: AnimationKind;
@@ -68,6 +75,13 @@ type ClientViewState = {
   hoveredCardId?: string;
   hoverAnchor?: { x: number; y: number };
   confirmingConcede?: boolean;
+  menuScreen: MenuScreen;
+  matchmaking?: MatchmakingState;
+  matchmakingTimer?: number;
+  collectionFilter: CollectionFilter;
+  pinnedCollectionCardId?: string;
+  avatarPickerOpen?: boolean;
+  editingDisplayName?: string;
 };
 
 type ResolvedCardView = {
@@ -110,6 +124,8 @@ type MatchHistoryRow = {
   result_reason: string;
   created_at?: string;
   finished_at?: string;
+  player1_user_id?: string | null;
+  player2_user_id?: string | null;
 };
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -138,7 +154,9 @@ const view: ClientViewState = {
   session: undefined,
   decks: [],
   collection: [],
-  matchHistory: []
+  matchHistory: [],
+  menuScreen: "main",
+  collectionFilter: "all"
 };
 
 ensureDragLayer();
@@ -162,101 +180,386 @@ function render(): void {
 }
 
 function renderTopbar(): string {
-  const roomLabel = view.room ? `Room ${view.room.roomId} - ${view.mySeat ?? "spectating"}` : "Authoritative PvP";
+  const roomLabel = view.room ? `Room ${view.room.roomId} - ${view.mySeat ?? "spectating"}` : "寶島遊戲王 v2";
   const accountMode = Boolean(supabase);
   const displayName = view.profile?.display_name ?? "Player";
   const joinDisabled = view.room || view.joining || (accountMode && (!view.session || !view.selectedDeckId));
+  const hideJoinForm = view.room || (accountMode && view.session);
   return `
-    <section class="topbar">
+    <section class="topbar ${hideJoinForm ? "topbar-minimal" : ""}">
       <div class="brand-lockup">
-        <h1>TWCARDGAME v2</h1>
+        <h1>寶島遊戲王 v2</h1>
         <p>${escapeHtml(roomLabel)}</p>
       </div>
+      ${hideJoinForm ? "" : `
       <form id="join-form" class="join" data-testid="join-form">
         <input id="server-url" value="${escapeAttr(defaultServerUrl)}" ${view.room || view.joining ? "disabled" : ""} aria-label="Server URL" />
         <input id="display-name" value="${escapeAttr(displayName)}" ${view.room || view.joining || accountMode ? "disabled" : ""} aria-label="Display name" />
         <button ${joinDisabled ? "disabled" : ""}>${view.joining ? "Joining" : "Join"}</button>
-      </form>
+      </form>`}
     </section>
   `;
 }
 
 function renderLanding(): string {
-  if (supabase && view.session) return renderAccountLobby();
-  if (supabase) return renderAuthPanel();
+  if (supabase && !view.session) return renderAuthPanel();
+  return renderMenu();
+}
 
-  return `
-    <section class="landing">
-      <div class="landing-copy">
-        <h2>Battle verification build</h2>
-        <p>Start the v2 server, then join a PvP room from two browser windows.</p>
-        ${view.joinError ? `<p class="error-text">${escapeHtml(view.joinError)}</p>` : ""}
-      </div>
-    </section>
-  `;
+function renderMenu(): string {
+  switch (view.menuScreen) {
+    case "battle":
+      return renderBattleScreen();
+    case "profile":
+      return renderProfileScreen();
+    case "collection":
+      return renderCollectionScreen();
+    case "deckEditor":
+      return renderDeckEditorScreen();
+    case "main":
+    default:
+      return renderMainMenu();
+  }
 }
 
 function renderAuthPanel(): string {
   return `
-    <section class="landing account-landing">
-      <div class="account-panel auth-panel">
-        <h2>Account Login</h2>
-        <p>Sign in to save decks, sync your collection, and record PvP history.</p>
+    <section class="screen auth-screen" data-screen="auth">
+      ${renderCloudLayer()}
+      <div class="auth-card parchment-card">
+        <div class="game-title-block">
+          <h1 class="game-title">寶島遊戲王 v2</h1>
+          <p class="game-subtitle">Battle on the Isle</p>
+        </div>
         ${view.accountError ? `<p class="error-text">${escapeHtml(view.accountError)}</p>` : ""}
         ${view.accountMessage ? `<p class="success-text">${escapeHtml(view.accountMessage)}</p>` : ""}
         <form id="auth-form" class="auth-form">
-          <input id="auth-email" type="email" autocomplete="email" placeholder="Email" required />
-          <input id="auth-password" type="password" autocomplete="current-password" placeholder="Password" required />
-          <div class="button-row">
-            <button type="submit" data-auth-mode="signin" ${view.accountLoading ? "disabled" : ""}>Sign In</button>
+          <label class="auth-label">
+            <span>Email</span>
+            <input id="auth-email" type="email" autocomplete="email" placeholder="player@island.tw" required />
+          </label>
+          <label class="auth-label">
+            <span>Password</span>
+            <input id="auth-password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+          </label>
+          <div class="auth-actions">
+            <button type="submit" data-auth-mode="signin" data-testid="auth-signin" ${view.accountLoading ? "disabled" : ""}>Sign In</button>
             <button type="button" id="sign-up" ${view.accountLoading ? "disabled" : ""}>Create Account</button>
-            <button type="button" id="google-sign-in" ${view.accountLoading ? "disabled" : ""}>Google</button>
           </div>
+          <div class="auth-divider"><span>or</span></div>
+          <button type="button" id="google-sign-in" class="oauth-button" ${view.accountLoading ? "disabled" : ""}>Continue with Google</button>
         </form>
       </div>
     </section>
   `;
 }
 
-function renderAccountLobby(): string {
-  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+function renderCloudLayer(): string {
   return `
-    <section class="account-lobby">
-      <div class="account-toolbar">
-        <div>
-          <h2>${escapeHtml(view.profile?.display_name ?? "Player")}</h2>
-          <p>${view.collection.length} owned cards - Catalog ${escapeHtml(CARD_CATALOG_VERSION)}</p>
+    <div class="cloud-layer" aria-hidden="true">
+      <div class="cloud cloud-1"></div>
+      <div class="cloud cloud-2"></div>
+      <div class="cloud cloud-3"></div>
+      <div class="cloud cloud-4"></div>
+    </div>
+  `;
+}
+
+function renderMainMenu(): string {
+  const displayName = view.profile?.display_name ?? "Player";
+  const avatarUrl = view.profile?.avatar_url || "/images/avatars/avatar1.webp";
+  const stats = computeMatchStats();
+  const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
+  const ownedCount = view.collection.filter((row) => row.quantity > 0).length;
+  const totalCatalog = CARD_CATALOG.filter((card) => card.collectible !== false).length;
+  const accountMode = Boolean(supabase);
+  return `
+    <section class="screen main-menu" data-screen="main">
+      ${renderCloudLayer()}
+      <div class="main-menu-inner">
+        <div class="game-title-block">
+          <h1 class="game-title">寶島遊戲王 v2</h1>
+          <span class="version-pill">Catalog ${escapeHtml(CARD_CATALOG_VERSION)}</span>
         </div>
-        <div class="button-row">
-          <button id="sync-collection">Sync Collection</button>
-          <button id="new-deck">New Deck</button>
-          <button id="refresh-account">Refresh</button>
-          <button id="sign-out">Sign Out</button>
-        </div>
+        ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
+        ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
+        ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
+        <nav class="menu-buttons" aria-label="Main menu">
+          <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥<small>Enter Battle</small></button>
+          <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面<small>Profile</small></button>
+          <button class="menu-button" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>卡片收藏<small>Collection</small></button>
+          <button class="menu-button menu-disabled" disabled title="Coming soon">商店<small>Shop · Coming Soon</small></button>
+        </nav>
       </div>
-      ${view.accountError ? `<p class="error-text account-status">${escapeHtml(view.accountError)}</p>` : ""}
-      ${view.accountMessage ? `<p class="success-text account-status">${escapeHtml(view.accountMessage)}</p>` : ""}
-      ${view.joinError ? `<p class="error-text account-status">${escapeHtml(view.joinError)}</p>` : ""}
-      <div class="account-grid">
-        <section class="account-panel deck-panel">
-          <h3>Saved Decks</h3>
-          <div class="deck-list">
-            ${view.decks.map(renderSavedDeck).join("") || `<p class="muted">No saved decks yet.</p>`}
+      <aside class="player-info-card" data-testid="player-chip">
+        <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+        <div class="player-info-text">
+          <strong>${escapeHtml(displayName)}</strong>
+          <span class="player-stats">W ${stats.wins} · L ${stats.losses} · ${winRateLabel}</span>
+          <span class="player-stats muted">${ownedCount}/${totalCatalog} cards</span>
+        </div>
+        ${accountMode ? `<button id="sign-out" class="player-chip-action" title="Sign out">⎋</button>` : ""}
+      </aside>
+    </section>
+  `;
+}
+
+function renderBattleScreen(): string {
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  const accountMode = Boolean(supabase);
+  const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  return `
+    <section class="screen battle-pick" data-screen="battle">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回主選單</button>
+        <h2>準備戰鬥 · Battle Setup</h2>
+      </header>
+      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
+      ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
+      <div class="battle-pick-grid">
+        <section class="parchment-card deck-pick">
+          <div class="panel-heading">
+            <h3>選擇牌組</h3>
+            <button id="new-deck" class="ghost-button">+ 新牌組</button>
           </div>
-          <p class="muted">${selectedDeck ? `Selected: ${escapeHtml(selectedDeck.name)}` : "Select a legal deck before joining PvP."}</p>
+          <div class="deck-list" data-testid="battle-deck-list">
+            ${accountMode ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">No saved decks yet. Create one to enter PvP.</p>`) : `<p class="muted">Dev mode: server will assign a default deck.</p>`}
+          </div>
+          <p class="muted">${selectedDeck ? `Selected: ${escapeHtml(selectedDeck.name)}` : accountMode ? "Select a legal 30-card deck." : "No deck selection needed in dev mode."}</p>
         </section>
-        <section class="account-panel editor-panel">
-          ${renderDeckEditor()}
+        <section class="parchment-card match-panel">
+          <h3>對戰</h3>
+          <p>準備好就出發 — 系統會配對另一位玩家進入競技場。</p>
+          <button id="find-match" class="primary-action" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
+            ${view.joining ? "Joining…" : "Find Match"}
+          </button>
+          <details class="advanced-disclosure">
+            <summary>進階設定 · Advanced</summary>
+            <form id="join-form-advanced" class="advanced-form">
+              <label>Server URL
+                <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
+              </label>
+              ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
+            </form>
+          </details>
         </section>
-        <section class="account-panel history-panel">
-          <h3>Match History</h3>
+      </div>
+      ${renderMatchmakingOverlay()}
+    </section>
+  `;
+}
+
+function renderMatchmakingOverlay(): string {
+  if (!view.matchmaking) return "";
+  const elapsedMs = Date.now() - view.matchmaking.startedAtMs;
+  const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  return `
+    <section class="matchmaking-overlay" data-testid="matchmaking-overlay">
+      <div class="matchmaking-card parchment-card">
+        <div class="searching-dots" aria-hidden="true"><span></span><span></span><span></span></div>
+        <h3>Looking for an opponent</h3>
+        <p class="matchmaking-timer" data-testid="matchmaking-elapsed">${mm}:${ss}</p>
+        <button id="matchmaking-cancel" class="danger" data-testid="matchmaking-cancel">Cancel</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderProfileScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode) {
+    return `
+      <section class="screen profile-screen" data-screen="profile">
+        ${renderCloudLayer()}
+        <header class="screen-header">
+          <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+          <h2>個人頁面 · Profile</h2>
+        </header>
+        <div class="parchment-card center-card">
+          <p>Sign in with Supabase to use the profile.</p>
+        </div>
+      </section>
+    `;
+  }
+  const profile = view.profile;
+  const displayName = view.editingDisplayName ?? profile?.display_name ?? "Player";
+  const avatarUrl = profile?.avatar_url || "/images/avatars/avatar1.webp";
+  const stats = computeMatchStats();
+  const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
+  const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
+  const recent = view.matchHistory.slice(0, 10);
+  return `
+    <section class="screen profile-screen" data-screen="profile">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>個人頁面 · Profile</h2>
+      </header>
+      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
+      ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
+      <div class="profile-grid">
+        <section class="parchment-card profile-header" data-testid="profile-header">
+          <div class="profile-avatar-block">
+            <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+            <button id="open-avatar-picker" class="ghost-button">Change avatar</button>
+          </div>
+          <form id="profile-form" class="profile-form">
+            <label>顯示名稱 · Display Name
+              <input id="profile-display-name" value="${escapeAttr(displayName)}" maxlength="32" />
+            </label>
+            <p class="profile-meta">Level <strong>—</strong> · XP placeholder</p>
+            <button type="submit" data-testid="profile-save" ${view.accountLoading ? "disabled" : ""}>Save</button>
+          </form>
+          ${view.avatarPickerOpen ? `
+          <div class="avatar-picker" data-testid="avatar-picker">
+            ${avatars.map((slug) => `
+              <button type="button" data-pick-avatar="${slug}" class="avatar-option ${profile?.avatar_url?.includes(slug) ? "selected" : ""}">
+                <img src="/images/avatars/${slug}.webp" alt="${slug}" />
+              </button>
+            `).join("")}
+          </div>` : ""}
+        </section>
+        <section class="parchment-card profile-stats">
+          <h3>Stats</h3>
+          <ul class="stat-list">
+            <li><span>Wins</span><strong>${stats.wins}</strong></li>
+            <li><span>Losses</span><strong>${stats.losses}</strong></li>
+            <li><span>Draws</span><strong>${stats.draws}</strong></li>
+            <li><span>Win rate</span><strong>${winRateLabel}</strong></li>
+            <li><span>Total</span><strong>${stats.total}</strong></li>
+          </ul>
+        </section>
+        <section class="parchment-card profile-history">
+          <h3>Recent Matches</h3>
           <div class="history-list">
-            ${view.matchHistory.map(renderMatchHistoryRow).join("") || `<p class="muted">No completed matches yet.</p>`}
+            ${recent.length === 0 ? `<p class="muted">No completed matches yet.</p>` : recent.map(renderMatchHistoryRow).join("")}
           </div>
         </section>
       </div>
     </section>
   `;
+}
+
+function renderCollectionScreen(): string {
+  const accountMode = Boolean(supabase);
+  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
+  const filter = view.collectionFilter;
+  const filtered = collectibles.filter((card) => {
+    const qty = collectionMap.get(card.id) ?? 0;
+    if (filter === "owned") return qty > 0;
+    if (filter === "missing") return qty === 0;
+    return true;
+  });
+  const ownedTotal = collectibles.filter((card) => (collectionMap.get(card.id) ?? 0) > 0).length;
+  return `
+    <section class="screen collection-screen" data-screen="collection">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
+        <h2>卡片收藏 · Collection</h2>
+        <span class="collection-summary">${ownedTotal}/${collectibles.length} owned</span>
+      </header>
+      ${accountMode ? "" : `<p class="muted center-card">Sign in to see your collection. Showing catalog only.</p>`}
+      <div class="collection-filters" role="tablist">
+        ${(["all", "owned", "missing"] as CollectionFilter[]).map((value) => `
+          <button class="collection-filter ${filter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
+            ${value === "all" ? "All" : value === "owned" ? "Owned" : "Missing"}
+          </button>
+        `).join("")}
+      </div>
+      <div class="collection-grid" data-testid="collection-grid">
+        ${filtered.length === 0 ? `<p class="muted">Nothing matches this filter.</p>` : filtered.map((card) => {
+          const qty = collectionMap.get(card.id) ?? 0;
+          return renderCollectionTile(card, qty);
+        }).join("")}
+      </div>
+      ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
+    </section>
+  `;
+}
+
+function renderCollectionTile(card: CardDefinition, quantity: number): string {
+  const grayscale = quantity === 0;
+  const limit = deckCopyLimit(card);
+  return `
+    <button type="button" class="collection-tile rarity-${card.rarity.toLowerCase()} ${grayscale ? "grayscale" : ""}" data-collection-card="${escapeAttr(card.id)}" data-testid="collection-tile">
+      <div class="collection-tile-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <span class="collection-tile-name">${escapeHtml(card.name)}</span>
+      <span class="collection-tile-cost">${card.cost}</span>
+      <span class="collection-tile-qty">${quantity}/${limit}</span>
+    </button>
+  `;
+}
+
+function renderPinnedCardDetail(cardId: string): string {
+  const card = cardCatalog.get(cardId);
+  if (!card) return "";
+  const resolved: ResolvedCardView = {
+    cardId: card.id,
+    instanceId: `pinned-${card.id}`,
+    name: card.name,
+    category: card.category,
+    description: card.description,
+    image: card.image,
+    cost: card.cost,
+    type: card.type,
+    rarity: card.rarity,
+    attack: card.attack,
+    health: card.health
+  };
+  return `
+    <div class="pinned-card-overlay" data-testid="pinned-card-overlay">
+      <div class="pinned-card-content">
+        <div class="card rarity-${resolved.rarity.toLowerCase()}">
+          ${renderCardFace(resolved, "mulligan")}
+        </div>
+        <button id="pinned-card-close" class="ghost-button">Close</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderDeckEditorScreen(): string {
+  return `
+    <section class="screen deck-editor-screen" data-screen="deckEditor">
+      ${renderCloudLayer()}
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="battle">← 返回戰鬥</button>
+        <h2>編輯牌組 · Deck Editor</h2>
+      </header>
+      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
+      ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
+      <section class="parchment-card editor-panel">
+        ${renderDeckEditor()}
+      </section>
+    </section>
+  `;
+}
+
+function computeMatchStats(): { wins: number; losses: number; draws: number; total: number } {
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+  const userId = view.session?.user?.id;
+  for (const row of view.matchHistory) {
+    const mySeatInRow: Seat | undefined =
+      userId && row.player1_user_id === userId ? "player1"
+      : userId && row.player2_user_id === userId ? "player2"
+      : undefined;
+    if (!row.winner_seat) {
+      draws++;
+      continue;
+    }
+    if (mySeatInRow && row.winner_seat === mySeatInRow) wins++;
+    else if (mySeatInRow) losses++;
+    else draws++;
+  }
+  const total = wins + losses + draws;
+  return { wins, losses, draws, total };
 }
 
 function renderSavedDeck(deck: DeckRow): string {
@@ -318,10 +621,20 @@ function renderDeckBuilderCard(card: CardDefinition, count: number): string {
 
 function renderMatchHistoryRow(row: MatchHistoryRow): string {
   const finished = row.finished_at ? new Date(row.finished_at).toLocaleString() : row.id;
+  const userId = view.session?.user?.id;
+  const mySeatInRow: Seat | undefined =
+    userId && row.player1_user_id === userId ? "player1"
+    : userId && row.player2_user_id === userId ? "player2"
+    : undefined;
+  const outcome = !row.winner_seat ? "draw"
+    : mySeatInRow && row.winner_seat === mySeatInRow ? "win"
+    : mySeatInRow ? "loss"
+    : "info";
+  const label = outcome === "win" ? "Win" : outcome === "loss" ? "Loss" : outcome === "draw" ? "Draw" : (row.winner_seat ?? "—");
   return `
-    <div class="history-row">
-      <strong>${escapeHtml(row.result_reason)}</strong>
-      <span>${escapeHtml(row.winner_seat ?? "no winner")}</span>
+    <div class="history-row outcome-${outcome}">
+      <strong class="history-outcome">${escapeHtml(label)}</strong>
+      <span class="history-reason">${escapeHtml(row.result_reason)}</span>
       <small>${escapeHtml(finished)}</small>
     </div>
   `;
@@ -775,7 +1088,11 @@ function bindStaticActions(): void {
   document.querySelector<HTMLButtonElement>("#sign-out")?.addEventListener("click", () => void signOut());
   document.querySelector<HTMLButtonElement>("#refresh-account")?.addEventListener("click", () => void loadAccountData());
   document.querySelector<HTMLButtonElement>("#sync-collection")?.addEventListener("click", () => void syncCollection());
-  document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => startNewDeck());
+  document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => {
+    startNewDeck(false);
+    view.menuScreen = "deckEditor";
+    render();
+  });
   document.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
   document.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
   document.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
@@ -820,6 +1137,7 @@ function bindStaticActions(): void {
     el.addEventListener("click", () => {
       const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
       if (deck) view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
+      view.menuScreen = "deckEditor";
       render();
     });
   }
@@ -832,6 +1150,162 @@ function bindStaticActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-remove-card]")) {
     el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-menu-screen]")) {
+    el.addEventListener("click", () => {
+      const target = el.dataset.menuScreen as MenuScreen | undefined;
+      if (!target) return;
+      navigateToScreen(target);
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#find-match")?.addEventListener("click", () => void startMatchmaking());
+  document.querySelector<HTMLButtonElement>("#matchmaking-cancel")?.addEventListener("click", () => void cancelMatchmaking());
+  document.querySelector<HTMLFormElement>("#profile-form")?.addEventListener("submit", (event) => void saveProfile(event));
+  document.querySelector<HTMLButtonElement>("#open-avatar-picker")?.addEventListener("click", () => {
+    view.avatarPickerOpen = !view.avatarPickerOpen;
+    render();
+  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-pick-avatar]")) {
+    el.addEventListener("click", () => void pickAvatar(el.dataset.pickAvatar));
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-filter]")) {
+    el.addEventListener("click", () => {
+      const value = el.dataset.collectionFilter as CollectionFilter | undefined;
+      if (!value) return;
+      view.collectionFilter = value;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-card]")) {
+    el.addEventListener("click", () => {
+      view.pinnedCollectionCardId = el.dataset.collectionCard;
+      render();
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#pinned-card-close")?.addEventListener("click", () => {
+    view.pinnedCollectionCardId = undefined;
+    render();
+  });
+  const displayInput = document.querySelector<HTMLInputElement>("#profile-display-name");
+  if (displayInput) {
+    displayInput.addEventListener("input", () => {
+      view.editingDisplayName = displayInput.value;
+    });
+  }
+}
+
+function navigateToScreen(target: MenuScreen): void {
+  if (view.matchmaking && target !== "battle") return;
+  view.menuScreen = target;
+  view.accountError = undefined;
+  view.accountMessage = undefined;
+  view.joinError = undefined;
+  view.avatarPickerOpen = false;
+  view.pinnedCollectionCardId = undefined;
+  if (target !== "profile") view.editingDisplayName = undefined;
+  render();
+}
+
+async function startMatchmaking(): Promise<void> {
+  if (view.matchmaking || view.joining || view.room) return;
+  view.matchmaking = { startedAtMs: Date.now(), status: "searching" };
+  view.joinError = undefined;
+  scheduleMatchmakingTick();
+  render();
+  await joinRoomFromBattleScreen();
+}
+
+function scheduleMatchmakingTick(): void {
+  if (view.matchmakingTimer !== undefined) return;
+  view.matchmakingTimer = window.setInterval(() => {
+    if (!view.matchmaking) {
+      stopMatchmakingTick();
+      return;
+    }
+    render();
+  }, 1000);
+}
+
+function stopMatchmakingTick(): void {
+  if (view.matchmakingTimer !== undefined) {
+    window.clearInterval(view.matchmakingTimer);
+    view.matchmakingTimer = undefined;
+  }
+}
+
+async function cancelMatchmaking(): Promise<void> {
+  const room = view.room;
+  view.matchmaking = undefined;
+  stopMatchmakingTick();
+  if (room) {
+    try {
+      await room.leave(true);
+    } catch {
+      // ignore
+    }
+    view.room = undefined;
+    view.mySeat = undefined;
+    view.state = undefined;
+    view.publicSync = undefined;
+  }
+  render();
+}
+
+async function joinRoomFromBattleScreen(): Promise<void> {
+  const advancedServer = document.querySelector<HTMLInputElement>("#server-url-advanced")?.value;
+  const advancedName = document.querySelector<HTMLInputElement>("#display-name-advanced")?.value;
+  const createdInputs: HTMLInputElement[] = [];
+  const ensureHiddenInput = (id: string, value: string | undefined) => {
+    if (value === undefined) return;
+    const existing = document.querySelector<HTMLInputElement>(`#${id}`);
+    if (existing) {
+      existing.value = value;
+      return;
+    }
+    const inp = document.createElement("input");
+    inp.id = id;
+    inp.value = value;
+    inp.style.display = "none";
+    document.body.appendChild(inp);
+    createdInputs.push(inp);
+  };
+  ensureHiddenInput("server-url", advancedServer ?? defaultServerUrl);
+  ensureHiddenInput("display-name", advancedName ?? view.profile?.display_name);
+  const synthetic = { preventDefault: () => {}, target: null } as unknown as Event;
+  try {
+    await joinRoom(synthetic);
+  } finally {
+    for (const inp of createdInputs) inp.remove();
+  }
+}
+
+async function saveProfile(event: Event): Promise<void> {
+  event.preventDefault();
+  if (!supabase || !view.session?.user) return;
+  const name = (view.editingDisplayName ?? view.profile?.display_name ?? "").trim();
+  if (!name) {
+    view.accountError = "Display name cannot be empty.";
+    render();
+    return;
+  }
+  await withAccountLoading(async () => {
+    const { error } = await supabase.from("profiles").update({ display_name: name }).eq("user_id", view.session!.user.id);
+    if (error) throw error;
+    view.accountMessage = "Profile updated.";
+    view.editingDisplayName = undefined;
+    await loadAccountDataRaw();
+  });
+}
+
+async function pickAvatar(slug: string | undefined): Promise<void> {
+  if (!supabase || !view.session?.user || !slug) return;
+  const avatarUrl = `/images/avatars/${slug}.webp`;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", view.session!.user.id);
+    if (error) throw error;
+    view.accountMessage = "Avatar updated.";
+    view.avatarPickerOpen = false;
+    await loadAccountDataRaw();
+  });
 }
 
 function bindSelectionActions(): void {
@@ -1145,6 +1619,9 @@ async function backToLobby(): Promise<void> {
   view.animationCues = [];
   view.eventStatus = undefined;
   view.toast = undefined;
+  view.matchmaking = undefined;
+  stopMatchmakingTick();
+  view.menuScreen = "main";
   if (room) {
     try {
       await room.leave(true);
@@ -1187,6 +1664,8 @@ async function joinRoom(event: Event): Promise<void> {
     view.publicSync = undefined;
     view.presence.clear();
     view.rejectedHandIds.clear();
+    view.matchmaking = undefined;
+    stopMatchmakingTick();
     (window as any).__room = joined;
 
     joined.onStateChange((nextState: any) => {
@@ -1227,6 +1706,8 @@ async function joinRoom(event: Event): Promise<void> {
     });
   } catch (error) {
     view.joinError = error instanceof Error ? error.message : "Unable to join room.";
+    view.matchmaking = undefined;
+    stopMatchmakingTick();
   } finally {
     view.joining = false;
     render();
@@ -1240,14 +1721,17 @@ async function initializeAccount(): Promise<void> {
   if (view.session) await loadAccountData();
   supabase.auth.onAuthStateChange((_event, session) => {
     view.session = session;
-    if (session) void loadAccountData();
-    else {
+    if (session) {
+      view.menuScreen = "main";
+      void loadAccountData();
+    } else {
       view.profile = undefined;
       view.decks = [];
       view.collection = [];
       view.matchHistory = [];
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
+      view.menuScreen = "main";
       render();
     }
   });
@@ -1321,7 +1805,7 @@ async function loadAccountData(): Promise<void> {
         .order("card_id", { ascending: true }),
       supabase
         .from("match_history")
-        .select("id,winner_seat,result_reason,created_at,finished_at")
+        .select("id,winner_seat,result_reason,created_at,finished_at,player1_user_id,player2_user_id")
         .order("finished_at", { ascending: false })
         .limit(20)
     ]);
