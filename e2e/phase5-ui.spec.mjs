@@ -1,5 +1,5 @@
 /**
- * E2E: Phase 5 UI affordances — full coverage of all 9 verified items.
+ * E2E: Phase 5 UI affordances — full coverage of verified items.
  *
  * Verified items:
  *   1. Full game board UI   — hero zones, hand rows, board rows, mana crystals
@@ -11,6 +11,9 @@
  *   7. COMMAND_REJECTED     — stale seq triggers toast + rejected-card border
  *   8. End-of-match screen  — result overlay shown; Back to Lobby clears the board
  *   9. Mobile RWD           — 390 px viewport: battle surface doesn't overflow
+ *  10. Attack lunge + floating damage number on attack
+ *  11. Hover tooltip        — full card preview on desktop hover
+ *  12. Concede modal        — confirmation modal intercepts surrender
  *
  * Prerequisites:
  *   Vite dev server  - http://localhost:5173
@@ -480,6 +483,93 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       } catch (_) {}
     }
 
+    // ── TEST 10: Attack lunge + floating damage number ──────────────────────
+    // Continues from TEST 4 where attacker is selected and hero is valid target.
+    var attackTested = false;
+    try {
+      // Make sure attacker is still selected and hero is highlighted (TEST 4 left this state).
+      var hasAttacker = await actPage.evaluate(() =>
+        document.querySelectorAll("[data-testid='board-minion'].can-attack").length > 0
+      );
+      if (!hasAttacker) throw new Error("no can-attack minion to drive attack flow");
+      // Re-click the can-attack minion to ensure it's selected
+      await actPage.locator("[data-testid='board-minion'].can-attack").first().click();
+      // Click the opponent hero to set as target
+      await actPage.locator('[data-testid="opponent-hero"]').click();
+      // Confirm attack via the Attack button
+      var ckAtk = await snap(actPage);
+      var attackEnabled = await actPage.evaluate(() => !document.querySelector("#attack").hasAttribute("disabled"));
+      if (!attackEnabled) throw new Error("Attack button not enabled after selecting attacker + target");
+      // Watch for .lunging class before firing
+      await actPage.evaluate(() => {
+        window.__lungeSeen = false;
+        var obs = new MutationObserver(() => {
+          if (document.querySelector(".lunging")) { window.__lungeSeen = true; obs.disconnect(); }
+        });
+        obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
+        window.__lungeObs = obs;
+      });
+      await actPage.click("#attack");
+      await waitEvent(actPage, "DAMAGE", ckAtk, actTag);
+      // Float number must appear within a short window
+      await actPage.waitForFunction(
+        () => Boolean(document.querySelector('[data-testid="float-number"]')),
+        null, { timeout: 1500 }
+      );
+      var floatText = await actPage.locator('[data-testid="float-number"]').first().textContent();
+      if (!floatText || !floatText.trim().startsWith("-")) throw new Error("float-number did not render damage value, got: " + floatText);
+      pass("10. Floating damage number — " + floatText.trim() + " floated from target");
+
+      var lungeSeen = await actPage.evaluate(() => Boolean(window.__lungeSeen));
+      if (!lungeSeen) throw new Error(".lunging class was never applied to an element");
+      pass("10b. Attack lunge — .lunging class observed on attacker");
+      attackTested = true;
+    } catch (e) { fail("10. Attack lunge + floating number", e); }
+
+    // ── TEST 11: Hover tooltip on hand card ─────────────────────────────────
+    try {
+      // p2 is desktop (mobile=false), so hover should work there
+      var desktopPage = p2;
+      var hasHand = await desktopPage.evaluate(() => document.querySelectorAll('[data-testid="hand-card"]').length > 0);
+      if (!hasHand) throw new Error("no hand card to hover on desktop page");
+      await desktopPage.locator('[data-testid="hand-card"]').first().hover();
+      // Tooltip has a 220ms debounce
+      await desktopPage.waitForSelector('[data-testid="hover-tooltip"]', { timeout: 1500 });
+      var tooltipName = await desktopPage.evaluate(() => {
+        var el = document.querySelector('[data-testid="hover-tooltip"] .card-title');
+        return el ? el.textContent : "";
+      });
+      if (!tooltipName || tooltipName.trim().length === 0) throw new Error("hover tooltip is empty");
+      pass("11. Hover tooltip — full card preview shown for: " + tooltipName.trim());
+
+      // Move cursor away — tooltip should disappear
+      await desktopPage.mouse.move(0, 0);
+      await desktopPage.waitForFunction(
+        () => !document.querySelector('[data-testid="hover-tooltip"]'),
+        null, { timeout: 1500 }
+      );
+      pass("11b. Hover tooltip — dismissed on mouseleave");
+    } catch (e) { fail("11. Hover tooltip", e); }
+
+    // ── TEST 12: Concede confirmation modal — cancel path ───────────────────
+    try {
+      // Whichever page currently has #concede visible (any in-match page)
+      var cancelPage = (await isMyTurn(actPage)) ? actPage : idlPage;
+      await cancelPage.click('[data-testid="concede"]');
+      await cancelPage.waitForSelector('[data-testid="concede-overlay"]', { timeout: 5000 });
+      pass("12. Concede modal — overlay shown after Concede click");
+      await cancelPage.click('[data-testid="concede-cancel"]');
+      await cancelPage.waitForFunction(
+        () => !document.querySelector('[data-testid="concede-overlay"]'),
+        null, { timeout: 2000 }
+      );
+      // Match must still be running (no GAME_FINISHED yet)
+      var gameStillRunning = await cancelPage.evaluate(() => Boolean(document.querySelector('[data-testid="battle-surface"]')));
+      if (!gameStillRunning) throw new Error("battle-surface vanished after cancel — concede was not intercepted");
+      pass("12b. Concede modal — Stay button dismisses without surrendering");
+    } catch (e) { fail("12. Concede confirmation modal", e); }
+    void attackTested;
+
     // ── TEST 7: COMMAND_REJECTED — stale seq → toast + rejected-card ─────────
     try {
       // Send a stale command directly via the injected __room reference
@@ -513,6 +603,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       // Find whichever page is currently active and concede
       var concedePage = (await isMyTurn(actPage)) ? actPage : idlPage;
       await concedePage.click('[data-testid="concede"]');
+      await concedePage.waitForSelector('[data-testid="concede-confirm"]', { timeout: 5000 });
+      await concedePage.click('[data-testid="concede-confirm"]');
       await waitEvent(concedePage, "GAME_FINISHED", ckCon, "concede");
 
       // Result overlay must appear

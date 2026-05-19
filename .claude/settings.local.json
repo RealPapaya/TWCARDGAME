@@ -9,7 +9,10 @@
       "Bash(node e2e/game-loop.spec.mjs)",
       "Bash(npm install *)",
       "Skill(twcardgame-v2)",
-      "Skill(twcardgame-v2:*)"
+      "Skill(twcardgame-v2:*)",
+      "Bash(dir \"D:\\\\Google AI\\\\TWCARDGAME\\\\apps\\\\web\" /s /b)",
+      "Bash(findstr /i \"test\\\\|spec\\\\|e2e\")",
+      "Bash(npm test *)"
     ]
   }
 }

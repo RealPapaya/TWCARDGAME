@@ -130,6 +130,7 @@ export type GameEventType =
   | "CARD_BURNED"
   | "CARD_PLAYED"
   | "MINION_SUMMONED"
+  | "ATTACK"
   | "DAMAGE"
   | "HEAL"
   | "BUFF"

@@ -306,6 +306,7 @@ function attack(
 
   const targetAttack = ref.kind === "MINION" ? (ref.unit as { attack: number }).attack : 0;
   const attackerRef = { owner: player, kind: "MINION" as const, unit: attacker };
+  addEvent(state, events, "ATTACK", { attackerInstanceId, target }, seat);
   applyDamage(state, ref, attacker.attack, events);
   if (ref.kind === "MINION") applyDamage(state, attackerRef, targetAttack, events);
   attacker.canAttack = false;

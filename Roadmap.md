@@ -175,16 +175,14 @@ What was completed (commit 2b07d36)
  Mobile responsive layout — 390 px viewport verified, no horizontal overflow
  COMMAND_REJECTED feedback — toast with shake animation + rejected-card border
  End-of-match screen — result overlay (Victory/Defeat) + Back to Lobby
- E2E spec (e2e/phase5-ui.spec.mjs) — 13 items verified, 13 passed
+ E2E spec (e2e/phase5-ui.spec.mjs) — extended with core-gameplay-feel coverage (attack lunge, float numbers, hover tooltip, concede modal)
+ Attack animation — attacker lunges toward target then snaps back (new ATTACK GameEvent drives the cue)
+ Floating damage/heal numbers — amount floats up from the affected target (red for damage, green for heal)
+ Minion death particle effect — dust-cloud particles burst on death alongside the grayscale fade
+ Card hover tooltip — desktop hover (≥220 ms) shows full-size card detail popup, dismissed on leave / drag
+ Concede confirmation modal — overlay with Stay / Concede intercepts accidental surrender
 
 Remaining tasks — v1 parity gap
-
-Core gameplay feel
- Attack animation — attacker element moves toward target then snaps back; currently only shake cue on target
- Floating damage/heal numbers — amount floats up from the affected target; currently only a text event cue
- Minion death particle effect — dust-cloud particles on death; currently only a grayscale fade
- Card hover tooltip — hovering a hand card or board minion shows a full-size card detail popup
- Concede confirmation modal — prevent accidental surrender; v1 shows a confirm dialog before sending concede
 
 Main menu & navigation
  Main menu page — game title logo, arena background, cloud animation, Enter Battle / Profile / Shop / Collection buttons

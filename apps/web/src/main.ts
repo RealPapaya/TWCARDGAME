@@ -17,7 +17,7 @@ import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle } from "./ui.js"
 import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } from "./drag.js";
 import "./styles.css";
 
-type AnimationKind = "play" | "summon" | "attack" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
+type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 
 type AnimationCue = {
   id: string;
@@ -26,6 +26,8 @@ type AnimationCue = {
   seat?: Seat;
   targetKey?: string;
   cardId?: string;
+  attackerInstanceId?: string;
+  amount?: number;
 };
 
 type ClientViewState = {
@@ -63,6 +65,9 @@ type ClientViewState = {
   matchHistory: MatchHistoryRow[];
   selectedDeckId?: string;
   editingDeck?: Partial<DeckRow> & Pick<DeckRow, "name" | "card_ids">;
+  hoveredCardId?: string;
+  hoverAnchor?: { x: number; y: number };
+  confirmingConcede?: boolean;
 };
 
 type ResolvedCardView = {
@@ -153,6 +158,7 @@ function render(): void {
 
   bindStaticActions();
   bindSelectionActions();
+  applyPostRenderEffects();
 }
 
 function renderTopbar(): string {
@@ -355,7 +361,9 @@ function renderGame(status: GameStatus | ""): string {
       ${renderEventCues()}
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
+      ${renderConcedeModal()}
     </section>
+    ${renderHoverTooltip()}
     <section class="log" data-testid="event-log">
       ${view.events.map(renderEventLine).join("")}
     </section>
@@ -413,7 +421,7 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   ]);
 
   return `
-    <button class="${heroClasses}" data-target='${target}' data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
+    <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
       <span class="avatar" aria-hidden="true"></span>
       <strong>${escapeHtml(name)}</strong>
       <span class="hero-hp">${hp}/${maxHp}</span>
@@ -661,12 +669,93 @@ function renderEventCue(cue: AnimationCue): string {
       </div>
     `;
   }
+  if (cue.kind === "attackerMoves") {
+    return "";
+  }
+  if (cue.kind === "damage" || cue.kind === "heal") {
+    if (!cue.targetKey || cue.amount === undefined) return "";
+    const sign = cue.kind === "damage" ? "-" : "+";
+    return `<div class="float-number ${cue.kind}" data-cue-id="${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
+  }
+  if (cue.kind === "destroy") {
+    if (!cue.targetKey) return "";
+    const particles = particleSpread(cue.id);
+    return `<div class="death-burst" data-cue-id="${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
+  }
   return `<div class="event-cue event-${cue.kind}">${escapeHtml(cue.text)}</div>`;
+}
+
+function particleSpread(seed: string): string {
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i++) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  const spans: string[] = [];
+  for (let i = 0; i < 8; i++) {
+    hash = Math.imul(hash ^ (i + 1), 2654435761) >>> 0;
+    const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
+    const distance = 40 + ((hash >>> 8) % 30);
+    const dx = Math.round(Math.cos(angle) * distance);
+    const dy = Math.round(Math.sin(angle) * distance);
+    spans.push(`<span style="--dx:${dx}px;--dy:${dy}px"></span>`);
+  }
+  return spans.join("");
 }
 
 function renderToast(): string {
   if (!view.toast) return "";
   return `<div class="toast show" data-testid="toast">${escapeHtml(view.toast)}</div>`;
+}
+
+function renderHoverTooltip(): string {
+  if (!view.hoveredCardId || !view.hoverAnchor) return "";
+  const card = cardCatalog.get(view.hoveredCardId);
+  if (!card) return "";
+  const margin = 16;
+  const tooltipWidth = 260;
+  const approxHeight = 360;
+  let left = view.hoverAnchor.x + margin;
+  if (left + tooltipWidth > window.innerWidth - margin) {
+    left = Math.max(margin, view.hoverAnchor.x - tooltipWidth - margin);
+  }
+  let top = view.hoverAnchor.y - approxHeight / 2;
+  top = Math.max(margin, Math.min(top, window.innerHeight - approxHeight - margin));
+  const resolved: ResolvedCardView = {
+    cardId: card.id,
+    instanceId: `tooltip-${card.id}`,
+    name: card.name,
+    category: card.category,
+    description: card.description,
+    image: card.image,
+    cost: card.cost,
+    type: card.type,
+    rarity: card.rarity,
+    attack: card.attack,
+    health: card.health
+  };
+  return `
+    <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
+      <div class="card rarity-${resolved.rarity.toLowerCase()}">
+        ${renderCardFace(resolved, "mulligan")}
+      </div>
+    </div>
+  `;
+}
+
+function renderConcedeModal(): string {
+  if (!view.confirmingConcede) return "";
+  return `
+    <section class="confirm-overlay" data-testid="concede-overlay">
+      <div class="confirm-content">
+        <h3>Concede this match?</h3>
+        <div class="confirm-actions">
+          <button id="concede-cancel" data-testid="concede-cancel">Stay</button>
+          <button id="concede-confirm" class="danger" data-testid="concede-confirm">Concede</button>
+        </div>
+      </div>
+    </section>
+  `;
 }
 
 function renderEventLine(event: GameEvent): string {
@@ -705,7 +794,20 @@ function bindStaticActions(): void {
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
-  document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => send({ type: "concede" }));
+  document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => {
+    view.confirmingConcede = true;
+    clearHoverTooltip();
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#concede-cancel")?.addEventListener("click", () => {
+    view.confirmingConcede = false;
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#concede-confirm")?.addEventListener("click", () => {
+    view.confirmingConcede = false;
+    send({ type: "concede" });
+    render();
+  });
   document.querySelector<HTMLButtonElement>("#back-to-lobby")?.addEventListener("click", () => void backToLobby());
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
@@ -740,7 +842,15 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
-    el.addEventListener("pointerdown", (event) => attachHandPointerDrag(event, el));
+    el.addEventListener("pointerdown", (event) => {
+      clearHoverTooltip();
+      attachHandPointerDrag(event, el);
+    });
+    bindHoverPreview(el, () => {
+      const handId = el.dataset.handId;
+      const card = handId ? view.hand.find((item) => item.instanceId === handId) : undefined;
+      return card?.cardId;
+    });
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
@@ -751,7 +861,14 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
-    el.addEventListener("pointerdown", (event) => attachAttackerPointerDrag(event, el));
+    el.addEventListener("pointerdown", (event) => {
+      clearHoverTooltip();
+      attachAttackerPointerDrag(event, el);
+    });
+  }
+
+  for (const el of document.querySelectorAll<HTMLElement>("[data-testid='board-minion']")) {
+    bindHoverPreview(el, () => minionCardIdFromElement(el));
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
@@ -778,6 +895,59 @@ function bindSelectionActions(): void {
       render();
     });
   }
+}
+
+const hoverState: { timer?: number; lastCardId?: string; lastEl?: HTMLElement } = {};
+const hoverCapable = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches;
+
+function bindHoverPreview(el: HTMLElement, resolve: () => string | undefined): void {
+  if (!hoverCapable) return;
+  el.addEventListener("mouseenter", (event) => {
+    if (view.confirmingConcede) return;
+    const cardId = resolve();
+    if (!cardId) return;
+    window.clearTimeout(hoverState.timer);
+    hoverState.lastEl = el;
+    const rect = el.getBoundingClientRect();
+    const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    hoverState.timer = window.setTimeout(() => {
+      if (hoverState.lastEl !== el) return;
+      view.hoveredCardId = cardId;
+      view.hoverAnchor = anchor;
+      hoverState.lastCardId = cardId;
+      render();
+    }, 220);
+    void event;
+  });
+  el.addEventListener("mouseleave", () => {
+    if (hoverState.lastEl === el) hoverState.lastEl = undefined;
+    window.clearTimeout(hoverState.timer);
+    hoverState.timer = undefined;
+    if (view.hoveredCardId) {
+      view.hoveredCardId = undefined;
+      view.hoverAnchor = undefined;
+      render();
+    }
+  });
+}
+
+function clearHoverTooltip(): void {
+  window.clearTimeout(hoverState.timer);
+  hoverState.timer = undefined;
+  hoverState.lastEl = undefined;
+  if (view.hoveredCardId) {
+    view.hoveredCardId = undefined;
+    view.hoverAnchor = undefined;
+  }
+}
+
+function minionCardIdFromElement(el: HTMLElement): string | undefined {
+  const seat = el.dataset.seat as Seat | undefined;
+  const targetKey = el.dataset.targetKey;
+  if (!seat || !targetKey) return undefined;
+  const player = readPlayer(seat);
+  const minion = player?.board?.find((item) => item.instanceId === targetKey);
+  return minion?.cardId;
 }
 
 const DRAG_THRESHOLD_PX = 6;
@@ -1382,12 +1552,18 @@ function handleEvents(message: GameEvent[]): void {
 function enqueueEventCues(events: GameEvent[]): void {
   const cues = events.map(eventToCue).filter((cue): cue is AnimationCue => Boolean(cue));
   if (cues.length === 0) return;
-  view.animationCues = [...cues, ...view.animationCues].slice(0, 6);
+  view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
+    const lifetime =
+      cue.kind === "play" ? 1050
+      : cue.kind === "attackerMoves" ? 460
+      : cue.kind === "damage" || cue.kind === "heal" ? 1150
+      : cue.kind === "destroy" ? 700
+      : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
       render();
-    }, cue.kind === "play" ? 1050 : 900);
+    }, lifetime);
   }
 }
 
@@ -1404,8 +1580,14 @@ function eventToCue(event: GameEvent): AnimationCue | undefined {
   if (event.type === "MINION_SUMMONED") {
     return { id, kind: "summon", text: "Summoned", seat: event.seat, targetKey: target, cardId };
   }
-  if (event.type === "DAMAGE") return { id, kind: "damage", text: amount ? `-${amount}` : "Damage", seat: event.seat, targetKey: target };
-  if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target };
+  if (event.type === "ATTACK") {
+    const attackerInstanceId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
+    const targetRef = (payload.target ?? undefined) as TargetRef | undefined;
+    const targetKey = targetRef ? targetKeyFor(targetRef) : undefined;
+    return { id, kind: "attackerMoves", text: "", seat: event.seat, attackerInstanceId, targetKey };
+  }
+  if (event.type === "DAMAGE") return { id, kind: "damage", text: amount ? `-${amount}` : "Damage", seat: event.seat, targetKey: target, amount };
+  if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target, amount };
   if (event.type === "BUFF" || event.type === "SHIELD_POPPED") return { id, kind: "buff", text: "Buff", seat: event.seat, targetKey: target };
   if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
   if (event.type === "TURN_STARTED") return { id, kind: "turn", text: event.seat === view.mySeat ? "Your Turn" : "Opponent Turn", seat: event.seat };
@@ -1571,6 +1753,51 @@ function hasCue(targetKey: string | undefined, kind?: AnimationKind): boolean {
   if (!targetKey) return false;
   return view.animationCues.some((cue) => cue.targetKey === targetKey && (!kind || cue.kind === kind));
 }
+
+const appliedLunges = new Set<string>();
+
+function applyPostRenderEffects(): void {
+  const surface = document.querySelector<HTMLElement>(".battle-surface");
+  const eventLayer = document.querySelector<HTMLElement>(".event-layer");
+  for (const cue of view.animationCues) {
+    if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
+      const attacker = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`);
+      const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
+      if (attacker && target) {
+        const a = attacker.getBoundingClientRect();
+        const t = target.getBoundingClientRect();
+        const dx = Math.round(t.left + t.width / 2 - (a.left + a.width / 2));
+        const dy = Math.round(t.top + t.height / 2 - (a.top + a.height / 2));
+        attacker.style.setProperty("--lunge-dx", `${dx}px`);
+        attacker.style.setProperty("--lunge-dy", `${dy}px`);
+        attacker.classList.add("lunging");
+        appliedLunges.add(cue.id);
+        window.setTimeout(() => {
+          attacker.classList.remove("lunging");
+          attacker.style.removeProperty("--lunge-dx");
+          attacker.style.removeProperty("--lunge-dy");
+          appliedLunges.delete(cue.id);
+        }, 460);
+      }
+    }
+  }
+  if (surface && eventLayer) {
+    const surfaceRect = surface.getBoundingClientRect();
+    for (const node of eventLayer.querySelectorAll<HTMLElement>("[data-anchor-key]")) {
+      if (node.dataset.anchored === "true") continue;
+      const anchorKey = node.dataset.anchorKey ?? "";
+      const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(anchorKey)}"]`);
+      if (!target) continue;
+      const r = target.getBoundingClientRect();
+      const x = r.left + r.width / 2 - surfaceRect.left;
+      const y = r.top + r.height / 2 - surfaceRect.top;
+      node.style.left = `${x}px`;
+      node.style.top = `${y}px`;
+      node.dataset.anchored = "true";
+    }
+  }
+}
+
 
 function cardName(cardId: string | undefined): string | undefined {
   return cardId ? cardCatalog.get(cardId)?.name ?? cardId : undefined;
