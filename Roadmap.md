@@ -2,7 +2,7 @@ TWCARDGAME v2 — Development Roadmap
 
 Project: 寶島遊戲王 v2 parallel rewrite
 Architecture: Colyseus + TypeScript monorepo · Supabase · Vite · Fly.io · Vercel
-Last updated: 2026-05-17
+Last updated: 2026-05-19
 
 
 Phase Overview
@@ -153,7 +153,7 @@ What was completed
 
 
 Phase 5 — Real UI / UX
-Status: ⬜ Pending — prototype only
+Status: 🔄 In Progress
 
 Goal: the game looks and feels like 寶島保護戰, not a developer scaffold.
 
@@ -163,18 +163,51 @@ legacy/css/ — v1 color system, card frame styles, board layout (safe to port)
 legacy/js/ — v1 rendering logic (do not port logic; use only as visual reference)
 assets/ — card art, audio (shared, already in place)
 
-Tasks
+What was completed (commit 2b07d36)
 
- Full game board UI — hero zones, hand, board rows, mana display
- Card component rendering with art, cost, attack/health stats, rarity
- Card drag-and-drop or click-to-play with valid target highlighting
- Target selection UI (taunt indicators, valid target glow)
- Animation event playback — play card, attack, damage numbers, minion death
- Mulligan selection UI
- Reconnect / waiting-for-opponent UI
- Mobile responsive layout
- COMMAND_REJECTED feedback shown to player (toast / shake effect)
- End-of-match screen (winner, stats, back to lobby)
+ Full game board UI — hero zones, hand rows, board rows, mana crystals
+ Card component rendering — cost gem, title, art box, rarity, attack/health stats
+ Card click-to-play with valid-target highlighting and drag-and-drop arrow layer
+ Target selection UI — taunt glow, valid-target ring animation, attacker-selected state
+ Animation event playback — card preview slam, event cues (play/summon/damage/heal/buff/destroy)
+ Mulligan selection UI — overlay, card selection with replace tag, confirm count button
+ Reconnect / waiting-for-opponent banner
+ Mobile responsive layout — 390 px viewport verified, no horizontal overflow
+ COMMAND_REJECTED feedback — toast with shake animation + rejected-card border
+ End-of-match screen — result overlay (Victory/Defeat) + Back to Lobby
+ E2E spec (e2e/phase5-ui.spec.mjs) — 13 items verified, 13 passed
+
+Remaining tasks — v1 parity gap
+
+Core gameplay feel
+ Attack animation — attacker element moves toward target then snaps back; currently only shake cue on target
+ Floating damage/heal numbers — amount floats up from the affected target; currently only a text event cue
+ Minion death particle effect — dust-cloud particles on death; currently only a grayscale fade
+ Card hover tooltip — hovering a hand card or board minion shows a full-size card detail popup
+ Concede confirmation modal — prevent accidental surrender; v1 shows a confirm dialog before sending concede
+
+Main menu & navigation
+ Main menu page — game title logo, arena background, cloud animation, Enter Battle / Profile / Shop / Collection buttons
+ View transition animations — slide-up / fade between lobby → game → result screens
+
+Battle UI polish
+ Audio system — background music and sound effects for attacks, plays, deaths, turn change
+ Custom cursor — webp cursor sprite on desktop (see legacy/css/style.css); optional / desktop-only
+
+Account & profile
+ Player profile page — level display, XP bar, win/loss stats, avatar, title; currently only shows display_name
+ Card collection gallery — filterable card grid (all / owned / not owned) with card art; currently only shows count
+ Matchmaking waiting UI — animated searching state, elapsed time counter, cancel matchmaking button
+
+Single-player mode
+ AI opponent (at least Normal difficulty) — fixed theme deck vs rules engine; no new rules-engine work needed
+ Difficulty and theme deck selection screen
+
+Store & progression (lower priority)
+ Shop page — card pack purchase UI, gold currency display
+ Pack opening animation
+ Leaderboard page
+ Friends system — friend list, invitations, online status dot
 
 
 Phase 6 — Production Launch
