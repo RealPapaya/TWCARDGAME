@@ -49,6 +49,9 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   onCreate(options: GameRoomCreateOptions = {}): void {
     this.setState(new GameStateSchema());
     this.onMessage<ClientCommandMessage>("command", (client, message) => this.handleCommand(client, message));
+    this.onMessage("getJoinCode", (client) => {
+      if (this.registeredJoinCode) client.send("joinCode", { code: this.registeredJoinCode });
+    });
 
     const incomingCode = options.joinCode ? normalizeJoinCode(options.joinCode) : undefined;
     if (incomingCode || options.private) {
@@ -57,7 +60,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       this.registeredJoinCode = code;
       this.setPrivate(true);
       this.setMetadata({ joinCode: code });
-      this.broadcast("joinCode", { code });
+      // Code is sent to the creator in onJoin (with delay) and also on demand via getJoinCode.
     }
   }
 
@@ -71,6 +74,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.seats.set(client.sessionId, seat);
     this.setup.set(seat, setup);
     client.send("seat", { seat });
+
+    // If this is a private room, send the join code to the creator (first joiner).
+    // Delay 150 ms so the client's create() promise has time to resolve and attach
+    // its onMessage("joinCode") listener before this WS frame arrives.
+    if (this.registeredJoinCode && this.setup.size === 1) {
+      const code = this.registeredJoinCode;
+      setTimeout(() => client.send("joinCode", { code }), 150);
+    }
 
     if (!this.match && this.setup.size === 2) {
       this.createMatch();

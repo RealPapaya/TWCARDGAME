@@ -17,6 +17,7 @@
     "publish:catalog": "npm run publish:catalog -w @twcardgame/db",
     "test:e2e": "node e2e/game-loop.spec.mjs && node e2e/action-seq.spec.mjs && node e2e/phase5-ui.spec.mjs",
     "test:reconnect": "node e2e/reconnect.spec.mjs",
+    "test:checklist": "node e2e/checklist.spec.mjs",
     "dev:server": "npm run dev -w @twcardgame/server",
     "dev:web": "npm run dev -w @twcardgame/web"
   },

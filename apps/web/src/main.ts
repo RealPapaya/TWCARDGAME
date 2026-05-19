@@ -883,7 +883,10 @@ function renderGame(status: GameStatus | ""): string {
 
 function renderConnectionBanner(): string {
   if (!view.room || hasBothPlayers()) return "";
-  return `<div class="match-banner waiting">Waiting for opponent</div>`;
+  const codePart = view.privateJoinCode
+    ? ` · Room code: <code class="private-code">${escapeHtml(view.privateJoinCode)}</code>`
+    : "";
+  return `<div class="match-banner waiting" data-testid="private-code-banner">Waiting for opponent${codePart}</div>`;
 }
 
 function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "player" | "opponent"): string {
@@ -1904,6 +1907,9 @@ async function createPrivateChallenge(): Promise<void> {
       view.privateJoinCode = message.code;
       render();
     });
+    // Request the join code explicitly after listener is attached,
+    // in case the server's push arrived before the listener was ready.
+    setTimeout(() => room.send("getJoinCode", {}), 300);
   } catch (error) {
     view.joinError = error instanceof Error ? error.message : "Unable to create private room.";
   } finally {
@@ -1955,7 +1961,6 @@ function bindRoomMessages(joined: Room): void {
   view.presence.clear();
   view.rejectedHandIds.clear();
   view.matchmaking = undefined;
-  view.privateJoinCode = undefined;
   stopMatchmakingTick();
   (window as any).__room = joined;
 
@@ -2412,6 +2417,7 @@ async function backToLobby(): Promise<void> {
   view.eventStatus = undefined;
   view.toast = undefined;
   view.matchmaking = undefined;
+  view.privateJoinCode = undefined;
   stopMatchmakingTick();
   view.menuScreen = "main";
   if (room) {
