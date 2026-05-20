@@ -35,7 +35,8 @@
       "Bash(cat apps/web/vercel.json)",
       "Bash(Get-ChildItem -Path \"d:\\\\Google AI\\\\TWCARDGAME\" -Depth 0)",
       "Bash(Select-Object Name, PSIsContainer)",
-      "Bash(xargs ls -lh)"
+      "Bash(xargs ls -lh)",
+      "Bash(rg -n \"leaderboard\\\\|排行\\\\|榜\" LEGACY --include=\"*.js\" --include=\"*.html\" --include=\"*.css\" -l)"
     ],
     "additionalDirectories": [
       "\\tmp"

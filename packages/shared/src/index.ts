@@ -29,7 +29,14 @@ export interface ShopItemRow {
   kind: string;
   display_name: string;
   description?: string | null;
-  contents: { cards?: string[] };
+  price_gold: number;
+  contents: {
+    cards?: string[];
+    cardCount?: number;
+    itemCount?: number;
+    dropRates?: Array<{ label: string; rate: number; rarity?: Rarity; type?: string }>;
+    note?: string;
+  };
 }
 
 export const SEATS: readonly Seat[] = ["player1", "player2"] as const;

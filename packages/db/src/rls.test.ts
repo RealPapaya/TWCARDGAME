@@ -5,6 +5,7 @@ const coreMigration = readFileSync(new URL("../migrations/0001_v2_core.sql", imp
 const phase4Migration = readFileSync(new URL("../migrations/0002_phase4_account_deck_collection.sql", import.meta.url), "utf8");
 const grantsMigration = readFileSync(new URL("../migrations/0003_phase4_browser_table_grants.sql", import.meta.url), "utf8");
 const serviceRoleGrantsMigration = readFileSync(new URL("../migrations/0004_phase4_service_role_grants.sql", import.meta.url), "utf8");
+const legacyShopMigration = readFileSync(new URL("../migrations/0006_legacy_shop_items.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -49,5 +50,16 @@ describe("Supabase RLS migration coverage", () => {
     expect(phase4Migration).toContain("catalog.collectible is false");
     expect(phase4Migration).toContain("case when catalog.rarity = 'LEGENDARY' then 1 else 2 end");
     expect(phase4Migration).toContain("deck.qty > coalesce(collection.quantity, 0)");
+  });
+
+  it("keeps legacy shop purchases paid and seeded with v1 product ids", () => {
+    expect(legacyShopMigration).toContain("add column if not exists gold integer not null default 100");
+    expect(legacyShopMigration).toContain("add column if not exists price_gold integer not null default 0");
+    expect(legacyShopMigration).toContain("if profile.gold < item.price_gold then");
+    expect(legacyShopMigration).toContain("set gold = profile.gold - item.price_gold");
+    expect(legacyShopMigration).toContain("'card-pack'");
+    expect(legacyShopMigration).toContain("'cosmetic-pack'");
+    expect(legacyShopMigration).toContain("'CARD_PACK'");
+    expect(legacyShopMigration).toContain("'COSMETIC_PACK'");
   });
 });

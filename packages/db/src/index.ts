@@ -31,6 +31,11 @@ export interface PlayerProfileRow {
   user_id: string;
   display_name: string;
   avatar_url?: string | null;
+  gold?: number;
+  vouchers?: number;
+  owned_avatars?: string[];
+  owned_titles?: string[];
+  selected_title?: string;
   created_at?: string;
   updated_at?: string;
 }

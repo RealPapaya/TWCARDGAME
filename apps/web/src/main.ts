@@ -98,12 +98,15 @@ type ClientViewState = {
   leaderboard: LeaderboardRow[];
   leaderboardLoading?: boolean;
   leaderboardError?: string;
+  leaderboardSortBy: "wins" | "level";
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
   shopMessage?: string;
   shopError?: string;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
+  packOpeningRewards?: PackOpeningReward[];
   packOpeningFlipped?: boolean[];
+  packOpeningKind?: "card" | "cosmetic";
   aiDifficulty: AiDifficulty;
   privateJoinCode?: string;
   privateJoinCodeInput?: string;
@@ -133,6 +136,11 @@ type ProfileRow = {
   user_id: string;
   display_name: string;
   avatar_url?: string | null;
+  gold: number;
+  vouchers: number;
+  owned_avatars?: string[];
+  owned_titles?: string[];
+  selected_title?: string;
 };
 
 type DeckRow = {
@@ -157,6 +165,20 @@ type MatchHistoryRow = {
   finished_at?: string;
   player1_user_id?: string | null;
   player2_user_id?: string | null;
+};
+
+type PackOpeningReward =
+  | { type: "card"; cardId: string; name: string; rarity: string; image: string }
+  | { type: "avatar"; id: string; name: string; path: string }
+  | { type: "title"; id: string; name: string }
+  | { type: "voucher"; amount: number; name: string };
+
+type PurchaseShopResult = {
+  itemId: string;
+  kind: string;
+  priceGold: number;
+  remainingGold: number;
+  rewards: Array<{ type: string; cardId?: string; id?: string; name?: string; path?: string; amount?: number }>;
 };
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
@@ -332,6 +354,7 @@ const view: ClientViewState = {
   collectionSearch: "",
   friends: [],
   leaderboard: [],
+  leaderboardSortBy: "wins",
   shopItems: [],
   aiDifficulty: "normal",
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
@@ -355,7 +378,7 @@ function render(): void {
     <main class="${shellClass}">
       ${view.state ? renderGame(status) : renderLanding()}
       ${renderToast()}
-      ${renderPackOpeningOverlay()}
+      ${renderLegacyShopPackOverlay()}
     </main>
   `;
 
@@ -528,7 +551,7 @@ function renderMenu(): string {
     case "leaderboard":
       return renderLeaderboardScreen();
     case "shop":
-      return renderShopScreen();
+      return renderLegacyShopScreen();
     case "ai":
       return renderBattleScreen();
     case "main":
@@ -1650,6 +1673,14 @@ function bindStaticActions(): void {
       render();
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-lb-sort]")) {
+    el.addEventListener("click", () => {
+      const value = el.dataset.lbSort as "wins" | "level" | undefined;
+      if (!value) return;
+      view.leaderboardSortBy = value;
+      render();
+    });
+  }
   document.querySelector<HTMLInputElement>("#collection-search-input")?.addEventListener("input", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     view.collectionSearch = input.value;
@@ -1716,7 +1747,7 @@ function bindStaticActions(): void {
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-flip-index]")) {
     el.addEventListener("click", () => {
-      if (!view.packOpeningFlipped || !view.packOpeningCards) return;
+      if (!view.packOpeningFlipped || !view.packOpeningRewards) return;
       const idx = parseInt(el.dataset.flipIndex ?? "-1", 10);
       if (idx < 0 || view.packOpeningFlipped[idx]) return;
       view.packOpeningFlipped[idx] = true;
@@ -1725,8 +1756,9 @@ function bindStaticActions(): void {
     });
   }
   document.querySelector<HTMLButtonElement>("#btn-pack-done")?.addEventListener("click", () => {
-    view.packOpeningCards = undefined;
+    view.packOpeningRewards = undefined;
     view.packOpeningFlipped = undefined;
+    view.packOpeningKind = undefined;
     render();
   });
   for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
@@ -1867,33 +1899,59 @@ function renderPrivateCodeBanner(code: string): string {
   `;
 }
 
+function deriveLbLevel(wins: number): number {
+  return Math.floor(wins / 10) + 1;
+}
+
+function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, sortBy: "wins" | "level"): string {
+  const rankClass = displayRank <= 3 ? ` lb-card-rank-${displayRank}` : "";
+  const rankBadge = displayRank === 1 ? "🥇" : displayRank === 2 ? "🥈" : displayRank === 3 ? "🥉" : `#${displayRank}`;
+  const avatarUrl = row.avatar_url || "/images/avatars/avatar1.webp";
+  const level = deriveLbLevel(row.wins_count);
+  const statLabel = sortBy === "level" ? `Lv. ${level}` : `${row.wins_count} 勝`;
+  return `
+    <div class="lb-player-card${rankClass}">
+      <div class="lb-rank-badge">${rankBadge}</div>
+      <img class="lb-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <div class="lb-player-info">
+        <div class="lb-player-name">${escapeHtml(row.display_name)}</div>
+        <div class="lb-player-title">#菜鳥</div>
+      </div>
+      <div class="lb-stat-pill">${escapeHtml(statLabel)}</div>
+      <button class="lb-action-btn" title="玩家選項">⋯</button>
+    </div>
+  `;
+}
+
 function renderLeaderboardScreen(): string {
+  const sortBy = view.leaderboardSortBy;
+  const sorted = [...view.leaderboard].sort((a, b) =>
+    sortBy === "level"
+      ? deriveLbLevel(b.wins_count) - deriveLbLevel(a.wins_count) || b.wins_count - a.wins_count
+      : b.wins_count - a.wins_count
+  );
+  const titleText = sortBy === "level" ? "等級排行榜" : "勝場排行榜";
   return `
     <section class="screen leaderboard-screen" data-screen="leaderboard">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-        <h2>排行榜 · Leaderboard</h2>
-      </header>
-      ${view.leaderboardError ? `<p class="error-text menu-status">${escapeHtml(view.leaderboardError)}</p>` : ""}
-      <section class="parchment-card leaderboard-card">
+      <div class="lb-modal-content">
+        <div class="lb-modal-header">
+          <h2 class="lb-modal-title">🏆 ${titleText}</h2>
+          <button class="lb-close-btn" data-menu-screen="main">關閉</button>
+        </div>
+        <div class="lb-tabs" role="tablist">
+          <button class="lb-tab ${sortBy === "wins" ? "active" : ""}" data-lb-sort="wins" role="tab">勝場排行</button>
+          <button class="lb-tab ${sortBy === "level" ? "active" : ""}" data-lb-sort="level" role="tab">等級排行</button>
+        </div>
         ${view.leaderboardLoading
-          ? `<p class="muted">載入中…</p>`
-          : view.leaderboard.length === 0
-            ? `<p class="muted">目前還沒有任何上榜紀錄。</p>`
-            : `<table class="leaderboard-table" data-testid="leaderboard-table">
-                <thead><tr><th>#</th><th>玩家</th><th>勝場</th></tr></thead>
-                <tbody>
-                  ${view.leaderboard.map((row) => `
-                    <tr>
-                      <td class="leaderboard-rank">${row.rank}</td>
-                      <td>${escapeHtml(row.display_name)}</td>
-                      <td class="leaderboard-wins">${row.wins_count}</td>
-                    </tr>
-                  `).join("")}
-                </tbody>
-              </table>`}
-      </section>
+          ? `<p class="lb-empty">載入中…</p>`
+          : view.leaderboardError
+            ? `<p class="error-text lb-empty">${escapeHtml(view.leaderboardError)}</p>`
+            : `<div class="lb-list" data-testid="leaderboard-table">
+                ${sorted.length === 0
+                  ? `<p class="lb-empty">暫無排行榜資料</p>`
+                  : sorted.map((row, i) => renderLeaderboardPlayerCard(row, i + 1, sortBy)).join("")}
+              </div>`}
+      </div>
     </section>
   `;
 }
@@ -2014,6 +2072,159 @@ function renderPackOpeningOverlay(): string {
   `;
 }
 
+function renderLegacyShopScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode || !view.session) {
+    return signInRequiredScreen("商店");
+  }
+  const gold = view.profile?.gold ?? 0;
+  return `
+    <section class="screen shop-screen" data-screen="shop">
+      <div class="shop-container">
+        <header class="shop-header">
+          <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
+          <h2 class="shop-title">商店</h2>
+          <div class="shop-gold-display">
+            <img class="gold-icon" src="/images/ui/gold_coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <span id="shop-gold-amount">${gold}</span>
+          </div>
+        </header>
+        ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
+        ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
+        <div class="shop-products">
+          ${view.shopLoading
+            ? `<p class="muted">載入商店中...</p>`
+            : view.shopItems.length === 0
+              ? `<p class="muted">目前沒有可購買的商品。</p>`
+              : view.shopItems.map(renderLegacyShopItem).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderLegacyShopItem(item: ShopItemRow): string {
+  const isCardPack = item.kind === "CARD_PACK";
+  const affordable = (view.profile?.gold ?? 0) >= item.price_gold;
+  const icon = isCardPack
+    ? `<img src="/images/card_pack_book.webp" alt="卡牌包" onerror="this.style.display='none';this.parentElement.textContent='🎴'">`
+    : `<span aria-hidden="true">✨</span>`;
+  const rates = item.contents?.dropRates ?? legacyShopDropRates(item.kind);
+  const ratesHtml = rates.length > 0 ? `
+    <div class="product-rates-side">
+      <div class="rates-title">${isCardPack ? "獲得機率" : "內容機率"}</div>
+      <div class="product-drop-rates">
+        ${rates.map((rate) => `
+          <div class="rate-row ${rate.rarity?.toLowerCase() ?? rate.type ?? ""}">
+            <span>${escapeHtml(rate.label)}</span>
+            <span class="rate-val">${rate.rate}%</span>
+          </div>
+        `).join("")}
+      </div>
+      ${item.contents?.note ? `<small class="product-note">${escapeHtml(item.contents.note)}</small>` : ""}
+    </div>
+  ` : "";
+
+  return `
+    <section class="product-card" data-testid="shop-item" data-product="${escapeAttr(item.id)}">
+      <div class="product-top-row">
+        <div class="product-image">${icon}</div>
+        <h3>${escapeHtml(item.display_name)}</h3>
+      </div>
+      <div class="product-details-bottom">
+        <div class="product-info-side">
+          ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
+          <div class="product-price">
+            <img class="price-coin" src="/images/ui/gold_coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <span>${item.price_gold}</span>
+          </div>
+          <button class="btn-buy" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop" ${affordable ? "" : "disabled"}>購買</button>
+        </div>
+        ${ratesHtml}
+      </div>
+    </section>
+  `;
+}
+
+function legacyShopDropRates(kind: string): NonNullable<ShopItemRow["contents"]["dropRates"]> {
+  if (kind === "CARD_PACK") {
+    return [
+      { label: "普通", rarity: "COMMON", rate: 60 },
+      { label: "精良", rarity: "RARE", rate: 26 },
+      { label: "史詩", rarity: "EPIC", rate: 10 },
+      { label: "傳說", rarity: "LEGENDARY", rate: 4 }
+    ];
+  }
+  if (kind === "COSMETIC_PACK") {
+    return [
+      { label: "個人頭像", type: "avatar", rate: 50 },
+      { label: "專屬稱號", type: "title", rate: 50 }
+    ];
+  }
+  return [];
+}
+
+function renderLegacyShopPackOverlay(): string {
+  if (!view.packOpeningRewards || view.packOpeningRewards.length === 0) return "";
+  const rewards = view.packOpeningRewards;
+  const flipped = view.packOpeningFlipped ?? rewards.map(() => false);
+  const allFlipped = flipped.every(Boolean);
+  const cardItems = rewards.map((reward, i) => {
+    const rarity = reward.type === "card" ? reward.rarity.toUpperCase() : "RARE";
+    const rarityClass = reward.type === "card" ? reward.rarity.toLowerCase() : reward.type;
+    return `
+      <div class="pack-card-wrapper${flipped[i] ? ` flipped ${rarity}` : ""}" data-flip-index="${i}" role="button" aria-label="翻開獎勵">
+        <div class="pack-card-inner">
+          <div class="pack-card-back">
+            <img src="/images/ui/card_back.webp" alt="card back" onerror="this.src='/images/card_back.webp'">
+          </div>
+          <div class="pack-card-front">
+            <div class="pack-card-content rarity-${rarityClass}">
+              ${renderRewardVisual(reward)}
+              <div class="pack-card-name">${escapeHtml(rewardName(reward))}</div>
+              <div class="pack-card-rarity">${escapeHtml(rewardLabel(reward))}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <div class="pack-overlay" id="pack-opening-overlay" data-testid="pack-overlay">
+      <h2 class="pack-title">${view.packOpeningKind === "cosmetic" ? "開包結果" : "開包！"}</h2>
+      <div class="pack-cards-container">${cardItems}</div>
+      <button id="btn-pack-done" class="${allFlipped ? "visible" : ""}">完成</button>
+    </div>
+  `;
+}
+
+function renderRewardVisual(reward: PackOpeningReward): string {
+  if (reward.type === "card") {
+    const imgSrc = escapeAttr(assetUrl(reward.image));
+    return `<div class="pack-card-img-wrap"><img src="${imgSrc}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'"></div>`;
+  }
+  if (reward.type === "avatar") {
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><img class="reward-avatar-img" src="${escapeAttr(reward.path)}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'"></div>`;
+  }
+  if (reward.type === "title") {
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-title-badge">#${escapeHtml(reward.name)}</span></div>`;
+  }
+  return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge">券 ${reward.amount}</span></div>`;
+}
+
+function rewardName(reward: PackOpeningReward): string {
+  if (reward.type === "voucher") return `${reward.amount} 消費券`;
+  return reward.name;
+}
+
+function rewardLabel(reward: PackOpeningReward): string {
+  if (reward.type === "card") return rarityLabel[reward.rarity] ?? reward.rarity;
+  if (reward.type === "avatar") return "個人頭像";
+  if (reward.type === "title") return "專屬稱號";
+  return reward.name;
+}
+
 function signInRequiredScreen(title: string): string {
   return `
     <section class="screen friends-screen" data-screen="friends">
@@ -2113,9 +2324,9 @@ async function loadShopItems(): Promise<void> {
   try {
     const { data, error } = await supabase
       .from("shop_items")
-      .select("id,kind,display_name,description,contents")
+      .select("id,kind,display_name,description,price_gold,contents")
       .eq("active", true)
-      .order("display_name", { ascending: true });
+      .order("price_gold", { ascending: false });
     if (error) throw error;
     view.shopItems = (data as ShopItemRow[]) ?? [];
   } catch (error) {
@@ -2132,24 +2343,43 @@ async function claimShopItem(itemId: string): Promise<void> {
   view.shopMessage = undefined;
   render();
   try {
-    const { error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
+    const { data, error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
     if (error) throw error;
-    const item = view.shopItems.find((i) => i.id === itemId);
-    const cardIds = item?.contents?.cards ?? [];
-    view.packOpeningCards = cardIds
-      .map((id) => {
-        const card = cardCatalog.get(id);
-        if (!card) return undefined;
-        return { cardId: card.id, name: card.name, rarity: card.rarity, image: card.image };
-      })
-      .filter(Boolean) as Array<{ cardId: string; name: string; rarity: string; image: string }>;
-    view.packOpeningFlipped = view.packOpeningCards.map(() => false);
+    const result = data as PurchaseShopResult | null;
+    view.packOpeningRewards = normalizeShopRewards(result);
+    view.packOpeningKind = result?.kind === "COSMETIC_PACK" ? "cosmetic" : "card";
+    view.packOpeningFlipped = view.packOpeningRewards.map(() => false);
+    view.packOpeningCards = undefined;
+    view.shopMessage = "購買成功";
     await loadAccountDataRaw();
     render();
   } catch (error) {
-    view.shopError = error instanceof Error ? error.message : "Failed to claim shop item.";
+    view.shopError = error instanceof Error ? error.message : "購買失敗。";
     render();
   }
+}
+
+function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningReward[] {
+  const rewards = result?.rewards ?? [];
+  return rewards
+    .map((reward): PackOpeningReward | undefined => {
+      if (reward.type === "card" && reward.cardId) {
+        const card = cardCatalog.get(reward.cardId);
+        if (!card) return undefined;
+        return { type: "card", cardId: card.id, name: card.name, rarity: card.rarity, image: card.image };
+      }
+      if (reward.type === "avatar" && reward.id && reward.name && reward.path) {
+        return { type: "avatar", id: reward.id, name: reward.name, path: reward.path };
+      }
+      if (reward.type === "title" && reward.id && reward.name) {
+        return { type: "title", id: reward.id, name: reward.name };
+      }
+      if (reward.type === "voucher" && typeof reward.amount === "number") {
+        return { type: "voucher", amount: reward.amount, name: reward.name ?? "重複補償" };
+      }
+      return undefined;
+    })
+    .filter((reward): reward is PackOpeningReward => Boolean(reward));
 }
 
 async function startAiMatch(): Promise<void> {
@@ -2891,7 +3121,11 @@ async function loadAccountData(): Promise<void> {
 
     const userId = view.session!.user.id;
     const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
-      supabase.from("profiles").select("user_id,display_name,avatar_url").eq("user_id", userId).single(),
+      supabase
+        .from("profiles")
+        .select("user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title")
+        .eq("user_id", userId)
+        .single(),
       supabase
         .from("decks")
         .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
@@ -2939,7 +3173,11 @@ async function loadAccountDataRaw(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const userId = view.session.user.id;
   const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
-    supabase.from("profiles").select("user_id,display_name,avatar_url").eq("user_id", userId).single(),
+    supabase
+      .from("profiles")
+      .select("user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title")
+      .eq("user_id", userId)
+      .single(),
     supabase
       .from("decks")
       .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
