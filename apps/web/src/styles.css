@@ -2594,15 +2594,29 @@ input {
   cursor: not-allowed;
 }
 
+/* Bottom bar — wraps player-info-card (left) and corner-rail (right), pinned to bottom */
+.main-menu-bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 clamp(10px, 2vw, 30px) clamp(10px, 1.8vh, 20px);
+  z-index: 100;
+  pointer-events: none;
+}
+
+.main-menu-bottom > * {
+  pointer-events: all;
+}
+
 /* Bottom-right corner rail: shop (right) + collection (left of shop) */
 .menu-corner-rail {
-  position: absolute;
-  right: clamp(10px, 2vw, 30px);
-  bottom: clamp(12px, 2vh, 24px);
   display: flex;
   flex-direction: row;
   gap: clamp(8px, 1vw, 20px);
-  z-index: 100;
 }
 
 .menu-corner-btn {
@@ -2677,11 +2691,8 @@ input {
   letter-spacing: 0.02em;
 }
 
-/* Player info card (bottom-left) — matches V1: parchment, wood border, gold corners */
+/* Player info card (bottom-left) — inside .main-menu-bottom, no absolute positioning needed */
 .player-info-card {
-  position: absolute;
-  left: clamp(10px, 1.5vw, 20px);
-  bottom: clamp(12px, 2vh, 24px);
   display: flex;
   align-items: center;
   gap: clamp(10px, 1.5vw, 20px);
@@ -3613,8 +3624,6 @@ input {
     min-height: 56px;
   }
   .player-info-card {
-    left: 12px;
-    bottom: 12px;
     padding: 8px 10px;
   }
   .player-avatar {
@@ -4269,4 +4278,211 @@ input {
   opacity: 1;
   transform: translateY(0);
   pointer-events: all;
+}
+
+/* ============================================================
+   Settings modal
+   ============================================================ */
+
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-modal {
+  width: min(420px, 90%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: clamp(20px, 3vw, 36px);
+  padding-bottom: clamp(28px, 4vw, 48px);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 200, 0.7),
+    0 0 40px rgba(0, 0, 0, 0.65);
+}
+
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.settings-modal-header h3 {
+  font-family: var(--font-display);
+  font-size: clamp(18px, 2.4vw, 24px);
+  color: var(--wood-dark);
+  margin: 0;
+}
+
+.settings-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 16px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-section-title {
+  font-family: var(--font-display);
+  font-size: clamp(14px, 1.8vw, 18px);
+  color: var(--wood-dark);
+  margin: 0;
+}
+
+.settings-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-mute-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.settings-mute-btn.muted {
+  filter: grayscale(0.7);
+  opacity: 0.6;
+}
+
+.settings-volume-slider {
+  flex: 1;
+  height: 8px;
+  accent-color: var(--wood);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: unset;
+}
+
+.settings-volume-label {
+  flex-shrink: 0;
+  width: 40px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--wood-dark);
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--wood-dark);
+  opacity: 0.2;
+  margin: 4px 0;
+}
+
+.settings-signout-btn {
+  align-self: flex-start;
+  padding: 10px 28px;
+}
+
+/* ============================================================
+   Changelog modal
+   ============================================================ */
+
+.changelog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.changelog-modal {
+  width: min(760px, 92vw);
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 200, 0.7),
+    0 0 40px rgba(0, 0, 0, 0.65);
+}
+
+.changelog-list {
+  overflow-y: auto;
+  padding: 4px 4px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.changelog-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.changelog-list::-webkit-scrollbar-track {
+  background: var(--parchment-dark);
+  border-radius: 8px;
+}
+
+.changelog-list::-webkit-scrollbar-thumb {
+  background: var(--wood-medium);
+  border-radius: 8px;
+  border: 2px solid var(--wood-dark);
+}
+
+.changelog-version {
+  border: 2px solid var(--wood-dark);
+  border-radius: 10px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.changelog-version h4 {
+  font-family: var(--font-display);
+  font-size: clamp(14px, 2vw, 18px);
+  color: var(--wood-dark);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(93, 46, 23, 0.25);
+}
+
+.changelog-version ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.changelog-version li {
+  border-left: 4px solid var(--wood-medium);
+  padding-left: 14px;
+}
+
+.changelog-version li strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: clamp(12px, 1.6vw, 15px);
+  color: var(--wood-dark);
+}
+
+.changelog-version li p {
+  margin: 4px 0 0;
+  font-size: clamp(11px, 1.4vw, 13px);
+  color: #7a4a3a;
+  font-family: "Noto Sans TC", Inter, sans-serif;
+  white-space: pre-wrap;
 }

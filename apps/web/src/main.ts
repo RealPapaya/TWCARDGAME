@@ -107,7 +107,12 @@ type ClientViewState = {
   aiDifficulty: AiDifficulty;
   privateJoinCode?: string;
   privateJoinCodeInput?: string;
-  audioEnabled: boolean;
+  bgmVolume: number;
+  sfxVolume: number;
+  bgmMuted: boolean;
+  sfxMuted: boolean;
+  settingsOpen: boolean;
+  changelogOpen: boolean;
 };
 
 type ResolvedCardView = {
@@ -167,7 +172,10 @@ const supabase: SupabaseClient | undefined =
     : undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const seats: Seat[] = ["player1", "player2"];
-const audioPreferenceKey = "twcardgame.audioEnabled";
+const bgmVolumeKey = "twcardgame.bgmVolume";
+const sfxVolumeKey = "twcardgame.sfxVolume";
+const bgmMutedKey = "twcardgame.bgmMuted";
+const sfxMutedKey = "twcardgame.sfxMuted";
 const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
 const sfxPaths: Record<SoundCue, string> = {
   cardPlay: "/audio/sfx/LowCostMionion.mp3",
@@ -183,6 +191,126 @@ let audioUnlocked = false;
 const rarityLabel: Record<string, string> = {
   COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說", REPIC: "特殊"
 };
+
+type PatchNoteItem = { title: string; desc: string };
+type PatchNoteVersion = { version: string; date: string; items: PatchNoteItem[] };
+const PATCH_NOTES: PatchNoteVersion[] = [
+  {
+    version: "v0.9.0", date: "2026-01-20",
+    items: [
+      { title: "[新增] 對戰系統", desc: "新增對戰系統，玩家可以與其他玩家進行對戰，為甚麼只有這一條更新，因為超難做" }
+    ]
+  },
+  {
+    version: "v0.8.0", date: "2026-01-20",
+    items: [
+      { title: "[新卡片] 王ADEN、卡車司機", desc: "" },
+      { title: "[新增] 好友系統、排行榜系統", desc: "新增好友系統，玩家可以添加好友、查看好友列表、發送好友邀請等。排行榜系統可以讓玩家查看目前伺服器上的玩家 並且以等級為排行" },
+      { title: "[商店系統] 新增卡牌分解合成購買以及卡牌庫", desc: "新增卡牌分解合成功能，玩家可以將卡牌分解成消費券，再用消費券合成卡牌" },
+      { title: "[音效] 新增卡牌落地和攻擊音效、背景音樂", desc: "新增卡牌落地和攻擊音效，讓遊戲更有互動性" }
+    ]
+  },
+  {
+    version: "v0.7.0", date: "2026-01-18",
+    items: [
+      { title: "[新增] 帳號創建系統", desc: "新增帳號密碼，玩家可以儲存自己的牌組、頭像等等" },
+      { title: "[新功能] Mulligan", desc: "新增mulligan功能，玩家可以重新洗牌" },
+      { title: "[架構] 程式碼重構", desc: "重構代碼結構，使代碼更易於維護和擴展" }
+    ]
+  },
+  {
+    version: "v0.6.1", date: "2026-01-15",
+    items: [
+      { title: "[視覺優化] 更新適應性畫面", desc: "保持每個解析度的畫面比例一致" }
+    ]
+  },
+  {
+    version: "v0.6.0", date: "2026-01-15",
+    items: [
+      { title: "[新卡片] 沉默不是金", desc: "" },
+      { title: "[新增] 預設牌組、對戰紀錄", desc: "提供多個預設牌組，對戰中可查看對戰紀錄以供玩家參考" },
+      { title: "[視覺優化] 更新與AI對戰的選擇畫面", desc: "將難度以及牌組整合在同一個畫面" }
+    ]
+  },
+  {
+    version: "v0.5.0", date: "2026-01-14",
+    items: [
+      { title: "[新卡片] 蠻牛、死亡之握、TOYZ、卓榮泰、大法官、林佳龍", desc: "新增多張全新卡片，包含「蠻牛」(補血抽牌)、「死亡之握」(倒數三回合死亡)、「TOYZ」(高體質負面戰吼) 等。" },
+      { title: "[新增] 箭頭顏色、對戰提示", desc: "摧毀類型箭頭新增黑色並修改形式，新增對戰提示詞" },
+      { title: "[修正] 幽靈動畫", desc: "當抽牌時左側有牌由下往上飄出" }
+    ]
+  },
+  {
+    version: "v0.4.0", date: "2026-01-13",
+    items: [
+      { title: "[新卡片] 8+9、無期徒刑、鉅額交保、普發一萬、停班停課、王定宇", desc: "" },
+      { title: "[機制] 群體鎖定與增益", desc: "新增集體沉默與集體增益機制，支援更複雜的控場與反制策略" },
+      { title: "[新增] 遊戲主視覺", desc: "新增遊戲主視覺，包含主畫面、選卡畫面、對戰畫面、牌組編輯畫面" },
+      { title: "[視覺] 新聞回血特效", desc: "當「王定宇」觸發新聞回血效果時，現在會有綠色的回復數字飄出" }
+    ]
+  },
+  {
+    version: "v0.3.1", date: "2026-01-11",
+    items: [
+      { title: "[新增功能] 自訂游標系統", desc: "全站啟用風格游標，滑鼠懸停互動元素時保持一致外觀，提供更佳的沈浸感。可使用卡牌會出現綠光提示" },
+      { title: "[新卡片] 陳其邁、藍亦明、電子腳鐐、蘇貞昌、哈們、謝和弦、蔡想想、蔡樂樂、民進黨黨部、國民黨黨部、鋼鐵韓粉、青鳥大學生、老鳥中年", desc: "新增「陳其邁」(群體鎖定+召喚藍亦明)、「藍亦明」(存活機制)、「電子腳鐐」(沈默/鎖定)、「蘇貞昌」(衝鋒+回手) 與多張具備陣營特色的卡牌。" },
+      { title: "[調整] 蔡英文、水電師傅", desc: "蔡英文現在會召喚蔡想想、蔡樂樂，水電師傅生命值提升至4->5" },
+      { title: "[系統優化] 代碼重構與機制更新", desc: "分離卡牌資料結構以提升維護性，並實作新的攻守交換戰吼機制 (SWAP_ATTACK_HEALTH)。" }
+    ]
+  },
+  {
+    version: "v0.3.0", date: "2026-01-10",
+    items: [
+      { title: "[新卡片] 武漢肺炎、陳時中、陳建仁、網軍、側翼攻擊、八卦、緋聞、政治清算、查水表(重製)、炎上(重製)", desc: "新增「政治清算」造成單體巨額傷害。重製「查水表」與「炎上」效果。" },
+      { title: "[機制修正] 減費效果與法力驗證系統", desc: "修正「陳建仁」等減費卡牌導致的「0費無法出牌」問題。全面重構法力驗證邏輯，確保顯示費用即為實際支付費用。" },
+      { title: "[視覺優化] 震動反饋、波紋擴散、黑暗處決特效", desc: "新增「政治清算」的黑暗處決印記、「查水表」的全場搜查波紋、「武漢肺炎」的毒氣擴散，以及卡牌互動的震動反饋。" },
+      { title: "[系統] 數字顯示與預覽修復", desc: "優化傷害數字顯示系統。修復拖曳預覽時的卡頓與遮擋問題。" }
+    ]
+  },
+  {
+    version: "v0.2.2", date: "2026-01-09",
+    items: [
+      { title: "[新卡片] 賴清德、高端疫苗、黃捷、抗中保台、芒果乾、蘇巧慧", desc: "新增 6 張全新卡片，包含與民進黨相關的強力效果。" },
+      { title: "[優化] AI 主題牌組與測試模式", desc: "對戰改為選擇主題（綠/藍/白）進行挑戰。測試模式支援編輯電腦主題牌組。" }
+    ]
+  },
+  {
+    version: "v0.2.1", date: "2026-01-09",
+    items: [
+      { title: "[新卡片] 新增柯文哲(獄中)、蔡璧如、陳珮琪、陳珮琪(老公獄中)。", desc: "包含新的「自殘」與「滿血回復」機制。" },
+      { title: "[優化] AI 主題牌組與測試模式", desc: "對戰改為選擇主題（綠/藍/白）進行挑戰。測試模式支援編輯電腦主題牌組。" },
+      { title: "[修正] 介面與名詞調整", desc: "「法術」卡全面更名為「新聞」。統一按鈕樣式與位置。優化受傷數值顯示與補血動畫顏色。" }
+    ]
+  },
+  {
+    version: "v0.2.0", date: "2026-01-09",
+    items: [
+      { title: "[新卡片] 老榮民、法院傳票、連勝文、倒閣、造勢晚會、921大地震", desc: "新增多張具備政治色彩與強力效果的傳奇/史詩卡片。" },
+      { title: "[優化/機制] 全場視覺特效、AI 智能決策、打擊感強化", desc: "整合碎石噴發特效與畫面震動，大幅提升隨從對陣時的打擊反饋。" }
+    ]
+  },
+  {
+    version: "v0.1.2", date: "2026-01-08",
+    items: [
+      { title: "[新卡片] 政治切割、謝龍介", desc: "新增具備棄牌連動機制的卡片。謝龍介被丟棄時會直接進入戰場！" },
+      { title: "[機制] 棄牌召喚系統", desc: "完善了棄牌連鎖機制，現在卡片被隨機丟棄時能觸發自身或場上的特殊效果。" }
+    ]
+  },
+  {
+    version: "v0.1.1", date: "2026-01-08",
+    items: [
+      { title: "[新卡片] 傅崐萁、徐巧芯", desc: "新增「花蓮國王」傅崐萁及隨機棄牌連動。支援多重棄牌觸發系統。" }
+    ]
+  },
+  {
+    version: "v0.1", date: "2026-01-08",
+    items: [
+      { title: "[初始卡片組] 45張", desc: "含多種卡牌包含新聞、隨從牌。" },
+      { title: "[機制] 戰吼、光盾、嘲諷、衝鋒、遺志", desc: "新增多種卡牌機制。" },
+      { title: "[優化] 介面佈局與棄牌邏輯", desc: "新增版本號顯示、更新日誌，並優化了棄牌類卡片的打出限制。" }
+    ]
+  }
+];
 
 const view: ClientViewState = {
   hand: [],
@@ -204,7 +332,12 @@ const view: ClientViewState = {
   leaderboard: [],
   shopItems: [],
   aiDifficulty: "normal",
-  audioEnabled: readStoredAudioPreference()
+  bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
+  sfxVolume: readStoredNumber(sfxVolumeKey, 0.72),
+  bgmMuted: readStoredBool(bgmMutedKey, false),
+  sfxMuted: readStoredBool(sfxMutedKey, false),
+  settingsOpen: false,
+  changelogOpen: false
 };
 
 ensureDragLayer();
@@ -229,18 +362,42 @@ function render(): void {
   ensureBgm();
 }
 
-function readStoredAudioPreference(): boolean {
+function readStoredNumber(key: string, fallback: number): number {
   try {
-    return localStorage.getItem(audioPreferenceKey) !== "false";
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    const n = parseFloat(raw);
+    return isNaN(n) ? fallback : Math.max(0, Math.min(1, n));
   } catch {
-    return true;
+    return fallback;
+  }
+}
+
+function readStoredBool(key: string, fallback: boolean): boolean {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw === null) return fallback;
+    return raw === "true";
+  } catch {
+    return fallback;
+  }
+}
+
+function saveAudioPrefs(): void {
+  try {
+    localStorage.setItem(bgmVolumeKey, String(view.bgmVolume));
+    localStorage.setItem(sfxVolumeKey, String(view.sfxVolume));
+    localStorage.setItem(bgmMutedKey, String(view.bgmMuted));
+    localStorage.setItem(sfxMutedKey, String(view.sfxMuted));
+  } catch {
+    // Blocked storage; in-memory prefs still work.
   }
 }
 
 function installAudioUnlock(): void {
   bgmTrack.loop = true;
   bgmTrack.preload = "auto";
-  bgmTrack.volume = 0.22;
+  bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
   const unlock = () => {
     audioUnlocked = true;
     ensureBgm();
@@ -251,39 +408,52 @@ function installAudioUnlock(): void {
   window.addEventListener("keydown", unlock, { once: true });
 }
 
-function toggleAudio(): void {
-  view.audioEnabled = !view.audioEnabled;
-  try {
-    localStorage.setItem(audioPreferenceKey, String(view.audioEnabled));
-  } catch {
-    // Ignore blocked storage; the in-memory preference still works.
-  }
-  if (view.audioEnabled) {
-    audioUnlocked = true;
-    playSfx("turn", 0.45);
-    ensureBgm();
-  } else {
-    bgmTrack.pause();
-  }
-  render();
-}
-
 function ensureBgm(): void {
-  if (!view.audioEnabled || !audioUnlocked) return;
+  if (!audioUnlocked) return;
+  bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  if (view.bgmMuted) {
+    bgmTrack.pause();
+    return;
+  }
   if (!bgmTrack.paused) return;
   void bgmTrack.play().catch(() => {
     // Browsers may still block playback until a stronger user gesture.
   });
 }
 
-function playSfx(cue: SoundCue, volume = 0.72): void {
-  if (!view.audioEnabled || !audioUnlocked) return;
+function playSfx(cue: SoundCue, volume?: number): void {
+  if (view.sfxMuted || !audioUnlocked) return;
   const audio = new Audio(sfxPaths[cue]);
   audio.preload = "auto";
-  audio.volume = volume;
+  audio.volume = volume ?? view.sfxVolume;
   void audio.play().catch(() => {
     // Missing files or browser autoplay policy should never break gameplay.
   });
+}
+
+function setBgmVolume(v: number): void {
+  view.bgmVolume = v;
+  bgmTrack.volume = view.bgmMuted ? 0 : v;
+  saveAudioPrefs();
+}
+
+function setSfxVolume(v: number): void {
+  view.sfxVolume = v;
+  saveAudioPrefs();
+}
+
+function toggleBgmMute(): void {
+  view.bgmMuted = !view.bgmMuted;
+  saveAudioPrefs();
+  ensureBgm();
+  render();
+}
+
+function toggleSfxMute(): void {
+  view.sfxMuted = !view.sfxMuted;
+  saveAudioPrefs();
+  if (!view.sfxMuted) playSfx("turn");
+  render();
 }
 
 function playEventAudio(events: GameEvent[]): void {
@@ -398,39 +568,69 @@ function renderMainMenu(): string {
         <nav class="menu-buttons" aria-label="Main menu">
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
           <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
-          <button class="menu-button menu-patch" data-testid="menu-patch" disabled>更新內容</button>
+          <button class="menu-button menu-patch" id="changelog-open" data-testid="menu-patch">更新內容</button>
         </nav>
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
-        <button class="menu-icon-btn" data-menu-screen="profile" data-testid="menu-settings" title="設定" ${accountMode ? "" : "disabled"}>⚙️</button>
+        <button id="settings-toggle" class="menu-icon-btn" data-testid="menu-settings" title="設定">⚙️</button>
         <button class="menu-icon-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">🏆</button>
         <button class="menu-icon-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>🤝</button>
-        <button id="audio-toggle" class="menu-icon-btn audio-toggle ${view.audioEnabled ? "audio-on" : "audio-off"}" data-testid="audio-toggle" title="${view.audioEnabled ? "Sound on" : "Sound off"}" aria-pressed="${view.audioEnabled}">${view.audioEnabled ? "♪" : "×"}</button>
       </nav>
-      <nav class="menu-corner-rail" aria-label="底部功能">
-        <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
-          <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="卡牌庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-          <span class="corner-icon-emoji" style="display:none">🃏</span>
-          <span class="corner-label">卡牌庫</span>
-        </button>
-        <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
-          <img class="corner-icon" src="/images/ui/shop_logo.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-          <span class="corner-icon-emoji" style="display:none">💰</span>
-          <span class="corner-label">商店</span>
-        </button>
-      </nav>
-      <aside class="player-info-card" data-testid="player-chip">
-        <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
-        <div class="player-info-text">
-          <strong>${escapeHtml(displayName)}</strong>
-          <span class="player-title-text">${escapeHtml(playerTitle)}</span>
-          <span class="player-level-row">Lv.${level} <span class="player-card-count">${ownedCount}/${totalCatalog}</span></span>
-          <div class="xp-bar-track"><div class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></div></div>
-          <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
-        </div>
-        ${accountMode ? `<button id="sign-out" class="player-chip-action" title="Sign out">⎋</button>` : ""}
-      </aside>
+      <div class="main-menu-bottom">
+        <aside class="player-info-card" data-testid="player-chip">
+          <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+          <div class="player-info-text">
+            <strong>${escapeHtml(displayName)}</strong>
+            <span class="player-title-text">${escapeHtml(playerTitle)}</span>
+            <span class="player-level-row">Lv.${level} <span class="player-card-count">${ownedCount}/${totalCatalog}</span></span>
+            <div class="xp-bar-track"><div class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></div></div>
+            <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
+          </div>
+        </aside>
+        <nav class="menu-corner-rail" aria-label="底部功能">
+          <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
+            <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="卡牌庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="corner-icon-emoji" style="display:none">🃏</span>
+            <span class="corner-label">卡牌庫</span>
+          </button>
+          <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
+            <img class="corner-icon" src="/images/ui/shop_logo.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="corner-icon-emoji" style="display:none">💰</span>
+            <span class="corner-label">商店</span>
+          </button>
+        </nav>
+      </div>
+      ${view.settingsOpen ? renderSettingsModal() : ""}
+      ${view.changelogOpen ? renderChangelogModal() : ""}
     </section>
+  `;
+}
+
+function renderChangelogModal(): string {
+  return `
+    <div class="changelog-backdrop" id="changelog-backdrop" role="dialog" aria-modal="true" aria-label="更新日誌">
+      <div class="changelog-modal parchment-card">
+        <header class="settings-modal-header">
+          <h3>更新日誌</h3>
+          <button id="changelog-close" class="settings-close-btn" title="關閉">✕</button>
+        </header>
+        <div class="changelog-list">
+          ${PATCH_NOTES.map((entry) => `
+            <div class="changelog-version">
+              <h4>版本 ${escapeHtml(entry.version)} (${escapeHtml(entry.date)})</h4>
+              <ul>
+                ${entry.items.map((item) => `
+                  <li>
+                    <strong>${escapeHtml(item.title)}</strong>
+                    ${item.desc ? `<p>${escapeHtml(item.desc)}</p>` : ""}
+                  </li>
+                `).join("")}
+              </ul>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+    </div>
   `;
 }
 
@@ -601,6 +801,42 @@ function renderProfileScreen(): string {
         </section>
       </div>
     </section>
+  `;
+}
+
+function renderSettingsModal(): string {
+  const accountMode = Boolean(supabase);
+  const bgmPct = Math.round(view.bgmVolume * 100);
+  const sfxPct = Math.round(view.sfxVolume * 100);
+  return `
+    <div class="settings-backdrop" id="settings-backdrop" role="dialog" aria-modal="true" aria-label="設定">
+      <div class="settings-modal parchment-card">
+        <header class="settings-modal-header">
+          <h3>設定</h3>
+          <button id="settings-close" class="settings-close-btn" title="關閉">✕</button>
+        </header>
+        <h4 class="settings-section-title">🎵 音樂</h4>
+        <div class="settings-volume-row">
+          <button id="settings-bgm-mute" class="settings-mute-btn ${view.bgmMuted ? "muted" : ""}" title="${view.bgmMuted ? "取消靜音" : "靜音"}">
+            ${view.bgmMuted ? "🔇" : "🔊"}
+          </button>
+          <input id="settings-bgm-volume" type="range" class="settings-volume-slider" min="0" max="1" step="0.01" value="${view.bgmVolume}" ${view.bgmMuted ? "disabled" : ""} />
+          <span class="settings-volume-label">${bgmPct}%</span>
+        </div>
+        <h4 class="settings-section-title">🔔 音效</h4>
+        <div class="settings-volume-row">
+          <button id="settings-sfx-mute" class="settings-mute-btn ${view.sfxMuted ? "muted" : ""}" title="${view.sfxMuted ? "取消靜音" : "靜音"}">
+            ${view.sfxMuted ? "🔇" : "🔊"}
+          </button>
+          <input id="settings-sfx-volume" type="range" class="settings-volume-slider" min="0" max="1" step="0.01" value="${view.sfxVolume}" ${view.sfxMuted ? "disabled" : ""} />
+          <span class="settings-volume-label">${sfxPct}%</span>
+        </div>
+        ${accountMode ? `
+        <div class="settings-divider"></div>
+        <button id="settings-sign-out" class="settings-signout-btn danger" data-testid="settings-sign-out">登出</button>
+        ` : ""}
+      </div>
+    </div>
   `;
 }
 
@@ -1478,8 +1714,36 @@ function bindStaticActions(): void {
   document.querySelector<HTMLButtonElement>("#create-private-room")?.addEventListener("click", () => {
     void createPrivateChallenge();
   });
-  document.querySelector<HTMLButtonElement>("#audio-toggle")?.addEventListener("click", () => {
-    toggleAudio();
+  document.querySelector<HTMLButtonElement>("#settings-toggle")?.addEventListener("click", () => {
+    view.settingsOpen = true;
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#settings-close")?.addEventListener("click", () => {
+    view.settingsOpen = false;
+    render();
+  });
+  document.querySelector<HTMLElement>("#settings-backdrop")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) { view.settingsOpen = false; render(); }
+  });
+  document.querySelector<HTMLButtonElement>("#changelog-open")?.addEventListener("click", () => {
+    view.changelogOpen = true;
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#changelog-close")?.addEventListener("click", () => {
+    view.changelogOpen = false;
+    render();
+  });
+  document.querySelector<HTMLElement>("#changelog-backdrop")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) { view.changelogOpen = false; render(); }
+  });
+  document.querySelector<HTMLButtonElement>("#settings-sign-out")?.addEventListener("click", () => void signOut());
+  document.querySelector<HTMLButtonElement>("#settings-bgm-mute")?.addEventListener("click", toggleBgmMute);
+  document.querySelector<HTMLButtonElement>("#settings-sfx-mute")?.addEventListener("click", toggleSfxMute);
+  document.querySelector<HTMLInputElement>("#settings-bgm-volume")?.addEventListener("input", (e) => {
+    setBgmVolume(parseFloat((e.currentTarget as HTMLInputElement).value));
+  });
+  document.querySelector<HTMLInputElement>("#settings-sfx-volume")?.addEventListener("input", (e) => {
+    setSfxVolume(parseFloat((e.currentTarget as HTMLInputElement).value));
   });
 }
 
