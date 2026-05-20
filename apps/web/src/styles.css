@@ -1,4 +1,7 @@
 :root {
+  --game-width: 1600px;
+  --game-height: 900px;
+  --app-scale: 1;
   --ink: #f5ead4;
   --ink-muted: #cbbca2;
   --dark: #120c08;
@@ -114,21 +117,25 @@ h3 {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 100vw;
-  height: 100vh;
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
   overflow: hidden;
   background: #000;
+  touch-action: none;
 }
 
 .app-shell {
   position: relative;
-  /* Fit inside viewport while keeping 16:9, never overflow */
-  width: min(100vw, 177.78vh);
-  height: min(100vh, 56.25vw);
+  width: var(--game-width);
+  height: var(--game-height);
   overflow: hidden;
   flex-shrink: 0;
   display: grid;
   grid-template-rows: auto 1fr auto;
+  transform: scale(var(--app-scale));
+  transform-origin: center center;
   background:
     radial-gradient(circle at 50% 20%, rgba(255, 236, 170, 0.14), transparent 32%),
     url("/images/backgrounds/arena_bg.webp") center / cover no-repeat,
@@ -196,7 +203,7 @@ h3 {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) 150px 80px;
   gap: 8px;
-  width: min(540px, 56vw);
+  width: 540px;
 }
 
 input {
@@ -216,7 +223,7 @@ input {
 }
 
 .landing-copy {
-  width: min(560px, 92vw);
+  width: 560px;
   padding: 26px;
   background: linear-gradient(180deg, var(--parchment-light), var(--parchment-dark));
   border: 6px solid var(--wood-dark);
@@ -321,7 +328,7 @@ input {
 .auth-panel {
   display: grid;
   gap: 12px;
-  width: min(560px, 92vw);
+  width: 560px;
 }
 
 .auth-form {
@@ -352,7 +359,7 @@ input {
 }
 
 .deck-card-list {
-  max-height: calc(100vh - 260px);
+  max-height: calc(var(--game-height) - 260px);
   overflow: auto;
   padding-right: 4px;
 }
@@ -456,7 +463,7 @@ input {
 
 .battle-surface {
   position: relative;
-  height: calc(100vh - 74px - 96px);
+  height: calc(var(--game-height) - 74px - 96px);
   min-height: 560px;
   display: grid;
   grid-template-rows: minmax(210px, 1fr) 72px minmax(250px, 1.08fr);
@@ -1093,7 +1100,7 @@ input {
   display: grid;
   justify-items: center;
   gap: 14px;
-  width: min(1080px, 96vw);
+  width: 1080px;
   text-align: center;
 }
 
@@ -1166,7 +1173,7 @@ input {
 
 .result-text {
   color: #ffe45d;
-  font-size: clamp(48px, 9vw, 118px);
+  font-size: 118px;
   letter-spacing: 0;
   text-shadow: 0 0 20px currentColor, 0 8px 20px #000;
 }
@@ -1256,7 +1263,7 @@ input {
   transform: translateX(-50%);
   z-index: 120;
   min-width: 260px;
-  max-width: min(620px, 86vw);
+  max-width: 620px;
   padding: 13px 22px;
   border: 2px solid #ff7a69;
   border-radius: 8px;
@@ -1425,7 +1432,7 @@ input {
   white-space: nowrap;
 }
 
-@media (max-width: 980px) {
+@media (max-width: 0px) {
   .topbar {
     display: grid;
   }
@@ -1512,7 +1519,7 @@ input {
   }
 }
 
-@media (max-width: 720px), (orientation: portrait) {
+@media (max-width: 0px) {
   html,
   body {
     overflow-x: hidden;
@@ -2065,7 +2072,7 @@ input {
   position: relative;
   min-height: 100%;
   height: 100%;
-  padding: 24px clamp(16px, 4vw, 56px);
+  padding: 24px 56px;
   animation: screen-enter 280ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
   overflow: hidden;
 }
@@ -2091,7 +2098,7 @@ input {
 }
 
 .screen-header h2 {
-  font-size: clamp(22px, 3.4vw, 32px);
+  font-size: 32px;
   color: var(--ink);
   text-shadow: 0 2px 6px rgba(0, 0, 0, 0.55);
 }
@@ -2176,7 +2183,7 @@ input {
     transform: translateX(-360px);
   }
   to {
-    transform: translateX(calc(100vw + 360px));
+    transform: translateX(calc(var(--game-width) + 360px));
   }
 }
 
@@ -2221,7 +2228,7 @@ input {
 }
 
 .game-title {
-  font-size: clamp(40px, 7vw, 88px);
+  font-size: 88px;
   margin: 0;
   color: #f1e4d1;
   font-family: var(--font-display);
@@ -2270,15 +2277,15 @@ input {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: min(420px, 88vw);
-  margin-top: clamp(56px, 15vh, 126px);
+  width: 420px;
+  margin-top: 120px;
 }
 
 .auth-page-title {
   margin: 0 0 42px;
   color: var(--parchment-light);
   font-family: "Noto Serif TC", var(--font-display);
-  font-size: clamp(44px, 5vw, 64px);
+  font-size: 64px;
   font-weight: 900;
   letter-spacing: 8px;
   line-height: 1;
@@ -2533,26 +2540,26 @@ input {
   gap: 0;
   width: 100%;
   max-width: 600px;
-  margin-top: clamp(60px, 12vh, 180px);
+  margin-top: 180px;
 }
 
 /* Title matches V1: 85px, parchment colour, 12px letter-spacing, drop shadow */
 .main-menu-center .game-title {
-  font-size: clamp(52px, 7vw, 85px);
-  margin-bottom: clamp(20px, 3vw, 50px);
+  font-size: 85px;
+  margin-bottom: 50px;
   color: #f1e4d1;
   text-shadow:
     0 0 10px rgba(241, 228, 209, 0.3),
     4px 4px 0 #4a3728,
     6px 6px 15px rgba(0, 0, 0, 0.8);
-  letter-spacing: clamp(4px, 1vw, 12px);
+  letter-spacing: 12px;
   font-family: var(--font-display);
 }
 
 /* Version pill → plain version text like V1 */
 .version-pill {
   display: block;
-  font-size: clamp(14px, 1.5vw, 22px);
+  font-size: 22px;
   font-weight: bold;
   color: #ffffff;
   letter-spacing: 2px;
@@ -2561,13 +2568,13 @@ input {
   border: none;
   padding: 0;
   border-radius: 0;
-  margin-bottom: clamp(14px, 2vw, 25px);
+  margin-bottom: 25px;
 }
 
 .menu-buttons {
   display: flex;
   flex-direction: column;
-  gap: clamp(14px, 2vw, 30px);
+  gap: 30px;
   align-items: center;
   width: 100%;
   margin-top: 0;
@@ -2580,9 +2587,9 @@ input {
   justify-content: center;
   width: 100%;
   max-width: 500px;
-  padding: clamp(10px, 1.5vw, 18px) clamp(20px, 3vw, 40px);
-  min-height: clamp(50px, 6vw, 72px);
-  font-size: clamp(16px, 2vw, 24px);
+  padding: 18px 40px;
+  min-height: 72px;
+  font-size: 24px;
   font-family: var(--font-display);
   letter-spacing: 0.08em;
   position: relative;
@@ -2645,29 +2652,29 @@ input {
 }
 
 .menu-button.menu-patch {
-  font-size: clamp(12px, 1.4vw, 18px);
-  min-height: clamp(36px, 4vw, 50px);
-  padding: clamp(6px, 1vw, 10px) clamp(14px, 2vw, 25px);
+  font-size: 18px;
+  min-height: 50px;
+  padding: 10px 25px;
   opacity: 0.85;
 }
 
 /* Right-side icon rail: top-right, vertical, parchment ovals — matches V1 */
 .menu-icon-rail {
   position: absolute;
-  right: clamp(20px, 3vw, 60px);
-  top: clamp(10px, 2vh, 20px);
+  right: 60px;
+  top: 20px;
   display: flex;
   flex-direction: column;
-  gap: clamp(10px, 1.5vh, 20px);
+  gap: 20px;
   z-index: 100;
 }
 
 .menu-icon-btn {
-  width: clamp(60px, 6vw, 110px);
-  height: clamp(60px, 6vw, 110px);
+  width: 110px;
+  height: 110px;
   background: #e6ccb2;
   border: 6px solid #5d2e17;
-  font-size: clamp(28px, 3.5vw, 60px);
+  font-size: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2685,9 +2692,9 @@ input {
   border-radius: 50%;
   background: rgba(139, 69, 19, 0.3);
   border: 3px solid #8b4513;
-  width: clamp(44px, 4.5vw, 70px);
-  height: clamp(44px, 4.5vw, 70px);
-  font-size: clamp(22px, 2.5vw, 36px);
+  width: 70px;
+  height: 70px;
+  font-size: 36px;
   filter: none;
   box-shadow:
     inset 0 2px 4px rgba(0, 0, 0, 0.2),
@@ -2713,9 +2720,9 @@ input {
 
 .menu-icon-btn:nth-child(4) {
   border-radius: 50%;
-  width: clamp(42px, 4.3vw, 66px);
-  height: clamp(42px, 4.3vw, 66px);
-  font-size: clamp(20px, 2.4vw, 34px);
+  width: 66px;
+  height: 66px;
+  font-size: 34px;
   align-self: flex-end;
   filter: drop-shadow(4px 5px 0px #3d1e0f);
 }
@@ -2753,7 +2760,7 @@ input {
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
-  padding: 0 clamp(10px, 2vw, 30px) clamp(10px, 1.8vh, 20px);
+  padding: 0 30px 20px;
   z-index: 100;
   pointer-events: none;
 }
@@ -2766,7 +2773,7 @@ input {
 .menu-corner-rail {
   display: flex;
   flex-direction: row;
-  gap: clamp(8px, 1vw, 20px);
+  gap: 20px;
 }
 
 .menu-corner-btn {
@@ -2775,8 +2782,8 @@ input {
   align-items: center;
   justify-content: center;
   gap: 4px;
-  width: clamp(90px, 10vw, 150px);
-  height: clamp(90px, 10vw, 150px);
+  width: 150px;
+  height: 150px;
   border-radius: 50%;
   border: 4px solid #8b4513;
   background: linear-gradient(to bottom, #f4e4bc, #e6ccb2);
@@ -2820,20 +2827,20 @@ input {
 }
 
 .corner-icon {
-  width: clamp(54px, 6vw, 90px);
-  height: clamp(54px, 6vw, 90px);
+  width: 90px;
+  height: 90px;
   object-fit: contain;
   filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.6));
   display: block;
 }
 
 .corner-icon-emoji {
-  font-size: clamp(28px, 3.5vw, 54px);
+  font-size: 54px;
   line-height: 1;
 }
 
 .corner-label {
-  font-size: clamp(10px, 1.2vw, 22px);
+  font-size: 22px;
   font-family: var(--font-display);
   color: #3d1e0f;
   font-weight: 900;
@@ -2845,8 +2852,8 @@ input {
 .player-info-card {
   display: flex;
   align-items: center;
-  gap: clamp(10px, 1.5vw, 20px);
-  padding: clamp(10px, 1.5vw, 20px) clamp(14px, 1.8vw, 25px);
+  gap: 20px;
+  padding: 20px 25px;
   background: #f4e4bc;
   background-image: radial-gradient(circle at 50% 50%, rgba(255,255,255,0.2) 0%, transparent 100%);
   border: 6px solid #5d2e17;
@@ -2855,7 +2862,7 @@ input {
     inset 0 2px 4px rgba(0, 0, 0, 0.1),
     0 8px 20px rgba(0, 0, 0, 0.6);
   z-index: 50;
-  max-width: clamp(200px, 22vw, 340px);
+  max-width: 340px;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
 }
 
@@ -2885,8 +2892,8 @@ input {
 }
 
 .player-avatar {
-  width: clamp(50px, 5.5vw, 80px);
-  height: clamp(50px, 5.5vw, 80px);
+  width: 80px;
+  height: 80px;
   border-radius: 50%;
   border: 5px solid #8b4513;
   object-fit: cover;
@@ -2901,12 +2908,12 @@ input {
 .player-info-text {
   display: flex;
   flex-direction: column;
-  gap: clamp(2px, 0.4vh, 4px);
-  min-width: clamp(80px, 9vw, 140px);
+  gap: 4px;
+  min-width: 140px;
 }
 
 .player-info-text strong {
-  font-size: clamp(14px, 1.6vw, 22px);
+  font-size: 22px;
   font-family: var(--font-display);
   letter-spacing: 0.04em;
   color: #3d1e0f;
@@ -2917,14 +2924,14 @@ input {
 }
 
 .player-title-text {
-  font-size: clamp(10px, 1.1vw, 14px);
+  font-size: 14px;
   color: #8b4513;
   font-weight: 600;
   margin-bottom: 2px;
 }
 
 .player-level-row {
-  font-size: clamp(10px, 1.1vw, 16px);
+  font-size: 16px;
   color: #3d1e0f;
   font-weight: bold;
   display: flex;
@@ -2934,12 +2941,12 @@ input {
 
 .player-card-count {
   color: #8b4513;
-  font-size: clamp(9px, 1vw, 14px);
+  font-size: 14px;
 }
 
 .xp-bar-track {
-  width: clamp(80px, 9vw, 140px);
-  height: clamp(6px, 0.7vw, 10px);
+  width: 140px;
+  height: 10px;
   background: rgba(61, 30, 15, 0.2);
   border: 1px solid #8b4513;
   border-radius: 5px;
@@ -2958,7 +2965,7 @@ input {
 
 .player-stats {
   color: #5d2e17;
-  font-size: clamp(10px, 1.1vw, 14px);
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -2968,7 +2975,7 @@ input {
   border: 2px solid #8b4513;
   color: #5d2e17;
   padding: 4px 8px;
-  font-size: clamp(10px, 1.1vw, 14px);
+  font-size: 14px;
   border-radius: 6px;
   box-shadow: none;
   text-shadow: none;
@@ -3004,7 +3011,7 @@ input {
   gap: 16px;
 }
 
-@media (max-width: 600px) {
+@media (max-width: 0px) {
   .battle-mode-panels {
     grid-template-columns: 1fr;
   }
@@ -3021,7 +3028,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 50vh;
+  max-height: 450px;
   overflow-y: auto;
 }
 
@@ -3389,7 +3396,7 @@ input {
   margin: 0;
   color: var(--wood-dark);
   font-family: "Noto Serif TC", var(--font-display);
-  font-size: clamp(30px, 4vw, 42px);
+  font-size: 42px;
   font-weight: 900;
   letter-spacing: 8px;
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
@@ -3684,8 +3691,8 @@ input {
 }
 
 .pinned-card-content .card {
-  width: min(320px, 82vw);
-  height: min(468px, calc(100vh - 110px));
+  width: 320px;
+  height: 468px;
   padding: 16px 18px;
 }
 
@@ -3745,7 +3752,7 @@ input {
 
 /* Responsive */
 
-@media (max-width: 980px) {
+@media (max-width: 0px) {
   .battle-pick-grid {
     grid-template-columns: 1fr;
   }
@@ -3768,7 +3775,7 @@ input {
   }
 }
 
-@media (max-width: 720px) {
+@media (max-width: 0px) {
   .menu-button {
     font-size: 18px;
     min-height: 56px;
@@ -3797,7 +3804,7 @@ input {
   }
 }
 
-@media (max-width: 420px) {
+@media (max-width: 0px) {
   .screen {
     padding: 16px 12px;
   }
@@ -3818,7 +3825,7 @@ input {
 .ai-grid       { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .shop-grid     { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
-@media (max-width: 720px) {
+@media (max-width: 0px) {
   .friends-grid, .ai-grid { grid-template-columns: 1fr; }
 }
 
@@ -3988,7 +3995,7 @@ input {
   left: 50%;
   transform: translateX(-50%);
   font-family: var(--font-display);
-  font-size: clamp(26px, 3.5vw, 40px);
+  font-size: 40px;
   font-weight: 900;
   color: var(--wood-dark);
   text-shadow: 0 1px 0 rgba(255, 244, 200, 0.5);
@@ -4120,7 +4127,7 @@ input {
 
 .product-card h3 {
   font-family: var(--font-display);
-  font-size: clamp(20px, 2.4vw, 28px);
+  font-size: 28px;
   font-weight: 900;
   color: #3d1e0f;
   margin: 0;
@@ -4280,7 +4287,7 @@ input {
 
 .pack-title {
   font-family: var(--font-display);
-  font-size: clamp(28px, 4vw, 40px);
+  font-size: 40px;
   color: var(--parchment-light);
   text-shadow: 0 0 24px rgba(212, 175, 55, 0.7);
   margin: 0;
@@ -4449,8 +4456,8 @@ input {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  padding: clamp(20px, 3vw, 36px);
-  padding-bottom: clamp(28px, 4vw, 48px);
+  padding: 36px;
+  padding-bottom: 48px;
   box-shadow:
     inset 0 0 0 1px rgba(255, 244, 200, 0.7),
     0 0 40px rgba(0, 0, 0, 0.65);
@@ -4465,7 +4472,7 @@ input {
 
 .settings-modal-header h3 {
   font-family: var(--font-display);
-  font-size: clamp(18px, 2.4vw, 24px);
+  font-size: 24px;
   color: var(--wood-dark);
   margin: 0;
 }
@@ -4483,7 +4490,7 @@ input {
 
 .settings-section-title {
   font-family: var(--font-display);
-  font-size: clamp(14px, 1.8vw, 18px);
+  font-size: 18px;
   color: var(--wood-dark);
   margin: 0;
 }
@@ -4559,8 +4566,8 @@ input {
 }
 
 .changelog-modal {
-  width: min(760px, 92vw);
-  max-height: 80vh;
+  width: 760px;
+  max-height: 720px;
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -4601,7 +4608,7 @@ input {
 
 .changelog-version h4 {
   font-family: var(--font-display);
-  font-size: clamp(14px, 2vw, 18px);
+  font-size: 18px;
   color: var(--wood-dark);
   margin: 0 0 12px;
   padding-bottom: 8px;
@@ -4625,13 +4632,13 @@ input {
 .changelog-version li strong {
   display: block;
   font-family: var(--font-display);
-  font-size: clamp(12px, 1.6vw, 15px);
+  font-size: 15px;
   color: var(--wood-dark);
 }
 
 .changelog-version li p {
   margin: 4px 0 0;
-  font-size: clamp(11px, 1.4vw, 13px);
+  font-size: 13px;
   color: #7a4a3a;
   font-family: "Noto Sans TC", Inter, sans-serif;
   white-space: pre-wrap;
