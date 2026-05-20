@@ -5123,3 +5123,33 @@ input {
   font-family: "Noto Sans TC", Inter, sans-serif;
   white-space: pre-wrap;
 }
+
+/* Medieval toast — matches LEGACY .medieval-toast style */
+.medieval-toast {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #8b4513;
+  color: #f4e4bc;
+  padding: 15px 40px;
+  border: 5px solid #5d2e17;
+  font-family: "Noto Serif TC", serif;
+  font-weight: bold;
+  font-size: 1.2rem;
+  z-index: 99999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.medieval-toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+

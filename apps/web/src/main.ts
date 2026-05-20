@@ -72,7 +72,6 @@ type ClientViewState = {
   joinError?: string;
   accountLoading: boolean;
   accountError?: string;
-  accountMessage?: string;
   session?: Session | null;
   profile?: ProfileRow;
   decks: DeckRow[];
@@ -94,7 +93,6 @@ type ClientViewState = {
   editingDisplayNameActive?: boolean;
   friends: FriendRow[];
   friendsLoading?: boolean;
-  friendsMessage?: string;
   friendsError?: string;
   leaderboard: LeaderboardRow[];
   leaderboardLoading?: boolean;
@@ -102,7 +100,6 @@ type ClientViewState = {
   leaderboardSortBy: "wins" | "level";
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
-  shopMessage?: string;
   shopError?: string;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
   packOpeningRewards?: PackOpeningReward[];
@@ -142,7 +139,14 @@ type ProfileRow = {
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string;
+  login_days?: number;
+  current_login_streak?: number;
+  longest_login_streak?: number;
+  last_login_date?: string | null;
 };
+
+const PROFILE_SELECT =
+  "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 
 type DeckRow = {
   id: string;
@@ -585,7 +589,6 @@ function renderAuthPanel(): string {
             <button type="button" id="sign-up" class="auth-tab" ${view.accountLoading ? "disabled" : ""}>註冊</button>
           </div>
         ${view.accountError ? `<p class="error-text">${escapeHtml(view.accountError)}</p>` : ""}
-        ${view.accountMessage ? `<p class="success-text">${escapeHtml(view.accountMessage)}</p>` : ""}
         <form id="auth-form" class="auth-form">
           <label class="auth-label">
             <span>帳號</span>
@@ -634,7 +637,6 @@ function renderMainMenu(): string {
         <h1 class="game-title">寶島遊戲王</h1>
         <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
         ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-        ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
         ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
         <nav class="menu-buttons" aria-label="Main menu">
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
@@ -832,7 +834,6 @@ function renderProfileScreen(): string {
         <h2>個人頁面</h2>
       </header>
       ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-      ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
       <div class="profile-grid">
         <section class="parchment-card profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
@@ -1047,7 +1048,6 @@ function renderDeckEditorScreen(): string {
         <h2>編輯牌組 · Deck Editor</h2>
       </header>
       ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-      ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
       <section class="parchment-card editor-panel">
         ${renderDeckEditor()}
       </section>
@@ -1765,8 +1765,7 @@ function bindStaticActions(): void {
       void navigator.clipboard?.writeText(code).catch(() => {
         // Clipboard might be blocked in some browsers; the code is visible on-screen.
       });
-      view.friendsMessage = `已複製代碼 ${code}`;
-      render();
+      showToast(`已複製代碼 ${code}`);
     });
   }
   document.querySelector<HTMLButtonElement>("#cancel-private-room")?.addEventListener("click", () => {
@@ -1859,7 +1858,6 @@ function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
   view.menuScreen = target;
   view.accountError = undefined;
-  view.accountMessage = undefined;
   view.joinError = undefined;
   view.avatarPickerOpen = false;
   view.pinnedCollectionCardId = undefined;
@@ -1897,7 +1895,6 @@ function renderFriendsScreen(): string {
         <h2>好友 · Friends</h2>
       </header>
       ${view.friendsError ? `<p class="error-text menu-status">${escapeHtml(view.friendsError)}</p>` : ""}
-      ${view.friendsMessage ? `<p class="success-text menu-status">${escapeHtml(view.friendsMessage)}</p>` : ""}
       <div class="friends-grid">
         <section class="parchment-card friends-add">
           <h3>新增好友</h3>
@@ -2026,7 +2023,6 @@ function renderShopScreen(): string {
           </div>
         </header>
         ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
-        ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
         <div class="shop-products">
           ${view.shopLoading
             ? `<p class="muted">載入中…</p>`
@@ -2142,7 +2138,6 @@ function renderLegacyShopScreen(): string {
           </div>
         </header>
         ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
-        ${view.shopMessage ? `<p class="success-text menu-status">${escapeHtml(view.shopMessage)}</p>` : ""}
         <div class="shop-products">
           ${view.shopLoading
             ? `<p class="muted">載入商店中...</p>`
@@ -2349,12 +2344,11 @@ async function sendFriendRequest(displayName: string): Promise<void> {
   }
   view.friendsLoading = true;
   view.friendsError = undefined;
-  view.friendsMessage = undefined;
   render();
   try {
     const { error } = await supabase.rpc("send_friend_request", { p_target_display_name: target });
     if (error) throw error;
-    view.friendsMessage = `已將 ${target} 加為好友。`;
+    showToast(`已將 ${target} 加為好友。`);
     await loadFriends();
   } catch (error) {
     view.friendsError = error instanceof Error ? error.message : "Failed to add friend.";
@@ -2366,11 +2360,10 @@ async function sendFriendRequest(displayName: string): Promise<void> {
 async function removeFriend(friendUserId: string): Promise<void> {
   if (!supabase || !view.session) return;
   view.friendsError = undefined;
-  view.friendsMessage = undefined;
   try {
     const { error } = await supabase.rpc("remove_friend", { p_friend_user_id: friendUserId });
     if (error) throw error;
-    view.friendsMessage = "好友已移除。";
+    showToast("好友已移除。");
     await loadFriends();
   } catch (error) {
     view.friendsError = error instanceof Error ? error.message : "Failed to remove friend.";
@@ -2422,7 +2415,6 @@ async function loadShopItems(): Promise<void> {
 async function claimShopItem(itemId: string): Promise<void> {
   if (!supabase || !view.session) return;
   view.shopError = undefined;
-  view.shopMessage = undefined;
   try {
     const { data, error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
     if (error) throw error;
@@ -2431,7 +2423,7 @@ async function claimShopItem(itemId: string): Promise<void> {
     view.packOpeningKind = result?.kind === "COSMETIC_PACK" ? "cosmetic" : "card";
     view.packOpeningFlipped = view.packOpeningRewards.map(() => false);
     view.packOpeningCards = undefined;
-    view.shopMessage = "購買成功";
+    showToast("購買成功！");
     await loadAccountDataRaw();
     updateShopGoldDisplay(result);
     mountPackOpeningOverlay();
@@ -2728,7 +2720,7 @@ async function saveProfile(event: Event): Promise<void> {
   await withAccountLoading(async () => {
     const { error } = await supabase.from("profiles").update({ display_name: name }).eq("user_id", view.session!.user.id);
     if (error) throw error;
-    view.accountMessage = "個人資料已更新。";
+    showToast("個人資料已更新。");
     view.editingDisplayName = undefined;
     view.editingDisplayNameActive = false;
     await loadAccountDataRaw();
@@ -2741,7 +2733,7 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
   await withAccountLoading(async () => {
     const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", view.session!.user.id);
     if (error) throw error;
-    view.accountMessage = "Avatar updated.";
+    showToast("頭像已更新。");
     view.avatarPickerOpen = false;
     await loadAccountDataRaw();
   });
@@ -3189,7 +3181,7 @@ async function signInWithPassword(event: Event): Promise<void> {
   await withAccountLoading(async () => {
     const { error } = await supabase.auth.signInWithPassword(credentials);
     if (error) throw error;
-    view.accountMessage = "Signed in.";
+    pendingWelcomeToast = true;
   });
 }
 
@@ -3203,7 +3195,7 @@ async function signUpWithPassword(): Promise<void> {
       options: { data: { display_name: email.split("@")[0] || "Player" } }
     });
     if (error) throw error;
-    view.accountMessage = "Account created. Confirm email if your Supabase project requires it, then sign in.";
+    showToast("帳號已建立，請確認信箱後登入。");
   });
 }
 
@@ -3223,8 +3215,16 @@ async function signOut(): Promise<void> {
   await withAccountLoading(async () => {
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-    view.accountMessage = "Signed out.";
+    showToast("已登出。");
   });
+}
+
+async function recordDailyLoginIfAvailable(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  const { error } = await supabase.rpc("record_daily_login");
+  if (error) {
+    console.warn("daily login tracking failed", error);
+  }
 }
 
 async function loadAccountData(): Promise<void> {
@@ -3232,12 +3232,13 @@ async function loadAccountData(): Promise<void> {
   await withAccountLoading(async () => {
     await ensureProfile();
     await ensureCollection();
+    await recordDailyLoginIfAvailable();
 
     const userId = view.session!.user.id;
     const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
       supabase
         .from("profiles")
-        .select("user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title")
+        .select(PROFILE_SELECT)
         .eq("user_id", userId)
         .single(),
       supabase
@@ -3271,6 +3272,10 @@ async function loadAccountData(): Promise<void> {
       view.selectedDeckId = view.decks[0]?.id;
     }
     if (!view.editingDeck) startNewDeck(false);
+    if (pendingWelcomeToast) {
+      pendingWelcomeToast = false;
+      showToast(`歡迎回來，${view.profile?.display_name ?? "玩家"}！`);
+    }
   });
 }
 
@@ -3278,7 +3283,7 @@ async function syncCollection(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   await withAccountLoading(async () => {
     await ensureCollection();
-    view.accountMessage = "Collection synced.";
+    showToast("收藏已同步。");
     await loadAccountDataRaw();
   });
 }
@@ -3289,7 +3294,7 @@ async function loadAccountDataRaw(): Promise<void> {
   const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
     supabase
       .from("profiles")
-      .select("user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title")
+      .select(PROFILE_SELECT)
       .eq("user_id", userId)
       .single(),
     supabase
@@ -3364,7 +3369,7 @@ async function saveEditingDeck(event: Event): Promise<void> {
     });
     if (error) throw error;
     const saved = data as DeckRow;
-    view.accountMessage = `Saved ${saved.name}.`;
+    showToast(`牌組「${saved.name}」已儲存。`);
     view.selectedDeckId = saved.id;
     view.editingDeck = { ...saved, card_ids: [...saved.card_ids] };
     await loadAccountData();
@@ -3376,7 +3381,7 @@ async function deleteDeck(deckId: string | undefined): Promise<void> {
   await withAccountLoading(async () => {
     const { error } = await supabase.rpc("delete_user_deck", { p_deck_id: deckId });
     if (error) throw error;
-    view.accountMessage = "Deck deleted.";
+    showToast("牌組已刪除。");
     if (view.selectedDeckId === deckId) view.selectedDeckId = undefined;
     if (view.editingDeck?.id === deckId) startNewDeck(false);
     await loadAccountData();
@@ -3432,7 +3437,6 @@ function removeCardFromEditor(cardId: string | undefined): void {
 async function withAccountLoading(action: () => Promise<void>): Promise<void> {
   view.accountLoading = true;
   view.accountError = undefined;
-  view.accountMessage = undefined;
   render();
   try {
     await action();
@@ -3442,6 +3446,25 @@ async function withAccountLoading(action: () => Promise<void>): Promise<void> {
     view.accountLoading = false;
     render();
   }
+}
+
+let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let pendingWelcomeToast = false;
+function showToast(message: string): void {
+  let el = document.getElementById("medieval-toast");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "medieval-toast";
+    el.className = "medieval-toast";
+    document.body.appendChild(el);
+  }
+  el.textContent = message;
+  el.classList.add("show");
+  if (toastTimer !== undefined) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    el!.classList.remove("show");
+    toastTimer = undefined;
+  }, 2500);
 }
 
 function readAuthFields(): { email: string; password: string } {

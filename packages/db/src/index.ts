@@ -36,8 +36,101 @@ export interface PlayerProfileRow {
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string;
+  login_days?: number;
+  current_login_streak?: number;
+  longest_login_streak?: number;
+  last_login_date?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export type CosmeticKind = "avatar" | "title";
+export type CurrencyKind = "gold" | "voucher";
+
+export interface CosmeticCatalogRow {
+  kind: CosmeticKind;
+  id: string;
+  display_name: string;
+  asset_path?: string | null;
+  active: boolean;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserCosmeticRow {
+  user_id: string;
+  kind: CosmeticKind;
+  cosmetic_id: string;
+  acquired_at?: string;
+  source?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface UserCurrencyLedgerRow {
+  id: string;
+  user_id: string;
+  currency: CurrencyKind;
+  delta: number;
+  balance_after: number;
+  reason: string;
+  source_type?: string | null;
+  source_id?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface UserLoginDayRow {
+  user_id: string;
+  login_date: string;
+  streak_day: number;
+  reward_gold: number;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface UserEventRow {
+  id: string;
+  user_id: string;
+  event_type: string;
+  event_date_taipei: string;
+  source_type?: string | null;
+  source_id?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+}
+
+export interface QuestDefinitionRow {
+  id: string;
+  display_name: string;
+  description?: string | null;
+  event_type: string;
+  target_count: number;
+  reward?: Record<string, unknown>;
+  active: boolean;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface UserQuestProgressRow {
+  user_id: string;
+  quest_id: string;
+  current_count: number;
+  completed_at?: string | null;
+  claimed_at?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DailyLoginResult {
+  login_date: string;
+  login_days: number;
+  current_login_streak: number;
+  longest_login_streak: number;
+  recorded: boolean;
 }
 
 export interface CardCatalogSnapshotRow {
@@ -93,6 +186,14 @@ export async function persistMatchHistory(client: SupabaseClient, row: MatchHist
 export async function recordPvpWin(client: SupabaseClient, matchId: string): Promise<void> {
   const { error } = await client.rpc("record_pvp_win", { p_match_id: matchId });
   if (error) throw error;
+}
+
+export async function recordDailyLogin(client: SupabaseClient): Promise<DailyLoginResult> {
+  const { data, error } = await client.rpc("record_daily_login");
+  if (error) throw error;
+  const [row] = (data ?? []) as DailyLoginResult[];
+  if (!row) throw new Error("Daily login RPC returned no row.");
+  return row;
 }
 
 export async function getAuthenticatedUser(client: SupabaseClient, accessToken: string): Promise<AuthenticatedUser> {

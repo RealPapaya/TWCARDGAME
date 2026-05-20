@@ -6,9 +6,19 @@ const phase4Migration = readFileSync(new URL("../migrations/0002_phase4_account_
 const grantsMigration = readFileSync(new URL("../migrations/0003_phase4_browser_table_grants.sql", import.meta.url), "utf8");
 const serviceRoleGrantsMigration = readFileSync(new URL("../migrations/0004_phase4_service_role_grants.sql", import.meta.url), "utf8");
 const legacyShopMigration = readFileSync(new URL("../migrations/0006_legacy_shop_items.sql", import.meta.url), "utf8");
+const userDataMigration = readFileSync(new URL("../migrations/0007_user_inventory_login_quests.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
+  const userDataTables = [
+    "cosmetic_catalog",
+    "user_cosmetics",
+    "user_currency_ledger",
+    "user_login_days",
+    "user_events",
+    "quest_definitions",
+    "user_quest_progress"
+  ];
 
   it("enables RLS on every browser-exposed table", () => {
     for (const table of browserTables) {
@@ -61,5 +71,52 @@ describe("Supabase RLS migration coverage", () => {
     expect(legacyShopMigration).toContain("'cosmetic-pack'");
     expect(legacyShopMigration).toContain("'CARD_PACK'");
     expect(legacyShopMigration).toContain("'COSMETIC_PACK'");
+  });
+
+  it("adds user-data tables behind RLS for inventory, login, events, and quests", () => {
+    for (const table of userDataTables) {
+      expect(userDataMigration).toContain(`alter table public.${table} enable row level security;`);
+    }
+    expect(userDataMigration).toContain("create table if not exists public.user_events");
+    expect(userDataMigration).toContain("create table if not exists public.quest_definitions");
+    expect(userDataMigration).toContain("create table if not exists public.user_quest_progress");
+  });
+
+  it("allows browser reads but keeps event and ledger writes behind RPCs", () => {
+    expect(userDataMigration).toContain("grant select on public.user_currency_ledger to authenticated;");
+    expect(userDataMigration).toContain("grant select on public.user_events to authenticated;");
+    expect(userDataMigration).toContain("grant select on public.user_quest_progress to authenticated;");
+    expect(userDataMigration).not.toContain("grant select, insert on public.user_events to authenticated");
+    expect(userDataMigration).not.toContain("grant select, insert on public.user_currency_ledger to authenticated");
+    expect(userDataMigration).not.toContain("grant insert on public.user_events to authenticated");
+    expect(userDataMigration).not.toContain("grant insert on public.user_currency_ledger to authenticated");
+  });
+
+  it("exposes only safe authenticated user-data RPCs to the browser", () => {
+    expect(userDataMigration).toContain("grant execute on function public.record_daily_login() to authenticated;");
+    expect(userDataMigration).toContain("grant execute on function public.select_user_cosmetic(text, text) to authenticated;");
+    expect(userDataMigration).toContain("revoke all on function public.emit_user_event(uuid, text, text, text, jsonb) from public;");
+    expect(userDataMigration).toContain("revoke all on function public.adjust_user_currency(uuid, text, integer, text, text, text, jsonb) from public;");
+    expect(userDataMigration).toContain("revoke all on function public.grant_user_cosmetic(uuid, text, text, text, text, jsonb) from public;");
+  });
+
+  it("records Taipei daily login events idempotently and prepares quest progress", () => {
+    expect(userDataMigration).toContain("now() at time zone 'Asia/Taipei'");
+    expect(userDataMigration).toContain("create or replace function public.record_daily_login()");
+    expect(userDataMigration).toContain("on conflict do nothing");
+    expect(userDataMigration).toContain("'daily_login'");
+    expect(userDataMigration).toContain("insert into public.user_quest_progress");
+  });
+
+  it("routes shop, deck, and PvP mutations into the user event window", () => {
+    expect(userDataMigration).toContain("create or replace function public.purchase_shop_item(p_item_id text)");
+    expect(userDataMigration).toContain("'card_acquired'");
+    expect(userDataMigration).toContain("'cosmetic_acquired'");
+    expect(userDataMigration).toContain("'shop_purchase'");
+    expect(userDataMigration).toContain("create or replace function public.save_user_deck(");
+    expect(userDataMigration).toContain("'deck_saved'");
+    expect(userDataMigration).toContain("create or replace function public.record_pvp_win(p_match_id text)");
+    expect(userDataMigration).toContain("'match_finished'");
+    expect(userDataMigration).toContain("'pvp_win'");
   });
 });
