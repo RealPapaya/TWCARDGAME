@@ -30,7 +30,9 @@
       "Bash(mv packages/__TRACKED_VAR__/dist /tmp/dist-bak/__TRACKED_VAR__)",
       "Bash(mv /tmp/dist-bak/__TRACKED_VAR__ packages/__TRACKED_VAR__/dist)",
       "Bash(rmdir /tmp/dist-bak)",
-      "Bash(ls packages/__TRACKED_VAR__/dist)"
+      "Bash(ls packages/__TRACKED_VAR__/dist)",
+      "Bash(cat vercel.json)",
+      "Bash(cat apps/web/vercel.json)"
     ],
     "additionalDirectories": [
       "\\tmp"

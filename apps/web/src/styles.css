@@ -2630,8 +2630,6 @@ input {
   position: absolute;
   top: 0; left: 0; right: 0; bottom: 0;
   border-radius: 50%;
-  background: url("/images/ui/parchment_texture.webp");
-  opacity: 0.3;
   pointer-events: none;
 }
 

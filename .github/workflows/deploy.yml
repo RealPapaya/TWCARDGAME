@@ -8,6 +8,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    # Job-level `if:` cannot read `secrets.*` directly, so expose which
+    # deploy credentials are configured as outputs for the deploy jobs to gate on.
+    outputs:
+      has-railway: ${{ steps.secrets.outputs.has-railway }}
+      has-vercel: ${{ steps.secrets.outputs.has-vercel }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,9 +24,25 @@ jobs:
       - run: npm test
       - run: npm run check
       - run: npm run build
+      - name: Detect deploy credentials
+        id: secrets
+        run: |
+          if [ -n "${{ secrets.RAILWAY_TOKEN }}" ]; then
+            echo "has-railway=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-railway=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::RAILWAY_TOKEN not set — skipping server deploy."
+          fi
+          if [ -n "${{ secrets.VERCEL_TOKEN }}" ]; then
+            echo "has-vercel=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has-vercel=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::VERCEL_TOKEN not set — skipping web deploy."
+          fi
 
   deploy-server:
     needs: test
+    if: needs.test.outputs.has-railway == 'true'
     runs-on: ubuntu-latest
     concurrency: deploy-server
     steps:
@@ -35,6 +56,7 @@ jobs:
 
   deploy-web:
     needs: test
+    if: needs.test.outputs.has-vercel == 'true'
     runs-on: ubuntu-latest
     concurrency: deploy-web
     env:

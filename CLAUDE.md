@@ -8,7 +8,7 @@ This is the TWCARDGAME **v2** rewrite — a TypeScript npm-workspaces monorepo (
 
 Workspaces (TS project references are wired in [tsconfig.json](tsconfig.json)):
 
-- [apps/server](apps/server/) — `@twcardgame/server`, Colyseus authoritative PvP room (Fly.io deployable, see [fly.toml](apps/server/fly.toml) / [Dockerfile](apps/server/Dockerfile)).
+- [apps/server](apps/server/) — `@twcardgame/server`, Colyseus authoritative PvP room (Railway deployable, see [railway.json](railway.json) / [Dockerfile](apps/server/Dockerfile)).
 - [apps/web](apps/web/) — `@twcardgame/web`, Vite vanilla-TS client using `@colyseus/sdk`.
 - [packages/cards](packages/cards/) — source-controlled card catalog, Zod schemas, validation, CLI.
 - [packages/rules](packages/rules/) — deterministic gameplay engine (pure, no I/O).
