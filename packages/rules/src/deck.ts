@@ -7,6 +7,12 @@ export interface DeckValidationResult {
   errors: string[];
 }
 
+/** Max copies of any single card id allowed in a 30-card deck. */
+export const DECK_COPY_LIMIT = 2;
+
+/** Max LEGENDARY cards (counted across all ids) allowed in a deck. */
+export const DECK_LEGENDARY_LIMIT = 2;
+
 export interface OwnedCardQuantity {
   cardId: string;
   quantity: number;
@@ -35,16 +41,21 @@ export function validateDeck(
     counts.set(id, (counts.get(id) ?? 0) + 1);
   }
 
+  let legendaryTotal = 0;
   for (const [id, count] of counts) {
     const card = cardById.get(id);
     if (!card) continue;
-    const limit = card.rarity === "LEGENDARY" ? 1 : 2;
-    if (count > limit) errors.push(`${id} exceeds copy limit ${limit}; got ${count}.`);
+    if (count > DECK_COPY_LIMIT) errors.push(`${id} exceeds copy limit ${DECK_COPY_LIMIT}; got ${count}.`);
+    if (card.rarity === "LEGENDARY") legendaryTotal += count;
     const ownedQuantity = ownership?.get(id);
     if (ownership && ownedQuantity === undefined) errors.push(`Card not owned: ${id}`);
     else if (ownedQuantity !== undefined && count > ownedQuantity) {
       errors.push(`${id} exceeds owned quantity ${ownedQuantity}; got ${count}.`);
     }
+  }
+
+  if (legendaryTotal > DECK_LEGENDARY_LIMIT) {
+    errors.push(`Deck exceeds legendary limit ${DECK_LEGENDARY_LIMIT}; got ${legendaryTotal}.`);
   }
 
   return { valid: errors.length === 0, errors };

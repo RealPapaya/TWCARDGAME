@@ -102,6 +102,8 @@ type ClientViewState = {
   collectionRarity: string;
   collectionSearch: string;
   pinnedCollectionCardId?: string;
+  cardOpBusy?: boolean;
+  coverPickerOpen?: boolean;
   avatarPickerOpen?: boolean;
   editingDisplayName?: string;
   editingDisplayNameActive?: boolean;
@@ -171,6 +173,7 @@ type DeckRow = {
   name: string;
   card_catalog_version: string;
   card_ids: string[];
+  cover_card_id?: string | null;
   updated_at?: string;
 };
 
@@ -1075,7 +1078,8 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
             <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
             <h2 class="collection-title">${escapeHtml(title)}</h2>
             <div class="collection-header-voucher" title="持有消費券">
-              <span id="collection-vouchers"><span class="voucher-icon">券</span>20</span>
+              <span id="collection-vouchers"><span class="voucher-icon">券</span>${view.profile?.vouchers ?? 0}</span>
+              ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" title="一鍵分解所有超過 2 張的多餘卡牌" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
             </div>
           </header>
           ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
@@ -1190,21 +1194,10 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   const owned = hasCollectionRows() ? quantity > 0 : true;
   const limit = deckCopyLimit(card);
   const effectiveOwned = hasCollectionRows() ? quantity : limit;
-  const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
+  const legendaryOk = canAddLegendary(card, view.editingDeck?.card_ids ?? []);
+  const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned && legendaryOk;
   const disabled = Boolean(view.editingDeck) && !canAdd;
-  const resolved: ResolvedCardView = {
-    cardId: card.id,
-    instanceId: `collection-${card.id}`,
-    name: card.name,
-    category: card.category,
-    description: card.description,
-    image: card.image,
-    cost: card.cost,
-    type: card.type,
-    rarity: card.rarity,
-    attack: card.attack,
-    health: card.health
-  };
+  const resolved = resolveCatalogCard(card, `collection-${card.id}`);
   return `
     <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
       <span class="card-count-badge">x${quantity}</span>
@@ -1216,29 +1209,58 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   `;
 }
 
+const VOUCHER_RATES: Record<string, { disenchant: number; craft: number }> = {
+  COMMON: { disenchant: 20, craft: 50 },
+  RARE: { disenchant: 60, craft: 200 },
+  EPIC: { disenchant: 160, craft: 400 },
+  REPIC: { disenchant: 160, craft: 400 },
+  LEGENDARY: { disenchant: 300, craft: 800 }
+};
+
+function voucherRate(rarity: string): { disenchant: number; craft: number } {
+  return VOUCHER_RATES[rarity] ?? VOUCHER_RATES.COMMON;
+}
+
 function renderPinnedCardDetail(cardId: string): string {
   const card = cardCatalog.get(cardId);
   if (!card) return "";
-  const resolved: ResolvedCardView = {
-    cardId: card.id,
-    instanceId: `pinned-${card.id}`,
-    name: card.name,
-    category: card.category,
-    description: card.description,
-    image: card.image,
-    cost: card.cost,
-    type: card.type,
-    rarity: card.rarity,
-    attack: card.attack,
-    health: card.health
-  };
+  const resolved = resolveCatalogCard(card, `pinned-${card.id}`);
+  const owned = view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0;
+  const vouchers = view.profile?.vouchers ?? 0;
+  const rate = voucherRate(card.rarity);
+  const collectible = card.collectible !== false;
+  const accountReady = Boolean(view.session?.user);
+  const busy = Boolean(view.cardOpBusy);
+  const canDisenchant = accountReady && collectible && owned > 0 && !busy;
+  const canCraft = accountReady && collectible && vouchers >= rate.craft && !busy;
   return `
-    <div class="pinned-card-overlay" data-testid="pinned-card-overlay">
-      <div class="pinned-card-content">
-        <div class="card rarity-${resolved.rarity.toLowerCase()}">
-          ${renderCardFace(resolved, "mulligan")}
+    <div class="pinned-card-overlay" data-testid="pinned-card-overlay" id="pinned-card-overlay">
+      <div class="pinned-card-content card-op-modal">
+        <header class="card-op-header">
+          <h3>${escapeHtml(card.name)}</h3>
+          <button id="pinned-card-close" class="settings-close-btn" title="關閉" aria-label="關閉">✕</button>
+        </header>
+        <div class="card-op-body">
+          <div class="card rarity-${resolved.rarity.toLowerCase()}">
+            ${renderCardFace(resolved, "mulligan")}
+          </div>
+          <div class="card-op-side">
+            <p class="card-op-count">擁有數量：<strong>${owned}</strong></p>
+            ${collectible ? `
+              <div class="card-op-actions">
+                <button type="button" id="card-op-disenchant" class="card-op-btn disenchant" data-card-id="${escapeAttr(card.id)}" ${canDisenchant ? "" : "disabled"}>
+                  <span class="card-op-label">分解</span>
+                  <span class="card-op-value"><span class="voucher-icon">券</span>${rate.disenchant}</span>
+                </button>
+                <button type="button" id="card-op-craft" class="card-op-btn craft" data-card-id="${escapeAttr(card.id)}" ${canCraft ? "" : "disabled"}>
+                  <span class="card-op-label">合成</span>
+                  <span class="card-op-value"><span class="voucher-icon">券</span>${rate.craft}</span>
+                </button>
+              </div>
+              <p class="card-op-hint muted">${accountReady ? `持有消費券：${vouchers}` : "登入後才能分解或合成卡牌。"}</p>
+            ` : `<p class="card-op-hint muted">此卡牌無法分解或合成。</p>`}
+          </div>
         </div>
-        <button id="pinned-card-close" class="ghost-button">Close</button>
       </div>
     </div>
   `;
@@ -1302,6 +1324,7 @@ function renderCollectionDeckColumnContent(): string {
     ${deck ? `
       <form id="deck-form" class="collection-deck-editor">
         <div class="deck-editor-topline">
+          ${renderDeckCoverThumb(deck)}
           <label class="deck-name-field">
             <span>牌組名稱</span>
             <input id="deck-name" value="${escapeAttr(deck.name)}" aria-label="Deck name" maxlength="40" />
@@ -1310,6 +1333,7 @@ function renderCollectionDeckColumnContent(): string {
         </div>
         <div class="deck-editor-actions">
           <button type="submit">儲存</button>
+          <button type="button" id="edit-cover" ${deck.card_ids.length === 0 ? "disabled title='牌組需有卡片才能設定封面'" : ""}>編輯封面</button>
           <button type="button" id="autofill-deck">自動補滿</button>
           <button type="button" id="clear-deck">清空</button>
           ${deck.id ? `<button type="button" class="danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>` : ""}
@@ -1321,6 +1345,7 @@ function renderCollectionDeckColumnContent(): string {
           ${renderCurrentDeckCards(deck.card_ids)}
         </div>
       </form>
+      ${view.coverPickerOpen ? renderCoverPicker(deck) : ""}
     ` : `
       <section class="collection-deck-editor deck-editor-placeholder">
         <p class="muted deck-empty">點選上方牌組開始編輯，或按「+ 新增」建立新牌組。</p>
@@ -1329,9 +1354,59 @@ function renderCollectionDeckColumnContent(): string {
   `;
 }
 
+function renderDeckCoverThumb(deck: { cover_card_id?: string | null; card_ids: readonly string[] }): string {
+  const coverCard = resolveDeckCoverCard(deck);
+  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  return `
+    <button type="button" id="edit-cover-thumb" class="deck-cover-thumb" title="編輯封面" ${deck.card_ids.length === 0 ? "disabled" : ""}>
+      <span class="deck-cover-thumb-art" style="background-image:url('${escapeAttr(coverUrl)}')"></span>
+      <span class="deck-cover-thumb-label">封面</span>
+    </button>
+  `;
+}
+
+function renderCoverPicker(deck: { cover_card_id?: string | null; card_ids: readonly string[] }): string {
+  const counts = countCards(deck.card_ids);
+  const cards = [...counts.keys()]
+    .map((id) => cardCatalog.get(id))
+    .filter((card): card is CardDefinition => Boolean(card))
+    .sort((a, b) => a.cost - b.cost || a.name.localeCompare(b.name, "zh-Hant"));
+  const activeCover = resolveDeckCoverCard(deck)?.id;
+  return `
+    <div class="cover-picker-overlay" id="cover-picker-overlay" role="dialog" aria-modal="true" aria-label="編輯封面">
+      <div class="cover-picker-modal parchment-card">
+        <header class="settings-modal-header">
+          <h3>選擇牌組封面</h3>
+          <button type="button" id="cover-picker-close" class="settings-close-btn" title="關閉" aria-label="關閉">✕</button>
+        </header>
+        <div class="cover-picker-grid" data-preserve-scroll>
+          ${cards.length === 0 ? `<p class="muted">牌組內沒有卡片。</p>` : cards.map((card) => `
+            <button type="button" class="cover-picker-tile ${card.id === activeCover ? "selected" : ""}" data-cover-card="${escapeAttr(card.id)}" title="${escapeAttr(card.name)}">
+              <span class="cover-picker-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+              <span class="cover-picker-name">${escapeHtml(card.name)}</span>
+            </button>
+          `).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function resolveDeckCoverCard(deck: { cover_card_id?: string | null; card_ids: readonly string[] }): CardDefinition | undefined {
+  if (deck.cover_card_id && deck.card_ids.includes(deck.cover_card_id)) {
+    const explicit = cardCatalog.get(deck.cover_card_id);
+    if (explicit) return explicit;
+  }
+  for (const id of deck.card_ids) {
+    const card = cardCatalog.get(id);
+    if (card) return card;
+  }
+  return undefined;
+}
+
 function renderCollectionDeckBanner(deck: DeckRow): string {
   const selected = deck.id === view.editingDeck?.id;
-  const coverCard = deck.card_ids.map((id) => cardCatalog.get(id)).find(Boolean);
+  const coverCard = resolveDeckCoverCard(deck);
   const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
   const incomplete = deck.card_ids.length !== 30;
   return `
@@ -1621,6 +1696,22 @@ function renderCardFace(card: ResolvedCardView, size: "hand" | "mulligan"): stri
   `;
 }
 
+function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedCardView {
+  return {
+    cardId: card.id,
+    instanceId,
+    name: card.name,
+    category: card.category,
+    description: card.description,
+    image: card.image,
+    cost: card.cost,
+    type: card.type,
+    rarity: card.rarity,
+    attack: card.attack,
+    health: card.health
+  };
+}
+
 function renderCenterLine(activeSeat: Seat | ""): string {
   const isMyTurn = activeSeat && activeSeat === view.mySeat;
   const selectedCard = selectedHandCard();
@@ -1714,22 +1805,7 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "play" && card) {
     return `
       <div class="event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}">
-        ${renderCardFace(
-          {
-            cardId: card.id,
-            instanceId: cue.id,
-            name: card.name,
-            category: card.category,
-            description: card.description,
-            image: card.image,
-            cost: card.cost,
-            type: card.type,
-            rarity: card.rarity,
-            attack: card.attack,
-            health: card.health
-          },
-          "mulligan"
-        )}
+        ${renderCardFace(resolveCatalogCard(card, cue.id), "mulligan")}
       </div>
     `;
   }
@@ -1785,19 +1861,7 @@ function renderHoverTooltip(): string {
   }
   let top = view.hoverAnchor.y - approxHeight / 2;
   top = Math.max(margin, Math.min(top, window.innerHeight - approxHeight - margin));
-  const resolved: ResolvedCardView = {
-    cardId: card.id,
-    instanceId: `tooltip-${card.id}`,
-    name: card.name,
-    category: card.category,
-    description: card.description,
-    image: card.image,
-    cost: card.cost,
-    type: card.type,
-    rarity: card.rarity,
-    attack: card.attack,
-    health: card.health
-  };
+  const resolved = resolveCatalogCard(card, `tooltip-${card.id}`);
   return `
     <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
       <div class="card rarity-${resolved.rarity.toLowerCase()}">
@@ -1992,6 +2056,21 @@ function bindStaticActions(): void {
     view.pinnedCollectionCardId = undefined;
     render();
   });
+  document.querySelector<HTMLElement>("#pinned-card-overlay")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) {
+      view.pinnedCollectionCardId = undefined;
+      render();
+    }
+  });
+  document.querySelector<HTMLButtonElement>("#card-op-disenchant")?.addEventListener("click", (event) => {
+    const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
+    if (cardId) void disenchantCard(cardId, 1);
+  });
+  document.querySelector<HTMLButtonElement>("#card-op-craft")?.addEventListener("click", (event) => {
+    const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
+    if (cardId) void craftCard(cardId);
+  });
+  document.querySelector<HTMLButtonElement>("#bulk-disenchant")?.addEventListener("click", () => void bulkDisenchantExtras());
   document.querySelector<HTMLButtonElement>("#edit-display-name")?.addEventListener("click", () => {
     view.editingDisplayNameActive = true;
     view.editingDisplayName = view.profile?.display_name ?? "";
@@ -2155,6 +2234,31 @@ function bindCollectionDeckControls(root: ParentNode): void {
   for (const el of root.querySelectorAll<HTMLElement>("[data-remove-card]")) {
     el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
   }
+  const openCoverPicker = (): void => {
+    if (!view.editingDeck || view.editingDeck.card_ids.length === 0) return;
+    view.coverPickerOpen = true;
+    refreshCollectionDeckWorkspace();
+  };
+  root.querySelector<HTMLButtonElement>("#edit-cover")?.addEventListener("click", openCoverPicker);
+  root.querySelector<HTMLButtonElement>("#edit-cover-thumb")?.addEventListener("click", openCoverPicker);
+  root.querySelector<HTMLButtonElement>("#cover-picker-close")?.addEventListener("click", () => {
+    view.coverPickerOpen = false;
+    refreshCollectionDeckWorkspace();
+  });
+  root.querySelector<HTMLElement>("#cover-picker-overlay")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) {
+      view.coverPickerOpen = false;
+      refreshCollectionDeckWorkspace();
+    }
+  });
+  for (const el of root.querySelectorAll<HTMLElement>("[data-cover-card]")) {
+    el.addEventListener("click", () => {
+      if (!view.editingDeck) return;
+      view.editingDeck = { ...view.editingDeck, cover_card_id: el.dataset.coverCard };
+      view.coverPickerOpen = false;
+      refreshCollectionDeckWorkspace();
+    });
+  }
 }
 
 function beginNewDeck(): void {
@@ -2188,7 +2292,8 @@ function updateCollectionCardButtons(): void {
     const selectedCount = selectedCounts.get(cardId) ?? 0;
     const limit = deckCopyLimit(card);
     const effectiveOwned = hasCollectionRows() ? quantity : limit;
-    const canAdd = Boolean(view.editingDeck) && quantity > 0 && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
+    const legendaryOk = canAddLegendary(card, view.editingDeck?.card_ids ?? []);
+    const canAdd = Boolean(view.editingDeck) && quantity > 0 && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned && legendaryOk;
     el.disabled = !canAdd;
     el.classList.toggle("can-add", canAdd);
     el.classList.toggle("cannot-add", !canAdd);
@@ -2616,7 +2721,7 @@ function renderPackOpeningOverlay(): string {
   const allFlipped = flipped.every(Boolean);
 
   const cardItems = cards.map((card, i) => {
-    const imgSrc = escapeAttr(assetUrl(card.image));
+    const catalogCard = cardCatalog.get(card.cardId);
     const rarity = card.rarity.toUpperCase();
     const rarityClass = card.rarity.toLowerCase();
     const label = rarityLabel[card.rarity] ?? card.rarity;
@@ -2629,14 +2734,15 @@ function renderPackOpeningOverlay(): string {
               onerror="this.src='/images/card_back.webp'">
           </div>
           <div class="pack-card-front">
-            <div class="pack-card-content rarity-${rarityClass}">
-              <div class="pack-card-img-wrap">
-                <img src="${imgSrc}" alt="${escapeAttr(card.name)}"
-                  onerror="this.style.display='none'">
-              </div>
-              <div class="pack-card-name">${escapeHtml(card.name)}</div>
-              <div class="pack-card-rarity">${escapeHtml(label)}</div>
-            </div>
+            ${catalogCard
+              ? `<div class="card pack-face-card rarity-${rarityClass}">${renderCardFace(resolveCatalogCard(catalogCard, `pack-${catalogCard.id}-${i}`), "mulligan")}</div>`
+              : `<div class="pack-card-content rarity-${rarityClass}">
+                <div class="pack-card-img-wrap">
+                  <img src="${escapeAttr(assetUrl(card.image))}" alt="${escapeAttr(card.name)}" onerror="this.style.display='none'">
+                </div>
+                <div class="pack-card-name">${escapeHtml(card.name)}</div>
+                <div class="pack-card-rarity">${escapeHtml(label)}</div>
+              </div>`}
           </div>
         </div>
       </div>
@@ -2646,7 +2752,7 @@ function renderPackOpeningOverlay(): string {
   return `
     <div class="pack-overlay" id="pack-opening-overlay" data-testid="pack-overlay">
       <h2 class="pack-title">開包！</h2>
-      <div class="pack-cards-container">${cardItems}</div>
+      <div class="pack-cards-container" style="--pack-count:${Math.min(cards.length, 5)}">${cardItems}</div>
       <button id="btn-pack-done" class="${allFlipped ? "visible" : ""}">完成</button>
     </div>
   `;
@@ -2774,7 +2880,7 @@ function renderLegacyShopPackOverlay(): string {
   return `
     <div class="pack-overlay" id="pack-opening-overlay" data-testid="pack-overlay">
       <h2 class="pack-title">${view.packOpeningKind === "cosmetic" ? "開包結果" : "開包！"}</h2>
-      <div class="pack-cards-container">${cardItems}</div>
+      <div class="pack-cards-container" style="--pack-count:${Math.min(rewards.length, 5)}">${cardItems}</div>
       <button id="btn-pack-done" class="${allFlipped ? "visible" : ""}">完成</button>
     </div>
   `;
@@ -2782,20 +2888,22 @@ function renderLegacyShopPackOverlay(): string {
 
 function renderPackRewardFace(reward: PackOpeningReward, rarityClass: string): string {
   if (reward.type === "card") {
-    const imgSrc = escapeAttr(assetUrl(reward.image));
-    const stats = reward.cardType === "MINION"
-      ? `<div class="pack-card-stats"><span class="pack-stat-atk"><span>${reward.attack ?? 0}</span></span><span class="pack-stat-hp">${reward.health ?? 0}</span></div>`
-      : "";
+    const resolved: ResolvedCardView = {
+      cardId: reward.cardId,
+      instanceId: `pack-${reward.cardId}`,
+      name: reward.name,
+      category: reward.category,
+      description: reward.description,
+      image: reward.image,
+      cost: reward.cost,
+      type: reward.cardType,
+      rarity: reward.rarity,
+      attack: reward.attack,
+      health: reward.health
+    };
     return `
-      <div class="pack-card-content pack-card-content-card rarity-${rarityClass}">
-        <span class="pack-card-cost"><span>${reward.cost}</span></span>
-        <strong class="pack-card-name">${escapeHtml(reward.name)}</strong>
-        <div class="pack-card-img-wrap">
-          <img src="${imgSrc}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'">
-        </div>
-        <span class="pack-card-category">${escapeHtml(reward.category)}</span>
-        <p class="pack-card-desc">${escapeHtml(reward.description)}</p>
-        ${stats}
+      <div class="card pack-face-card rarity-${rarityClass}">
+        ${renderCardFace(resolved, "mulligan")}
       </div>
     `;
   }
@@ -3814,7 +3922,7 @@ async function loadAccountData(): Promise<void> {
         .single(),
       supabase
         .from("decks")
-        .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
+        .select("id,user_id,name,card_catalog_version,card_ids,cover_card_id,updated_at")
         .eq("user_id", userId)
         .order("updated_at", { ascending: false }),
       supabase
@@ -3873,7 +3981,7 @@ async function loadAccountDataRaw(): Promise<void> {
       .single(),
     supabase
       .from("decks")
-      .select("id,user_id,name,card_catalog_version,card_ids,updated_at")
+      .select("id,user_id,name,card_catalog_version,card_ids,cover_card_id,updated_at")
       .eq("user_id", userId)
       .order("updated_at", { ascending: false }),
     supabase
@@ -3937,12 +4045,17 @@ async function saveEditingDeck(event: Event): Promise<void> {
   if (!supabase || !view.editingDeck) return;
   const name = (document.querySelector<HTMLInputElement>("#deck-name")?.value ?? view.editingDeck.name).trim();
   const cardIds = view.editingDeck.card_ids;
+  const coverCardId =
+    view.editingDeck.cover_card_id && cardIds.includes(view.editingDeck.cover_card_id)
+      ? view.editingDeck.cover_card_id
+      : null;
   await withAccountLoading(async () => {
     const { data, error } = await supabase.rpc("save_user_deck", {
       p_deck_id: view.editingDeck?.id ?? null,
       p_name: name,
       p_card_catalog_version: CARD_CATALOG_VERSION,
-      p_card_ids: cardIds
+      p_card_ids: cardIds,
+      p_cover_card_id: coverCardId
     });
     if (error) throw error;
     const saved = data as DeckRow;
@@ -3963,6 +4076,92 @@ async function deleteDeck(deckId: string | undefined): Promise<void> {
     if (view.editingDeck?.id === deckId) view.editingDeck = undefined;
     await loadAccountData();
   });
+}
+
+async function disenchantCard(cardId: string, count: number): Promise<void> {
+  if (!supabase || !view.session?.user || view.cardOpBusy) return;
+  const card = cardCatalog.get(cardId);
+  if (!card) return;
+  const gain = voucherRate(card.rarity).disenchant * count;
+  if (!window.confirm(`確定要分解 ${count} 張「${card.name}」嗎？\n分解後將獲得 ${gain} 點消費券。`)) return;
+  view.cardOpBusy = true;
+  render();
+  try {
+    const { error } = await supabase.rpc("disenchant_card", { p_card_id: cardId, p_count: count });
+    if (error) throw error;
+    await loadAccountDataRaw();
+    showToast(`分解成功！獲得 ${gain} 點消費券。`);
+  } catch (error) {
+    showToast(`分解失敗：${errorMessage(error)}`);
+  } finally {
+    view.cardOpBusy = false;
+    render();
+  }
+}
+
+async function craftCard(cardId: string): Promise<void> {
+  if (!supabase || !view.session?.user || view.cardOpBusy) return;
+  const card = cardCatalog.get(cardId);
+  if (!card) return;
+  const cost = voucherRate(card.rarity).craft;
+  if (!window.confirm(`確定要合成「${card.name}」嗎？\n合成將消耗 ${cost} 點消費券。`)) return;
+  view.cardOpBusy = true;
+  render();
+  try {
+    const { error } = await supabase.rpc("craft_card", { p_card_id: cardId });
+    if (error) throw error;
+    await loadAccountDataRaw();
+    showToast(`合成成功！消耗 ${cost} 點消費券。`);
+  } catch (error) {
+    showToast(`合成失敗：${errorMessage(error)}`);
+  } finally {
+    view.cardOpBusy = false;
+    render();
+  }
+}
+
+function extraCopyEntries(): Array<{ cardId: string; extra: number }> {
+  const entries: Array<{ cardId: string; extra: number }> = [];
+  for (const row of view.collection) {
+    const card = cardCatalog.get(row.card_id);
+    if (!card || card.collectible === false) continue;
+    const extra = row.quantity - DECK_COPY_LIMIT;
+    if (extra > 0) entries.push({ cardId: row.card_id, extra });
+  }
+  return entries;
+}
+
+async function bulkDisenchantExtras(): Promise<void> {
+  if (!supabase || !view.session?.user || view.cardOpBusy) return;
+  const entries = extraCopyEntries();
+  if (entries.length === 0) {
+    showToast("沒有超過 2 張的卡牌可分解。");
+    return;
+  }
+  let totalCards = 0;
+  let totalGain = 0;
+  for (const { cardId, extra } of entries) {
+    const card = cardCatalog.get(cardId);
+    if (!card) continue;
+    totalCards += extra;
+    totalGain += voucherRate(card.rarity).disenchant * extra;
+  }
+  if (!window.confirm(`一鍵分解所有超過 2 張的多餘卡牌？\n共 ${totalCards} 張，可獲得約 ${totalGain} 點消費券。`)) return;
+  view.cardOpBusy = true;
+  render();
+  try {
+    for (const { cardId, extra } of entries) {
+      const { error } = await supabase.rpc("disenchant_card", { p_card_id: cardId, p_count: extra });
+      if (error) throw error;
+    }
+    await loadAccountDataRaw();
+    showToast(`一鍵分解完成！分解 ${totalCards} 張，獲得 ${totalGain} 點消費券。`);
+  } catch (error) {
+    showToast(`一鍵分解失敗：${errorMessage(error)}`);
+  } finally {
+    view.cardOpBusy = false;
+    render();
+  }
 }
 
 function startNewDeck(doRender = true): void {
@@ -3988,7 +4187,7 @@ function autofillDeck(): void {
 
 function clearDeck(): void {
   if (!view.editingDeck) return;
-  view.editingDeck = { ...view.editingDeck, card_ids: [] };
+  view.editingDeck = { ...view.editingDeck, card_ids: [], cover_card_id: null };
   refreshCollectionDeckWorkspace();
 }
 
@@ -4003,6 +4202,10 @@ function addCardToEditor(cardId: string | undefined): void {
     ? (view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0)
     : limit;
   if (owned <= 0 || (counts.get(cardId) ?? 0) >= Math.min(limit, owned) || view.editingDeck!.card_ids.length >= 30) return;
+  if (!canAddLegendary(card, view.editingDeck!.card_ids)) {
+    showToast(`傳說卡牌在牌組中最多只能放 ${DECK_LEGENDARY_LIMIT} 張！`);
+    return;
+  }
   view.editingDeck = { ...view.editingDeck!, card_ids: [...view.editingDeck!.card_ids, cardId] };
   refreshCollectionDeckWorkspace();
 }
@@ -4013,7 +4216,12 @@ function removeCardFromEditor(cardId: string | undefined): void {
   if (index < 0) return;
   const cardIds = [...view.editingDeck.card_ids];
   cardIds.splice(index, 1);
-  view.editingDeck = { ...view.editingDeck, card_ids: cardIds };
+  const coverStillValid = view.editingDeck.cover_card_id ? cardIds.includes(view.editingDeck.cover_card_id) : true;
+  view.editingDeck = {
+    ...view.editingDeck,
+    card_ids: cardIds,
+    cover_card_id: coverStillValid ? view.editingDeck.cover_card_id : null
+  };
   refreshCollectionDeckWorkspace();
 }
 
@@ -4413,9 +4621,25 @@ function countCards(cardIds: readonly string[]): Map<string, number> {
   return counts;
 }
 
+const DECK_COPY_LIMIT = 2;
+const DECK_LEGENDARY_LIMIT = 2;
+
 function deckCopyLimit(card: CardDefinition): number {
   if (card.collectible === false) return 0;
-  return card.rarity === "LEGENDARY" ? 1 : 2;
+  return DECK_COPY_LIMIT;
+}
+
+function deckLegendaryCount(cardIds: readonly string[]): number {
+  let total = 0;
+  for (const id of cardIds) {
+    if (cardCatalog.get(id)?.rarity === "LEGENDARY") total++;
+  }
+  return total;
+}
+
+function canAddLegendary(card: CardDefinition, cardIds: readonly string[]): boolean {
+  if (card.rarity !== "LEGENDARY") return true;
+  return deckLegendaryCount(cardIds) < DECK_LEGENDARY_LIMIT;
 }
 
 function hasCollectionRows(): boolean {

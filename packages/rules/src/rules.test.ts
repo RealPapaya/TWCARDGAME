@@ -22,10 +22,22 @@ describe("rules architecture", () => {
     const legal = legalDeckIds();
     expect(validateDeck(legal, CARD_CATALOG).errors).toEqual([]);
 
-    const legendary = CARD_CATALOG.find((card) => card.rarity === "LEGENDARY");
-    expect(legendary).toBeTruthy();
-    const illegal = legal.slice(0, 28).concat(legendary!.id, legendary!.id);
-    expect(validateDeck(illegal, CARD_CATALOG).valid).toBe(false);
+    const legendaries = CARD_CATALOG.filter((card) => card.rarity === "LEGENDARY" && card.collectible !== false);
+    expect(legendaries.length).toBeGreaterThanOrEqual(2);
+
+    // 2 copies of a single legendary is allowed (per-card limit is 2).
+    const withTwoLegendary = legal.slice(0, 28).concat(legendaries[0]!.id, legendaries[0]!.id);
+    expect(validateDeck(withTwoLegendary, CARD_CATALOG).valid).toBe(true);
+
+    // 3 copies of any card exceeds the per-card limit.
+    const overCopyLimit = legal.slice(0, 27).concat(legendaries[0]!.id, legendaries[0]!.id, legendaries[0]!.id);
+    expect(validateDeck(overCopyLimit, CARD_CATALOG).valid).toBe(false);
+
+    // More than 2 legendary cards in total is illegal.
+    const overLegendary = legal.slice(0, 27).concat(legendaries[0]!.id, legendaries[1]!.id, legendaries[0]!.id);
+    const overResult = validateDeck(overLegendary, CARD_CATALOG);
+    expect(overResult.valid).toBe(false);
+    expect(overResult.errors.some((e) => e.includes("legendary limit"))).toBe(true);
   });
 
   it("enforces collection quantities during deck validation", () => {
