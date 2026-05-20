@@ -1,7 +1,7 @@
 # Matches live in this process's memory. Keep a single machine for launch —
 # multi-instance scaling needs the Colyseus Redis presence driver
 # (see docs/phase3-multiplayer-reliability.md). Do not enable autoscaling.
-app = "twcardgame-v2-server"
+app = "twcardgame"
 primary_region = "nrt"
 
 [build]

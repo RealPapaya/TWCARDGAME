@@ -21,7 +21,7 @@ const gameServer = new Server({
     app.get("/health", (_req: unknown, res: { json: (body: unknown) => void }) => {
       res.json({
         ok: true,
-        service: "twcardgame-v2-server",
+        service: "twcardgame",
         supabase: {
           configured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
         }

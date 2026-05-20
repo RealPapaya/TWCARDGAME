@@ -5,7 +5,7 @@ This is the operator runbook for taking TWCARDGAME v2 live. The repo-side artifa
 The steps below need real accounts, credentials, and DNS access — execute them in order.
 
 - **Web client** → Vercel (`apps/web`, built to `apps/web/dist-public`)
-- **Game server** → Fly.io (`apps/server`, app `twcardgame-v2-server`, region `nrt`)
+- **Game server** → Fly.io (`apps/server`, app `twcardgame`, region `nrt`)
 - **Database** → a production Supabase project, separate from dev
 
 Architecture note: matches live in the server process's memory. Run a **single Fly
@@ -41,14 +41,14 @@ Prereq: `flyctl` installed and `fly auth login` done.
 
 1. Create the app if it does not exist (name must match `apps/server/fly.toml`):
    ```bash
-   fly apps create twcardgame-v2-server
+   fly apps create twcardgame
    ```
 2. Set secrets (these are **not** in the repo):
    ```bash
    fly secrets set \
      SUPABASE_URL=<prod-url> \
      SUPABASE_SERVICE_ROLE_KEY=<prod-service-role-key> \
-     --app twcardgame-v2-server
+     --app twcardgame
    ```
    `NODE_ENV` and `PORT` are already set in `fly.toml [env]`.
 3. First deploy — run from the **repo root** so the Docker build context includes
@@ -56,8 +56,8 @@ Prereq: `flyctl` installed and `fly auth login` done.
    ```bash
    flyctl deploy --config apps/server/fly.toml --dockerfile apps/server/Dockerfile --remote-only
    ```
-4. Keep a single machine: `fly scale count 1 --app twcardgame-v2-server`.
-5. Verify: `curl https://twcardgame-v2-server.fly.dev/health` returns
+4. Keep a single machine: `fly scale count 1 --app twcardgame`.
+5. Verify: `curl https://twcardgame.fly.dev/health` returns
    `{"ok":true,...,"supabase":{"configured":true}}`.
 
 ---
@@ -70,7 +70,7 @@ Prereq: `flyctl` installed and `fly auth login` done.
    - Build command: `npm run build -w @twcardgame/web`
    - Output directory: `apps/web/dist-public`
 2. Set Environment Variables (Production scope) in the Vercel project:
-   - `VITE_COLYSEUS_URL` = `wss://twcardgame-v2-server.fly.dev`
+   - `VITE_COLYSEUS_URL` = `wss://twcardgame.fly.dev`
    - `VITE_SUPABASE_URL` = production Supabase URL
    - `VITE_SUPABASE_ANON_KEY` = production Supabase anon key
    These are inlined at build time, so a redeploy is needed after any change.
@@ -87,7 +87,7 @@ Deploy (`.github/workflows/deploy.yml`) runs on push to `master` and needs:
 
 | Secret | Where to get it |
 | --- | --- |
-| `FLY_API_TOKEN` | `fly tokens create deploy --app twcardgame-v2-server` |
+| `FLY_API_TOKEN` | `fly tokens create deploy --app twcardgame` |
 | `VERCEL_TOKEN` | Vercel → Account Settings → Tokens |
 | `VERCEL_ORG_ID` | Vercel project Settings (Org/Team ID) |
 | `VERCEL_PROJECT_ID` | Vercel project Settings (Project ID) |
@@ -101,7 +101,7 @@ Add them under GitHub repo → Settings → Secrets and variables → Actions.
 With the server running (Fly or local):
 
 ```bash
-LOAD_TEST_URL=wss://twcardgame-v2-server.fly.dev \
+LOAD_TEST_URL=wss://twcardgame.fly.dev \
 LOAD_TEST_ROOMS=50 \
   npm run test:load
 ```
@@ -110,7 +110,7 @@ The script reports connect success rate, matches completed, and command
 round-trip p50/p95. Watch server resources in parallel:
 
 ```bash
-fly metrics --app twcardgame-v2-server   # or the Fly dashboard Metrics tab
+fly metrics --app twcardgame   # or the Fly dashboard Metrics tab
 ```
 
 Record peak memory and CPU. If memory climbs and does not fall after matches end,
@@ -129,7 +129,7 @@ investigate room disposal before launch. Start at ~25 rooms, then ramp.
 
 ## 7. Rollback plan
 
-- **Server**: `fly releases --app twcardgame-v2-server` lists prior releases;
+- **Server**: `fly releases --app twcardgame` lists prior releases;
   roll back with `fly deploy --image <previous-image-ref>` or
   `fly releases rollback` (or `fly machine update` to a known-good image).
 - **Web**: in the Vercel dashboard, promote a previous deployment (instant
