@@ -23,7 +23,17 @@
       "Bash(node -e ' *)",
       "Bash(nvm install *)",
       "Bash(nvm use *)",
-      "Bash(node -e \"const v = require\\('/d/Google AI/TWCARDGAME/node_modules/vitest/package.json'\\); console.log\\(v.version\\)\")"
+      "Bash(node -e \"const v = require\\('/d/Google AI/TWCARDGAME/node_modules/vitest/package.json'\\); console.log\\(v.version\\)\")",
+      "Bash(cd \"/d/Google AI/TWCARDGAME\" && mv packages/shared/dist /tmp/shared-dist-bak && npx vitest run packages/rules/src/rules.test.ts 2>&1 | tail -20; mv /tmp/shared-dist-bak packages/shared/dist)",
+      "Bash(node -e \"console.log\\(require\\('vite/package.json'\\).version\\)\")",
+      "Bash(mkdir -p /tmp/dist-bak)",
+      "Bash(mv packages/__TRACKED_VAR__/dist /tmp/dist-bak/__TRACKED_VAR__)",
+      "Bash(mv /tmp/dist-bak/__TRACKED_VAR__ packages/__TRACKED_VAR__/dist)",
+      "Bash(rmdir /tmp/dist-bak)",
+      "Bash(ls packages/__TRACKED_VAR__/dist)"
+    ],
+    "additionalDirectories": [
+      "\\tmp"
     ]
   }
 }
