@@ -1,8 +1,10 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
+import { AI_THEMES } from "@twcardgame/shared";
 import type {
   AiDifficulty,
+  AiTheme,
   ClientCommandMessage,
   FriendRow,
   FriendRequestRow,
@@ -133,6 +135,7 @@ type ClientViewState = {
   packOpeningFlipped?: boolean[];
   packOpeningKind?: "card" | "cosmetic";
   aiDifficulty: AiDifficulty;
+  aiTheme: AiTheme;
   privateJoinCode?: string;
   privateJoinCodeInput?: string;
   bgmVolume: number;
@@ -408,6 +411,7 @@ const view: ClientViewState = {
   publicPlayerProfile: undefined,
   shopItems: [],
   aiDifficulty: "normal",
+  aiTheme: AI_THEMES[0].id,
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
   sfxVolume: readStoredNumber(sfxVolumeKey, 0.72),
   bgmMuted: readStoredBool(bgmMutedKey, false),
@@ -882,6 +886,7 @@ function renderBattleScreen(): string {
           </section>
           <section class="parchment-card match-panel">
             <h3>🤖 電腦對戰</h3>
+            <h4 class="ai-section-label">難度</h4>
             <div class="ai-difficulty-options">
               ${difficulties.map((opt) => `
                 <label class="ai-difficulty-option ${view.aiDifficulty === opt.value ? "selected" : ""}">
@@ -889,6 +894,10 @@ function renderBattleScreen(): string {
                   <strong>${opt.label}</strong>
                 </label>
               `).join("")}
+            </div>
+            <h4 class="ai-section-label">主題挑戰</h4>
+            <div class="ai-theme-options" data-testid="ai-theme-options">
+              ${AI_THEMES.map(renderAiThemeCard).join("")}
             </div>
             <button id="start-ai-match" class="primary-action" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
               ${view.joining ? "連線中…" : "開始對戰"}
@@ -898,6 +907,28 @@ function renderBattleScreen(): string {
       </div>
       ${renderMatchmakingOverlay()}
     </section>
+  `;
+}
+
+function renderAiThemeCard(theme: (typeof AI_THEMES)[number]): string {
+  const hero = cardCatalog.get(theme.heroCardId);
+  const heroArt = hero ? assetUrl(hero.image) : "";
+  const selected = view.aiTheme === theme.id;
+  return `
+    <button
+      type="button"
+      class="ai-theme-card ${selected ? "selected" : ""}"
+      data-ai-theme="${escapeAttr(theme.id)}"
+      data-testid="ai-theme-${escapeAttr(theme.id)}"
+      aria-pressed="${selected}"
+    >
+      <span class="ai-theme-art" style="background-image:url('${escapeAttr(heroArt)}')"></span>
+      <span class="ai-theme-meta">
+        <strong class="ai-theme-name">${escapeHtml(theme.name)}</strong>
+        <span class="ai-theme-party">${escapeHtml(theme.partyTag)}</span>
+        <span class="ai-theme-label">${escapeHtml(theme.label)}</span>
+      </span>
+    </button>
   `;
 }
 
@@ -2227,6 +2258,15 @@ function bindStaticActions(): void {
       }
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-ai-theme]")) {
+    el.addEventListener("click", () => {
+      const theme = AI_THEMES.find((entry) => entry.id === el.dataset.aiTheme);
+      if (theme) {
+        view.aiTheme = theme.id;
+        render();
+      }
+    });
+  }
   document.querySelector<HTMLButtonElement>("#start-ai-match")?.addEventListener("click", () => {
     void startAiMatch();
   });
@@ -3229,9 +3269,14 @@ async function startAiMatch(): Promise<void> {
           displayName: view.profile?.display_name,
           accessToken: view.session?.access_token,
           deckId: view.selectedDeckId,
-          difficulty: view.aiDifficulty
+          difficulty: view.aiDifficulty,
+          theme: view.aiTheme
         }
-      : { displayName: view.profile?.display_name ?? "Player", difficulty: view.aiDifficulty };
+      : {
+          displayName: view.profile?.display_name ?? "Player",
+          difficulty: view.aiDifficulty,
+          theme: view.aiTheme
+        };
     const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
     bindRoomMessages(room);
   } catch (error) {

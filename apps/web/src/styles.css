@@ -3067,7 +3067,7 @@ input {
 .primary-action {
   padding: 14px 22px;
   font-size: 20px;
-  background: linear-gradient(to bottom, #ffe680 0%, #d4af37 55%, #8b4513 100%);
+  background: #d4af37;
 }
 
 .ghost-button {
@@ -5231,6 +5231,52 @@ input {
 .ai-difficulty-option input { grid-area: radio; align-self: center; }
 .ai-difficulty-option strong { grid-area: title; }
 .ai-difficulty-option small { grid-area: desc; color: rgba(0, 0, 0, 0.65); }
+
+.ai-section-label {
+  margin: 12px 0 4px;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--wood-dark);
+  text-align: left;
+}
+.ai-theme-options { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+.ai-theme-card {
+  display: grid;
+  grid-template-columns: 52px 1fr;
+  grid-template-areas: "art meta";
+  gap: 4px 12px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 8px;
+  background: var(--parchment-light);
+  box-shadow: none;
+  text-shadow: none;
+  cursor: pointer;
+  text-align: left;
+}
+.ai-theme-card.selected {
+  border-color: rgba(220, 130, 30, 0.8);
+  background: rgba(255, 240, 220, 0.85);
+}
+.ai-theme-art {
+  grid-area: art;
+  width: 52px;
+  height: 52px;
+  border-radius: 6px;
+  border: 2px solid var(--wood-medium);
+  background-size: cover;
+  background-position: center top;
+}
+.ai-theme-meta {
+  grid-area: meta;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.ai-theme-name { font-size: 16px; color: var(--wood-dark); }
+.ai-theme-party { font-size: 11px; color: var(--wood-medium); letter-spacing: 0.1em; }
+.ai-theme-label { font-size: 12px; color: rgba(0, 0, 0, 0.6); }
 
 .private-room-section {
   margin-top: 12px;

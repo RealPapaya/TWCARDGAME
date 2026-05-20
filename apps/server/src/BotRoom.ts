@@ -1,6 +1,14 @@
 import { CARD_CATALOG } from "@twcardgame/cards";
 import { decide, legalMoves, normalizeSeed, type BotRngState } from "@twcardgame/rules";
-import { type AiDifficulty, type CommandEnvelope, type Seat } from "@twcardgame/shared";
+import {
+  AI_THEMES,
+  AI_THEME_DECKS,
+  isAiTheme,
+  type AiDifficulty,
+  type AiTheme,
+  type CommandEnvelope,
+  type Seat
+} from "@twcardgame/shared";
 import { type Client } from "colyseus";
 import { GameRoom, type GameRoomCreateOptions } from "./GameRoom.js";
 import { defaultDeckIds, type JoinOptions, type PlayerSetup } from "./accounts.js";
@@ -12,6 +20,7 @@ const ALLOWED_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"]
 
 export interface BotRoomCreateOptions extends GameRoomCreateOptions {
   difficulty?: AiDifficulty;
+  theme?: AiTheme;
 }
 
 const BOT_NAMES: Record<AiDifficulty, string> = {
@@ -23,6 +32,7 @@ const BOT_NAMES: Record<AiDifficulty, string> = {
 export class BotRoom extends GameRoom {
   override maxClients = 1;
   private difficulty: AiDifficulty = "normal";
+  private theme?: AiTheme;
   private botSeat: Seat = "player2";
   private humanSeat: Seat = "player1";
   // RNG seeded deterministically from the roomId so a recorded command log
@@ -37,8 +47,18 @@ export class BotRoom extends GameRoom {
     if (options.difficulty && ALLOWED_DIFFICULTIES.includes(options.difficulty)) {
       this.difficulty = options.difficulty;
     }
-    this.botRng = { state: normalizeSeed(seedFromString(`${this.roomId}:${this.difficulty}`)) };
-    this.setMetadata({ ...(this.metadata ?? {}), mode: "pve", difficulty: this.difficulty });
+    if (isAiTheme(options.theme)) {
+      this.theme = options.theme;
+    }
+    this.botRng = {
+      state: normalizeSeed(seedFromString(`${this.roomId}:${this.difficulty}:${this.theme ?? "default"}`))
+    };
+    this.setMetadata({
+      ...(this.metadata ?? {}),
+      mode: "pve",
+      difficulty: this.difficulty,
+      theme: this.theme ?? null
+    });
   }
 
   override async onJoin(client: Client, options: JoinOptions = {}, auth?: PlayerSetup): Promise<void> {
@@ -52,7 +72,7 @@ export class BotRoom extends GameRoom {
     this.setup.set(this.humanSeat, humanSetup);
     this.setup.set(this.botSeat, this.buildBotSetup());
     client.send("seat", { seat: this.humanSeat });
-    client.send("bot", { seat: this.botSeat, difficulty: this.difficulty });
+    client.send("bot", { seat: this.botSeat, difficulty: this.difficulty, theme: this.theme ?? null });
 
     this.createMatch();
   }
@@ -79,13 +99,22 @@ export class BotRoom extends GameRoom {
   }
 
   private buildBotSetup(): PlayerSetup {
+    const themeDeck = this.theme ? AI_THEME_DECKS[this.theme] : undefined;
     return {
       userId: `bot-${this.roomId}`,
-      displayName: BOT_NAMES[this.difficulty],
-      // Static AI deck (the canonical dev fallback) so the bot doesn't mirror
-      // the human and matches don't always devolve into the same lines.
-      deckIds: defaultDeckIds()
+      displayName: this.botDisplayName(),
+      // A themed deck when the player picked a challenge, otherwise the static
+      // dev fallback so the bot doesn't mirror the human.
+      deckIds: themeDeck ? [...themeDeck] : defaultDeckIds()
     };
+  }
+
+  private botDisplayName(): string {
+    if (this.theme) {
+      const definition = AI_THEMES.find((entry) => entry.id === this.theme);
+      if (definition) return definition.name;
+    }
+    return BOT_NAMES[this.difficulty];
   }
 
   private scheduleBotStep(): void {
