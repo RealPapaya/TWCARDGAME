@@ -22,7 +22,8 @@
       "Bash(LOAD_TEST_ROOMS=3 LOAD_TEST_DURATION_MS=40000 npm run test:load)",
       "Bash(node -e ' *)",
       "Bash(nvm install *)",
-      "Bash(nvm use *)"
+      "Bash(nvm use *)",
+      "Bash(node -e \"const v = require\\('/d/Google AI/TWCARDGAME/node_modules/vitest/package.json'\\); console.log\\(v.version\\)\")"
     ]
   }
 }

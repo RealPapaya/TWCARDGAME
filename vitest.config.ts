@@ -8,5 +8,10 @@ export default defineConfig({
     globals: true,
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
     environment: "node",
+    server: {
+      deps: {
+        inline: [/@twcardgame\//]
+      }
+    }
   }
 });
