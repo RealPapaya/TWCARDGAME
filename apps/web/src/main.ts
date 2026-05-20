@@ -91,6 +91,7 @@ type ClientViewState = {
   pinnedCollectionCardId?: string;
   avatarPickerOpen?: boolean;
   editingDisplayName?: string;
+  editingDisplayNameActive?: boolean;
   friends: FriendRow[];
   friendsLoading?: boolean;
   friendsMessage?: string;
@@ -168,7 +169,19 @@ type MatchHistoryRow = {
 };
 
 type PackOpeningReward =
-  | { type: "card"; cardId: string; name: string; rarity: string; image: string }
+  | {
+      type: "card";
+      cardId: string;
+      name: string;
+      category: string;
+      description: string;
+      cost: number;
+      cardType: string;
+      rarity: string;
+      image: string;
+      attack?: number;
+      health?: number;
+    }
   | { type: "avatar"; id: string; name: string; path: string }
   | { type: "title"; id: string; name: string }
   | { type: "voucher"; amount: number; name: string };
@@ -795,27 +808,28 @@ function renderProfileScreen(): string {
         ${renderCloudLayer()}
         <header class="screen-header">
           <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-          <h2>個人頁面 · Profile</h2>
+          <h2>個人頁面</h2>
         </header>
         <div class="parchment-card center-card">
-          <p>Sign in with Supabase to use the profile.</p>
+          <p>請先登入才能使用個人頁面。</p>
         </div>
       </section>
     `;
   }
   const profile = view.profile;
-  const displayName = view.editingDisplayName ?? profile?.display_name ?? "Player";
+  const displayName = view.editingDisplayName ?? profile?.display_name ?? "玩家";
   const avatarUrl = profile?.avatar_url || "/images/avatars/avatar1.webp";
   const stats = computeMatchStats();
   const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
   const recent = view.matchHistory.slice(0, 10);
+  const editing = view.editingDisplayNameActive ?? false;
   return `
     <section class="screen profile-screen" data-screen="profile">
       ${renderCloudLayer()}
       <header class="screen-header">
         <button class="back-button" data-menu-screen="main">← 返回主選單</button>
-        <h2>個人頁面 · Profile</h2>
+        <h2>個人頁面</h2>
       </header>
       ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
       ${view.accountMessage ? `<p class="success-text menu-status">${escapeHtml(view.accountMessage)}</p>` : ""}
@@ -823,14 +837,20 @@ function renderProfileScreen(): string {
         <section class="parchment-card profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
             <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
-            <button id="open-avatar-picker" class="ghost-button">Change avatar</button>
+            <button id="open-avatar-picker" class="ghost-button">更換頭像</button>
           </div>
           <form id="profile-form" class="profile-form">
-            <label>顯示名稱 · Display Name
-              <input id="profile-display-name" value="${escapeAttr(displayName)}" maxlength="32" />
-            </label>
-            <p class="profile-meta">Level <strong>—</strong> · XP placeholder</p>
-            <button type="submit" data-testid="profile-save" ${view.accountLoading ? "disabled" : ""}>Save</button>
+            <div class="profile-name-row">
+              ${editing
+                ? `<input id="profile-display-name" class="profile-name-input" value="${escapeAttr(displayName)}" maxlength="32" autofocus />`
+                : `<span class="profile-name-display">${escapeHtml(displayName)}</span>`
+              }
+              ${editing
+                ? `<button type="submit" class="profile-name-confirm-btn" data-testid="profile-save" ${view.accountLoading ? "disabled" : ""} title="儲存">✓</button>
+                   <button type="button" id="cancel-edit-name" class="profile-name-cancel-btn" title="取消">✕</button>`
+                : `<button type="button" id="edit-display-name" class="profile-pencil-btn" title="編輯顯示名稱">✏️</button>`
+              }
+            </div>
           </form>
           ${view.avatarPickerOpen ? `
           <div class="avatar-picker" data-testid="avatar-picker">
@@ -842,19 +862,19 @@ function renderProfileScreen(): string {
           </div>` : ""}
         </section>
         <section class="parchment-card profile-stats">
-          <h3>Stats</h3>
+          <h3>戰績統計</h3>
           <ul class="stat-list">
-            <li><span>Wins</span><strong>${stats.wins}</strong></li>
-            <li><span>Losses</span><strong>${stats.losses}</strong></li>
-            <li><span>Draws</span><strong>${stats.draws}</strong></li>
-            <li><span>Win rate</span><strong>${winRateLabel}</strong></li>
-            <li><span>Total</span><strong>${stats.total}</strong></li>
+            <li><span>勝場</span><strong>${stats.wins}</strong></li>
+            <li><span>敗場</span><strong>${stats.losses}</strong></li>
+            <li><span>平局</span><strong>${stats.draws}</strong></li>
+            <li><span>勝率</span><strong>${winRateLabel}</strong></li>
+            <li><span>總場次</span><strong>${stats.total}</strong></li>
           </ul>
         </section>
         <section class="parchment-card profile-history">
-          <h3>Recent Matches</h3>
+          <h3>近期對戰</h3>
           <div class="history-list">
-            ${recent.length === 0 ? `<p class="muted">No completed matches yet.</p>` : recent.map(renderMatchHistoryRow).join("")}
+            ${recent.length === 0 ? `<p class="muted">尚無對戰紀錄。</p>` : recent.map(renderMatchHistoryRow).join("")}
           </div>
         </section>
       </div>
@@ -1125,7 +1145,7 @@ function renderMatchHistoryRow(row: MatchHistoryRow): string {
     : mySeatInRow && row.winner_seat === mySeatInRow ? "win"
     : mySeatInRow ? "loss"
     : "info";
-  const label = outcome === "win" ? "Win" : outcome === "loss" ? "Loss" : outcome === "draw" ? "Draw" : (row.winner_seat ?? "—");
+  const label = outcome === "win" ? "勝" : outcome === "loss" ? "敗" : outcome === "draw" ? "平局" : (row.winner_seat ?? "—");
   return `
     <div class="history-row outcome-${outcome}">
       <strong class="history-outcome">${escapeHtml(label)}</strong>
@@ -1701,6 +1721,21 @@ function bindStaticActions(): void {
     view.pinnedCollectionCardId = undefined;
     render();
   });
+  document.querySelector<HTMLButtonElement>("#edit-display-name")?.addEventListener("click", () => {
+    view.editingDisplayNameActive = true;
+    view.editingDisplayName = view.profile?.display_name ?? "";
+    render();
+    requestAnimationFrame(() => {
+      const inp = document.querySelector<HTMLInputElement>("#profile-display-name");
+      inp?.focus();
+      inp?.select();
+    });
+  });
+  document.querySelector<HTMLButtonElement>("#cancel-edit-name")?.addEventListener("click", () => {
+    view.editingDisplayNameActive = false;
+    view.editingDisplayName = undefined;
+    render();
+  });
   const displayInput = document.querySelector<HTMLInputElement>("#profile-display-name");
   if (displayInput) {
     displayInput.addEventListener("input", () => {
@@ -1745,22 +1780,7 @@ function bindStaticActions(): void {
       if (id) void claimShopItem(id);
     });
   }
-  for (const el of document.querySelectorAll<HTMLElement>("[data-flip-index]")) {
-    el.addEventListener("click", () => {
-      if (!view.packOpeningFlipped || !view.packOpeningRewards) return;
-      const idx = parseInt(el.dataset.flipIndex ?? "-1", 10);
-      if (idx < 0 || view.packOpeningFlipped[idx]) return;
-      view.packOpeningFlipped[idx] = true;
-      playSfx("packFlip", 0.6);
-      render();
-    });
-  }
-  document.querySelector<HTMLButtonElement>("#btn-pack-done")?.addEventListener("click", () => {
-    view.packOpeningRewards = undefined;
-    view.packOpeningFlipped = undefined;
-    view.packOpeningKind = undefined;
-    render();
-  });
+  bindPackOpeningActions();
   for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
     el.addEventListener("change", () => {
       const value = el.value as AiDifficulty;
@@ -1814,6 +1834,27 @@ function bindStaticActions(): void {
   });
 }
 
+function bindPackOpeningActions(): void {
+  const overlay = document.querySelector("#pack-opening-overlay");
+  if (!overlay) return;
+  for (const el of overlay.querySelectorAll<HTMLElement>("[data-flip-index]")) {
+    el.addEventListener("click", () => {
+      if (!view.packOpeningFlipped || !view.packOpeningRewards) return;
+      const idx = parseInt(el.dataset.flipIndex ?? "-1", 10);
+      if (idx < 0 || view.packOpeningFlipped[idx]) return;
+      view.packOpeningFlipped[idx] = true;
+      playSfx("packFlip", 0.6);
+      flipPackRewardCard(idx);
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#btn-pack-done")?.addEventListener("click", () => {
+    view.packOpeningRewards = undefined;
+    view.packOpeningFlipped = undefined;
+    view.packOpeningKind = undefined;
+    document.querySelector("#pack-opening-overlay")?.remove();
+  });
+}
+
 function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
   view.menuScreen = target;
@@ -1822,11 +1863,22 @@ function navigateToScreen(target: MenuScreen): void {
   view.joinError = undefined;
   view.avatarPickerOpen = false;
   view.pinnedCollectionCardId = undefined;
-  if (target !== "profile") view.editingDisplayName = undefined;
+  if (target !== "profile") { view.editingDisplayName = undefined; view.editingDisplayNameActive = false; }
   if (target === "friends") void loadFriends();
   if (target === "leaderboard") void loadLeaderboard();
   if (target === "shop") void loadShopItems();
   render();
+}
+
+function flipPackRewardCard(index: number): void {
+  const wrapper = document.querySelector<HTMLElement>(`[data-flip-index="${index}"]`);
+  if (!wrapper || !view.packOpeningRewards) return;
+  const reward = view.packOpeningRewards[index];
+  const rarity = reward?.type === "card" ? reward.rarity.toUpperCase() : "RARE";
+  wrapper.classList.add("flipped", rarity);
+  if (view.packOpeningFlipped?.every(Boolean)) {
+    document.querySelector<HTMLButtonElement>("#btn-pack-done")?.classList.add("visible");
+  }
 }
 
 // ─── Phase 5 screens ──────────────────────────────────────────────────────────
@@ -2041,7 +2093,7 @@ function renderPackOpeningOverlay(): string {
     const rarityClass = card.rarity.toLowerCase();
     const label = rarityLabel[card.rarity] ?? card.rarity;
     return `
-      <div class="pack-card-wrapper${flipped[i] ? ` flipped ${rarity}` : ""}"
+      <div class="pack-card-wrapper rarity-${rarityClass}${flipped[i] ? ` flipped ${rarity}` : ""}"
         data-flip-index="${i}" role="button" aria-label="翻開卡牌">
         <div class="pack-card-inner">
           <div class="pack-card-back">
@@ -2172,18 +2224,20 @@ function renderLegacyShopPackOverlay(): string {
   const cardItems = rewards.map((reward, i) => {
     const rarity = reward.type === "card" ? reward.rarity.toUpperCase() : "RARE";
     const rarityClass = reward.type === "card" ? reward.rarity.toLowerCase() : reward.type;
+    const wrapperClasses = classNames([
+      "pack-card-wrapper",
+      `rarity-${rarityClass}`,
+      `pack-reward-${reward.type}`,
+      flipped[i] && `flipped ${rarity}`
+    ]);
     return `
-      <div class="pack-card-wrapper${flipped[i] ? ` flipped ${rarity}` : ""}" data-flip-index="${i}" role="button" aria-label="翻開獎勵">
+      <div class="${wrapperClasses}" data-flip-index="${i}" role="button" aria-label="翻開獎勵">
         <div class="pack-card-inner">
           <div class="pack-card-back">
             <img src="/images/ui/card_back.webp" alt="card back" onerror="this.src='/images/card_back.webp'">
           </div>
           <div class="pack-card-front">
-            <div class="pack-card-content rarity-${rarityClass}">
-              ${renderRewardVisual(reward)}
-              <div class="pack-card-name">${escapeHtml(rewardName(reward))}</div>
-              <div class="pack-card-rarity">${escapeHtml(rewardLabel(reward))}</div>
-            </div>
+            ${renderPackRewardFace(reward, rarityClass)}
           </div>
         </div>
       </div>
@@ -2195,6 +2249,34 @@ function renderLegacyShopPackOverlay(): string {
       <h2 class="pack-title">${view.packOpeningKind === "cosmetic" ? "開包結果" : "開包！"}</h2>
       <div class="pack-cards-container">${cardItems}</div>
       <button id="btn-pack-done" class="${allFlipped ? "visible" : ""}">完成</button>
+    </div>
+  `;
+}
+
+function renderPackRewardFace(reward: PackOpeningReward, rarityClass: string): string {
+  if (reward.type === "card") {
+    const imgSrc = escapeAttr(assetUrl(reward.image));
+    const stats = reward.cardType === "MINION"
+      ? `<div class="pack-card-stats"><span class="pack-stat-atk"><span>${reward.attack ?? 0}</span></span><span class="pack-stat-hp">${reward.health ?? 0}</span></div>`
+      : "";
+    return `
+      <div class="pack-card-content pack-card-content-card rarity-${rarityClass}">
+        <span class="pack-card-cost"><span>${reward.cost}</span></span>
+        <strong class="pack-card-name">${escapeHtml(reward.name)}</strong>
+        <div class="pack-card-img-wrap">
+          <img src="${imgSrc}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'">
+        </div>
+        <span class="pack-card-category">${escapeHtml(reward.category)}</span>
+        <p class="pack-card-desc">${escapeHtml(reward.description)}</p>
+        ${stats}
+      </div>
+    `;
+  }
+  return `
+    <div class="pack-card-content rarity-${rarityClass}">
+      ${renderRewardVisual(reward)}
+      <div class="pack-card-name">${escapeHtml(rewardName(reward))}</div>
+      <div class="pack-card-rarity">${escapeHtml(rewardLabel(reward))}</div>
     </div>
   `;
 }
@@ -2341,7 +2423,6 @@ async function claimShopItem(itemId: string): Promise<void> {
   if (!supabase || !view.session) return;
   view.shopError = undefined;
   view.shopMessage = undefined;
-  render();
   try {
     const { data, error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
     if (error) throw error;
@@ -2352,11 +2433,27 @@ async function claimShopItem(itemId: string): Promise<void> {
     view.packOpeningCards = undefined;
     view.shopMessage = "購買成功";
     await loadAccountDataRaw();
-    render();
+    updateShopGoldDisplay(result);
+    mountPackOpeningOverlay();
   } catch (error) {
     view.shopError = error instanceof Error ? error.message : "購買失敗。";
     render();
   }
+}
+
+function updateShopGoldDisplay(result: PurchaseShopResult | null): void {
+  const gold = view.profile?.gold ?? result?.remainingGold;
+  const goldEl = document.querySelector<HTMLElement>("#shop-gold-amount");
+  if (goldEl && typeof gold === "number") goldEl.textContent = String(gold);
+}
+
+function mountPackOpeningOverlay(): void {
+  const html = renderLegacyShopPackOverlay();
+  if (!html) return;
+  document.querySelector("#pack-opening-overlay")?.remove();
+  const host = document.querySelector(".app-shell") ?? app;
+  host.insertAdjacentHTML("beforeend", html);
+  bindPackOpeningActions();
 }
 
 function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningReward[] {
@@ -2366,7 +2463,19 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
       if (reward.type === "card" && reward.cardId) {
         const card = cardCatalog.get(reward.cardId);
         if (!card) return undefined;
-        return { type: "card", cardId: card.id, name: card.name, rarity: card.rarity, image: card.image };
+        return {
+          type: "card",
+          cardId: card.id,
+          name: card.name,
+          category: card.category,
+          description: card.description,
+          cost: card.cost,
+          cardType: card.type,
+          rarity: card.rarity,
+          image: card.image,
+          attack: card.attack,
+          health: card.health
+        };
       }
       if (reward.type === "avatar" && reward.id && reward.name && reward.path) {
         return { type: "avatar", id: reward.id, name: reward.name, path: reward.path };
@@ -2612,15 +2721,16 @@ async function saveProfile(event: Event): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const name = (view.editingDisplayName ?? view.profile?.display_name ?? "").trim();
   if (!name) {
-    view.accountError = "Display name cannot be empty.";
+    view.accountError = "顯示名稱不能為空。";
     render();
     return;
   }
   await withAccountLoading(async () => {
     const { error } = await supabase.from("profiles").update({ display_name: name }).eq("user_id", view.session!.user.id);
     if (error) throw error;
-    view.accountMessage = "Profile updated.";
+    view.accountMessage = "個人資料已更新。";
     view.editingDisplayName = undefined;
+    view.editingDisplayNameActive = false;
     await loadAccountDataRaw();
   });
 }
@@ -3049,10 +3159,14 @@ async function initializeAccount(): Promise<void> {
   const { data } = await supabase.auth.getSession();
   view.session = data.session;
   if (view.session) await loadAccountData();
-  supabase.auth.onAuthStateChange((_event, session) => {
+  supabase.auth.onAuthStateChange((event, session) => {
+    const previousUserId = view.session?.user?.id;
+    const nextUserId = session?.user?.id;
     view.session = session;
+    if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
+    if (event === "SIGNED_IN" && previousUserId === nextUserId) return;
     if (session) {
-      view.menuScreen = "main";
+      if (previousUserId !== nextUserId) view.menuScreen = "main";
       void loadAccountData();
     } else {
       view.profile = undefined;

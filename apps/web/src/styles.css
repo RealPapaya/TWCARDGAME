@@ -3168,13 +3168,74 @@ input {
   max-width: 420px;
 }
 
-.profile-form input {
-  padding: 8px 10px;
+.profile-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.profile-name-display {
+  font-size: 18px;
+  font-weight: bold;
+  color: #3d1e0f;
+  flex: 1;
+  word-break: break-word;
+}
+
+.profile-name-input {
+  flex: 1;
+  padding: 6px 10px;
   border-radius: 6px;
   border: 2px solid #8b4513;
   background: #fff8e0;
   color: #3d1e0f;
-  font-size: 15px;
+  font-size: 16px;
+}
+
+.profile-pencil-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+  padding: 4px 6px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  opacity: 0.7;
+  transition: opacity 0.15s;
+}
+
+.profile-pencil-btn:hover {
+  opacity: 1;
+}
+
+.profile-name-confirm-btn,
+.profile-name-cancel-btn {
+  background: none;
+  border: 1.5px solid currentColor;
+  cursor: pointer;
+  font-size: 14px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+  flex-shrink: 0;
+  font-weight: bold;
+}
+
+.profile-name-confirm-btn {
+  color: #2d7a2d;
+}
+
+.profile-name-confirm-btn:hover {
+  background: #e8f5e9;
+}
+
+.profile-name-cancel-btn {
+  color: #8b4513;
+}
+
+.profile-name-cancel-btn:hover {
+  background: #fdecea;
 }
 
 .profile-meta {
@@ -3955,11 +4016,10 @@ input {
   border: 2px solid #c4b091;
   border-radius: 8px;
   padding: 12px 15px;
-  transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;
 }
 .lb-player-card:hover {
-  transform: translateX(5px);
   box-shadow: 0 4px 12px rgba(93, 46, 23, 0.3);
   border-color: #d4af37;
 }
@@ -4507,14 +4567,57 @@ input {
 }
 
 .pack-card-wrapper {
-  width: 150px;
-  height: 215px;
+  --pack-edge: #8b8b8b;
+  --pack-glow: rgba(220, 220, 220, 0.55);
+  width: clamp(156px, 15vw, 218px);
+  aspect-ratio: 5 / 7;
+  height: auto;
   cursor: pointer;
   flex-shrink: 0;
 }
 
+.pack-card-wrapper.rarity-common {
+  --pack-edge: #cfd4d9;
+  --pack-glow: rgba(216, 224, 230, 0.68);
+}
+
+.pack-card-wrapper.rarity-rare,
+.pack-card-wrapper.rarity-avatar,
+.pack-card-wrapper.rarity-title,
+.pack-card-wrapper.rarity-voucher {
+  --pack-edge: #1fb7ff;
+  --pack-glow: rgba(25, 177, 255, 0.78);
+}
+
+.pack-card-wrapper.rarity-epic {
+  --pack-edge: #b35cff;
+  --pack-glow: rgba(179, 92, 255, 0.82);
+}
+
+.pack-card-wrapper.rarity-legendary {
+  --pack-edge: #ffb233;
+  --pack-glow: rgba(255, 164, 32, 0.9);
+}
+
+.pack-card-wrapper.rarity-repic {
+  --pack-edge: #2cf3d7;
+  --pack-glow: rgba(44, 243, 215, 0.78);
+}
+
 .pack-card-wrapper:not(.flipped):hover .pack-card-inner {
   transform: translateY(-6px) scale(1.03);
+}
+
+.pack-card-wrapper:not(.flipped):hover .pack-card-back {
+  border-color: var(--pack-edge);
+  box-shadow:
+    0 0 18px var(--pack-glow),
+    0 0 42px color-mix(in srgb, var(--pack-glow), transparent 28%),
+    0 18px 34px rgba(0, 0, 0, 0.5);
+}
+
+.pack-card-wrapper:not(.flipped):hover .pack-card-back::after {
+  opacity: 1;
 }
 
 .pack-card-inner {
@@ -4541,6 +4644,21 @@ input {
 .pack-card-back {
   transform: rotateY(0deg);
   overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.48);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.pack-card-back::after {
+  content: "";
+  position: absolute;
+  inset: -18%;
+  background:
+    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--pack-glow), transparent 15%), transparent 38%),
+    radial-gradient(circle at 50% 50%, transparent 42%, color-mix(in srgb, var(--pack-glow), transparent 45%) 58%, transparent 72%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
 }
 
 .pack-card-back img {
@@ -4552,8 +4670,10 @@ input {
 
 .pack-card-front {
   transform: rotateY(180deg);
-  border: 3px solid var(--wood-medium);
+  border: 2px solid var(--pack-edge);
   overflow: hidden;
+  background: #0f0f0f;
+  box-shadow: 0 0 24px var(--pack-glow), 0 18px 40px rgba(0, 0, 0, 0.55);
 }
 
 .pack-card-content {
@@ -4563,6 +4683,8 @@ input {
   flex-direction: column;
   align-items: center;
   border-radius: 9px;
+  position: relative;
+  overflow: hidden;
 }
 
 .pack-card-content.rarity-common    { background: linear-gradient(160deg, #e0e0e0, #a8a8a8); }
@@ -4571,11 +4693,63 @@ input {
 .pack-card-content.rarity-legendary { background: linear-gradient(160deg, #ffe0a0, #e06000); }
 .pack-card-content.rarity-repic     { background: linear-gradient(160deg, #a0f0e8, #00a8b0); }
 
+.pack-card-content-card {
+  justify-content: flex-start;
+  padding: 22px 12px 34px;
+  background: #151515;
+  color: #f5f5f5;
+}
+
+.pack-card-content-card.rarity-common,
+.pack-card-content-card.rarity-rare,
+.pack-card-content-card.rarity-epic,
+.pack-card-content-card.rarity-legendary,
+.pack-card-content-card.rarity-repic {
+  background:
+    radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--pack-glow), transparent 82%), transparent 32%),
+    linear-gradient(180deg, #1b1b1b 0%, #111111 100%);
+}
+
+.pack-card-cost {
+  position: absolute;
+  top: 7px;
+  left: 7px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  z-index: 3;
+  transform: rotate(45deg);
+  border-radius: 5px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  background: linear-gradient(135deg, #22d7ff, #0477dc);
+  color: white;
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 900;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  box-shadow: 0 0 10px rgba(34, 215, 255, 0.65);
+}
+
+.pack-card-cost span {
+  transform: rotate(-45deg);
+}
+
 .pack-card-img-wrap {
-  flex: 1;
   width: 100%;
+  flex: 1;
   overflow: hidden;
   border-radius: 9px 9px 0 0;
+}
+
+.pack-card-content-card .pack-card-img-wrap {
+  flex: 0 0 auto;
+  height: 36%;
+  min-height: 78px;
+  margin-top: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.42);
+  border-radius: 6px;
+  background: #282828;
 }
 
 .pack-card-img-wrap img {
@@ -4616,13 +4790,87 @@ input {
 
 .pack-card-name {
   font-family: var(--font-display);
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 900;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9);
   text-align: center;
   padding: 4px 6px 2px;
   width: 100%;
+}
+
+.pack-card-content-card .pack-card-name {
+  min-height: 28px;
+  padding: 0 26px;
+  color: #ffe45d;
+  line-height: 1.12;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.pack-card-category {
+  max-width: 92%;
+  margin-top: 10px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  background: rgba(32, 214, 242, 0.28);
+  color: #a9f4ff;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pack-card-desc {
+  width: 100%;
+  min-height: 34px;
+  margin: 8px 0 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 12px;
+  line-height: 1.25;
+  text-align: center;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+}
+
+.pack-card-stats {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: -2px;
+  display: flex;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.pack-stat-atk,
+.pack-stat-hp {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  text-shadow: 1px 1px 2px #000;
+}
+
+.pack-stat-atk {
+  background: linear-gradient(135deg, #f09819, #edde5d);
+  clip-path: polygon(50% 0, 80% 20%, 80% 62%, 100% 62%, 100% 80%, 70% 80%, 70% 100%, 30% 100%, 30% 80%, 0 80%, 0 62%, 20% 62%, 20% 20%);
+}
+
+.pack-stat-hp {
+  background: linear-gradient(180deg, #ff416c, #ff4b62);
+  clip-path: polygon(50% 15%, 70% 0, 90% 5%, 100% 25%, 100% 50%, 50% 90%, 0 50%, 0 25%, 10% 5%, 30% 0);
 }
 
 .pack-card-rarity {

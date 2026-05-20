@@ -41,6 +41,8 @@ begin
   end if;
 end$$;
 
+drop function if exists public.purchase_shop_item(text);
+
 create or replace function public.purchase_shop_item(p_item_id text)
 returns jsonb
 language plpgsql
