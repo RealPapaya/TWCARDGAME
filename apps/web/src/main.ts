@@ -32,6 +32,14 @@ type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | 
 type CollectionFilter = "all" | "owned" | "missing";
 type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
 type FriendsPanel = "friends" | "recommended" | "add";
+type PublicPlayerProfile = {
+  userId: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  winsCount: number;
+  source: "好友" | "排行榜" | "邀請";
+  rank?: number;
+};
 type MatchmakingState = {
   startedAtMs: number;
   status: "searching" | "joining" | "error";
@@ -106,6 +114,7 @@ type ClientViewState = {
   leaderboardLoading?: boolean;
   leaderboardError?: string;
   leaderboardSortBy: "wins" | "level";
+  publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
   shopError?: string;
@@ -385,6 +394,7 @@ const view: ClientViewState = {
   friendsPanel: "friends",
   leaderboard: [],
   leaderboardSortBy: "wins",
+  publicPlayerProfile: undefined,
   shopItems: [],
   aiDifficulty: "normal",
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
@@ -419,6 +429,7 @@ function renderNow(): void {
   const nextHtml = `
     <main class="${shellClass}">
       ${view.state ? renderGame(status) : renderLanding()}
+      ${renderPublicPlayerProfileModal()}
       ${renderToast()}
       ${renderLegacyShopPackOverlay()}
     </main>
@@ -917,6 +928,9 @@ function renderProfileScreen(): string {
   const avatarUrl = profile?.avatar_url || "/images/avatars/avatar1.webp";
   const stats = computeMatchStats();
   const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
+  const level = deriveLbLevel(stats.wins);
+  const ownedCardCount = view.collection.reduce((sum, row) => sum + row.quantity, 0);
+  const title = profile?.selected_title || "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
   const recent = view.matchHistory.slice(0, 10);
   const editing = view.editingDisplayNameActive ?? false;
@@ -934,19 +948,27 @@ function renderProfileScreen(): string {
             <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
             <button id="open-avatar-picker" class="ghost-button">更換頭像</button>
           </div>
-          <form id="profile-form" class="profile-form">
-            <div class="profile-name-row">
-              ${editing
-                ? `<input id="profile-display-name" class="profile-name-input" value="${escapeAttr(displayName)}" maxlength="32" autofocus />`
-                : `<span class="profile-name-display">${escapeHtml(displayName)}</span>`
-              }
-              ${editing
-                ? `<button type="submit" class="profile-name-confirm-btn" data-testid="profile-save" ${view.accountLoading ? "disabled" : ""} title="儲存">✓</button>
-                   <button type="button" id="cancel-edit-name" class="profile-name-cancel-btn" title="取消">✕</button>`
-                : `<button type="button" id="edit-display-name" class="profile-pencil-btn" title="編輯顯示名稱">✏️</button>`
-              }
+          <div class="profile-identity">
+            <form id="profile-form" class="profile-form">
+              <div class="profile-name-row">
+                ${editing
+                  ? `<input id="profile-display-name" class="profile-name-input" value="${escapeAttr(displayName)}" maxlength="32" autofocus />`
+                  : `<span class="profile-name-display">${escapeHtml(displayName)}</span>`
+                }
+                ${editing
+                  ? `<button type="submit" class="profile-name-confirm-btn" data-testid="profile-save" ${view.accountLoading ? "disabled" : ""} title="儲存">✓</button>
+                     <button type="button" id="cancel-edit-name" class="profile-name-cancel-btn" title="取消">✕</button>`
+                  : `<button type="button" id="edit-display-name" class="profile-pencil-btn" title="編輯顯示名稱">✏️</button>`
+                }
+              </div>
+            </form>
+            <div class="profile-title-badge">${escapeHtml(title)}</div>
+            <div class="profile-ribbon">
+              <span>Lv. ${level}</span>
+              <span>${stats.wins} 勝</span>
+              <span>${winRateLabel} 勝率</span>
             </div>
-          </form>
+          </div>
           ${view.avatarPickerOpen ? `
           <div class="avatar-picker" data-testid="avatar-picker">
             ${avatars.map((slug) => `
@@ -955,6 +977,15 @@ function renderProfileScreen(): string {
               </button>
             `).join("")}
           </div>` : ""}
+        </section>
+        <section class="parchment-card profile-wallet">
+          <h3>帳號資源</h3>
+          <div class="profile-resource-grid">
+            <div class="profile-resource"><span>金幣</span><strong>${profile?.gold ?? 0}</strong></div>
+            <div class="profile-resource"><span>消費券</span><strong>${profile?.vouchers ?? 0}</strong></div>
+            <div class="profile-resource"><span>卡牌收藏</span><strong>${ownedCardCount}</strong></div>
+            <div class="profile-resource"><span>牌組</span><strong>${view.decks.length}</strong></div>
+          </div>
         </section>
         <section class="parchment-card profile-stats">
           <h3>戰績統計</h3>
@@ -965,6 +996,14 @@ function renderProfileScreen(): string {
             <li><span>勝率</span><strong>${winRateLabel}</strong></li>
             <li><span>總場次</span><strong>${stats.total}</strong></li>
           </ul>
+        </section>
+        <section class="parchment-card profile-login">
+          <h3>登入紀錄</h3>
+          <div class="profile-login-grid">
+            <div><span>累積登入</span><strong>${profile?.login_days ?? 0}</strong></div>
+            <div><span>目前連續</span><strong>${profile?.current_login_streak ?? 0}</strong></div>
+            <div><span>最長連續</span><strong>${profile?.longest_login_streak ?? 0}</strong></div>
+          </div>
         </section>
         <section class="parchment-card profile-history">
           <h3>近期對戰</h3>
@@ -1030,24 +1069,18 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
   const selectedTotal = deck?.card_ids.length ?? 0;
   return `
     <section class="screen collection-screen" data-screen="collection">
-      <div class="collection-container">
-        <header class="collection-header">
-          <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
-          <h2 class="collection-title">${escapeHtml(title)}</h2>
-        </header>
-        ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-        <div class="collection-controls-bar">
-          <div class="controls-left">
+      <div class="collection-left-panel">
+        <div class="collection-container">
+          <header class="collection-header">
+            <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
+            <h2 class="collection-title">${escapeHtml(title)}</h2>
+            <div class="collection-header-voucher" title="持有消費券">
+              <span id="collection-vouchers"><span class="voucher-icon">券</span>20</span>
+            </div>
+          </header>
+          ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
+          <div class="collection-controls-bar">
             <span id="collection-progress">已收集卡片種類: ${ownedTotal}/${collectibles.length}</span>
-          </div>
-          <div class="controls-center collection-filters" role="tablist">
-            ${(["all", "owned", "missing"] as CollectionFilter[]).map((value) => `
-              <button class="collection-filter ${view.collectionFilter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
-                ${collectionFilterLabel(value)}
-              </button>
-            `).join("")}
-          </div>
-          <div class="controls-right">
             <label class="collection-select" aria-label="排序">
               <span>排序</span>
               <select id="collection-sort-select">
@@ -1078,14 +1111,13 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
               <input id="collection-search-input" value="${escapeAttr(view.collectionSearch)}" placeholder="搜尋卡牌名稱..." autocomplete="off" />
               <span class="search-icon">⌕</span>
             </label>
-            <div class="collection-stats" title="持有消費券">
-              <span id="collection-vouchers"><span class="voucher-icon">券</span>20</span>
-            </div>
           </div>
-        </div>
-        ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
-        <div class="collection-workbench">
+          ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
           <section class="collection-card-library" aria-label="卡牌庫">
+            <label class="show-unowned-label">
+              <input type="checkbox" id="show-unowned-checkbox" ${view.collectionFilter !== "owned" ? "checked" : ""} />
+              顯示未擁有的卡牌
+            </label>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
               ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
                 const qty = collectionMap.get(card.id) ?? 0;
@@ -1093,20 +1125,14 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
               }).join("")}
             </div>
           </section>
-          <aside class="collection-deck-column" aria-label="牌組">
-            ${renderCollectionDeckColumnContent()}
-          </aside>
         </div>
       </div>
+      <aside class="collection-deck-column" aria-label="牌組">
+        ${renderCollectionDeckColumnContent()}
+      </aside>
       ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
     </section>
   `;
-}
-
-function collectionFilterLabel(filter: CollectionFilter): string {
-  if (filter === "owned") return "已擁有";
-  if (filter === "missing") return "未擁有";
-  return "全部";
 }
 
 function collectionSortOptions(): Array<{ value: CollectionSort; label: string }> {
@@ -1161,10 +1187,11 @@ function rarityRank(rarity: string): number {
 }
 
 function renderCollectionTile(card: CardDefinition, quantity: number, selectedCount: number, selectedTotal: number): string {
-  const owned = quantity > 0;
+  const owned = hasCollectionRows() ? quantity > 0 : true;
   const limit = deckCopyLimit(card);
   const effectiveOwned = hasCollectionRows() ? quantity : limit;
   const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
+  const disabled = Boolean(view.editingDeck) && !canAdd;
   const resolved: ResolvedCardView = {
     cardId: card.id,
     instanceId: `collection-${card.id}`,
@@ -1179,7 +1206,7 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
     health: card.health
   };
   return `
-    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${canAdd ? "" : "disabled"}>
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
       <span class="card-count-badge">x${quantity}</span>
       ${selectedCount > 0 ? `<span class="deck-count-badge">${selectedCount}/${limit}</span>` : ""}
       <div class="card rarity-${card.rarity.toLowerCase()}">
@@ -1874,7 +1901,14 @@ function bindStaticActions(): void {
     el.addEventListener("click", () => void deleteDeck(el.dataset.deleteDeck));
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-add-card]")) {
-    el.addEventListener("click", () => addCardToEditor(el.dataset.addCard));
+    el.addEventListener("click", () => {
+      if (view.editingDeck) {
+        addCardToEditor(el.dataset.addCard);
+      } else {
+        view.pinnedCollectionCardId = el.dataset.addCard;
+        render();
+      }
+    });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-remove-card]")) {
     el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
@@ -1896,14 +1930,11 @@ function bindStaticActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-avatar]")) {
     el.addEventListener("click", () => void pickAvatar(el.dataset.pickAvatar));
   }
-  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-filter]")) {
-    el.addEventListener("click", () => {
-      const value = el.dataset.collectionFilter as CollectionFilter | undefined;
-      if (!value) return;
-      view.collectionFilter = value;
-      render();
-    });
-  }
+  document.querySelector<HTMLInputElement>("#show-unowned-checkbox")?.addEventListener("change", (event) => {
+    const checked = (event.currentTarget as HTMLInputElement).checked;
+    view.collectionFilter = checked ? "all" : "owned";
+    render();
+  });
   document.querySelector<HTMLSelectElement>("#collection-sort-select")?.addEventListener("change", (event) => {
     const value = (event.currentTarget as HTMLSelectElement).value as CollectionSort;
     view.collectionSort = value;
@@ -1925,6 +1956,22 @@ function bindStaticActions(): void {
       render();
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-view-player-profile]")) {
+    el.addEventListener("click", () => {
+      const userId = el.dataset.viewPlayerProfile;
+      if (userId) openPublicPlayerProfile(userId);
+    });
+  }
+  document.querySelector<HTMLElement>("#public-profile-backdrop")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) {
+      view.publicPlayerProfile = undefined;
+      render();
+    }
+  });
+  document.querySelector<HTMLButtonElement>("#close-public-profile")?.addEventListener("click", () => {
+    view.publicPlayerProfile = undefined;
+    render();
+  });
   document.querySelector<HTMLInputElement>("#collection-search-input")?.addEventListener("input", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     view.collectionSearch = input.value;
@@ -2307,6 +2354,7 @@ function renderFriendRow(friend: FriendRow): string {
         <span class="muted">Wins ${friend.wins_count}</span>
       </div>
       <div class="friend-actions">
+        <button class="ghost-button" data-view-player-profile="${escapeAttr(friend.friend_user_id)}" data-testid="view-friend-profile">查看</button>
         <button class="ghost-button" data-challenge-friend="${escapeAttr(friend.friend_user_id)}" data-testid="challenge-friend">挑戰</button>
         <button class="danger" data-remove-friend="${escapeAttr(friend.friend_user_id)}" data-testid="remove-friend">刪除</button>
       </div>
@@ -2337,6 +2385,7 @@ function renderFriendRequestRow(request: FriendRequestRow, actions: string): str
         <span class="muted">Wins ${request.wins_count}</span>
       </div>
       <div class="friend-actions">
+        <button class="ghost-button" data-view-player-profile="${escapeAttr(request.other_user_id)}" data-testid="view-request-profile">查看</button>
         ${actions}
       </div>
     </li>
@@ -2358,6 +2407,83 @@ function deriveLbLevel(wins: number): number {
   return Math.floor(wins / 10) + 1;
 }
 
+function renderPublicPlayerProfileModal(): string {
+  const player = view.publicPlayerProfile;
+  if (!player) return "";
+  const avatarUrl = player.avatarUrl || "/images/avatars/avatar1.webp";
+  const level = deriveLbLevel(player.winsCount);
+  const rankText = player.rank ? `#${player.rank}` : "—";
+  return `
+    <section id="public-profile-backdrop" class="public-profile-backdrop" role="dialog" aria-modal="true" aria-label="玩家個人頁面">
+      <div class="parchment-card public-profile-card">
+        <button id="close-public-profile" class="public-profile-close" title="關閉">×</button>
+        <div class="public-profile-hero">
+          <img class="public-profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+          <div class="public-profile-info">
+            <span class="public-profile-source">${escapeHtml(player.source)}</span>
+            <h3>${escapeHtml(player.displayName)}</h3>
+            <div class="public-profile-title">#菜鳥</div>
+          </div>
+        </div>
+        <div class="public-profile-stats">
+          <div><span>等級</span><strong>Lv. ${level}</strong></div>
+          <div><span>勝場</span><strong>${player.winsCount}</strong></div>
+          <div><span>排行</span><strong>${escapeHtml(rankText)}</strong></div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function openPublicPlayerProfile(userId: string): void {
+  if (view.session?.user.id === userId) {
+    view.publicPlayerProfile = undefined;
+    navigateToScreen("profile");
+    return;
+  }
+  const friend = view.friends.find((row) => row.friend_user_id === userId);
+  if (friend) {
+    view.publicPlayerProfile = {
+      userId,
+      displayName: friend.display_name,
+      avatarUrl: friend.avatar_url,
+      winsCount: friend.wins_count,
+      source: "好友"
+    };
+    render();
+    return;
+  }
+  const request = view.friendRequests.find((row) => row.other_user_id === userId);
+  if (request) {
+    view.publicPlayerProfile = {
+      userId,
+      displayName: request.display_name,
+      avatarUrl: request.avatar_url,
+      winsCount: request.wins_count,
+      source: "邀請"
+    };
+    render();
+    return;
+  }
+  const sorted = [...view.leaderboard].sort((a, b) =>
+    view.leaderboardSortBy === "level"
+      ? deriveLbLevel(b.wins_count) - deriveLbLevel(a.wins_count) || b.wins_count - a.wins_count
+      : b.wins_count - a.wins_count
+  );
+  const leaderboardRow = sorted.find((row) => row.user_id === userId);
+  if (leaderboardRow) {
+    view.publicPlayerProfile = {
+      userId,
+      displayName: leaderboardRow.display_name,
+      avatarUrl: leaderboardRow.avatar_url,
+      winsCount: leaderboardRow.wins_count,
+      source: "排行榜",
+      rank: sorted.findIndex((row) => row.user_id === userId) + 1
+    };
+    render();
+  }
+}
+
 function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, sortBy: "wins" | "level"): string {
   const rankClass = displayRank <= 3 ? ` lb-card-rank-${displayRank}` : "";
   const rankBadge = displayRank === 1 ? "🥇" : displayRank === 2 ? "🥈" : displayRank === 3 ? "🥉" : `#${displayRank}`;
@@ -2373,7 +2499,7 @@ function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, s
         <div class="lb-player-title">#菜鳥</div>
       </div>
       <div class="lb-stat-pill">${escapeHtml(statLabel)}</div>
-      <button class="lb-action-btn" title="玩家選項">⋯</button>
+      <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}" title="查看個人頁面">查看</button>
     </div>
   `;
 }
