@@ -41,12 +41,6 @@
     --neon-lime: #39ff14;
 }
 
-/* Custom Cursor Theme */
-body,
-* {
-    cursor: url('../assets/images/cursors/cursor_default.webp') 0 0, auto !important;
-}
-
 
 #drag-layer {
     position: fixed;

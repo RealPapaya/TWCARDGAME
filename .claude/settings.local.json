@@ -32,7 +32,10 @@
       "Bash(rmdir /tmp/dist-bak)",
       "Bash(ls packages/__TRACKED_VAR__/dist)",
       "Bash(cat vercel.json)",
-      "Bash(cat apps/web/vercel.json)"
+      "Bash(cat apps/web/vercel.json)",
+      "Bash(Get-ChildItem -Path \"d:\\\\Google AI\\\\TWCARDGAME\" -Depth 0)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(xargs ls -lh)"
     ],
     "additionalDirectories": [
       "\\tmp"

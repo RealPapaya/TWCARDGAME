@@ -507,29 +507,30 @@ function renderAuthPanel(): string {
   return `
     <section class="screen auth-screen" data-screen="auth">
       ${renderCloudLayer()}
-      <div class="auth-card parchment-card">
-        <div class="game-title-block">
-          <h1 class="game-title">寶島遊戲王 v2</h1>
-          <p class="game-subtitle">Battle on the Isle</p>
-        </div>
+      <div class="auth-container-v2">
+        <h1 class="auth-page-title">帳號登入</h1>
+        <div class="auth-card parchment-card">
+          <div class="auth-tabs" aria-label="帳號操作">
+            <button type="button" class="auth-tab active" ${view.accountLoading ? "disabled" : ""}>登入</button>
+            <button type="button" id="sign-up" class="auth-tab" ${view.accountLoading ? "disabled" : ""}>註冊</button>
+          </div>
         ${view.accountError ? `<p class="error-text">${escapeHtml(view.accountError)}</p>` : ""}
         ${view.accountMessage ? `<p class="success-text">${escapeHtml(view.accountMessage)}</p>` : ""}
         <form id="auth-form" class="auth-form">
           <label class="auth-label">
-            <span>Email</span>
-            <input id="auth-email" type="email" autocomplete="email" placeholder="player@island.tw" required />
+            <span>帳號</span>
+            <input id="auth-email" type="email" autocomplete="email" placeholder="輸入用戶名" required />
           </label>
           <label class="auth-label">
-            <span>Password</span>
-            <input id="auth-password" type="password" autocomplete="current-password" placeholder="••••••••" required />
+            <span>密碼</span>
+            <input id="auth-password" type="password" autocomplete="current-password" placeholder="輸入密碼" required />
           </label>
-          <div class="auth-actions">
-            <button type="submit" data-auth-mode="signin" data-testid="auth-signin" ${view.accountLoading ? "disabled" : ""}>Sign In</button>
-            <button type="button" id="sign-up" ${view.accountLoading ? "disabled" : ""}>Create Account</button>
-          </div>
-          <div class="auth-divider"><span>or</span></div>
-          <button type="button" id="google-sign-in" class="oauth-button" ${view.accountLoading ? "disabled" : ""}>Continue with Google</button>
+          <button type="button" id="google-sign-in" class="google-logo-button" aria-label="使用 Google 登入" title="使用 Google 登入" ${view.accountLoading ? "disabled" : ""}>
+            <span class="google-g" aria-hidden="true">G</span>
+          </button>
+          <button type="submit" class="auth-submit" data-auth-mode="signin" data-testid="auth-signin" ${view.accountLoading ? "disabled" : ""}>確定登入</button>
         </form>
+        </div>
       </div>
     </section>
   `;
