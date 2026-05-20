@@ -26,12 +26,12 @@ jobs:
     concurrency: deploy-server
     steps:
       - uses: actions/checkout@v4
-      - uses: superfly/flyctl-actions/setup-flyctl@master
-      # Run from the repo root so the Docker build context includes apps/ and
-      # packages/ (the Dockerfile COPYs them by repo-relative path).
-      - run: flyctl deploy --config apps/server/fly.toml --dockerfile apps/server/Dockerfile --remote-only
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+      - name: Deploy to Railway
+        run: railway up --service twcardgame-server --detach
         env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   deploy-web:
     needs: test
