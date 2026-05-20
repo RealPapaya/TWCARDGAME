@@ -31,6 +31,7 @@ type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "
 type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
 type CollectionFilter = "all" | "owned" | "missing";
 type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
+type FriendsPanel = "friends" | "recommended" | "add";
 type MatchmakingState = {
   startedAtMs: number;
   status: "searching" | "joining" | "error";
@@ -98,6 +99,7 @@ type ClientViewState = {
   editingDisplayNameActive?: boolean;
   friends: FriendRow[];
   friendRequests: FriendRequestRow[];
+  friendsPanel: FriendsPanel;
   friendsLoading?: boolean;
   friendsError?: string;
   leaderboard: LeaderboardRow[];
@@ -380,6 +382,7 @@ const view: ClientViewState = {
   collectionSearch: "",
   friends: [],
   friendRequests: [],
+  friendsPanel: "friends",
   leaderboard: [],
   leaderboardSortBy: "wins",
   shopItems: [],
@@ -1242,11 +1245,12 @@ function computeMatchStats(): { wins: number; losses: number; draws: number; tot
 
 function renderSavedDeck(deck: DeckRow): string {
   const selected = deck.id === view.selectedDeckId;
+  const incomplete = deck.card_ids.length !== 30;
   return `
     <div class="saved-deck ${selected ? "selected" : ""}">
-      <button class="deck-select" data-select-deck="${escapeAttr(deck.id)}">
+      <button class="deck-select" data-select-deck="${escapeAttr(deck.id)}" ${incomplete ? `disabled title="牌組未滿 30 張，無法用於對戰"` : ""}>
         <strong>${escapeHtml(deck.name)}</strong>
-        <span>${deck.card_ids.length} cards</span>
+        <span>${incomplete ? "⚠ " : ""}${deck.card_ids.length}/30 張</span>
       </button>
       <button data-edit-deck="${escapeAttr(deck.id)}">Edit</button>
       <button class="danger" data-delete-deck="${escapeAttr(deck.id)}">Delete</button>
@@ -1262,6 +1266,7 @@ function renderCollectionDeckColumnContent(): string {
       <div class="deck-shelf-heading">
         <h3>牌組</h3>
         <span>${view.decks.length} 組</span>
+        <button type="button" id="new-deck" class="deck-shelf-new-btn">+ 新增</button>
       </div>
       <div class="deck-banner-list" data-testid="collection-deck-list" data-preserve-scroll>
         ${view.decks.map(renderCollectionDeckBanner).join("") || `<p class="muted deck-empty">尚未建立牌組。</p>`}
@@ -1274,10 +1279,10 @@ function renderCollectionDeckColumnContent(): string {
             <span>牌組名稱</span>
             <input id="deck-name" value="${escapeAttr(deck.name)}" aria-label="Deck name" maxlength="40" />
           </label>
-          <strong class="${selectedTotal === 30 ? "deck-complete" : "deck-count"}">${selectedTotal}/30</strong>
+          <strong class="${selectedTotal === 30 ? "deck-complete" : "deck-count"}">${selectedTotal < 30 ? "⚠ " : ""}${selectedTotal}/30</strong>
         </div>
         <div class="deck-editor-actions">
-          <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>儲存</button>
+          <button type="submit">儲存</button>
           <button type="button" id="autofill-deck">自動補滿</button>
           <button type="button" id="clear-deck">清空</button>
           ${deck.id ? `<button type="button" class="danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>` : ""}
@@ -1291,8 +1296,7 @@ function renderCollectionDeckColumnContent(): string {
       </form>
     ` : `
       <section class="collection-deck-editor deck-editor-placeholder">
-        <button type="button" id="new-deck" class="ghost-button">新增牌組</button>
-        <p class="muted deck-empty">選擇上方牌組開始編輯，或新增一副牌組後再從左側加入卡牌。</p>
+        <p class="muted deck-empty">點選上方牌組開始編輯，或按「+ 新增」建立新牌組。</p>
       </section>
     `}
   `;
@@ -1302,14 +1306,19 @@ function renderCollectionDeckBanner(deck: DeckRow): string {
   const selected = deck.id === view.editingDeck?.id;
   const coverCard = deck.card_ids.map((id) => cardCatalog.get(id)).find(Boolean);
   const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  const incomplete = deck.card_ids.length !== 30;
   return `
-    <button type="button" class="deck-banner ${selected ? "selected" : ""}" data-edit-deck="${escapeAttr(deck.id)}">
+    <div class="deck-banner ${selected ? "selected" : ""}">
       <span class="deck-banner-art" style="background-image:url('${escapeAttr(coverUrl)}')"></span>
       <span class="deck-banner-main">
         <strong>${escapeHtml(deck.name)}</strong>
-        <span>${deck.card_ids.length}/30 張</span>
+        <span>${incomplete ? "⚠ " : ""}${deck.card_ids.length}/30 張</span>
       </span>
-    </button>
+      <div class="deck-banner-actions">
+        <button type="button" class="deck-action-btn" data-edit-deck="${escapeAttr(deck.id)}">編輯</button>
+        <button type="button" class="deck-action-btn danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>
+      </div>
+    </div>
   `;
 }
 
@@ -1962,6 +1971,14 @@ function bindStaticActions(): void {
     const input = document.querySelector<HTMLInputElement>("#add-friend-input");
     void sendFriendRequest(input?.value ?? "");
   });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-friends-panel]")) {
+    el.addEventListener("click", () => {
+      const panel = el.dataset.friendsPanel as FriendsPanel | undefined;
+      if (!panel) return;
+      view.friendsPanel = panel;
+      render();
+    });
+  }
   for (const el of document.querySelectorAll<HTMLElement>("[data-remove-friend]")) {
     el.addEventListener("click", () => {
       const id = el.dataset.removeFriend;
@@ -2200,6 +2217,7 @@ function renderFriendsScreen(): string {
   const friends = view.friends;
   const incoming = view.friendRequests.filter((request) => request.direction === "incoming");
   const outgoing = view.friendRequests.filter((request) => request.direction === "outgoing");
+  const panel = view.friendsPanel;
   return `
     <section class="screen friends-screen" data-screen="friends">
       ${renderCloudLayer()}
@@ -2209,34 +2227,53 @@ function renderFriendsScreen(): string {
       </header>
       ${view.friendsError ? `<p class="error-text menu-status">${escapeHtml(view.friendsError)}</p>` : ""}
       <div class="friends-grid">
-        <section class="parchment-card friends-add">
-          <h3>新增好友</h3>
-          <form id="add-friend-form" class="friends-add-form">
-            <label>對方的顯示名稱
-              <input id="add-friend-input" placeholder="顯示名稱" maxlength="32" required />
-            </label>
-            <button type="submit" data-testid="add-friend-submit" ${view.friendsLoading ? "disabled" : ""}>送出好友邀請</button>
-          </form>
-          <p class="muted">輸入完整的顯示名稱後送出，對方接受後才會成為好友。</p>
+        <nav class="friends-tabs" aria-label="好友分類">
+          <button type="button" class="friends-tab ${panel === "friends" ? "active" : ""}" data-friends-panel="friends" aria-pressed="${panel === "friends"}">好友</button>
+          <button type="button" class="friends-tab ${panel === "recommended" ? "active" : ""}" data-friends-panel="recommended" aria-pressed="${panel === "recommended"}">推薦</button>
+          <button type="button" class="friends-tab ${panel === "add" ? "active" : ""}" data-friends-panel="add" aria-pressed="${panel === "add"}">新增</button>
+        </nav>
+        <section class="parchment-card friends-panel">
+          ${renderFriendsPanel(panel, friends, incoming, outgoing)}
         </section>
-        <section class="parchment-card friends-list-card">
-          <h3>我的好友 (${friends.length})</h3>
-          ${view.friendsLoading ? `<p class="muted">載入中…</p>` : friends.length === 0
-            ? `<p class="muted">還沒有好友。先邀請一位玩家吧！</p>`
-            : `<ul class="friends-list">
-                ${friends.map((friend) => renderFriendRow(friend)).join("")}
-              </ul>`}
-        </section>
-        <section class="parchment-card friends-requests-card">
-          <h3>收到的邀請 (${incoming.length})</h3>
+      </div>
+      ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
+    </section>
+  `;
+}
+
+function renderFriendsPanel(panel: FriendsPanel, friends: FriendRow[], incoming: FriendRequestRow[], outgoing: FriendRequestRow[]): string {
+  if (panel === "add") {
+    return `
+      <div class="friends-panel-head">
+        <h3>新增好友</h3>
+      </div>
+      <form id="add-friend-form" class="friends-add-form">
+        <label>對方的顯示名稱
+          <input id="add-friend-input" placeholder="顯示名稱" maxlength="32" required />
+        </label>
+        <button type="submit" data-testid="add-friend-submit" ${view.friendsLoading ? "disabled" : ""}>送出邀請</button>
+      </form>
+      <p class="muted">輸入完整的顯示名稱後送出，對方接受後才會成為好友。</p>
+    `;
+  }
+
+  if (panel === "recommended") {
+    return `
+      <div class="friends-panel-head">
+        <h3>推薦</h3>
+        <span class="friends-count">${incoming.length + outgoing.length}</span>
+      </div>
+      <div class="friends-request-groups">
+        <section class="friends-request-group">
+          <h4>收到的邀請 (${incoming.length})</h4>
           ${incoming.length === 0
             ? `<p class="muted">目前沒有待處理的好友邀請。</p>`
             : `<ul class="friends-list">
                 ${incoming.map(renderIncomingFriendRequestRow).join("")}
               </ul>`}
         </section>
-        <section class="parchment-card friends-requests-card">
-          <h3>送出的邀請 (${outgoing.length})</h3>
+        <section class="friends-request-group">
+          <h4>送出的邀請 (${outgoing.length})</h4>
           ${outgoing.length === 0
             ? `<p class="muted">目前沒有等待對方回覆的邀請。</p>`
             : `<ul class="friends-list">
@@ -2244,8 +2281,19 @@ function renderFriendsScreen(): string {
               </ul>`}
         </section>
       </div>
-      ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
-    </section>
+    `;
+  }
+
+  return `
+    <div class="friends-panel-head">
+      <h3>我的好友</h3>
+      <span class="friends-count">${friends.length}</span>
+    </div>
+    ${view.friendsLoading ? `<p class="muted">載入中…</p>` : friends.length === 0
+      ? `<p class="muted">還沒有好友。先邀請一位玩家吧！</p>`
+      : `<ul class="friends-list">
+          ${friends.map((friend) => renderFriendRow(friend)).join("")}
+        </ul>`}
   `;
 }
 
@@ -2260,7 +2308,7 @@ function renderFriendRow(friend: FriendRow): string {
       </div>
       <div class="friend-actions">
         <button class="ghost-button" data-challenge-friend="${escapeAttr(friend.friend_user_id)}" data-testid="challenge-friend">挑戰</button>
-        <button class="danger" data-remove-friend="${escapeAttr(friend.friend_user_id)}" data-testid="remove-friend">移除</button>
+        <button class="danger" data-remove-friend="${escapeAttr(friend.friend_user_id)}" data-testid="remove-friend">刪除</button>
       </div>
     </li>
   `;
@@ -2690,7 +2738,7 @@ async function loadFriends(): Promise<void> {
     view.friends = (friendsResult.data as FriendRow[]) ?? [];
     view.friendRequests = (requestsResult.data as FriendRequestRow[]) ?? [];
   } catch (error) {
-    view.friendsError = error instanceof Error ? error.message : "Failed to load friends.";
+    view.friendsError = errorMessage(error);
   } finally {
     view.friendsLoading = false;
     render();
@@ -2714,7 +2762,7 @@ async function sendFriendRequest(displayName: string): Promise<void> {
     showToast(`已送出好友邀請給 ${target}。`);
     await loadFriends();
   } catch (error) {
-    view.friendsError = error instanceof Error ? error.message : "Failed to add friend.";
+    view.friendsError = errorMessage(error);
     view.friendsLoading = false;
     render();
   }
@@ -2729,7 +2777,7 @@ async function removeFriend(friendUserId: string): Promise<void> {
     showToast("好友已移除。");
     await loadFriends();
   } catch (error) {
-    view.friendsError = error instanceof Error ? error.message : "Failed to remove friend.";
+    view.friendsError = errorMessage(error);
     render();
   }
 }
@@ -2749,7 +2797,7 @@ async function respondFriendRequest(action: "accept" | "decline" | "cancel", req
     showToast(action === "accept" ? "已接受好友邀請。" : "好友邀請已更新。");
     await loadFriends();
   } catch (error) {
-    view.friendsError = error instanceof Error ? error.message : "Failed to update friend request.";
+    view.friendsError = errorMessage(error);
     view.friendsLoading = false;
     render();
   }
@@ -3774,7 +3822,7 @@ async function saveEditingDeck(event: Event): Promise<void> {
     const saved = data as DeckRow;
     showToast(`牌組「${saved.name}」已儲存。`);
     view.selectedDeckId = saved.id;
-    view.editingDeck = { ...saved, card_ids: [...saved.card_ids] };
+    view.editingDeck = undefined;
     await loadAccountData();
   });
 }
