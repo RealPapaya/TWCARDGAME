@@ -7,6 +7,7 @@ export default defineConfig({
     environment: "node"
   },
   resolve: {
-    conditions: ["source"]
+    conditions: ["source"],
+    customConditions: ["source"]
   }
 });
