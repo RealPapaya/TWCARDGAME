@@ -139,14 +139,12 @@ as $$
     when 'disenchant' then case p_rarity
       when 'LEGENDARY' then 300
       when 'EPIC' then 160
-      when 'REPIC' then 160
       when 'RARE' then 60
       else 20
     end
     when 'craft' then case p_rarity
       when 'LEGENDARY' then 800
       when 'EPIC' then 400
-      when 'REPIC' then 400
       when 'RARE' then 200
       else 50
     end

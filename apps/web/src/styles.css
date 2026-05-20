@@ -777,11 +777,6 @@ input {
   box-shadow: 0 0 20px rgba(255, 176, 46, 0.7), 0 10px 24px rgba(0, 0, 0, 0.56);
 }
 
-.card.rarity-repic {
-  border-color: #2cf3d7;
-  box-shadow: 0 0 18px rgba(44, 243, 215, 0.58), 0 10px 24px rgba(0, 0, 0, 0.56);
-}
-
 .card.can-play {
   border-color: rgba(82, 230, 109, 0.88);
   box-shadow: 0 0 18px rgba(82, 230, 109, 0.35), 0 8px 18px rgba(0, 0, 0, 0.42);
@@ -2042,6 +2037,14 @@ input {
   font-size: 20px;
 }
 
+.confirm-message {
+  margin: 0 0 18px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #d8c4a0;
+  max-width: 320px;
+}
+
 .confirm-actions {
   display: flex;
   justify-content: center;
@@ -3166,17 +3169,36 @@ input {
 
 /* Profile */
 
-.profile-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 0.9fr);
-  grid-template-areas:
-    "header header"
-    "wallet stats"
-    "login history";
-  gap: 18px;
+.profile-panel {
   position: relative;
   z-index: 2;
-  padding: 0 18px 28px;
+  margin: 0 18px 28px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  grid-template-areas:
+    "header  header"
+    "wallet  stats"
+    "login   stats"
+    "history history";
+  gap: 14px 20px;
+  align-items: start;
+}
+
+.profile-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(93, 46, 23, 0.18);
+}
+
+.profile-section--wallet { grid-area: wallet; }
+.profile-section--stats { grid-area: stats; }
+.profile-section--login { grid-area: login; }
+.profile-section--history { grid-area: history; }
+
+.profile-section > h3 {
+  margin: 0;
 }
 
 .profile-header {
@@ -3185,15 +3207,6 @@ input {
   grid-template-columns: auto 1fr;
   gap: 22px;
   align-items: center;
-}
-
-.profile-header::after {
-  content: "";
-  position: absolute;
-  inset: 12px;
-  border: 1px solid rgba(93, 46, 23, 0.16);
-  border-radius: 10px;
-  pointer-events: none;
 }
 
 .profile-avatar-block {
@@ -3334,22 +3347,6 @@ input {
   text-align: center;
 }
 
-.profile-wallet {
-  grid-area: wallet;
-}
-
-.profile-stats {
-  grid-area: stats;
-}
-
-.profile-login {
-  grid-area: login;
-}
-
-.profile-history {
-  grid-area: history;
-}
-
 .profile-resource-grid,
 .profile-login-grid {
   display: grid;
@@ -3359,12 +3356,12 @@ input {
 
 .profile-resource,
 .profile-login-grid div {
-  min-height: 74px;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 4px;
-  padding: 10px 12px;
+  gap: 2px;
+  padding: 8px 12px;
   border-radius: 8px;
   background: rgba(93, 46, 23, 0.08);
   border: 1px solid rgba(93, 46, 23, 0.1);
@@ -3380,7 +3377,7 @@ input {
 .profile-login-grid strong {
   color: #3d1e0f;
   font-family: var(--font-display);
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .stat-list {
@@ -3441,7 +3438,7 @@ input {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  max-height: 320px;
+  max-height: 220px;
   overflow-y: auto;
 }
 
@@ -3575,6 +3572,12 @@ input {
   box-shadow:
     inset 0 1px 0 rgba(255, 220, 160, 0.22),
     0 4px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Keep the absolutely-centered back button anchored on press; the global
+   button:active translateY would otherwise drop it out from under the cursor. */
+.collection-header .back-button:active:not(:disabled) {
+  transform: translateY(-50%);
 }
 
 .collection-header-voucher {
@@ -4641,11 +4644,13 @@ input {
   .battle-pick-grid {
     grid-template-columns: 1fr;
   }
-  .profile-grid {
+  .profile-panel {
     grid-template-columns: 1fr;
     grid-template-areas:
       "header"
+      "wallet"
       "stats"
+      "login"
       "history";
   }
   .profile-header {
@@ -4959,15 +4964,8 @@ input {
 }
 
 @media (max-width: 720px) {
-  .profile-grid {
-    grid-template-columns: 1fr;
-    grid-template-areas:
-      "header"
-      "wallet"
-      "stats"
-      "login"
-      "history";
-    padding-inline: 10px;
+  .profile-panel {
+    margin-inline: 10px;
   }
   .profile-header {
     grid-template-columns: 1fr;
@@ -5611,7 +5609,6 @@ input {
 .rate-row.rare      .rate-val { color: #0070dd; }
 .rate-row.epic      .rate-val { color: #a335ee; }
 .rate-row.legendary .rate-val { color: #ff8000; }
-.rate-row.repic     .rate-val { color: var(--cyan); }
 
 .rate-row.avatar .rate-val,
 .rate-row.title .rate-val {
@@ -5696,11 +5693,6 @@ input {
 .pack-card-wrapper.rarity-legendary {
   --pack-edge: #ffb233;
   --pack-glow: rgba(255, 164, 32, 0.9);
-}
-
-.pack-card-wrapper.rarity-repic {
-  --pack-edge: #2cf3d7;
-  --pack-glow: rgba(44, 243, 215, 0.78);
 }
 
 .pack-card-wrapper:not(.flipped):hover .pack-card-inner {
@@ -5845,7 +5837,6 @@ input {
 .pack-card-content.rarity-rare      { background: linear-gradient(160deg, #b8d8f8, #2a70c8); }
 .pack-card-content.rarity-epic      { background: linear-gradient(160deg, #d0a8f8, #7a1ac8); }
 .pack-card-content.rarity-legendary { background: linear-gradient(160deg, #ffe0a0, #e06000); }
-.pack-card-content.rarity-repic     { background: linear-gradient(160deg, #a0f0e8, #00a8b0); }
 
 .pack-card-content-card {
   justify-content: flex-start;
@@ -5857,8 +5848,7 @@ input {
 .pack-card-content-card.rarity-common,
 .pack-card-content-card.rarity-rare,
 .pack-card-content-card.rarity-epic,
-.pack-card-content-card.rarity-legendary,
-.pack-card-content-card.rarity-repic {
+.pack-card-content-card.rarity-legendary {
   background:
     radial-gradient(circle at 50% 20%, color-mix(in srgb, var(--pack-glow), transparent 82%), transparent 32%),
     linear-gradient(180deg, #1b1b1b 0%, #111111 100%);

@@ -527,7 +527,7 @@ export const CARD_CATALOG_GENERATED = [
     "attack": 3,
     "health": 11,
     "type": "MINION",
-    "rarity": "REPIC",
+    "rarity": "RARE",
     "description": "要頭腦有肌肉\n激怒：+4攻擊",
     "keywords": {
       "enrage": {
@@ -1784,7 +1784,7 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW070",
     "name": "蠻牛",
-    "category": "法術",
+    "category": "新聞",
     "cost": 3,
     "type": "NEWS",
     "rarity": "RARE",
@@ -1803,7 +1803,7 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW071",
     "name": "死亡之握",
-    "category": "法術",
+    "category": "新聞",
     "cost": 2,
     "type": "NEWS",
     "rarity": "RARE",

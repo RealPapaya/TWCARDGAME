@@ -103,6 +103,14 @@ type ClientViewState = {
   collectionSearch: string;
   pinnedCollectionCardId?: string;
   cardOpBusy?: boolean;
+  confirmDialog?: {
+    title: string;
+    message?: string;
+    confirmLabel: string;
+    cancelLabel: string;
+    danger?: boolean;
+    resolve: (ok: boolean) => void;
+  };
   coverPickerOpen?: boolean;
   avatarPickerOpen?: boolean;
   editingDisplayName?: string;
@@ -250,7 +258,7 @@ const sfxPaths: Record<SoundCue, string> = {
 };
 let audioUnlocked = false;
 const rarityLabel: Record<string, string> = {
-  COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說", REPIC: "特殊"
+  COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說"
 };
 
 type PatchNoteItem = { title: string; desc: string };
@@ -433,6 +441,7 @@ function renderNow(): void {
     <main class="${shellClass}">
       ${view.state ? renderGame(status) : renderLanding()}
       ${renderPublicPlayerProfileModal()}
+      ${renderConfirmDialog()}
       ${renderToast()}
       ${renderLegacyShopPackOverlay()}
     </main>
@@ -945,8 +954,8 @@ function renderProfileScreen(): string {
         <h2>個人頁面</h2>
       </header>
       ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-      <div class="profile-grid">
-        <section class="parchment-card profile-header" data-testid="profile-header">
+      <div class="parchment-card profile-panel" data-testid="profile-panel">
+        <div class="profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
             <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
             <button id="open-avatar-picker" class="ghost-button">更換頭像</button>
@@ -980,8 +989,9 @@ function renderProfileScreen(): string {
               </button>
             `).join("")}
           </div>` : ""}
-        </section>
-        <section class="parchment-card profile-wallet">
+        </div>
+
+        <div class="profile-section profile-section--wallet">
           <h3>帳號資源</h3>
           <div class="profile-resource-grid">
             <div class="profile-resource"><span>金幣</span><strong>${profile?.gold ?? 0}</strong></div>
@@ -989,8 +999,9 @@ function renderProfileScreen(): string {
             <div class="profile-resource"><span>卡牌收藏</span><strong>${ownedCardCount}</strong></div>
             <div class="profile-resource"><span>牌組</span><strong>${view.decks.length}</strong></div>
           </div>
-        </section>
-        <section class="parchment-card profile-stats">
+        </div>
+
+        <div class="profile-section profile-section--stats">
           <h3>戰績統計</h3>
           <ul class="stat-list">
             <li><span>勝場</span><strong>${stats.wins}</strong></li>
@@ -999,21 +1010,23 @@ function renderProfileScreen(): string {
             <li><span>勝率</span><strong>${winRateLabel}</strong></li>
             <li><span>總場次</span><strong>${stats.total}</strong></li>
           </ul>
-        </section>
-        <section class="parchment-card profile-login">
+        </div>
+
+        <div class="profile-section profile-section--login">
           <h3>登入紀錄</h3>
           <div class="profile-login-grid">
             <div><span>累積登入</span><strong>${profile?.login_days ?? 0}</strong></div>
             <div><span>目前連續</span><strong>${profile?.current_login_streak ?? 0}</strong></div>
             <div><span>最長連續</span><strong>${profile?.longest_login_streak ?? 0}</strong></div>
           </div>
-        </section>
-        <section class="parchment-card profile-history">
+        </div>
+
+        <div class="profile-section profile-section--history">
           <h3>近期對戰</h3>
           <div class="history-list">
             ${recent.length === 0 ? `<p class="muted">尚無對戰紀錄。</p>` : recent.map(renderMatchHistoryRow).join("")}
           </div>
-        </section>
+        </div>
       </div>
     </section>
   `;
@@ -1184,7 +1197,7 @@ function compareCollectionCards(a: CardDefinition, b: CardDefinition): number {
 
 function rarityRank(rarity: string): number {
   if (rarity === "LEGENDARY") return 5;
-  if (rarity === "EPIC" || rarity === "REPIC") return 4;
+  if (rarity === "EPIC") return 4;
   if (rarity === "RARE") return 3;
   if (rarity === "COMMON") return 2;
   return 1;
@@ -1213,7 +1226,6 @@ const VOUCHER_RATES: Record<string, { disenchant: number; craft: number }> = {
   COMMON: { disenchant: 20, craft: 50 },
   RARE: { disenchant: 60, craft: 200 },
   EPIC: { disenchant: 160, craft: 400 },
-  REPIC: { disenchant: 160, craft: 400 },
   LEGENDARY: { disenchant: 300, craft: 800 }
 };
 
@@ -1886,6 +1898,51 @@ function renderConcedeModal(): string {
   `;
 }
 
+function themedConfirm(options: {
+  title: string;
+  message?: string;
+  confirmLabel?: string;
+  cancelLabel?: string;
+  danger?: boolean;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    view.confirmDialog = {
+      title: options.title,
+      message: options.message,
+      confirmLabel: options.confirmLabel ?? "確定",
+      cancelLabel: options.cancelLabel ?? "取消",
+      danger: options.danger,
+      resolve
+    };
+    render();
+  });
+}
+
+function settleConfirmDialog(ok: boolean): void {
+  const dialog = view.confirmDialog;
+  if (!dialog) return;
+  view.confirmDialog = undefined;
+  dialog.resolve(ok);
+  render();
+}
+
+function renderConfirmDialog(): string {
+  const dialog = view.confirmDialog;
+  if (!dialog) return "";
+  return `
+    <section class="confirm-overlay" id="themed-confirm-overlay" role="dialog" aria-modal="true">
+      <div class="confirm-content">
+        <h3>${escapeHtml(dialog.title)}</h3>
+        ${dialog.message ? `<p class="confirm-message">${escapeHtml(dialog.message)}</p>` : ""}
+        <div class="confirm-actions">
+          <button id="themed-confirm-cancel">${escapeHtml(dialog.cancelLabel)}</button>
+          <button id="themed-confirm-ok" class="${dialog.danger ? "danger" : ""}">${escapeHtml(dialog.confirmLabel)}</button>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
 function renderEventLine(event: GameEvent): string {
   const payload = event.payload ? ` ${JSON.stringify(event.payload)}` : "";
   return `<p>${escapeHtml(`${event.type}#${event.seq ?? "?"}${payload}`)}</p>`;
@@ -1896,6 +1953,11 @@ function renderEmptySlots(): string {
 }
 
 function bindStaticActions(): void {
+  document.querySelector<HTMLButtonElement>("#themed-confirm-ok")?.addEventListener("click", () => settleConfirmDialog(true));
+  document.querySelector<HTMLButtonElement>("#themed-confirm-cancel")?.addEventListener("click", () => settleConfirmDialog(false));
+  document.querySelector<HTMLElement>("#themed-confirm-overlay")?.addEventListener("click", (event) => {
+    if (event.target === event.currentTarget) settleConfirmDialog(false);
+  });
   document.querySelector<HTMLFormElement>("#join-form")?.addEventListener("submit", joinRoom);
   document.querySelector<HTMLFormElement>("#auth-form")?.addEventListener("submit", (event) => void signInWithPassword(event));
   document.querySelector<HTMLButtonElement>("#sign-up")?.addEventListener("click", () => void signUpWithPassword());
@@ -4083,7 +4145,13 @@ async function disenchantCard(cardId: string, count: number): Promise<void> {
   const card = cardCatalog.get(cardId);
   if (!card) return;
   const gain = voucherRate(card.rarity).disenchant * count;
-  if (!window.confirm(`確定要分解 ${count} 張「${card.name}」嗎？\n分解後將獲得 ${gain} 點消費券。`)) return;
+  const ok = await themedConfirm({
+    title: "分解卡牌",
+    message: `確定要分解 ${count} 張「${card.name}」嗎？分解後將獲得 ${gain} 點消費券。`,
+    confirmLabel: "分解",
+    danger: true
+  });
+  if (!ok) return;
   view.cardOpBusy = true;
   render();
   try {
@@ -4104,7 +4172,12 @@ async function craftCard(cardId: string): Promise<void> {
   const card = cardCatalog.get(cardId);
   if (!card) return;
   const cost = voucherRate(card.rarity).craft;
-  if (!window.confirm(`確定要合成「${card.name}」嗎？\n合成將消耗 ${cost} 點消費券。`)) return;
+  const ok = await themedConfirm({
+    title: "合成卡牌",
+    message: `確定要合成「${card.name}」嗎？合成將消耗 ${cost} 點消費券。`,
+    confirmLabel: "合成"
+  });
+  if (!ok) return;
   view.cardOpBusy = true;
   render();
   try {
@@ -4146,7 +4219,13 @@ async function bulkDisenchantExtras(): Promise<void> {
     totalCards += extra;
     totalGain += voucherRate(card.rarity).disenchant * extra;
   }
-  if (!window.confirm(`一鍵分解所有超過 2 張的多餘卡牌？\n共 ${totalCards} 張，可獲得約 ${totalGain} 點消費券。`)) return;
+  const ok = await themedConfirm({
+    title: "一鍵分解多餘卡",
+    message: `分解所有超過 2 張的多餘卡牌？共 ${totalCards} 張，可獲得約 ${totalGain} 點消費券。`,
+    confirmLabel: "一鍵分解",
+    danger: true
+  });
+  if (!ok) return;
   view.cardOpBusy = true;
   render();
   try {
