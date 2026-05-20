@@ -1,17 +1,13 @@
 {
   "$schema": "https://railway.com/railway.schema.json",
-  "services": {
-    "twcardgame-server": {
-      "build": {
-        "builder": "DOCKERFILE",
-        "dockerfilePath": "apps/server/Dockerfile"
-      },
-      "deploy": {
-        "healthcheckPath": "/health",
-        "healthcheckTimeout": 30,
-        "restartPolicyType": "ON_FAILURE",
-        "restartPolicyMaxRetries": 3
-      }
-    }
+  "build": {
+    "builder": "DOCKERFILE",
+    "dockerfilePath": "apps/server/Dockerfile"
+  },
+  "deploy": {
+    "healthcheckPath": "/health",
+    "healthcheckTimeout": 30,
+    "restartPolicyType": "ON_FAILURE",
+    "restartPolicyMaxRetries": 3
   }
 }
