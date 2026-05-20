@@ -19,7 +19,8 @@
       "Bash(echo \"server starting, pid $!\")",
       "Bash(curl -s http://localhost:2567/health)",
       "Bash(LOAD_TEST_ROOMS=5 LOAD_TEST_DURATION_MS=45000 npm run test:load)",
-      "Bash(LOAD_TEST_ROOMS=3 LOAD_TEST_DURATION_MS=40000 npm run test:load)"
+      "Bash(LOAD_TEST_ROOMS=3 LOAD_TEST_DURATION_MS=40000 npm run test:load)",
+      "Bash(node -e ' *)"
     ]
   }
 }

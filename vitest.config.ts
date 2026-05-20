@@ -4,10 +4,9 @@ export default defineConfig({
   test: {
     globals: true,
     include: ["packages/**/*.test.ts", "apps/**/*.test.ts"],
-    environment: "node"
-  },
-  resolve: {
-    conditions: ["source"],
-    customConditions: ["source"]
+    environment: "node",
+    resolve: {
+      conditions: ["source", "import", "module", "node", "default"]
+    }
   }
 });
