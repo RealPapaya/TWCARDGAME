@@ -15,6 +15,7 @@ import {
   type JoinOptions,
   type PlayerSetup
 } from "./accounts.js";
+import { logger } from "./logger.js";
 import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
 import { createMatchResultPersistenceFromEnv, type MatchPersistenceMetadata, type MatchResultPersistence } from "./persistence.js";
 import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoinCodeForRoom } from "./privateRooms.js";
@@ -62,6 +63,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       this.setMetadata({ joinCode: code });
       // Code is sent to the creator in onJoin (with delay) and also on demand via getJoinCode.
     }
+    logger.info("room.create", { roomId: this.roomId, private: Boolean(this.registeredJoinCode) });
   }
 
   async onAuth(client: Client, options: JoinOptions = {}): Promise<PlayerSetup> {
@@ -118,6 +120,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       }
     } catch {
       if (!this.match || isMatchComplete(this.match)) return;
+      logger.info("match.disconnect_timeout", { roomId: this.roomId, matchId: this.match.matchId, seat });
       const events = this.finalizer.finish(this.match, { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" }, seat);
       this.syncPublicState();
       this.broadcastPublicSync();
@@ -128,6 +131,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   async onDispose(): Promise<void> {
     releaseJoinCodeForRoom(this.roomId);
+    logger.info("room.dispose", { roomId: this.roomId });
     if (!this.match) return;
     if (!isMatchComplete(this.match)) {
       this.finalizer.finish(this.match, { reason: "abandoned" });
@@ -289,6 +293,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   private scheduleCleanup(): void {
     if (this.cleanupScheduled) return;
     this.cleanupScheduled = true;
+    if (this.match) {
+      logger.info("match.finish", {
+        roomId: this.roomId,
+        matchId: this.match.matchId,
+        reason: this.match.result?.reason,
+        winnerSeat: this.match.result?.winnerSeat
+      });
+    }
     this.clock.setTimeout(() => {
       void this.disconnect();
     }, Math.max(0, MATCH_CLEANUP_DELAY_MS));

@@ -2,9 +2,18 @@ import { monitor } from "@colyseus/monitor";
 import { Server } from "colyseus";
 import { BotRoom } from "./BotRoom.js";
 import { GameRoom } from "./GameRoom.js";
+import { logger } from "./logger.js";
 import { lookupRoomIdByJoinCode, normalizeJoinCode } from "./privateRooms.js";
 
 const port = Number(process.env.PORT ?? 2567);
+
+process.on("unhandledRejection", (reason) => {
+  logger.error("unhandledRejection", { reason });
+});
+process.on("uncaughtException", (error) => {
+  logger.error("uncaughtException", { error });
+  process.exit(1);
+});
 
 const gameServer = new Server({
   gracefullyShutdown: true,
@@ -39,8 +48,8 @@ gameServer.define("pve", BotRoom);
 gameServer.onBeforeShutdown(() => {
   gameServer.removeRoomType("pvp");
   gameServer.removeRoomType("pve");
-  console.log("TWCARDGAME v2 server is draining rooms.");
+  logger.info("server.shutdown.draining");
 });
 
 await gameServer.listen(port);
-console.log(`TWCARDGAME v2 Colyseus server listening on ws://localhost:${port}`);
+logger.info("server.listen", { port });

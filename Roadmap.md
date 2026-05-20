@@ -2,7 +2,7 @@ TWCARDGAME v2 — Development Roadmap
 
 Project: 寶島遊戲王 v2 parallel rewrite
 Architecture: Colyseus + TypeScript monorepo · Supabase · Vite · Fly.io · Vercel
-Last updated: 2026-05-19
+Last updated: 2026-05-20
 
 
 Phase Overview
@@ -217,7 +217,7 @@ Before Phase 6 starts
 
 
 Phase 6 — Production Launch
-Status: ⬜ Pending
+Status: 🟡 In Progress
 
 Goal: v2 is live, stable, and replaces v1 as the canonical game URL.
 
@@ -226,12 +226,35 @@ Tasks
  Vercel deployment configured for apps/web (environment variables, build command)
  Fly.io deployment for apps/server (Dockerfile, fly.toml, secrets)
  Supabase production project (separate from dev, migrations applied)
- Environment config — .env.production for all apps, no secrets in repo
+ Environment config — .env.example for all apps, no secrets in repo
  Structured logging and error monitoring (e.g. Sentry or Fly.io logs)
  Load test — simulate concurrent rooms, verify memory and CPU under load
  Closed beta test with real players, collect feedback
  Rollback plan — v1 remains in legacy/ and can be re-deployed if critical issues found
  DNS cutover — point production domain to v2 Vercel deployment
+
+Repo artifacts completed
+
+ Structured JSON logging — apps/server/src/logger.ts (stdout/stderr) wired into
+   index.ts, GameRoom lifecycle, and match persistence; process-level
+   uncaughtException / unhandledRejection handlers added
+ Web global error capture — apps/web/src/logger.ts installed from main.ts
+ vercel.json — root build config for apps/web (build command, output dir)
+ apps/server/.env.example and apps/web/.env.example — documented, no secrets
+ fly.toml — HTTP /health check added; single-machine note recorded
+ Load-test harness — e2e/load-test.mjs (headless Colyseus PvE clients),
+   npm run test:load
+ GitHub Actions — .github/workflows/ci.yml (PR/branch CI) and deploy.yml
+   (master → Fly.io + Vercel)
+ Deployment runbook — docs/phase6-production-launch.md
+
+Pending operator execution (needs accounts / credentials / DNS)
+
+ Create production Supabase project, apply migrations, publish catalog
+ Fly.io deploy with secrets; Vercel project import with env vars
+ GitHub secrets: FLY_API_TOKEN, VERCEL_TOKEN, VERCEL_ORG_ID, VERCEL_PROJECT_ID
+ Run load test against the deployed server; record memory/CPU
+ Closed beta, DNS cutover — see docs/phase6-production-launch.md
 
 
 Architecture Constraints (always enforced)

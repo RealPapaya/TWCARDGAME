@@ -1,3 +1,6 @@
+# Matches live in this process's memory. Keep a single machine for launch —
+# multi-instance scaling needs the Colyseus Redis presence driver
+# (see docs/phase3-multiplayer-reliability.md). Do not enable autoscaling.
 app = "twcardgame-v2-server"
 primary_region = "nrt"
 
@@ -25,3 +28,10 @@ primary_region = "nrt"
     interval = "15s"
     timeout = "2s"
     grace_period = "10s"
+
+  [[services.http_checks]]
+    interval = "15s"
+    timeout = "2s"
+    grace_period = "10s"
+    method = "get"
+    path = "/health"

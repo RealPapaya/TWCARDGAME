@@ -19,7 +19,10 @@ import type {
 import { GameStateSchema } from "./schema.js";
 import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle } from "./ui.js";
 import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } from "./drag.js";
+import { installGlobalErrorHandlers } from "./logger.js";
 import "./styles.css";
+
+installGlobalErrorHandlers();
 
 type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";

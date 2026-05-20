@@ -18,10 +18,12 @@
     "test:e2e": "node e2e/game-loop.spec.mjs && node e2e/action-seq.spec.mjs && node e2e/phase5-ui.spec.mjs",
     "test:reconnect": "node e2e/reconnect.spec.mjs",
     "test:checklist": "node e2e/checklist.spec.mjs",
+    "test:load": "node e2e/load-test.mjs",
     "dev:server": "npm run dev -w @twcardgame/server",
     "dev:web": "npm run dev -w @twcardgame/web"
   },
   "devDependencies": {
+    "@colyseus/sdk": "^0.17.42",
     "@playwright/test": "^1.60.0",
     "@types/node": "^25.8.0",
     "playwright": "^1.60.0",

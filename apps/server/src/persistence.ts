@@ -1,6 +1,7 @@
 import { createSupabaseServerClient, persistMatchHistory, recordPvpWin, type MatchHistoryRow } from "@twcardgame/db";
 import { toPublicState, type MatchState } from "@twcardgame/rules";
 import type { AiDifficulty } from "@twcardgame/shared";
+import { logger } from "./logger.js";
 
 export interface MatchPersistenceMetadata {
   isVsAi?: boolean;
@@ -13,7 +14,7 @@ export interface MatchResultPersistence {
 }
 
 export interface MatchResultLogger {
-  warn(message?: unknown, ...optionalParams: unknown[]): void;
+  warn(event: string, fields?: Record<string, unknown>): void;
 }
 
 export function createMatchResultPersistenceFromEnv(
@@ -43,14 +44,14 @@ export const noopMatchResultPersistence: MatchResultPersistence = {
 export async function safePersistMatchResult(
   persistence: MatchResultPersistence,
   state: MatchState,
-  logger: MatchResultLogger = console,
+  matchLogger: MatchResultLogger = logger,
   metadata?: MatchPersistenceMetadata
 ): Promise<void> {
   if (!persistence.enabled) return;
   try {
     await persistence.persist(state, metadata);
   } catch (error) {
-    logger.warn("[match-history] Failed to persist match result.", error);
+    matchLogger.warn("match.persist.failed", { matchId: state.matchId, error });
   }
 }
 

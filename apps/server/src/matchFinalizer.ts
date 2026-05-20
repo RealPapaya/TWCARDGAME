@@ -1,5 +1,6 @@
 import type { GameEvent, MatchResult, Seat } from "@twcardgame/shared";
 import type { MatchState } from "@twcardgame/rules";
+import { logger as defaultLogger } from "./logger.js";
 import {
   safePersistMatchResult,
   type MatchPersistenceMetadata,
@@ -12,7 +13,7 @@ export class MatchResultFinalizer {
 
   constructor(
     private readonly persistence: MatchResultPersistence,
-    private readonly logger: MatchResultLogger = console
+    private readonly logger: MatchResultLogger = defaultLogger
   ) {}
 
   finish(match: MatchState, result: MatchResult, seat?: Seat): GameEvent[] {
