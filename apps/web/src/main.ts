@@ -29,6 +29,7 @@ type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "
 
 type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
 type CollectionFilter = "all" | "owned" | "missing";
+type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
 type MatchmakingState = {
   startedAtMs: number;
   status: "searching" | "joining" | "error";
@@ -86,6 +87,9 @@ type ClientViewState = {
   matchmaking?: MatchmakingState;
   matchmakingTimer?: number;
   collectionFilter: CollectionFilter;
+  collectionSort: CollectionSort;
+  collectionCategory: string;
+  collectionRarity: string;
   collectionSearch: string;
   pinnedCollectionCardId?: string;
   avatarPickerOpen?: boolean;
@@ -367,7 +371,10 @@ const view: ClientViewState = {
   collection: [],
   matchHistory: [],
   menuScreen: "main",
-  collectionFilter: "all",
+  collectionFilter: "owned",
+  collectionSort: "cost-asc",
+  collectionCategory: "all",
+  collectionRarity: "all",
   collectionSearch: "",
   friends: [],
   leaderboard: [],
@@ -662,9 +669,9 @@ function renderMainMenu(): string {
         </aside>
         <nav class="menu-corner-rail" aria-label="底部功能">
           <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
-            <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="卡牌庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="收藏庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">🃏</span>
-            <span class="corner-label">卡牌庫</span>
+            <span class="corner-label">收藏庫</span>
           </button>
           <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
             <img class="corner-icon" src="/images/ui/shop_logo.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
@@ -920,44 +927,69 @@ function renderSettingsModal(): string {
 }
 
 function renderCollectionScreen(): string {
+  return renderCollectionWorkspace("main", "收藏庫");
+}
+
+function renderCollectionWorkspace(backScreen: MenuScreen, title: string): string {
   const accountMode = Boolean(supabase);
   const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
-  const filter = view.collectionFilter;
-  const search = view.collectionSearch.trim().toLowerCase();
-  const filtered = collectibles.filter((card) => {
-    const qty = collectionMap.get(card.id) ?? 0;
-    if (filter === "owned" && qty <= 0) return false;
-    if (filter === "missing" && qty > 0) return false;
-    if (search) {
-      return (
-        card.name.toLowerCase().includes(search) ||
-        card.category.toLowerCase().includes(search) ||
-        card.description.toLowerCase().includes(search)
-      );
-    }
-    return true;
-  });
+  const filtered = filterCollectionCards(collectibles, collectionMap);
   const ownedTotal = collectibles.filter((card) => (collectionMap.get(card.id) ?? 0) > 0).length;
+  const categories = uniqueCollectionCategories(collectibles);
+  const rarities = uniqueCollectionRarities(collectibles);
+  const deck = view.editingDeck;
+  const selectedCounts = countCards(deck?.card_ids ?? []);
+  const selectedTotal = deck?.card_ids.length ?? 0;
   return `
     <section class="screen collection-screen" data-screen="collection">
       <div class="collection-container">
         <header class="collection-header">
-          <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回</button>
-          <h2 class="collection-title">卡牌圖鑑</h2>
+          <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
+          <h2 class="collection-title">${escapeHtml(title)}</h2>
+          <div class="collection-header-actions">
+            <button id="new-deck" class="ghost-button" type="button">新增牌組</button>
+          </div>
         </header>
+        ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
         <div class="collection-controls-bar">
           <div class="controls-left">
             <span id="collection-progress">已收集卡片種類: ${ownedTotal}/${collectibles.length}</span>
           </div>
           <div class="controls-center collection-filters" role="tablist">
             ${(["all", "owned", "missing"] as CollectionFilter[]).map((value) => `
-              <button class="collection-filter ${filter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
+              <button class="collection-filter ${view.collectionFilter === value ? "active" : ""}" data-collection-filter="${value}" data-testid="filter-${value}" role="tab">
                 ${collectionFilterLabel(value)}
               </button>
             `).join("")}
           </div>
           <div class="controls-right">
+            <label class="collection-select" aria-label="排序">
+              <span>排序</span>
+              <select id="collection-sort-select">
+                ${collectionSortOptions().map((option) => `
+                  <option value="${option.value}" ${view.collectionSort === option.value ? "selected" : ""}>${option.label}</option>
+                `).join("")}
+              </select>
+            </label>
+            <label class="collection-select" aria-label="分類篩選">
+              <span>分類</span>
+              <select id="collection-category-select">
+                <option value="all" ${view.collectionCategory === "all" ? "selected" : ""}>全部分類</option>
+                ${categories.map((category) => `
+                  <option value="${escapeAttr(category)}" ${view.collectionCategory === category ? "selected" : ""}>${escapeHtml(category)}</option>
+                `).join("")}
+              </select>
+            </label>
+            <label class="collection-select" aria-label="稀有度篩選">
+              <span>稀有度</span>
+              <select id="collection-rarity-select">
+                <option value="all" ${view.collectionRarity === "all" ? "selected" : ""}>全部稀有度</option>
+                ${rarities.map((rarity) => `
+                  <option value="${escapeAttr(rarity)}" ${view.collectionRarity === rarity ? "selected" : ""}>${escapeHtml(rarityLabel[rarity] ?? rarity)}</option>
+                `).join("")}
+              </select>
+            </label>
             <label class="search-box" aria-label="搜尋卡牌">
               <input id="collection-search-input" value="${escapeAttr(view.collectionSearch)}" placeholder="搜尋卡牌名稱..." autocomplete="off" />
               <span class="search-icon">⌕</span>
@@ -968,11 +1000,47 @@ function renderCollectionScreen(): string {
           </div>
         </div>
         ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
-        <div class="collection-grid" data-testid="collection-grid">
-          ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
-            const qty = collectionMap.get(card.id) ?? 0;
-            return renderCollectionTile(card, qty);
-          }).join("")}
+        <div class="collection-workbench">
+          <section class="collection-card-library" aria-label="卡牌庫">
+            <div class="collection-grid" data-testid="collection-grid">
+              ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
+                const qty = collectionMap.get(card.id) ?? 0;
+                return renderCollectionTile(card, qty, selectedCounts.get(card.id) ?? 0, selectedTotal);
+              }).join("")}
+            </div>
+          </section>
+          <aside class="collection-deck-column" aria-label="牌組">
+            <section class="deck-shelf">
+              <div class="deck-shelf-heading">
+                <h3>牌組</h3>
+                <span>${view.decks.length} 組</span>
+              </div>
+              <div class="deck-banner-list" data-testid="collection-deck-list">
+                ${view.decks.map(renderCollectionDeckBanner).join("") || `<p class="muted deck-empty">尚未建立牌組。</p>`}
+              </div>
+            </section>
+            <form id="deck-form" class="collection-deck-editor">
+              <div class="deck-editor-topline">
+                <label class="deck-name-field">
+                  <span>牌組名稱</span>
+                  <input id="deck-name" value="${escapeAttr(deck?.name ?? "New Deck")}" aria-label="Deck name" maxlength="40" />
+                </label>
+                <strong class="${selectedTotal === 30 ? "deck-complete" : "deck-count"}">${selectedTotal}/30</strong>
+              </div>
+              <div class="deck-editor-actions">
+                <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>儲存</button>
+                <button type="button" id="autofill-deck">自動補滿</button>
+                <button type="button" id="clear-deck">清空</button>
+                ${deck?.id ? `<button type="button" class="danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>` : ""}
+              </div>
+              ${hasCollectionRows()
+                ? ""
+                : `<p class="muted deck-sync-note">收藏同步中；儲存時會再次確認持有數量。</p>`}
+              <div class="deck-current-list" data-testid="deck-current-list">
+                ${renderCurrentDeckCards(deck?.card_ids ?? [])}
+              </div>
+            </form>
+          </aside>
         </div>
       </div>
       ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
@@ -986,8 +1054,62 @@ function collectionFilterLabel(filter: CollectionFilter): string {
   return "全部";
 }
 
-function renderCollectionTile(card: CardDefinition, quantity: number): string {
+function collectionSortOptions(): Array<{ value: CollectionSort; label: string }> {
+  return [
+    { value: "cost-asc", label: "費用低到高" },
+    { value: "cost-desc", label: "費用高到低" },
+    { value: "rarity", label: "稀有度" },
+    { value: "name", label: "名稱" }
+  ];
+}
+
+function uniqueCollectionCategories(cards: readonly CardDefinition[]): string[] {
+  return [...new Set(cards.map((card) => card.category).filter(Boolean))].sort((a, b) => a.localeCompare(b, "zh-Hant"));
+}
+
+function uniqueCollectionRarities(cards: readonly CardDefinition[]): string[] {
+  return [...new Set(cards.map((card) => card.rarity))].sort((a, b) => rarityRank(a) - rarityRank(b));
+}
+
+function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: Map<string, number>): CardDefinition[] {
+  const search = view.collectionSearch.trim().toLowerCase();
+  return cards
+    .filter((card) => {
+      const qty = collectionMap.get(card.id) ?? 0;
+      if (view.collectionFilter === "owned" && qty <= 0) return false;
+      if (view.collectionFilter === "missing" && qty > 0) return false;
+      if (view.collectionCategory !== "all" && card.category !== view.collectionCategory) return false;
+      if (view.collectionRarity !== "all" && card.rarity !== view.collectionRarity) return false;
+      if (!search) return true;
+      return (
+        card.name.toLowerCase().includes(search) ||
+        card.category.toLowerCase().includes(search) ||
+        card.description.toLowerCase().includes(search)
+      );
+    })
+    .sort(compareCollectionCards);
+}
+
+function compareCollectionCards(a: CardDefinition, b: CardDefinition): number {
+  if (view.collectionSort === "cost-desc") return b.cost - a.cost || a.name.localeCompare(b.name, "zh-Hant");
+  if (view.collectionSort === "rarity") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.cost - b.cost || a.name.localeCompare(b.name, "zh-Hant");
+  if (view.collectionSort === "name") return a.name.localeCompare(b.name, "zh-Hant");
+  return a.cost - b.cost || a.name.localeCompare(b.name, "zh-Hant");
+}
+
+function rarityRank(rarity: string): number {
+  if (rarity === "LEGENDARY") return 5;
+  if (rarity === "EPIC" || rarity === "REPIC") return 4;
+  if (rarity === "RARE") return 3;
+  if (rarity === "COMMON") return 2;
+  return 1;
+}
+
+function renderCollectionTile(card: CardDefinition, quantity: number, selectedCount: number, selectedTotal: number): string {
   const owned = quantity > 0;
+  const limit = deckCopyLimit(card);
+  const effectiveOwned = hasCollectionRows() ? quantity : limit;
+  const canAdd = owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
   const resolved: ResolvedCardView = {
     cardId: card.id,
     instanceId: `collection-${card.id}`,
@@ -1002,8 +1124,9 @@ function renderCollectionTile(card: CardDefinition, quantity: number): string {
     health: card.health
   };
   return `
-    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned"])}" data-collection-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}">
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${canAdd ? "" : "disabled"}>
       <span class="card-count-badge">x${quantity}</span>
+      ${selectedCount > 0 ? `<span class="deck-count-badge">${selectedCount}/${limit}</span>` : ""}
       <div class="card rarity-${card.rarity.toLowerCase()}">
         ${renderCardFace(resolved, "mulligan")}
       </div>
@@ -1040,19 +1163,7 @@ function renderPinnedCardDetail(cardId: string): string {
 }
 
 function renderDeckEditorScreen(): string {
-  return `
-    <section class="screen deck-editor-screen" data-screen="deckEditor">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="battle">← 返回戰鬥</button>
-        <h2>編輯牌組 · Deck Editor</h2>
-      </header>
-      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-      <section class="parchment-card editor-panel">
-        ${renderDeckEditor()}
-      </section>
-    </section>
-  `;
+  return renderCollectionWorkspace("battle", "編輯牌組");
 }
 
 function computeMatchStats(): { wins: number; losses: number; draws: number; total: number } {
@@ -1091,47 +1202,37 @@ function renderSavedDeck(deck: DeckRow): string {
   `;
 }
 
-function renderDeckEditor(): string {
-  const deck = view.editingDeck;
-  const selectedCounts = countCards(deck?.card_ids ?? []);
-  const selectedTotal = deck?.card_ids.length ?? 0;
-  const cards = CARD_CATALOG.filter((card) => card.collectible !== false);
-  const collectionReady = hasCollectionRows();
-
+function renderCollectionDeckBanner(deck: DeckRow): string {
+  const selected = deck.id === view.editingDeck?.id;
+  const coverCard = deck.card_ids.map((id) => cardCatalog.get(id)).find(Boolean);
+  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
   return `
-    <form id="deck-form" class="deck-editor">
-      <div class="editor-heading">
-        <h3>${deck?.id ? "Edit Deck" : "New Deck"}</h3>
-        <span>${selectedTotal}/30</span>
-      </div>
-      <input id="deck-name" value="${escapeAttr(deck?.name ?? "New Deck")}" aria-label="Deck name" />
-      ${
-        collectionReady
-          ? ""
-          : `<p class="muted">Collection is still syncing. You can build now; Save Deck will confirm ownership with Supabase.</p>`
-      }
-      <div class="editor-actions">
-        <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>Save Deck</button>
-        <button type="button" id="autofill-deck">Autofill</button>
-        <button type="button" id="clear-deck">Clear</button>
-      </div>
-      <div class="deck-card-list">
-        ${cards.map((card) => renderDeckBuilderCard(card, selectedCounts.get(card.id) ?? 0)).join("")}
-      </div>
-    </form>
+    <button type="button" class="deck-banner ${selected ? "selected" : ""}" data-edit-deck="${escapeAttr(deck.id)}">
+      <span class="deck-banner-art" style="background-image:url('${escapeAttr(coverUrl)}')"></span>
+      <span class="deck-banner-main">
+        <strong>${escapeHtml(deck.name)}</strong>
+        <span>${deck.card_ids.length}/30 張</span>
+      </span>
+    </button>
   `;
 }
 
-function renderDeckBuilderCard(card: CardDefinition, count: number): string {
-  const limit = deckCopyLimit(card);
-  return `
-    <div class="deck-builder-card">
-      <button type="button" data-add-card="${escapeAttr(card.id)}" ${count >= limit ? "disabled" : ""} title="Add card">+</button>
-      <button type="button" data-remove-card="${escapeAttr(card.id)}" ${count <= 0 ? "disabled" : ""}>-</button>
-      <span class="deck-card-name">${escapeHtml(card.name)}</span>
-      <span>${count}/${limit}</span>
+function renderCurrentDeckCards(cardIds: readonly string[]): string {
+  if (cardIds.length === 0) return `<p class="muted deck-empty">從左側卡牌庫點選卡片加入牌組。</p>`;
+  const counts = countCards(cardIds);
+  const rows = [...counts.entries()]
+    .map(([cardId, count]) => ({ card: cardCatalog.get(cardId), count }))
+    .filter((row): row is { card: CardDefinition; count: number } => Boolean(row.card))
+    .sort((a, b) => a.card.cost - b.card.cost || a.card.name.localeCompare(b.card.name, "zh-Hant"));
+  return rows.map(({ card, count }) => `
+    <div class="deck-current-row">
+      <span class="deck-row-cost">${card.cost}</span>
+      <span class="deck-row-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+      <span class="deck-row-name">${escapeHtml(card.name)}</span>
+      <span class="deck-row-count">x${count}</span>
+      <button type="button" data-remove-card="${escapeAttr(card.id)}" title="移除">-</button>
     </div>
-  `;
+  `).join("");
 }
 
 function renderMatchHistoryRow(row: MatchHistoryRow): string {
@@ -1608,11 +1709,16 @@ function bindStaticActions(): void {
   document.querySelector<HTMLButtonElement>("#sync-collection")?.addEventListener("click", () => void syncCollection());
   document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => {
     startNewDeck(false);
-    view.menuScreen = "deckEditor";
+    view.selectedDeckId = undefined;
+    if (view.menuScreen === "battle") view.menuScreen = "deckEditor";
     render();
   });
   document.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
   document.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
+  document.querySelector<HTMLInputElement>("#deck-name")?.addEventListener("input", (event) => {
+    if (!view.editingDeck) return;
+    view.editingDeck = { ...view.editingDeck, name: (event.currentTarget as HTMLInputElement).value };
+  });
   document.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
   document.querySelector<HTMLButtonElement>("#mulligan")?.addEventListener("click", () => {
     send({ type: "submitMulligan", replaceHandInstanceIds: [...view.mulliganSelection] });
@@ -1648,14 +1754,19 @@ function bindStaticActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
     el.addEventListener("click", () => {
       view.selectedDeckId = el.dataset.selectDeck;
+      const deck = view.decks.find((item) => item.id === el.dataset.selectDeck);
+      if (deck) view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
       render();
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-edit-deck]")) {
     el.addEventListener("click", () => {
       const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
-      if (deck) view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
-      view.menuScreen = "deckEditor";
+      if (deck) {
+        view.selectedDeckId = deck.id;
+        view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
+      }
+      if (view.menuScreen === "battle") view.menuScreen = "deckEditor";
       render();
     });
   }
@@ -1693,6 +1804,19 @@ function bindStaticActions(): void {
       render();
     });
   }
+  document.querySelector<HTMLSelectElement>("#collection-sort-select")?.addEventListener("change", (event) => {
+    const value = (event.currentTarget as HTMLSelectElement).value as CollectionSort;
+    view.collectionSort = value;
+    render();
+  });
+  document.querySelector<HTMLSelectElement>("#collection-category-select")?.addEventListener("change", (event) => {
+    view.collectionCategory = (event.currentTarget as HTMLSelectElement).value;
+    render();
+  });
+  document.querySelector<HTMLSelectElement>("#collection-rarity-select")?.addEventListener("change", (event) => {
+    view.collectionRarity = (event.currentTarget as HTMLSelectElement).value;
+    render();
+  });
   for (const el of document.querySelectorAll<HTMLElement>("[data-lb-sort]")) {
     el.addEventListener("click", () => {
       const value = el.dataset.lbSort as "wins" | "level" | undefined;
@@ -3390,15 +3514,18 @@ async function deleteDeck(deckId: string | undefined): Promise<void> {
 
 function startNewDeck(doRender = true): void {
   view.editingDeck = { name: "New Deck", card_ids: [] };
+  view.selectedDeckId = undefined;
   if (doRender) render();
 }
 
 function autofillDeck(): void {
   if (!view.editingDeck) startNewDeck(false);
   const ids: string[] = [];
+  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
   for (const card of CARD_CATALOG) {
     if (card.collectible === false) continue;
-    const copies = deckCopyLimit(card);
+    const owned = hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
+    const copies = Math.min(deckCopyLimit(card), owned);
     for (let i = 0; i < copies && ids.length < 30; i++) ids.push(card.id);
     if (ids.length >= 30) break;
   }
@@ -3419,7 +3546,10 @@ function addCardToEditor(cardId: string | undefined): void {
   if (!card) return;
   const counts = countCards(view.editingDeck!.card_ids);
   const limit = deckCopyLimit(card);
-  if ((counts.get(cardId) ?? 0) >= limit || view.editingDeck!.card_ids.length >= 30) return;
+  const owned = hasCollectionRows()
+    ? (view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0)
+    : limit;
+  if (owned <= 0 || (counts.get(cardId) ?? 0) >= Math.min(limit, owned) || view.editingDeck!.card_ids.length >= 30) return;
   view.editingDeck = { ...view.editingDeck!, card_ids: [...view.editingDeck!.card_ids, cardId] };
   render();
 }
