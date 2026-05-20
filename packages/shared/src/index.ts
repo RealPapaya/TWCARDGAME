@@ -16,6 +16,16 @@ export interface FriendRow {
   wins_count: number;
 }
 
+export interface FriendRequestRow {
+  request_id: string;
+  other_user_id: string;
+  display_name: string;
+  avatar_url?: string | null;
+  wins_count: number;
+  direction: "incoming" | "outgoing";
+  created_at?: string;
+}
+
 export interface LeaderboardRow {
   rank: number;
   user_id: string;

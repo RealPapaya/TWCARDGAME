@@ -7,6 +7,7 @@ const grantsMigration = readFileSync(new URL("../migrations/0003_phase4_browser_
 const serviceRoleGrantsMigration = readFileSync(new URL("../migrations/0004_phase4_service_role_grants.sql", import.meta.url), "utf8");
 const legacyShopMigration = readFileSync(new URL("../migrations/0006_legacy_shop_items.sql", import.meta.url), "utf8");
 const userDataMigration = readFileSync(new URL("../migrations/0007_user_inventory_login_quests.sql", import.meta.url), "utf8");
+const friendRequestsMigration = readFileSync(new URL("../migrations/0008_friend_requests.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -118,5 +119,15 @@ describe("Supabase RLS migration coverage", () => {
     expect(userDataMigration).toContain("create or replace function public.record_pvp_win(p_match_id text)");
     expect(userDataMigration).toContain("'match_finished'");
     expect(userDataMigration).toContain("'pvp_win'");
+  });
+
+  it("keeps friend requests pending until the receiver accepts", () => {
+    expect(friendRequestsMigration).toContain("create table if not exists public.friend_requests");
+    expect(friendRequestsMigration).toContain("status = 'pending'");
+    expect(friendRequestsMigration).toContain("create or replace function public.accept_friend_request(p_request_id uuid)");
+    expect(friendRequestsMigration).toContain("insert into public.friends (user_id, friend_user_id)");
+    expect(friendRequestsMigration).toContain("grant select on public.friend_requests to authenticated;");
+    expect(friendRequestsMigration).not.toContain("grant select, insert on public.friend_requests to authenticated;");
+    expect(friendRequestsMigration).toContain("grant execute on function public.list_friend_requests() to authenticated;");
   });
 });

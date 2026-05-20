@@ -5,6 +5,7 @@ import type {
   AiDifficulty,
   ClientCommandMessage,
   FriendRow,
+  FriendRequestRow,
   GameCommand,
   GameEvent,
   GameStatus,
@@ -96,6 +97,7 @@ type ClientViewState = {
   editingDisplayName?: string;
   editingDisplayNameActive?: boolean;
   friends: FriendRow[];
+  friendRequests: FriendRequestRow[];
   friendsLoading?: boolean;
   friendsError?: string;
   leaderboard: LeaderboardRow[];
@@ -377,6 +379,7 @@ const view: ClientViewState = {
   collectionRarity: "all",
   collectionSearch: "",
   friends: [],
+  friendRequests: [],
   leaderboard: [],
   leaderboardSortBy: "wins",
   shopItems: [],
@@ -389,6 +392,9 @@ const view: ClientViewState = {
   changelogOpen: false
 };
 
+let renderScheduled = false;
+let lastRenderedHtml = "";
+
 ensureDragLayer();
 installViewportGuards();
 installAudioUnlock();
@@ -396,9 +402,18 @@ render();
 void initializeAccount();
 
 function render(): void {
+  if (renderScheduled) return;
+  renderScheduled = true;
+  window.requestAnimationFrame(() => {
+    renderScheduled = false;
+    renderNow();
+  });
+}
+
+function renderNow(): void {
   const status = readStatus();
   const shellClass = view.state ? "app-shell in-match" : "app-shell";
-  app.innerHTML = `
+  const nextHtml = `
     <main class="${shellClass}">
       ${view.state ? renderGame(status) : renderLanding()}
       ${renderToast()}
@@ -406,10 +421,79 @@ function render(): void {
     </main>
   `;
 
-  bindStaticActions();
-  bindSelectionActions();
+  if (nextHtml !== lastRenderedHtml) {
+    const snapshot = captureRenderSnapshot();
+    app.innerHTML = nextHtml;
+    lastRenderedHtml = nextHtml;
+    bindStaticActions();
+    bindSelectionActions();
+    restoreRenderSnapshot(snapshot);
+  }
   applyPostRenderEffects();
   ensureBgm();
+}
+
+type RenderSnapshot = {
+  activeSelector?: string;
+  activeValue?: string;
+  selectionStart?: number | null;
+  selectionEnd?: number | null;
+  scroll: Array<{ selector: string; top: number; left: number }>;
+};
+
+function captureRenderSnapshot(): RenderSnapshot {
+  const active = document.activeElement;
+  const input = active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement ? active : undefined;
+  const activeSelector = input ? stableElementSelector(input) : undefined;
+  const selection = input ? readInputSelection(input) : undefined;
+  return {
+    activeSelector,
+    activeValue: input?.value,
+    selectionStart: selection?.start,
+    selectionEnd: selection?.end,
+    scroll: Array.from(document.querySelectorAll<HTMLElement>("[data-preserve-scroll]"))
+      .map((el) => ({ selector: stableElementSelector(el), top: el.scrollTop, left: el.scrollLeft }))
+      .filter((item) => item.selector)
+  };
+}
+
+function readInputSelection(input: HTMLInputElement | HTMLTextAreaElement): { start: number | null; end: number | null } | undefined {
+  try {
+    return { start: input.selectionStart, end: input.selectionEnd };
+  } catch {
+    return undefined;
+  }
+}
+
+function restoreRenderSnapshot(snapshot: RenderSnapshot): void {
+  for (const item of snapshot.scroll) {
+    const el = document.querySelector<HTMLElement>(item.selector);
+    if (!el) continue;
+    el.scrollTop = item.top;
+    el.scrollLeft = item.left;
+  }
+  if (!snapshot.activeSelector) return;
+  const input = document.querySelector<HTMLInputElement | HTMLTextAreaElement>(snapshot.activeSelector);
+  if (!input) return;
+  if (snapshot.activeValue !== undefined && input.value !== snapshot.activeValue) input.value = snapshot.activeValue;
+  input.focus();
+  if (snapshot.selectionStart !== null && snapshot.selectionStart !== undefined) {
+    try {
+      input.setSelectionRange(snapshot.selectionStart, snapshot.selectionEnd ?? snapshot.selectionStart);
+    } catch {
+      // Non-text inputs such as sliders do not support selection ranges.
+    }
+  }
+}
+
+function stableElementSelector(el: Element): string {
+  if (el.id) return `#${cssEscape(el.id)}`;
+  const testId = el.getAttribute("data-testid");
+  if (testId) return `[data-testid="${cssEscape(testId)}"]`;
+  const screen = el.getAttribute("data-screen");
+  if (screen) return `[data-screen="${cssEscape(screen)}"]`;
+  const className = Array.from(el.classList)[0];
+  return className ? `.${cssEscape(className)}` : "";
 }
 
 function readStoredNumber(key: string, fallback: number): number {
@@ -694,7 +778,7 @@ function renderChangelogModal(): string {
           <h3>更新日誌</h3>
           <button id="changelog-close" class="settings-close-btn" title="關閉">✕</button>
         </header>
-        <div class="changelog-list">
+        <div class="changelog-list" data-preserve-scroll>
           ${PATCH_NOTES.map((entry) => `
             <div class="changelog-version">
               <h4>版本 ${escapeHtml(entry.version)} (${escapeHtml(entry.date)})</h4>
@@ -947,9 +1031,6 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
         <header class="collection-header">
           <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
           <h2 class="collection-title">${escapeHtml(title)}</h2>
-          <div class="collection-header-actions">
-            <button id="new-deck" class="ghost-button" type="button">新增牌組</button>
-          </div>
         </header>
         ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
         <div class="collection-controls-bar">
@@ -1002,7 +1083,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
         ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
         <div class="collection-workbench">
           <section class="collection-card-library" aria-label="卡牌庫">
-            <div class="collection-grid" data-testid="collection-grid">
+            <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
               ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
                 const qty = collectionMap.get(card.id) ?? 0;
                 return renderCollectionTile(card, qty, selectedCounts.get(card.id) ?? 0, selectedTotal);
@@ -1010,36 +1091,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
             </div>
           </section>
           <aside class="collection-deck-column" aria-label="牌組">
-            <section class="deck-shelf">
-              <div class="deck-shelf-heading">
-                <h3>牌組</h3>
-                <span>${view.decks.length} 組</span>
-              </div>
-              <div class="deck-banner-list" data-testid="collection-deck-list">
-                ${view.decks.map(renderCollectionDeckBanner).join("") || `<p class="muted deck-empty">尚未建立牌組。</p>`}
-              </div>
-            </section>
-            <form id="deck-form" class="collection-deck-editor">
-              <div class="deck-editor-topline">
-                <label class="deck-name-field">
-                  <span>牌組名稱</span>
-                  <input id="deck-name" value="${escapeAttr(deck?.name ?? "New Deck")}" aria-label="Deck name" maxlength="40" />
-                </label>
-                <strong class="${selectedTotal === 30 ? "deck-complete" : "deck-count"}">${selectedTotal}/30</strong>
-              </div>
-              <div class="deck-editor-actions">
-                <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>儲存</button>
-                <button type="button" id="autofill-deck">自動補滿</button>
-                <button type="button" id="clear-deck">清空</button>
-                ${deck?.id ? `<button type="button" class="danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>` : ""}
-              </div>
-              ${hasCollectionRows()
-                ? ""
-                : `<p class="muted deck-sync-note">收藏同步中；儲存時會再次確認持有數量。</p>`}
-              <div class="deck-current-list" data-testid="deck-current-list">
-                ${renderCurrentDeckCards(deck?.card_ids ?? [])}
-              </div>
-            </form>
+            ${renderCollectionDeckColumnContent()}
           </aside>
         </div>
       </div>
@@ -1109,7 +1161,7 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   const owned = quantity > 0;
   const limit = deckCopyLimit(card);
   const effectiveOwned = hasCollectionRows() ? quantity : limit;
-  const canAdd = owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
+  const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
   const resolved: ResolvedCardView = {
     cardId: card.id,
     instanceId: `collection-${card.id}`,
@@ -1199,6 +1251,50 @@ function renderSavedDeck(deck: DeckRow): string {
       <button data-edit-deck="${escapeAttr(deck.id)}">Edit</button>
       <button class="danger" data-delete-deck="${escapeAttr(deck.id)}">Delete</button>
     </div>
+  `;
+}
+
+function renderCollectionDeckColumnContent(): string {
+  const deck = view.editingDeck;
+  const selectedTotal = deck?.card_ids.length ?? 0;
+  return `
+    <section class="deck-shelf">
+      <div class="deck-shelf-heading">
+        <h3>牌組</h3>
+        <span>${view.decks.length} 組</span>
+      </div>
+      <div class="deck-banner-list" data-testid="collection-deck-list" data-preserve-scroll>
+        ${view.decks.map(renderCollectionDeckBanner).join("") || `<p class="muted deck-empty">尚未建立牌組。</p>`}
+      </div>
+    </section>
+    ${deck ? `
+      <form id="deck-form" class="collection-deck-editor">
+        <div class="deck-editor-topline">
+          <label class="deck-name-field">
+            <span>牌組名稱</span>
+            <input id="deck-name" value="${escapeAttr(deck.name)}" aria-label="Deck name" maxlength="40" />
+          </label>
+          <strong class="${selectedTotal === 30 ? "deck-complete" : "deck-count"}">${selectedTotal}/30</strong>
+        </div>
+        <div class="deck-editor-actions">
+          <button type="submit" ${selectedTotal !== 30 ? "disabled" : ""}>儲存</button>
+          <button type="button" id="autofill-deck">自動補滿</button>
+          <button type="button" id="clear-deck">清空</button>
+          ${deck.id ? `<button type="button" class="danger" data-delete-deck="${escapeAttr(deck.id)}">刪除</button>` : ""}
+        </div>
+        ${hasCollectionRows()
+          ? ""
+          : `<p class="muted deck-sync-note">收藏同步中；儲存時會再次確認持有數量。</p>`}
+        <div class="deck-current-list" data-testid="deck-current-list" data-preserve-scroll>
+          ${renderCurrentDeckCards(deck.card_ids)}
+        </div>
+      </form>
+    ` : `
+      <section class="collection-deck-editor deck-editor-placeholder">
+        <button type="button" id="new-deck" class="ghost-button">新增牌組</button>
+        <p class="muted deck-empty">選擇上方牌組開始編輯，或新增一副牌組後再從左側加入卡牌。</p>
+      </section>
+    `}
   `;
 }
 
@@ -1708,10 +1804,7 @@ function bindStaticActions(): void {
   document.querySelector<HTMLButtonElement>("#refresh-account")?.addEventListener("click", () => void loadAccountData());
   document.querySelector<HTMLButtonElement>("#sync-collection")?.addEventListener("click", () => void syncCollection());
   document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => {
-    startNewDeck(false);
-    view.selectedDeckId = undefined;
-    if (view.menuScreen === "battle") view.menuScreen = "deckEditor";
-    render();
+    beginNewDeck();
   });
   document.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
   document.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
@@ -1754,8 +1847,6 @@ function bindStaticActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
     el.addEventListener("click", () => {
       view.selectedDeckId = el.dataset.selectDeck;
-      const deck = view.decks.find((item) => item.id === el.dataset.selectDeck);
-      if (deck) view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
       render();
     });
   }
@@ -1877,6 +1968,24 @@ function bindStaticActions(): void {
       if (id) void removeFriend(id);
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-accept-friend-request]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.acceptFriendRequest;
+      if (id) void respondFriendRequest("accept", id);
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-decline-friend-request]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.declineFriendRequest;
+      if (id) void respondFriendRequest("decline", id);
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-cancel-friend-request]")) {
+    el.addEventListener("click", () => {
+      const id = el.dataset.cancelFriendRequest;
+      if (id) void respondFriendRequest("cancel", id);
+    });
+  }
   for (const el of document.querySelectorAll<HTMLElement>("[data-challenge-friend]")) {
     el.addEventListener("click", () => {
       void createPrivateChallenge();
@@ -1957,6 +2066,83 @@ function bindStaticActions(): void {
   });
 }
 
+function bindCollectionDeckControls(root: ParentNode): void {
+  root.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", beginNewDeck);
+  root.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
+  root.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
+  root.querySelector<HTMLInputElement>("#deck-name")?.addEventListener("input", (event) => {
+    if (!view.editingDeck) return;
+    view.editingDeck = { ...view.editingDeck, name: (event.currentTarget as HTMLInputElement).value };
+  });
+  root.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
+  for (const el of root.querySelectorAll<HTMLElement>("[data-edit-deck]")) {
+    el.addEventListener("click", () => {
+      const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
+      if (deck) {
+        view.selectedDeckId = deck.id;
+        view.editingDeck = { ...deck, card_ids: [...deck.card_ids] };
+      }
+      refreshCollectionDeckWorkspace();
+    });
+  }
+  for (const el of root.querySelectorAll<HTMLElement>("[data-delete-deck]")) {
+    el.addEventListener("click", () => void deleteDeck(el.dataset.deleteDeck));
+  }
+  for (const el of root.querySelectorAll<HTMLElement>("[data-remove-card]")) {
+    el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
+  }
+}
+
+function beginNewDeck(): void {
+  startNewDeck(false);
+  if (view.menuScreen === "battle") view.menuScreen = "deckEditor";
+  if (document.querySelector(".collection-deck-column")) refreshCollectionDeckWorkspace();
+  else render();
+}
+
+function refreshCollectionDeckWorkspace(): void {
+  const column = document.querySelector<HTMLElement>(".collection-deck-column");
+  if (!column) {
+    render();
+    return;
+  }
+  column.innerHTML = renderCollectionDeckColumnContent();
+  lastRenderedHtml = "";
+  bindCollectionDeckControls(column);
+  updateCollectionCardButtons();
+}
+
+function updateCollectionCardButtons(): void {
+  const selectedCounts = countCards(view.editingDeck?.card_ids ?? []);
+  const selectedTotal = view.editingDeck?.card_ids.length ?? 0;
+  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  for (const el of document.querySelectorAll<HTMLButtonElement>(".collection-card[data-add-card]")) {
+    const cardId = el.dataset.addCard;
+    const card = cardId ? cardCatalog.get(cardId) : undefined;
+    if (!card || !cardId) continue;
+    const quantity = collectionMap.get(cardId) ?? 0;
+    const selectedCount = selectedCounts.get(cardId) ?? 0;
+    const limit = deckCopyLimit(card);
+    const effectiveOwned = hasCollectionRows() ? quantity : limit;
+    const canAdd = Boolean(view.editingDeck) && quantity > 0 && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned;
+    el.disabled = !canAdd;
+    el.classList.toggle("can-add", canAdd);
+    el.classList.toggle("cannot-add", !canAdd);
+
+    let badge = el.querySelector<HTMLElement>(".deck-count-badge");
+    if (selectedCount > 0) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "deck-count-badge";
+        el.insertBefore(badge, el.querySelector(".card"));
+      }
+      badge.textContent = `${selectedCount}/${limit}`;
+    } else {
+      badge?.remove();
+    }
+  }
+}
+
 function bindPackOpeningActions(): void {
   const overlay = document.querySelector("#pack-opening-overlay");
   if (!overlay) return;
@@ -1975,6 +2161,7 @@ function bindPackOpeningActions(): void {
     view.packOpeningFlipped = undefined;
     view.packOpeningKind = undefined;
     document.querySelector("#pack-opening-overlay")?.remove();
+    lastRenderedHtml = "";
   });
 }
 
@@ -2011,6 +2198,8 @@ function renderFriendsScreen(): string {
     return signInRequiredScreen("好友 · Friends");
   }
   const friends = view.friends;
+  const incoming = view.friendRequests.filter((request) => request.direction === "incoming");
+  const outgoing = view.friendRequests.filter((request) => request.direction === "outgoing");
   return `
     <section class="screen friends-screen" data-screen="friends">
       ${renderCloudLayer()}
@@ -2026,9 +2215,9 @@ function renderFriendsScreen(): string {
             <label>對方的顯示名稱
               <input id="add-friend-input" placeholder="顯示名稱" maxlength="32" required />
             </label>
-            <button type="submit" data-testid="add-friend-submit">送出好友邀請</button>
+            <button type="submit" data-testid="add-friend-submit" ${view.friendsLoading ? "disabled" : ""}>送出好友邀請</button>
           </form>
-          <p class="muted">輸入完整的顯示名稱後送出，雙方會立即成為好友。</p>
+          <p class="muted">輸入完整的顯示名稱後送出，對方接受後才會成為好友。</p>
         </section>
         <section class="parchment-card friends-list-card">
           <h3>我的好友 (${friends.length})</h3>
@@ -2036,6 +2225,22 @@ function renderFriendsScreen(): string {
             ? `<p class="muted">還沒有好友。先邀請一位玩家吧！</p>`
             : `<ul class="friends-list">
                 ${friends.map((friend) => renderFriendRow(friend)).join("")}
+              </ul>`}
+        </section>
+        <section class="parchment-card friends-requests-card">
+          <h3>收到的邀請 (${incoming.length})</h3>
+          ${incoming.length === 0
+            ? `<p class="muted">目前沒有待處理的好友邀請。</p>`
+            : `<ul class="friends-list">
+                ${incoming.map(renderIncomingFriendRequestRow).join("")}
+              </ul>`}
+        </section>
+        <section class="parchment-card friends-requests-card">
+          <h3>送出的邀請 (${outgoing.length})</h3>
+          ${outgoing.length === 0
+            ? `<p class="muted">目前沒有等待對方回覆的邀請。</p>`
+            : `<ul class="friends-list">
+                ${outgoing.map(renderOutgoingFriendRequestRow).join("")}
               </ul>`}
         </section>
       </div>
@@ -2056,6 +2261,35 @@ function renderFriendRow(friend: FriendRow): string {
       <div class="friend-actions">
         <button class="ghost-button" data-challenge-friend="${escapeAttr(friend.friend_user_id)}" data-testid="challenge-friend">挑戰</button>
         <button class="danger" data-remove-friend="${escapeAttr(friend.friend_user_id)}" data-testid="remove-friend">移除</button>
+      </div>
+    </li>
+  `;
+}
+
+function renderIncomingFriendRequestRow(request: FriendRequestRow): string {
+  return renderFriendRequestRow(request, `
+    <button class="ghost-button" data-accept-friend-request="${escapeAttr(request.request_id)}" data-testid="accept-friend-request">接受</button>
+    <button class="danger" data-decline-friend-request="${escapeAttr(request.request_id)}" data-testid="decline-friend-request">拒絕</button>
+  `);
+}
+
+function renderOutgoingFriendRequestRow(request: FriendRequestRow): string {
+  return renderFriendRequestRow(request, `
+    <button class="danger" data-cancel-friend-request="${escapeAttr(request.request_id)}" data-testid="cancel-friend-request">取消</button>
+  `);
+}
+
+function renderFriendRequestRow(request: FriendRequestRow, actions: string): string {
+  const avatar = request.avatar_url || "/images/avatars/avatar1.webp";
+  return `
+    <li class="friend-row" data-testid="friend-request-row">
+      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <div class="friend-meta">
+        <strong>${escapeHtml(request.display_name)}</strong>
+        <span class="muted">Wins ${request.wins_count}</span>
+      </div>
+      <div class="friend-actions">
+        ${actions}
       </div>
     </li>
   `;
@@ -2119,7 +2353,7 @@ function renderLeaderboardScreen(): string {
           ? `<p class="lb-empty">載入中…</p>`
           : view.leaderboardError
             ? `<p class="error-text lb-empty">${escapeHtml(view.leaderboardError)}</p>`
-            : `<div class="lb-list" data-testid="leaderboard-table">
+            : `<div class="lb-list" data-testid="leaderboard-table" data-preserve-scroll>
                 ${sorted.length === 0
                   ? `<p class="lb-empty">暫無排行榜資料</p>`
                   : sorted.map((row, i) => renderLeaderboardPlayerCard(row, i + 1, sortBy)).join("")}
@@ -2147,7 +2381,7 @@ function renderShopScreen(): string {
           </div>
         </header>
         ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
-        <div class="shop-products">
+        <div class="shop-products" data-preserve-scroll>
           ${view.shopLoading
             ? `<p class="muted">載入中…</p>`
             : view.shopItems.length === 0
@@ -2262,7 +2496,7 @@ function renderLegacyShopScreen(): string {
           </div>
         </header>
         ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
-        <div class="shop-products">
+        <div class="shop-products" data-preserve-scroll>
           ${view.shopLoading
             ? `<p class="muted">載入商店中...</p>`
             : view.shopItems.length === 0
@@ -2447,9 +2681,14 @@ async function loadFriends(): Promise<void> {
   view.friendsError = undefined;
   render();
   try {
-    const { data, error } = await supabase.rpc("list_friends");
-    if (error) throw error;
-    view.friends = (data as FriendRow[]) ?? [];
+    const [friendsResult, requestsResult] = await Promise.all([
+      supabase.rpc("list_friends"),
+      supabase.rpc("list_friend_requests")
+    ]);
+    if (friendsResult.error) throw friendsResult.error;
+    if (requestsResult.error) throw requestsResult.error;
+    view.friends = (friendsResult.data as FriendRow[]) ?? [];
+    view.friendRequests = (requestsResult.data as FriendRequestRow[]) ?? [];
   } catch (error) {
     view.friendsError = error instanceof Error ? error.message : "Failed to load friends.";
   } finally {
@@ -2472,7 +2711,7 @@ async function sendFriendRequest(displayName: string): Promise<void> {
   try {
     const { error } = await supabase.rpc("send_friend_request", { p_target_display_name: target });
     if (error) throw error;
-    showToast(`已將 ${target} 加為好友。`);
+    showToast(`已送出好友邀請給 ${target}。`);
     await loadFriends();
   } catch (error) {
     view.friendsError = error instanceof Error ? error.message : "Failed to add friend.";
@@ -2491,6 +2730,27 @@ async function removeFriend(friendUserId: string): Promise<void> {
     await loadFriends();
   } catch (error) {
     view.friendsError = error instanceof Error ? error.message : "Failed to remove friend.";
+    render();
+  }
+}
+
+async function respondFriendRequest(action: "accept" | "decline" | "cancel", requestId: string): Promise<void> {
+  if (!supabase || !view.session) return;
+  view.friendsLoading = true;
+  view.friendsError = undefined;
+  render();
+  try {
+    const rpcName =
+      action === "accept" ? "accept_friend_request"
+      : action === "decline" ? "decline_friend_request"
+      : "cancel_friend_request";
+    const { error } = await supabase.rpc(rpcName, { p_request_id: requestId });
+    if (error) throw error;
+    showToast(action === "accept" ? "已接受好友邀請。" : "好友邀請已更新。");
+    await loadFriends();
+  } catch (error) {
+    view.friendsError = error instanceof Error ? error.message : "Failed to update friend request.";
+    view.friendsLoading = false;
     render();
   }
 }
@@ -2775,8 +3035,19 @@ function scheduleMatchmakingTick(): void {
       stopMatchmakingTick();
       return;
     }
-    render();
+    updateMatchmakingTimer();
   }, 1000);
+}
+
+function updateMatchmakingTimer(): void {
+  if (!view.matchmaking) return;
+  const el = document.querySelector<HTMLElement>("[data-testid='matchmaking-elapsed']");
+  if (!el) return;
+  const elapsedMs = Date.now() - view.matchmaking.startedAtMs;
+  const seconds = Math.max(0, Math.floor(elapsedMs / 1000));
+  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const ss = String(seconds % 60).padStart(2, "0");
+  el.textContent = `${mm}:${ss}`;
 }
 
 function stopMatchmakingTick(): void {
@@ -3289,6 +3560,8 @@ async function initializeAccount(): Promise<void> {
       view.decks = [];
       view.collection = [];
       view.matchHistory = [];
+      view.friends = [];
+      view.friendRequests = [];
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
       view.menuScreen = "main";
@@ -3395,7 +3668,10 @@ async function loadAccountData(): Promise<void> {
     if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
       view.selectedDeckId = view.decks[0]?.id;
     }
-    if (!view.editingDeck) startNewDeck(false);
+    if (view.editingDeck?.id) {
+      const editingDeck = view.decks.find((deck) => deck.id === view.editingDeck?.id);
+      view.editingDeck = editingDeck ? { ...editingDeck, card_ids: [...editingDeck.card_ids] } : undefined;
+    }
     if (pendingWelcomeToast) {
       pendingWelcomeToast = false;
       showToast(`歡迎回來，${view.profile?.display_name ?? "玩家"}！`);
@@ -3451,7 +3727,10 @@ async function loadAccountDataRaw(): Promise<void> {
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;
   }
-  if (!view.editingDeck) startNewDeck(false);
+  if (view.editingDeck?.id) {
+    const editingDeck = view.decks.find((deck) => deck.id === view.editingDeck?.id);
+    view.editingDeck = editingDeck ? { ...editingDeck, card_ids: [...editingDeck.card_ids] } : undefined;
+  }
 }
 
 async function ensureCollection(): Promise<void> {
@@ -3507,7 +3786,7 @@ async function deleteDeck(deckId: string | undefined): Promise<void> {
     if (error) throw error;
     showToast("牌組已刪除。");
     if (view.selectedDeckId === deckId) view.selectedDeckId = undefined;
-    if (view.editingDeck?.id === deckId) startNewDeck(false);
+    if (view.editingDeck?.id === deckId) view.editingDeck = undefined;
     await loadAccountData();
   });
 }
@@ -3519,7 +3798,7 @@ function startNewDeck(doRender = true): void {
 }
 
 function autofillDeck(): void {
-  if (!view.editingDeck) startNewDeck(false);
+  if (!view.editingDeck) return;
   const ids: string[] = [];
   const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
   for (const card of CARD_CATALOG) {
@@ -3530,18 +3809,18 @@ function autofillDeck(): void {
     if (ids.length >= 30) break;
   }
   view.editingDeck = { ...view.editingDeck!, card_ids: ids };
-  render();
+  refreshCollectionDeckWorkspace();
 }
 
 function clearDeck(): void {
   if (!view.editingDeck) return;
   view.editingDeck = { ...view.editingDeck, card_ids: [] };
-  render();
+  refreshCollectionDeckWorkspace();
 }
 
 function addCardToEditor(cardId: string | undefined): void {
   if (!cardId) return;
-  if (!view.editingDeck) startNewDeck(false);
+  if (!view.editingDeck) return;
   const card = cardCatalog.get(cardId);
   if (!card) return;
   const counts = countCards(view.editingDeck!.card_ids);
@@ -3551,7 +3830,7 @@ function addCardToEditor(cardId: string | undefined): void {
     : limit;
   if (owned <= 0 || (counts.get(cardId) ?? 0) >= Math.min(limit, owned) || view.editingDeck!.card_ids.length >= 30) return;
   view.editingDeck = { ...view.editingDeck!, card_ids: [...view.editingDeck!.card_ids, cardId] };
-  render();
+  refreshCollectionDeckWorkspace();
 }
 
 function removeCardFromEditor(cardId: string | undefined): void {
@@ -3561,7 +3840,7 @@ function removeCardFromEditor(cardId: string | undefined): void {
   const cardIds = [...view.editingDeck.card_ids];
   cardIds.splice(index, 1);
   view.editingDeck = { ...view.editingDeck, card_ids: cardIds };
-  render();
+  refreshCollectionDeckWorkspace();
 }
 
 async function withAccountLoading(action: () => Promise<void>): Promise<void> {

@@ -4157,6 +4157,26 @@ input {
   color: rgba(93, 46, 23, 0.74) !important;
 }
 
+.deck-editor-placeholder {
+  justify-content: center;
+  align-items: stretch;
+  gap: 12px;
+}
+
+.deck-editor-placeholder .ghost-button {
+  width: 100%;
+  min-height: 42px;
+  border-color: var(--wood-dark);
+  color: var(--wood-dark);
+  background: rgba(255, 244, 213, 0.78);
+  text-shadow: none;
+}
+
+.deck-editor-placeholder .deck-empty {
+  text-align: center;
+  line-height: 1.5;
+}
+
 @media (max-width: 1100px) {
   .collection-container {
     padding: 24px 18px 18px;
@@ -4280,6 +4300,7 @@ input {
   padding: 0 16px 32px;
 }
 .friends-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); }
+.friends-requests-card { min-height: 170px; }
 .ai-grid       { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
 .shop-grid     { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
 
