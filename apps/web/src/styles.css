@@ -1004,6 +1004,14 @@ input {
   animation: death-fade 0.78s ease-out;
 }
 
+.minion.summoning {
+  animation: minion-land 0.68s cubic-bezier(0.2, 0.9, 0.18, 1) both;
+  z-index: 260;
+}
+.battle-surface.has-card-play-focus .minion.summoning {
+  animation-delay: 0.72s;
+}
+
 .minion-art {
   width: 100%;
   height: 68px;
@@ -1255,28 +1263,38 @@ input {
 .event-layer {
   position: absolute;
   inset: 0;
-  z-index: 70;
+  z-index: 1300;
   pointer-events: none;
   display: grid;
   place-items: center;
+  perspective: 1200px;
 }
-
+.event-focus-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.44);
+  backdrop-filter: blur(5px);
+  z-index: 0;
+}
 .event-card-preview {
-  width: 190px;
-  height: 272px;
+  width: 280px;
+  height: 410px;
   margin: 0;
   transform: none;
-  animation: card-preview-slam 1.05s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  padding: 8px;
+  justify-content: flex-start;
+  z-index: 1;
+  transform-style: preserve-3d;
+  animation: card-play-focus 1.15s cubic-bezier(0.19, 1, 0.22, 1) forwards;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.82), 0 0 24px rgba(0, 243, 255, 0.22);
 }
-
-.event-card-preview .card-art-box {
-  height: 92px;
-}
-
-.event-card-preview .card-desc {
-  height: 70px;
-  font-size: 11px;
-}
+.event-card-preview .card-cost { width: 42px; height: 42px; font-size: 20px; }
+.event-card-preview .card-title { min-height: 42px; margin: 32px 0 10px; font-size: 28px; line-height: 1.15; }
+.event-card-preview .card-art-box { height: 150px; margin-top: 0; }
+.event-card-preview .card-category { margin: 8px 0 7px; padding: 3px 10px; font-size: 16px; }
+.event-card-preview .card-desc { height: auto; flex: 1; padding: 0 10px; font-size: 18px; line-height: 1.34; white-space: pre-wrap; }
+.event-card-preview .minion-stats { left: 15px; right: 15px; bottom: 8px; }
+.event-card-preview .stat-atk, .event-card-preview .stat-hp { width: 60px; height: 60px; font-size: 28px; }
 
 .event-cue {
   position: absolute;
@@ -1478,6 +1496,19 @@ input {
     opacity: 0;
     transform: translateY(-36px) scale(0.94);
   }
+}
+
+@keyframes minion-land {
+  0% { opacity: 0; transform: translateY(-260px) scale(1.36) rotateX(18deg); filter: drop-shadow(0 42px 26px rgba(0, 0, 0, 0.6)); }
+  58% { opacity: 1; transform: translateY(12px) scale(1.04) rotateX(0); filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.55)); }
+  74% { transform: translateY(-7px) scale(1.02); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+}
+@keyframes card-play-focus {
+  0% { opacity: 0; transform: translateZ(-500px) scale(0.76) rotateX(20deg); }
+  34% { opacity: 1; transform: translateZ(0) scale(1) rotateX(0); }
+  74% { opacity: 1; transform: translateZ(0) scale(1) rotateX(0); }
+  100% { opacity: 0; transform: translateZ(-500px) scale(0.18); }
 }
 
 @keyframes turn-pulse {
@@ -1924,15 +1955,18 @@ input {
 .placement-indicator.active {
   width: 100px;
   opacity: 1;
-  border-color: #ffffff;
-  background: rgba(255, 255, 255, 0.1);
-  box-shadow: 0 0 15px rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 238, 0, 0.9);
+  background: rgba(255, 238, 0, 0.14);
+  box-shadow: 0 0 16px rgba(255, 238, 0, 0.42);
   margin: 0 5px;
 }
-
-.board.drop-highlight {
-  box-shadow: inset 0 0 24px rgba(255, 255, 255, 0.18);
+.board.drop-highlight { box-shadow: none; }
+.battle-surface .board.drop-highlight::before {
+  content: ""; position: absolute; left: clamp(-245px, -18vw, -120px); right: clamp(-245px, -18vw, -120px); top: -14px; bottom: -14px;
+  border: 1px solid rgba(255, 238, 0, 0.28); background: rgba(255, 238, 0, 0.22);
+  box-shadow: inset 0 0 30px rgba(255, 238, 0, 0.2), 0 0 28px rgba(255, 238, 0, 0.16); pointer-events: none; z-index: 0;
 }
+.battle-surface .board.drop-highlight > * { position: relative; z-index: 1; }
 
 @media (prefers-reduced-motion: reduce) {
   #drag-line {
@@ -7088,12 +7122,12 @@ input {
 }
 
 .battle-surface .player-area.opponent .board {
-  bottom: 0;
+  bottom: -65px;
   top: auto;
 }
 
 .battle-surface .player-area:not(.opponent) .board {
-  top: 0;
+  top: -80px;
   bottom: auto;
 }
 

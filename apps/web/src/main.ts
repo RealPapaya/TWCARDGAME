@@ -1659,6 +1659,7 @@ function renderGame(status: GameStatus | ""): string {
         ? `Target: ${targetLabel(view.selectedTarget)}`
         : "Choose attack target"
       : "No selection";
+  const hasCardPlayFocus = view.animationCues.some((cue) => cue.kind === "play");
 
   return `
     <section class="topbar battle-e2e-topbar" aria-hidden="true">
@@ -1670,7 +1671,7 @@ function renderGame(status: GameStatus | ""): string {
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
       <span>${escapeHtml(targetHint)}</span>
     </section>
-    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""}" data-testid="battle-surface">
+    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""}" data-testid="battle-surface">
       ${renderBattleHistoryPanel()}
       ${renderConnectionBanner()}
       ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
@@ -1857,6 +1858,7 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
     hasCue(targetKey, "damage") && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "summon") && "summoning",
     hasCue(targetKey, "destroy") && "being-destroyed"
   ]);
 
@@ -2077,8 +2079,10 @@ function renderResultOverlay(status: GameStatus | ""): string {
 
 function renderEventCues(): string {
   if (view.animationCues.length === 0) return "";
+  const hasCardPlayFocus = view.animationCues.some((cue) => cue.kind === "play");
   return `
     <div class="event-layer" data-testid="event-layer" aria-hidden="true">
+      ${hasCardPlayFocus ? `<div class="event-focus-backdrop"></div>` : ""}
       ${view.animationCues.map(renderEventCue).join("")}
     </div>
   `;
@@ -2094,6 +2098,9 @@ function renderEventCue(cue: AnimationCue): string {
     `;
   }
   if (cue.kind === "attackerMoves") {
+    return "";
+  }
+  if (cue.kind === "summon") {
     return "";
   }
   if (cue.kind === "damage" || cue.kind === "heal") {
@@ -4722,10 +4729,11 @@ function enqueueEventCues(events: GameEvent[]): void {
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
     const lifetime =
-      cue.kind === "play" ? 1050
+      cue.kind === "play" ? 1250
       : cue.kind === "attackerMoves" ? 460
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
       : cue.kind === "destroy" ? 700
+      : cue.kind === "summon" ? 1600
       : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);

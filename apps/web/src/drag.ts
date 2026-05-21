@@ -93,14 +93,15 @@ export function ensureDragLayer(): void {
 function buildArrowMarker(ns: string, id: string, color: string): SVGMarkerElement {
   const marker = document.createElementNS(ns, "marker");
   marker.setAttribute("id", id);
-  marker.setAttribute("viewBox", "0 0 10 10");
-  marker.setAttribute("refX", "8");
-  marker.setAttribute("refY", "5");
-  marker.setAttribute("markerWidth", "4");
-  marker.setAttribute("markerHeight", "4");
-  marker.setAttribute("orient", "auto-start-reverse");
+  marker.setAttribute("viewBox", "0 0 35 60");
+  marker.setAttribute("refX", "2");
+  marker.setAttribute("refY", "30");
+  marker.setAttribute("markerWidth", "35");
+  marker.setAttribute("markerHeight", "60");
+  marker.setAttribute("orient", "auto");
+  marker.setAttribute("markerUnits", "userSpaceOnUse");
   const path = document.createElementNS(ns, "path");
-  path.setAttribute("d", "M 0 0 L 10 5 L 0 10 z");
+  path.setAttribute("d", "M0,0 L0,60 L35,30 z");
   path.setAttribute("fill", color);
   marker.appendChild(path);
   return marker as SVGMarkerElement;
@@ -254,7 +255,9 @@ function updatePlacementIndicator(x: number, y: number): void {
     return;
   }
   const targetEl = document.elementFromPoint(x, y);
-  const overBoard = Boolean(targetEl?.closest('[data-testid="player-board"]')) || board.contains(targetEl);
+  const boardRect = board.getBoundingClientRect();
+  const insideBoardRect = x >= boardRect.left && x <= boardRect.right && y >= boardRect.top && y <= boardRect.bottom;
+  const overBoard = insideBoardRect || Boolean(targetEl?.closest('[data-testid="player-board"]')) || board.contains(targetEl);
 
   if (!overBoard) {
     board.classList.remove("drop-highlight");
