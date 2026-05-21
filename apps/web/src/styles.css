@@ -1017,7 +1017,8 @@ input {
 }
 
 .minion.summoning {
-  animation: minion-land 0.68s cubic-bezier(0.2, 0.9, 0.18, 1) both;
+  animation: minion-land 0.96s cubic-bezier(0.18, 0.82, 0.22, 1) both;
+  transform-origin: 50% 82%;
   z-index: 260;
 }
 .battle-surface.has-card-play-focus .minion.summoning {
@@ -1287,6 +1288,82 @@ input {
   place-items: center;
   perspective: 1200px;
 }
+
+.turn-announcement-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1800;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.48);
+  pointer-events: auto;
+  opacity: 0;
+}
+
+.turn-announcement-overlay::before {
+  content: "";
+  position: absolute;
+  left: 3%;
+  right: 3%;
+  top: 50%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22) 18%, rgba(255, 255, 255, 0.32) 50%, rgba(255, 255, 255, 0.22) 82%, transparent);
+  transform: translateY(-50%);
+}
+
+.turn-announcement-overlay.active {
+  animation: turn-announcement-fade 1.65s ease both;
+}
+
+.turn-announcement-text {
+  position: relative;
+  z-index: 1;
+  color: #fff;
+  font-family: "Noto Serif TC", serif;
+  font-size: clamp(58px, 8.5vw, 108px);
+  font-weight: 900;
+  letter-spacing: 0;
+  line-height: 1;
+  text-shadow: 0 4px 14px rgba(0, 0, 0, 0.86);
+  white-space: nowrap;
+  animation: turn-announcement-hold 1.65s ease both;
+}
+
+.battle-surface.battle-locked .card.can-play,
+.battle-surface.battle-locked .minion.can-attack,
+.battle-surface.battle-locked .valid-target {
+  cursor: default;
+}
+
+@keyframes turn-announcement-fade {
+  0% {
+    opacity: 0;
+  }
+  16%,
+  82% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes turn-announcement-hold {
+  0% {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  18%,
+  82% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+
 .event-focus-backdrop {
   position: absolute;
   inset: 0;
@@ -1517,10 +1594,23 @@ input {
 }
 
 @keyframes minion-land {
-  0% { opacity: 0; transform: translateY(-260px) scale(1.36) rotateX(18deg); filter: drop-shadow(0 42px 26px rgba(0, 0, 0, 0.6)); }
-  58% { opacity: 1; transform: translateY(12px) scale(1.04) rotateX(0); filter: drop-shadow(0 8px 8px rgba(0, 0, 0, 0.55)); }
-  74% { transform: translateY(-7px) scale(1.02); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: none; }
+  0% {
+    opacity: 0;
+    transform: translate3d(0, -320px, 0) scale(1.72);
+    filter: drop-shadow(0 78px 30px rgba(0, 0, 0, 0.12));
+  }
+  18% {
+    opacity: 1;
+  }
+  72% {
+    transform: translate3d(0, -18px, 0) scale(1.08);
+    filter: drop-shadow(0 30px 18px rgba(0, 0, 0, 0.34));
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: drop-shadow(0 7px 16px rgba(0, 0, 0, 0.42));
+  }
 }
 @keyframes card-play-focus {
   0% { opacity: 0; transform: translateZ(-500px) scale(0.76) rotateX(20deg); }
@@ -1993,6 +2083,15 @@ input {
 
   .hero.shaking {
     animation: none;
+  }
+
+  .turn-announcement-overlay.active,
+  .turn-announcement-text {
+    animation: none;
+  }
+
+  .turn-announcement-overlay.active {
+    opacity: 1;
   }
 }
 
@@ -6875,9 +6974,14 @@ input {
 }
 
 .expand-arrow {
-  color: #ffd700;
-  font-size: 24px;
+  font-size: 18px;
+  transition: transform 0.3s;
+  color: #6d5b4b;
+}
+
+.deck-option-group.expanded .expand-arrow {
   transform: rotate(90deg);
+  color: #ffd700;
 }
 
 .difficulty-options {

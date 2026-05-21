@@ -14,7 +14,9 @@ import { GameRoom, type GameRoomCreateOptions } from "./GameRoom.js";
 import { defaultDeckIds, type JoinOptions, type PlayerSetup } from "./accounts.js";
 import type { MatchPersistenceMetadata } from "./persistence.js";
 
-const BOT_THINK_DELAY_MS = parseInt(process.env.BOT_THINK_DELAY_MS ?? "600", 10);
+const BOT_MULLIGAN_DELAY_MS = parseInt(process.env.BOT_MULLIGAN_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "800", 10);
+const BOT_TURN_START_DELAY_MS = parseInt(process.env.BOT_TURN_START_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1600", 10);
+const BOT_ACTION_DELAY_MS = parseInt(process.env.BOT_ACTION_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1200", 10);
 
 const ALLOWED_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"];
 
@@ -41,6 +43,7 @@ export class BotRoom extends GameRoom {
   private botRng: BotRngState = { state: 0 };
   private commandCounter = 0;
   private botStepScheduled = false;
+  private lastBotTurnKey?: string;
 
   override onCreate(options: BotRoomCreateOptions = {}): void {
     super.onCreate({ ...options, joinCode: options.joinCode, private: true });
@@ -129,18 +132,21 @@ export class BotRoom extends GameRoom {
       this.clock.setTimeout(() => {
         this.botStepScheduled = false;
         this.runBotMulligan();
-      }, BOT_THINK_DELAY_MS);
+      }, BOT_MULLIGAN_DELAY_MS);
       return;
     }
 
     if (this.match.turn.activeSeat !== this.botSeat) return;
     if (this.match.pendingPrompt && this.match.pendingPrompt.seat !== this.botSeat) return;
 
+    const botTurnKey = `${this.match.turn.number}:${this.match.turn.activeSeat}`;
+    const isFirstStepThisTurn = this.lastBotTurnKey !== botTurnKey;
+    this.lastBotTurnKey = botTurnKey;
     this.botStepScheduled = true;
     this.clock.setTimeout(() => {
       this.botStepScheduled = false;
       this.runBotTurnStep();
-    }, BOT_THINK_DELAY_MS);
+    }, isFirstStepThisTurn ? BOT_TURN_START_DELAY_MS : BOT_ACTION_DELAY_MS);
   }
 
   private runBotMulligan(): void {

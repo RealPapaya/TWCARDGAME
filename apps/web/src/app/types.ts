@@ -69,6 +69,12 @@ export type ClientViewState = {
   selectedTarget?: TargetRef;
   events: GameEvent[];
   animationCues: AnimationCue[];
+  turnAnnouncement?: {
+    id: string;
+    text: string;
+    seat: Seat;
+    untilMs: number;
+  };
   eventStatus?: GameStatus;
   toast?: string;
   joining: boolean;

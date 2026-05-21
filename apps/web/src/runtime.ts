@@ -60,6 +60,7 @@ import { installViewportGuards } from "./app/viewport.js";
 
 const PROFILE_SELECT =
   "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
@@ -229,6 +230,8 @@ const view: ClientViewState = {
 
 let renderScheduled = false;
 let lastRenderedHtml = "";
+let turnAnnouncementTimer: number | undefined;
+let lastTurnAnnouncementKey: string | undefined;
 
 export function startApp(): void {
   setAppContext({ view, render, supabase, cardCatalog, seats });
@@ -1253,6 +1256,7 @@ function renderGame(status: GameStatus | ""): string {
   const myPlayer = readPlayer(me ?? "player1");
   const activeSeat = readActiveSeat();
   const selectedCard = selectedHandCard();
+  const battleLocked = isBattleActionLocked();
   const targetHint = selectedCard
     ? cardNeedsTarget(selectedCard.cardId)
       ? view.selectedTarget
@@ -1276,7 +1280,7 @@ function renderGame(status: GameStatus | ""): string {
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
       <span>${escapeHtml(targetHint)}</span>
     </section>
-    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""}" data-testid="battle-surface">
+    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""}" data-testid="battle-surface">
       ${renderBattleHistoryPanel()}
       ${renderConnectionBanner()}
       ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
@@ -1284,6 +1288,7 @@ function renderGame(status: GameStatus | ""): string {
       ${renderPlayerArea(me ?? "player1", myPlayer, "player")}
       ${renderBattlePlayerInfo(myPlayer)}
       ${renderEventCues()}
+      ${renderTurnAnnouncementOverlay()}
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
       ${view.settingsOpen ? renderSettingsModal() : ""}
@@ -1539,10 +1544,11 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
 
 function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, myPlayer?: PublicPlayer): string {
   const isMyTurn = activeSeat && activeSeat === view.mySeat;
+  const battleLocked = isBattleActionLocked();
   const selectedCard = selectedHandCard();
   const selectedNeedsTarget = selectedCard ? cardNeedsTarget(selectedCard.cardId) : false;
   const canPlay = Boolean(selectedCard && canAfford(selectedCard.cost) && (!selectedNeedsTarget || view.selectedTarget));
-  const canAttack = Boolean(view.selectedAttackerId && view.selectedTarget && isLegalAttackTarget(view.selectedTarget));
+  const canAttack = Boolean(!battleLocked && view.selectedAttackerId && view.selectedTarget && isLegalAttackTarget(view.selectedTarget));
   const primaryLabel = selectedCard ? (selectedNeedsTarget && !view.selectedTarget ? "Choose Target" : "Play Selected") : "Play Selected";
 
   return `
@@ -1558,7 +1564,7 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
         <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
         </div>
-        <button id="end-turn" class="end-turn-btn" ${view.room ? "" : "disabled"} data-testid="end-turn">結束回合</button>
+        <button id="end-turn" class="end-turn-btn" ${view.room && isMyTurn && !battleLocked ? "" : "disabled"} data-testid="end-turn">結束回合</button>
         <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
           <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
         </div>
@@ -1705,6 +1711,16 @@ function renderEventCues(): string {
       ${hasCardPlayFocus ? `<div class="event-focus-backdrop"></div>` : ""}
       ${view.animationCues.map(renderEventCue).join("")}
     </div>
+  `;
+}
+
+function renderTurnAnnouncementOverlay(): string {
+  const announcement = activeTurnAnnouncement();
+  if (!announcement) return "";
+  return `
+    <section class="turn-announcement-overlay active" data-testid="turn-announcement-overlay" aria-live="polite">
+      <div class="turn-announcement-text">${escapeHtml(announcement.text)}</div>
+    </section>
   `;
 }
 
@@ -1885,15 +1901,20 @@ function bindStaticActions(): void {
     render();
   });
   document.querySelector<HTMLButtonElement>("#play")?.addEventListener("click", () => {
+    if (isBattleActionLocked()) return;
     if (!view.selectedHandId) return;
     const selectedCard = view.hand.find((card) => card.instanceId === view.selectedHandId);
     send({ type: "playCard", handInstanceId: view.selectedHandId, target: view.selectedTarget ?? inferDefaultTarget(selectedCard?.cardId) });
   });
   document.querySelector<HTMLButtonElement>("#attack")?.addEventListener("click", () => {
+    if (isBattleActionLocked()) return;
     if (!view.selectedAttackerId || !view.selectedTarget) return;
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
-  document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
+  document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => {
+    if (isBattleActionLocked()) return;
+    send({ type: "endTurn" });
+  });
   document.querySelector<HTMLButtonElement>("#battle-settings-toggle")?.addEventListener("click", () => {
     view.battleSettingsOpen = !view.battleSettingsOpen;
     clearHoverTooltip();
@@ -3252,6 +3273,8 @@ function bindRoomMessages(joined: Room): void {
   view.publicSync = undefined;
   view.presence.clear();
   view.rejectedHandIds.clear();
+  view.turnAnnouncement = undefined;
+  lastTurnAnnouncementKey = undefined;
   view.matchmaking = undefined;
   stopMatchmakingTick();
   (window as any).__room = joined;
@@ -3410,6 +3433,7 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
     el.addEventListener("click", () => {
+      if (isBattleActionLocked()) return;
       const handId = el.dataset.handId;
       const card = view.hand.find((item) => item.instanceId === handId);
       if (handId && card && view.selectedHandId === handId && canAfford(card.cost) && !cardNeedsTarget(card.cardId)) {
@@ -3426,6 +3450,7 @@ function bindSelectionActions(): void {
       render();
     });
     el.addEventListener("pointerdown", (event) => {
+      if (isBattleActionLocked()) return;
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
     });
@@ -3433,6 +3458,7 @@ function bindSelectionActions(): void {
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
     el.addEventListener("click", (event) => {
+      if (isBattleActionLocked()) return;
       event.stopImmediatePropagation();
       view.selectedAttackerId = el.dataset.attackerId;
       view.selectedHandId = undefined;
@@ -3440,6 +3466,7 @@ function bindSelectionActions(): void {
       render();
     });
     el.addEventListener("pointerdown", (event) => {
+      if (isBattleActionLocked()) return;
       clearHoverTooltip();
       attachAttackerPointerDrag(event, el);
     });
@@ -3451,6 +3478,7 @@ function bindSelectionActions(): void {
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     el.addEventListener("click", () => {
+      if (isBattleActionLocked()) return;
       const target = JSON.parse(el.dataset.target!) as TargetRef;
       if (!isTargetHighlighted(target)) return;
       if (view.selectedAttackerId && isLegalAttackTarget(target)) {
@@ -3574,6 +3602,7 @@ function suppressNextClick(): void {
 }
 
 function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
+  if (isBattleActionLocked()) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   const handId = sourceEl.dataset.handId;
   if (!handId) return;
@@ -3621,6 +3650,10 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
         return Boolean(target && isLegalCardTarget(target));
       },
       onResolve: ({ insertionIndex, targetEl }) => {
+        if (isBattleActionLocked()) {
+          finalizeHandDrag(undefined);
+          return;
+        }
         const target = targetEl ? parseTargetAttr(targetEl) : undefined;
         if (needsTarget && !target) {
           finalizeHandDrag(undefined);
@@ -3661,6 +3694,7 @@ function finalizeHandDrag(_handIdConsumed: string | undefined): void {
 }
 
 function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
+  if (isBattleActionLocked()) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   const attackerId = sourceEl.dataset.attackerId;
   if (!attackerId) return;
@@ -3695,6 +3729,12 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
         return Boolean(target && isLegalAttackTarget(target));
       },
       onResolve: (targetEl) => {
+        if (isBattleActionLocked()) {
+          view.selectedAttackerId = undefined;
+          view.selectedTarget = undefined;
+          render();
+          return;
+        }
         const target = parseTargetAttr(targetEl);
         if (target && isLegalAttackTarget(target)) {
           send({ type: "attack", attackerInstanceId: attackerId, target });
@@ -3743,6 +3783,8 @@ async function backToLobby(): Promise<void> {
   view.publicSync = undefined;
   view.presence.clear();
   view.rejectedHandIds.clear();
+  view.turnAnnouncement = undefined;
+  lastTurnAnnouncementKey = undefined;
   view.selectedHandId = undefined;
   view.mulliganSelection.clear();
   view.selectedAttackerId = undefined;
@@ -4336,6 +4378,7 @@ function readAuthFields(): { email: string; password: string } {
 
 function send(command: GameCommand): void {
   if (!view.room) return;
+  if (isBattleActionCommand(command) && isBattleActionLocked()) return;
   const expectedActionSeq = view.publicSync?.actionSeq ?? view.state?.turn?.actionSeq ?? 0;
   const message: ClientCommandMessage = {
     commandId: `${view.mySeat ?? "client"}-${crypto.randomUUID()}`,
@@ -4348,8 +4391,62 @@ function send(command: GameCommand): void {
   }
 }
 
+function isBattleActionCommand(command: GameCommand): boolean {
+  return command.type === "playCard" || command.type === "attack" || command.type === "endTurn";
+}
+
+function activeTurnAnnouncement(): ClientViewState["turnAnnouncement"] | undefined {
+  const announcement = view.turnAnnouncement;
+  if (!announcement) return undefined;
+  if (announcement.untilMs <= Date.now()) {
+    view.turnAnnouncement = undefined;
+    return undefined;
+  }
+  return announcement;
+}
+
+function isBattleActionLocked(): boolean {
+  return Boolean(activeTurnAnnouncement());
+}
+
+function maybeShowTurnAnnouncement(events: GameEvent[]): void {
+  const mySeat = view.mySeat;
+  if (!mySeat) return;
+  const myTurnStarted = [...events].reverse().find((event) => {
+    if (event.type !== "TURN_STARTED") return false;
+    const activeSeat = event.seat ?? event.payload?.activeSeat;
+    return activeSeat === mySeat;
+  });
+  if (!myTurnStarted) return;
+  const key = `${myTurnStarted.seq ?? myTurnStarted.payload?.turn ?? "turn"}:${mySeat}`;
+  if (lastTurnAnnouncementKey === key) return;
+  lastTurnAnnouncementKey = key;
+  showTurnAnnouncement("你的回合", mySeat);
+}
+
+function showTurnAnnouncement(text: string, seat: Seat): void {
+  const id = crypto.randomUUID();
+  view.turnAnnouncement = {
+    id,
+    text,
+    seat,
+    untilMs: Date.now() + TURN_ANNOUNCEMENT_LOCK_MS
+  };
+  view.selectedHandId = undefined;
+  view.selectedAttackerId = undefined;
+  view.selectedTarget = undefined;
+  if (turnAnnouncementTimer !== undefined) window.clearTimeout(turnAnnouncementTimer);
+  turnAnnouncementTimer = window.setTimeout(() => {
+    if (view.turnAnnouncement?.id !== id) return;
+    view.turnAnnouncement = undefined;
+    turnAnnouncementTimer = undefined;
+    render();
+  }, TURN_ANNOUNCEMENT_LOCK_MS);
+}
+
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
+  maybeShowTurnAnnouncement(message);
   enqueueEventCues(message);
   playEventAudio(message);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
@@ -4411,7 +4508,7 @@ function eventToCue(event: GameEvent): AnimationCue | undefined {
   if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target, amount };
   if (event.type === "BUFF" || event.type === "SHIELD_POPPED") return { id, kind: "buff", text: "Buff", seat: event.seat, targetKey: target };
   if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
-  if (event.type === "TURN_STARTED") return { id, kind: "turn", text: event.seat === view.mySeat ? "Your Turn" : "Opponent Turn", seat: event.seat };
+  if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "Command rejected"), seat: event.seat };
   return undefined;
 }
@@ -4659,6 +4756,7 @@ function minionKeywords(minion: PublicMinion): string[] {
 }
 
 function canAfford(cost: number): boolean {
+  if (isBattleActionLocked()) return false;
   const player = view.mySeat ? readPlayer(view.mySeat) : undefined;
   return Boolean(player && player.mana.current >= cost && readActiveSeat() === view.mySeat);
 }
