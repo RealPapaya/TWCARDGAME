@@ -42,6 +42,7 @@ import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import type {
   AnimationCue,
   AnimationKind,
+  BattleMode,
   ClientViewState,
   CollectionFilter,
   CollectionRow,
@@ -190,6 +191,28 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   }
 ];
 
+const AI_THEME_ILLUSTRATIONS: Record<string, string> = {
+  dpp: "/images/illustrations/lai_illustration.webp",
+  dpp2: "/images/illustrations/tsai_illustration.webp",
+  kmt: "/images/illustrations/han_illustration.webp",
+  kmt2: "/images/illustrations/fu_kun_chi.webp",
+  tpp: "/images/illustrations/ko_illustration.webp"
+};
+
+const AI_THEME_DESCRIPTIONS: Record<string, string> = {
+  dpp: "透過賴清德強力的新聞數值造成高傷害的疊加牌組",
+  dpp2: "透過沉默、回手牌使戰場扭轉局面的奇幻蔡英文牌組",
+  kmt: "以韓國瑜為核心透過不斷來回進出戰場來增加體質強度的黏濁牌組",
+  kmt2: "透過傅崐萁反覆進出戰場與遺志效果，累積資源並拖垮對手",
+  tpp: "柯文哲為核心賦予治療光盾以及強化的簡單強力牌組"
+};
+
+const AI_DIFFICULTY_REWARDS: Record<AiDifficulty, number> = {
+  easy: 100,
+  normal: 200,
+  hard: 300
+};
+
 const view: ClientViewState = {
   hand: [],
   presence: new Map(),
@@ -218,6 +241,7 @@ const view: ClientViewState = {
   shopItems: [],
   aiDifficulty: "normal",
   aiTheme: AI_THEMES[0].id,
+  battleMode: "training",
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
   sfxVolume: readStoredNumber(sfxVolumeKey, 0.72),
   bgmMuted: readStoredBool(bgmMutedKey, false),
@@ -447,8 +471,16 @@ function renderChangelogModal(): string {
 function renderBattleScreen(): string {
   const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
   const accountMode = Boolean(supabase);
+  const activeMode = view.battleMode;
+  const battleModes: Array<{ value: BattleMode; title: string; description: string }> = [
+    { value: "training", title: "訓練場", description: "快速開一場練習對局" },
+    { value: "challenge", title: "挑戰模式", description: "建立或加入指定房間" },
+    { value: "pvp", title: "玩家對戰", description: "線上配對真人玩家" },
+    { value: "ai", title: "電腦對戰", description: "選擇 AI 主題與難度" }
+  ];
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
   const aiEntryDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const trainingDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
   const deckSlots = accountMode
     ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
     : `<div class="deck-slot saved-deck selected dev-deck-slot">
@@ -459,10 +491,24 @@ function renderBattleScreen(): string {
       </div>`;
 
   return `
-    <section class="screen battle-pick v1-deck-selection" data-screen="battle">
+    <section class="screen battle-pick v1-deck-selection battle-mode-${activeMode}" data-screen="battle">
       <div class="battle-selection-content">
         <button class="back-button neon-button secondary" data-menu-screen="main" data-testid="back-to-menu">返回</button>
-        <h2 id="deck-select-title" class="sub-title">選擇牌組</h2>
+        <h2 id="deck-select-title" class="sub-title">選擇戰鬥模式</h2>
+        <div class="battle-mode-grid" aria-label="戰鬥模式">
+          ${battleModes.map((mode) => `
+            <button
+              type="button"
+              class="battle-mode-card ${activeMode === mode.value ? "selected" : ""}"
+              data-battle-mode="${mode.value}"
+              data-testid="battle-mode-${mode.value}"
+              aria-pressed="${activeMode === mode.value}"
+            >
+              <strong>${escapeHtml(mode.title)}</strong>
+              <span>${escapeHtml(mode.description)}</span>
+            </button>
+          `).join("")}
+        </div>
         <div class="deck-slots-container" data-testid="battle-deck-list">
           ${deckSlots}
           <button id="new-deck" type="button" class="deck-slot add-deck-slot">
@@ -472,6 +518,9 @@ function renderBattleScreen(): string {
         </div>
         <div class="battle-selection-actions">
           <div class="battle-start-row">
+            <button id="start-training-match" class="neon-button battle-start-btn" data-testid="start-training-match" ${trainingDisabled ? "disabled" : ""}>
+              ${view.joining ? "連線中..." : "開始訓練"}
+            </button>
             <button id="find-match" class="neon-button battle-start-btn" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
               ${view.joining ? "連線中..." : "開始戰鬥"}
             </button>
@@ -600,15 +649,17 @@ function renderAiThemeCard(theme: (typeof AI_THEMES)[number]): string {
 
 function renderAiBattleSetupScreen(): string {
   const accountMode = Boolean(supabase);
-  const aiDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
-  const difficulties: { value: AiDifficulty; label: string }[] = [
-    { value: "easy", label: "簡單" },
-    { value: "normal", label: "普通" },
-    { value: "hard", label: "困難" }
+  const aiDisabled = view.joining || !view.aiDifficultySelected || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string; reward: number }[] = [
+    { value: "easy", label: "普通級", reward: AI_DIFFICULTY_REWARDS.easy },
+    { value: "normal", label: "專家級", reward: AI_DIFFICULTY_REWARDS.normal },
+    { value: "hard", label: "大師級", reward: AI_DIFFICULTY_REWARDS.hard }
   ];
   const selectedTheme = AI_THEMES.find((theme) => theme.id === view.aiTheme) ?? AI_THEMES[0];
-  const selectedHero = selectedTheme ? cardCatalog.get(selectedTheme.heroCardId) : undefined;
-  const selectedHeroArt = selectedHero ? assetUrl(selectedHero.image) : "";
+  const selectedHeroArt = AI_THEME_ILLUSTRATIONS[selectedTheme.id] ?? "";
+  const selectedThemeLabel = formatAiThemeLabel(selectedTheme.label);
+  const [selectedThemeName, selectedThemeSubtitle = selectedTheme.partyTag] = selectedThemeLabel.split("-");
+  const selectedThemeDescription = AI_THEME_DESCRIPTIONS[selectedTheme.id] ?? selectedThemeLabel;
 
   return `
     <section class="screen ai-battle-setup" data-screen="ai">
@@ -617,12 +668,12 @@ function renderAiBattleSetupScreen(): string {
           <div class="preview-image-container">
             ${selectedHeroArt ? `<img id="preview-image" src="${escapeAttr(selectedHeroArt)}" alt="${escapeAttr(selectedTheme?.name ?? "AI")}" />` : ""}
             <div class="preview-illustration-overlay active">
-              <div id="preview-illustration-title" class="illustration-title">${escapeHtml(selectedTheme?.name ?? "AI")}</div>
-              <div id="preview-illustration-subtitle" class="illustration-subtitle">${escapeHtml(selectedTheme?.partyTag ?? "")}</div>
+              <div id="preview-illustration-title" class="illustration-title">${escapeHtml(selectedThemeName)}</div>
+              <div id="preview-illustration-subtitle" class="illustration-subtitle">${escapeHtml(selectedThemeSubtitle)}</div>
             </div>
           </div>
           <div class="preview-description">
-            <p>${escapeHtml(selectedTheme?.label ?? "選擇一個 AI 主題與難度。")}</p>
+            <p>${escapeHtml(selectedThemeDescription)}</p>
           </div>
         </div>
         <div class="setup-options-panel">
@@ -636,7 +687,7 @@ function renderAiBattleSetupScreen(): string {
             <div id="start-battle-wrapper" class="${aiDisabled ? "disabled" : ""}">
               <button id="start-ai-match" class="hearth-select-btn" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
                 <div class="btn-ripple"></div>
-                <span class="btn-text">${view.joining ? "連線" : "對戰"}</span>
+                <span class="btn-text">${view.joining ? "連線" : "選擇"}</span>
                 <div class="ring-glow"></div>
               </button>
             </div>
@@ -648,8 +699,9 @@ function renderAiBattleSetupScreen(): string {
   `;
 }
 
-function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { value: AiDifficulty; label: string }[]): string {
+function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { value: AiDifficulty; label: string; reward: number }[]): string {
   const selected = view.aiTheme === theme.id;
+  const themeLabel = formatAiThemeLabel(theme.label);
   return `
     <div class="deck-option-group ${selected ? "expanded selected" : ""}">
       <button
@@ -659,20 +711,24 @@ function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { 
         data-testid="ai-theme-${escapeAttr(theme.id)}"
         aria-pressed="${selected}"
       >
-        <span class="option-label">${escapeHtml(theme.name)}</span>
-        <span class="ai-theme-party">${escapeHtml(theme.partyTag)}</span>
+        <span class="option-label">${escapeHtml(themeLabel)}</span>
         <span class="expand-arrow">›</span>
       </button>
       <div class="difficulty-options">
         ${difficulties.map((opt) => `
-          <label class="sub-difficulty-btn ${view.aiDifficulty === opt.value ? "selected" : ""}">
-            <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficulty === opt.value ? "checked" : ""} />
+          <label class="sub-difficulty-btn ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}">
+            <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
             <span>${opt.label}</span>
+            <span class="difficulty-reward"><img src="/images/ui/gold_coin.webp" alt="" />${opt.reward}</span>
           </label>
         `).join("")}
       </div>
     </div>
   `;
+}
+
+function formatAiThemeLabel(label: string): string {
+  return label.replace(/\s+—\s+/g, "-");
 }
 
 function renderMatchmakingOverlay(): string {
@@ -1999,6 +2055,15 @@ function bindStaticActions(): void {
       navigateToScreen(target);
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-battle-mode]")) {
+    el.addEventListener("click", () => {
+      const mode = el.dataset.battleMode as BattleMode | undefined;
+      if (!mode) return;
+      view.battleMode = mode;
+      render();
+    });
+  }
+  document.querySelector<HTMLButtonElement>("#start-training-match")?.addEventListener("click", () => void startTrainingMatch());
   document.querySelector<HTMLButtonElement>("#find-match")?.addEventListener("click", () => void startMatchmaking());
   document.querySelector<HTMLButtonElement>("#matchmaking-cancel")?.addEventListener("click", () => void cancelMatchmaking());
   document.querySelector<HTMLFormElement>("#profile-form")?.addEventListener("submit", (event) => void saveProfile(event));
@@ -2176,6 +2241,7 @@ function bindStaticActions(): void {
       const value = el.value as AiDifficulty;
       if (value === "easy" || value === "normal" || value === "hard") {
         view.aiDifficulty = value;
+        view.aiDifficultySelected = true;
         render();
       }
     });
@@ -2184,6 +2250,7 @@ function bindStaticActions(): void {
     el.addEventListener("click", () => {
       const theme = AI_THEMES.find((entry) => entry.id === el.dataset.aiTheme);
       if (theme) {
+        if (view.aiTheme !== theme.id) view.aiDifficultySelected = false;
         view.aiTheme = theme.id;
         render();
       }
@@ -3165,8 +3232,40 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
     .filter((reward): reward is PackOpeningReward => Boolean(reward));
 }
 
+async function startTrainingMatch(): Promise<void> {
+  if (view.joining || view.room) return;
+  if (supabase && (!view.session || !view.selectedDeckId)) {
+    showAlert("請先選擇牌組再進入訓練場。");
+    return;
+  }
+  view.joining = true;
+  render();
+  try {
+    const client = new Client(defaultServerUrl);
+    const joinOptions: Record<string, unknown> = supabase
+      ? {
+          displayName: view.profile?.display_name,
+          accessToken: view.session?.access_token,
+          deckId: view.selectedDeckId,
+          difficulty: "easy"
+        }
+      : {
+          displayName: view.profile?.display_name ?? "Player",
+          difficulty: "easy"
+        };
+    const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
+    bindRoomMessages(room);
+  } catch (error) {
+    showAlert(error instanceof Error ? error.message : "Unable to start training match.");
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
 async function startAiMatch(): Promise<void> {
   if (view.joining || view.room) return;
+  if (!view.aiDifficultySelected) return;
   if (supabase && (!view.session || !view.selectedDeckId)) {
     showAlert("請先選擇已儲存的牌組才能開始對戰。");
     return;

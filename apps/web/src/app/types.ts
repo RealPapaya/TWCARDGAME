@@ -19,6 +19,7 @@ export type { ShopItemRow } from "@twcardgame/shared";
 
 export type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
 export type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
+export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
 export type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
 export type FriendsPanel = "friends" | "recommended" | "add";
@@ -127,9 +128,11 @@ export type ClientViewState = {
   packOpeningFlipped?: boolean[];
   packOpeningKind?: "card" | "cosmetic";
   aiDifficulty: AiDifficulty;
+  aiDifficultySelected?: boolean;
   aiTheme: AiTheme;
   privateJoinCode?: string;
   privateJoinCodeInput?: string;
+  battleMode: BattleMode;
   bgmVolume: number;
   sfxVolume: number;
   bgmMuted: boolean;

@@ -6625,19 +6625,26 @@ input {
 
 .v1-deck-selection,
 .ai-battle-setup {
-  background: url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
+  background:
+    linear-gradient(180deg, rgba(7, 18, 24, 0.16), rgba(7, 18, 24, 0.36)),
+    url("/images/backgrounds/battle_map_bg.webp") center / cover no-repeat,
+    url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
   padding: 0;
   color: #f1e4d1;
+}
+
+.v1-deck-selection.battle-mode-challenge {
+  background: url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
 }
 
 .battle-selection-content {
   width: 100%;
   height: 100%;
   display: grid;
-  grid-template-rows: auto auto 1fr auto;
+  grid-template-rows: auto auto auto 1fr auto;
   justify-items: center;
   align-items: center;
-  padding: 66px 56px 50px;
+  padding: 52px 56px 44px;
 }
 
 .v1-deck-selection .back-button {
@@ -6649,6 +6656,55 @@ input {
   color: #f4e4bc;
   text-shadow: 0 5px 14px #000, 0 0 18px rgba(255, 238, 0, 0.25);
   letter-spacing: 0.08em;
+}
+
+.battle-mode-grid {
+  width: min(1180px, 100%);
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 10px;
+}
+
+.battle-mode-card {
+  min-height: 112px;
+  padding: 18px 20px;
+  display: grid;
+  align-content: center;
+  gap: 8px;
+  border: 3px solid rgba(244, 228, 188, 0.58);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(30, 58, 50, 0.82), rgba(20, 22, 32, 0.88)),
+    rgba(16, 26, 20, 0.8);
+  color: #f4e4bc;
+  text-align: center;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  letter-spacing: 0;
+}
+
+.battle-mode-card strong {
+  color: #fff8d8;
+  font-size: 25px;
+  line-height: 1.05;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.78);
+}
+
+.battle-mode-card span {
+  color: rgba(244, 228, 188, 0.82);
+  font-family: Inter, "Noto Sans TC", system-ui, sans-serif;
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.25;
+  text-shadow: 0 2px 5px rgba(0, 0, 0, 0.76);
+}
+
+.battle-mode-card.selected {
+  border-color: #ffd700;
+  background:
+    linear-gradient(180deg, rgba(79, 96, 47, 0.92), rgba(54, 38, 24, 0.9)),
+    rgba(36, 40, 20, 0.86);
+  box-shadow: 0 0 24px rgba(255, 215, 0, 0.36), 0 12px 26px rgba(0, 0, 0, 0.48);
 }
 
 .deck-slots-container {
@@ -6789,7 +6845,33 @@ input {
 .battle-start-btn {
   min-width: 170px;
   min-height: 56px;
+  align-items: center;
+  justify-content: center;
   font-size: 22px;
+}
+
+.v1-deck-selection #start-training-match,
+.v1-deck-selection #find-match,
+.v1-deck-selection [data-testid="battle-ai-entry"],
+.v1-deck-selection .battle-private-room,
+.v1-deck-selection .battle-advanced {
+  display: none;
+}
+
+.v1-deck-selection.battle-mode-training #start-training-match,
+.v1-deck-selection.battle-mode-pvp #find-match,
+.v1-deck-selection.battle-mode-ai [data-testid="battle-ai-entry"],
+.v1-deck-selection.battle-mode-challenge .battle-private-room,
+.v1-deck-selection.battle-mode-challenge .battle-advanced {
+  display: flex;
+}
+
+.v1-deck-selection.battle-mode-challenge .battle-start-row {
+  display: none;
+}
+
+.v1-deck-selection.battle-mode-challenge .battle-advanced {
+  display: block;
 }
 
 .battle-private-room {
@@ -6817,24 +6899,27 @@ input {
 }
 
 .ai-battle-setup .battle-setup-container {
-  display: flex;
-  gap: 60px;
+  position: relative;
+  display: block;
   width: 100%;
   height: 100%;
-  padding: 60px;
+  padding: 0;
 }
 
 .setup-preview-panel {
-  flex: 1;
+  position: absolute;
+  left: 284px;
+  top: 82px;
+  width: 560px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 30px;
+  justify-content: flex-start;
+  gap: 0;
 }
 
 .preview-image-container {
   position: relative;
-  width: min(80%, 640px);
+  width: 560px;
   aspect-ratio: 1;
   margin: 0 auto;
   display: grid;
@@ -6846,15 +6931,15 @@ input {
   content: "";
   position: absolute;
   inset: 0;
-  background: url("/images/ui/wood_frame.webp") center / 70% 70% no-repeat;
+  background: url("/images/ui/wood_frame.webp") center / 100% 100% no-repeat;
   z-index: 0;
 }
 
 .preview-image-container img {
   position: relative;
   z-index: 1;
-  width: 56%;
-  height: 56%;
+  width: 83%;
+  height: 83%;
   object-fit: cover;
   object-position: center top;
   border-radius: 4px;
@@ -6863,9 +6948,9 @@ input {
 .preview-illustration-overlay {
   position: absolute;
   z-index: 2;
-  width: 56%;
-  height: 56%;
-  padding: 22px;
+  width: 83%;
+  height: 83%;
+  padding: 44px 44px 54px;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
@@ -6876,7 +6961,7 @@ input {
 
 .illustration-title {
   color: #fff;
-  font-size: 56px;
+  font-size: 68px;
   font-weight: 900;
   line-height: 1;
   text-shadow: 4px 4px 16px rgba(0, 0, 0, 0.9);
@@ -6884,15 +6969,15 @@ input {
 
 .illustration-subtitle {
   color: rgba(255, 255, 255, 0.9);
-  font-size: 30px;
+  font-size: 42px;
   font-weight: 800;
   text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.9);
 }
 
 .preview-description {
-  width: min(49%, 420px);
-  min-height: 140px;
-  margin: -70px auto 0;
+  width: 520px;
+  min-height: 148px;
+  margin: 46px auto 0;
   padding: 20px;
   display: grid;
   place-items: center;
@@ -6909,18 +6994,21 @@ input {
 }
 
 .setup-options-panel {
-  flex: 0 0 450px;
-  position: relative;
+  position: absolute;
+  left: 908px;
+  top: 68px;
+  width: 450px;
+  height: 760px;
   display: flex;
   flex-direction: column;
 }
 
 .ai-selection-decoration {
   position: absolute;
-  right: 270px;
-  top: 47.5%;
+  left: 0;
+  top: 0;
   height: 100%;
-  transform: translateY(-50%);
+  transform: none;
   filter: drop-shadow(10px 10px 20px rgba(0, 0, 0, 0.8));
   opacity: 0.9;
   pointer-events: none;
@@ -6934,32 +7022,35 @@ input {
 }
 
 #deck-options-container {
-  position: relative;
-  right: 250px;
-  width: 340px;
-  margin-top: 150px;
+  position: absolute;
+  left: 68px;
+  top: 112px;
+  right: auto;
+  width: 282px;
+  margin: 0;
 }
 
 .deck-option-group {
-  margin-bottom: 20px;
-  border-radius: 12px;
+  margin-bottom: 18px;
+  border-radius: 8px;
   overflow: hidden;
 }
 
 .option-item {
   width: 100%;
-  min-height: 74px;
+  min-height: 64px;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 18px 24px;
+  gap: 12px;
+  padding: 14px 20px;
   background: #2b1d14;
   border: 3px solid #6d5b4b;
-  border-radius: 12px;
+  border-radius: 7px;
   color: #f1e4d1;
-  font-size: 24px;
+  font-size: 22px;
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.4);
   text-align: left;
+  letter-spacing: 0;
 }
 
 .option-item:hover,
@@ -6994,16 +7085,17 @@ input {
 }
 
 .deck-option-group.expanded .difficulty-options {
-  max-height: 300px;
+  max-height: 184px;
 }
 
 .sub-difficulty-btn {
   display: flex;
   align-items: center;
-  gap: 15px;
-  padding: 15px 40px;
+  gap: 10px;
+  min-height: 50px;
+  padding: 11px 34px;
   color: #c0b0a0;
-  font-size: 20px;
+  font-size: 18px;
   font-family: var(--font-display);
   cursor: pointer;
 }
@@ -7015,13 +7107,34 @@ input {
 }
 
 .sub-difficulty-btn input {
-  accent-color: #ffd700;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.difficulty-reward {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: auto;
+  color: #fcd34d;
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+}
+
+.difficulty-reward img {
+  width: 20px;
+  height: 20px;
+  display: block;
 }
 
 .setup-footer {
   position: absolute;
-  right: 115px;
-  bottom: 50px;
+  right: -84px;
+  bottom: 22px;
   z-index: 20;
   display: flex;
   flex-direction: column;
@@ -7031,8 +7144,8 @@ input {
 
 .hearth-select-btn {
   position: relative;
-  width: 140px;
-  height: 140px;
+  width: 132px;
+  height: 132px;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -7748,6 +7861,20 @@ input {
 @media (max-width: 900px) {
   .battle-selection-content {
     padding: 24px 18px;
+  }
+
+  .battle-mode-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+
+  .battle-mode-card {
+    min-height: 92px;
+    padding: 14px 12px;
+  }
+
+  .battle-mode-card strong {
+    font-size: 20px;
   }
 
   .sub-title {
