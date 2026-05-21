@@ -21,7 +21,7 @@ import type {
   TargetRef
 } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
-import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle } from "./ui.js";
+import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle, opponentFanStyle } from "./ui.js";
 import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } from "./drag.js";
 import { installGlobalErrorHandlers } from "./logger.js";
 import "./styles.css";
@@ -92,7 +92,8 @@ type ClientViewState = {
   selectedDeckId?: string;
   editingDeck?: Partial<DeckRow> & Pick<DeckRow, "name" | "card_ids">;
   hoveredCardId?: string;
-  hoverAnchor?: { x: number; y: number };
+  hoveredCard?: ResolvedCardView;
+  hoverAnchor?: { x: number; y: number; width: number; height: number };
   confirmingConcede?: boolean;
   menuScreen: MenuScreen;
   matchmaking?: MatchmakingState;
@@ -152,10 +153,13 @@ type ResolvedCardView = {
   description: string;
   image: string;
   cost: number;
+  baseCost?: number;
   type: string;
   rarity: string;
   attack?: number;
+  baseAttack?: number;
   health?: number;
+  baseHealth?: number;
 };
 
 type ProfileRow = {
@@ -1791,7 +1795,7 @@ function renderMana(current: number, max: number, role: "player" | "opponent"): 
 function renderOpponentHand(count: number): string {
   return `
     <div class="hand opponent-hand" data-testid="opponent-hand">
-      ${Array.from({ length: count }, (_, index) => `<span class="card card-back" style="${fanStyle(index, count)}"></span>`).join("")}
+      ${Array.from({ length: count }, (_, index) => `<span class="card card-back" style="${opponentFanStyle(index, count)}"></span>`).join("")}
     </div>
   `;
 }
@@ -1844,6 +1848,8 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
 
 function renderMinion(seat: Seat, minion: PublicMinion): string {
   const catalogCard = cardCatalog.get(minion.cardId);
+  const attackClass = classNames(["stat-atk", valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)]);
+  const healthClass = classNames(["stat-hp", valueDeltaClass(minion.currentHealth, minion.health)]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
   const targetKey = targetKeyFor(target);
@@ -1878,27 +1884,37 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
       <small class="keyword-row">${minionKeywords(minion).join(" ")}</small>
       <div class="minion-stats">
-        <span class="stat-atk"><span>${minion.attack}</span></span>
-        <span class="stat-hp">${minion.currentHealth}/${minion.health}</span>
+        <span class="${attackClass}"><span>${minion.attack}</span></span>
+        <span class="${healthClass}">${minion.currentHealth}</span>
       </div>
       <span class="sr-e2e">${minion.canAttack ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
     </button>
   `;
 }
 
-function renderCardFace(card: ResolvedCardView, size: "hand" | "mulligan"): string {
+function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): string {
+  const costClass = classNames(["card-cost", valueDeltaClass(card.cost, card.baseCost)]);
+  const attackClass = classNames(["stat-atk", valueDeltaClass(card.attack, card.baseAttack)]);
+  const healthClass = classNames(["stat-hp", valueDeltaClass(card.health, card.baseHealth)]);
   return `
-    <span class="card-cost"><span>${card.cost}</span></span>
+    <span class="${costClass}"><span>${card.cost}</span></span>
     <strong class="card-title">${escapeHtml(card.name)}</strong>
     <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" />
     <span class="card-category">${escapeHtml(card.category)}</span>
-    <span class="card-desc ${size === "mulligan" ? "large-desc" : ""}">${escapeHtml(card.description)}</span>
+    <span class="card-desc">${escapeHtml(card.description)}</span>
     ${
       card.type === "MINION"
-        ? `<span class="minion-stats"><span class="stat-atk"><span>${card.attack ?? 0}</span></span><span class="stat-hp">${card.health ?? 0}</span></span>`
+        ? `<span class="minion-stats"><span class="${attackClass}"><span>${card.attack ?? 0}</span></span><span class="${healthClass}">${card.health ?? 0}</span></span>`
         : ""
     }
   `;
+}
+
+function valueDeltaClass(value: number | undefined, base: number | undefined): string {
+  if (value === undefined || base === undefined) return "";
+  if (value < base) return "stat-lower";
+  if (value > base) return "stat-higher";
+  return "";
 }
 
 function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedCardView {
@@ -1910,10 +1926,13 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
     description: card.description,
     image: card.image,
     cost: card.cost,
+    baseCost: card.cost,
     type: card.type,
     rarity: card.rarity,
     attack: card.attack,
-    health: card.health
+    baseAttack: card.attack,
+    health: card.health,
+    baseHealth: card.health
   };
 }
 
@@ -2140,23 +2159,28 @@ function renderToast(): string {
 }
 
 function renderHoverTooltip(): string {
-  if (!view.hoveredCardId || !view.hoverAnchor) return "";
-  const card = cardCatalog.get(view.hoveredCardId);
-  if (!card) return "";
+  if ((!view.hoveredCardId && !view.hoveredCard) || !view.hoverAnchor) return "";
+  const catalogCard = view.hoveredCardId ? cardCatalog.get(view.hoveredCardId) : undefined;
+  const resolved = view.hoveredCard ?? (catalogCard ? resolveCatalogCard(catalogCard, `tooltip-${catalogCard.id}`) : undefined);
+  if (!resolved) return "";
   const margin = 16;
-  const tooltipWidth = 260;
-  const approxHeight = 360;
-  let left = view.hoverAnchor.x + margin;
-  if (left + tooltipWidth > window.innerWidth - margin) {
-    left = Math.max(margin, view.hoverAnchor.x - tooltipWidth - margin);
+  const tooltipWidth = 224;
+  const approxHeight = 322;
+  const anchorLeft = view.hoverAnchor.x - view.hoverAnchor.width / 2;
+  const anchorRight = view.hoverAnchor.x + view.hoverAnchor.width / 2;
+  const roomOnRight = window.innerWidth - anchorRight - margin;
+  const roomOnLeft = anchorLeft - margin;
+  let left = anchorRight + margin;
+  if (roomOnRight < tooltipWidth && roomOnLeft > roomOnRight) {
+    left = anchorLeft - tooltipWidth - margin;
   }
+  left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
   let top = view.hoverAnchor.y - approxHeight / 2;
   top = Math.max(margin, Math.min(top, window.innerHeight - approxHeight - margin));
-  const resolved = resolveCatalogCard(card, `tooltip-${card.id}`);
   return `
     <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
       <div class="card rarity-${resolved.rarity.toLowerCase()}">
-        ${renderCardFace(resolved, "mulligan")}
+        ${renderCardFace(resolved)}
       </div>
     </div>
   `;
@@ -2577,7 +2601,10 @@ function bindStaticActions(): void {
     if (e.target === e.currentTarget) { view.changelogOpen = false; render(); }
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-hover-card-id]")) {
-    bindHoverPreview(el, () => el.dataset.hoverCardId);
+    bindHoverPreview(el, () => {
+      const card = el.dataset.hoverCardId ? cardCatalog.get(el.dataset.hoverCardId) : undefined;
+      return card ? resolveCatalogCard(card, `tooltip-${card.id}`) : undefined;
+    });
   }
   document.querySelector<HTMLButtonElement>("#settings-sign-out")?.addEventListener("click", () => void signOut());
   document.querySelector<HTMLButtonElement>("#settings-bgm-mute")?.addEventListener("click", toggleBgmMute);
@@ -3270,10 +3297,13 @@ function renderPackRewardFace(reward: PackOpeningReward, rarityClass: string): s
       description: reward.description,
       image: reward.image,
       cost: reward.cost,
+      baseCost: reward.cost,
       type: reward.cardType,
       rarity: reward.rarity,
       attack: reward.attack,
-      health: reward.health
+      baseAttack: reward.attack,
+      health: reward.health,
+      baseHealth: reward.health
     };
     return `
       <div class="card pack-face-card rarity-${rarityClass}">
@@ -3815,7 +3845,7 @@ function bindSelectionActions(): void {
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-testid='board-minion']")) {
-    bindHoverPreview(el, () => minionCardIdFromElement(el));
+    bindHoverPreview(el, () => minionCardFromElement(el));
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
@@ -3860,21 +3890,22 @@ function bindSelectionActions(): void {
 const hoverState: { timer?: number; lastCardId?: string; lastEl?: HTMLElement } = {};
 const hoverCapable = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches;
 
-function bindHoverPreview(el: HTMLElement, resolve: () => string | undefined): void {
+function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | undefined): void {
   if (!hoverCapable) return;
   el.addEventListener("mouseenter", (event) => {
     if (view.confirmingConcede) return;
-    const cardId = resolve();
-    if (!cardId) return;
+    const card = resolve();
+    if (!card) return;
     window.clearTimeout(hoverState.timer);
     hoverState.lastEl = el;
     const rect = el.getBoundingClientRect();
-    const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
     hoverState.timer = window.setTimeout(() => {
       if (hoverState.lastEl !== el) return;
-      view.hoveredCardId = cardId;
+      view.hoveredCardId = card.cardId;
+      view.hoveredCard = card;
       view.hoverAnchor = anchor;
-      hoverState.lastCardId = cardId;
+      hoverState.lastCardId = card.cardId;
       render();
     }, 220);
     void event;
@@ -3885,6 +3916,7 @@ function bindHoverPreview(el: HTMLElement, resolve: () => string | undefined): v
     hoverState.timer = undefined;
     if (view.hoveredCardId) {
       view.hoveredCardId = undefined;
+      view.hoveredCard = undefined;
       view.hoverAnchor = undefined;
       render();
     }
@@ -3897,17 +3929,35 @@ function clearHoverTooltip(): void {
   hoverState.lastEl = undefined;
   if (view.hoveredCardId) {
     view.hoveredCardId = undefined;
+    view.hoveredCard = undefined;
     view.hoverAnchor = undefined;
   }
 }
 
-function minionCardIdFromElement(el: HTMLElement): string | undefined {
+function minionCardFromElement(el: HTMLElement): ResolvedCardView | undefined {
   const seat = el.dataset.seat as Seat | undefined;
   const targetKey = el.dataset.targetKey;
   if (!seat || !targetKey) return undefined;
   const player = readPlayer(seat);
   const minion = player?.board?.find((item) => item.instanceId === targetKey);
-  return minion?.cardId;
+  if (!minion) return undefined;
+  const catalogCard = cardCatalog.get(minion.cardId);
+  return {
+    cardId: minion.cardId,
+    instanceId: `tooltip-${minion.instanceId}`,
+    name: catalogCard?.name ?? minion.cardId,
+    category: catalogCard?.category ?? "MINION",
+    description: catalogCard?.description ?? "",
+    image: catalogCard?.image ?? "",
+    cost: catalogCard?.cost ?? 0,
+    baseCost: catalogCard?.cost,
+    type: "MINION",
+    rarity: catalogCard?.rarity ?? "COMMON",
+    attack: minion.attack,
+    baseAttack: minion.baseAttack ?? catalogCard?.attack,
+    health: minion.currentHealth,
+    baseHealth: minion.health
+  };
 }
 
 const DRAG_THRESHOLD_PX = 6;
@@ -4844,10 +4894,13 @@ function resolveHandCard(card: HandCardView): ResolvedCardView {
     description: catalogCard?.description ?? "",
     image: catalogCard?.image ?? "",
     cost: card.cost,
+    baseCost: catalogCard?.cost,
     type: card.type,
     rarity: catalogCard?.rarity ?? "COMMON",
     attack: card.attack ?? catalogCard?.attack,
-    health: card.health ?? catalogCard?.health
+    baseAttack: catalogCard?.attack,
+    health: card.health ?? catalogCard?.health,
+    baseHealth: catalogCard?.health
   };
 }
 

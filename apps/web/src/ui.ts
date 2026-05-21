@@ -11,6 +11,16 @@ export function fanStyle(index: number, total: number): string {
   return `--rot: ${rotation}deg; --y: ${y}px;`;
 }
 
+export function opponentFanStyle(index: number, total: number): string {
+  if (total <= 1) return "--rot: 0deg; --y: 0px;";
+  const center = (total - 1) / 2;
+  const distance = index - center;
+  const rotation = Math.max(-18, Math.min(18, distance * 6));
+  const abs = Math.abs(distance);
+  const y = abs * abs * 3 + abs * 5;
+  return `--rot: ${rotation}deg; --y: ${y}px;`;
+}
+
 export function assetUrl(path: string): string {
   if (!path) return "";
   if (/^https?:\/\//.test(path) || path.startsWith("/")) return path;
