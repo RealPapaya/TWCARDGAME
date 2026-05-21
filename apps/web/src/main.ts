@@ -140,6 +140,7 @@ type ClientViewState = {
   sfxMuted: boolean;
   settingsOpen: boolean;
   battleSettingsOpen: boolean;
+  battleDeckOpen: boolean;
   changelogOpen: boolean;
 };
 
@@ -415,6 +416,7 @@ const view: ClientViewState = {
   sfxMuted: readStoredBool(sfxMutedKey, false),
   settingsOpen: false,
   battleSettingsOpen: false,
+  battleDeckOpen: false,
   changelogOpen: false
 };
 
@@ -1679,9 +1681,9 @@ function renderGame(status: GameStatus | ""): string {
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
       ${view.settingsOpen ? renderSettingsModal() : ""}
+      ${view.battleDeckOpen ? renderBattleDeckModal() : ""}
       ${renderConcedeModal()}
     </section>
-    ${renderHoverTooltip()}
   `;
 }
 
@@ -1968,6 +1970,54 @@ function renderBattleSettingsMenu(): string {
   `;
 }
 
+function renderBattleDeckModal(): string {
+  const deck = resolveBattleDeckView();
+  return `
+    <section id="battle-deck-backdrop" class="battle-deck-backdrop" role="dialog" aria-modal="true" aria-label="查看牌組">
+      <div class="battle-deck-modal parchment-card">
+        <header class="settings-modal-header">
+          <h3>${escapeHtml(deck.name)}</h3>
+          <button id="battle-deck-close" class="settings-close-btn" title="關閉" aria-label="關閉">✕</button>
+        </header>
+        <div class="battle-deck-summary">${deck.cardIds.length}/30 張</div>
+        <div class="battle-deck-list" data-preserve-scroll>
+          ${renderBattleDeckRows(deck.cardIds)}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function resolveBattleDeckView(): { name: string; cardIds: string[] } {
+  const selectedDeck = view.selectedDeckId ? view.decks.find((deck) => deck.id === view.selectedDeckId) : undefined;
+  if (selectedDeck) return { name: selectedDeck.name, cardIds: [...selectedDeck.card_ids] };
+  return { name: "預設牌組", cardIds: defaultBattleDeckIds() };
+}
+
+function defaultBattleDeckIds(): string[] {
+  return CARD_CATALOG.filter((card) => card.rarity !== "LEGENDARY" && card.collectible !== false)
+    .slice(0, 15)
+    .flatMap((card) => [card.id, card.id]);
+}
+
+function renderBattleDeckRows(cardIds: readonly string[]): string {
+  const rows = [...countCards(cardIds).entries()]
+    .map(([cardId, count]) => ({ card: cardCatalog.get(cardId), count }))
+    .filter((row): row is { card: CardDefinition; count: number } => Boolean(row.card))
+    .sort((a, b) => a.card.cost - b.card.cost || a.card.name.localeCompare(b.card.name, "zh-Hant"));
+
+  if (rows.length === 0) return `<p class="muted deck-empty">目前沒有可顯示的牌組。</p>`;
+
+  return rows.map(({ card, count }) => `
+    <button type="button" class="battle-deck-row rarity-${card.rarity.toLowerCase()}" data-hover-card-id="${escapeAttr(card.id)}">
+      <span class="battle-deck-cost">${card.cost}</span>
+      <span class="battle-deck-name">${escapeHtml(card.name)}</span>
+      <span class="battle-deck-category">${escapeHtml(card.category)}</span>
+      <span class="battle-deck-count">x${count}</span>
+    </button>
+  `).join("");
+}
+
 function renderMulliganOverlay(status: GameStatus | ""): string {
   if (status !== "mulligan" || !view.room) return "";
   const ready = Boolean(view.mySeat && readPlayer(view.mySeat)?.mulliganReady);
@@ -2218,7 +2268,7 @@ function bindStaticActions(): void {
     render();
   });
   document.querySelector<HTMLButtonElement>("#battle-view-deck")?.addEventListener("click", () => {
-    view.toast = "查看牌組功能準備中";
+    view.battleDeckOpen = true;
     view.battleSettingsOpen = false;
     render();
   });
@@ -2241,6 +2291,18 @@ function bindStaticActions(): void {
     view.confirmingConcede = false;
     send({ type: "concede" });
     render();
+  });
+  document.querySelector<HTMLButtonElement>("#battle-deck-close")?.addEventListener("click", () => {
+    view.battleDeckOpen = false;
+    clearHoverTooltip();
+    render();
+  });
+  document.querySelector<HTMLElement>("#battle-deck-backdrop")?.addEventListener("click", (e) => {
+    if (e.target === e.currentTarget) {
+      view.battleDeckOpen = false;
+      clearHoverTooltip();
+      render();
+    }
   });
   document.querySelector<HTMLButtonElement>("#back-to-lobby")?.addEventListener("click", () => void backToLobby());
 
@@ -3728,11 +3790,6 @@ function bindSelectionActions(): void {
     el.addEventListener("pointerdown", (event) => {
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
-    });
-    bindHoverPreview(el, () => {
-      const handId = el.dataset.handId;
-      const card = handId ? view.hand.find((item) => item.instanceId === handId) : undefined;
-      return card?.cardId;
     });
   }
 

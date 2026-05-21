@@ -2039,7 +2039,7 @@ input {
 .hover-tooltip {
   position: fixed;
   width: 260px;
-  z-index: 90;
+  z-index: 1500;
   pointer-events: none;
   filter: drop-shadow(0 12px 32px rgba(0, 0, 0, 0.55));
 }
@@ -7333,6 +7333,123 @@ input {
 
 .battle-settings-item.danger:hover:not(:disabled) {
   background: #a91920;
+}
+
+.battle-deck-backdrop {
+  position: absolute;
+  inset: 0;
+  z-index: 1300;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.58);
+  backdrop-filter: blur(2px);
+}
+
+.battle-deck-modal {
+  width: min(600px, 88%);
+  max-height: 760px;
+  padding: 24px 22px 26px;
+  border-radius: 6px;
+}
+
+.battle-deck-modal .settings-modal-header {
+  margin-bottom: 8px;
+}
+
+.battle-deck-summary {
+  margin: -4px 0 12px;
+  color: #6b3519;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.battle-deck-list {
+  max-height: 560px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 2px solid rgba(93, 46, 23, 0.22);
+  border-radius: 4px;
+  background: rgba(139, 69, 19, 0.07);
+}
+
+.battle-deck-row {
+  width: 100%;
+  min-height: 48px;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr) minmax(90px, auto) 42px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  border: 3px solid #5d2e17;
+  border-radius: 4px;
+  background: rgba(255, 248, 224, 0.9);
+  color: #3d1e0f;
+  font-family: var(--font-display);
+  text-align: left;
+  box-shadow: 3px 4px 0 rgba(61, 30, 15, 0.8);
+}
+
+.battle-deck-row:hover:not(:disabled) {
+  transform: translate(-1px, -1px);
+  filter: brightness(1.04);
+  box-shadow: 4px 5px 0 rgba(61, 30, 15, 0.8);
+}
+
+.battle-deck-row.rarity-rare {
+  border-color: #2578b8;
+}
+
+.battle-deck-row.rarity-epic {
+  border-color: #7a36b8;
+}
+
+.battle-deck-row.rarity-legendary {
+  border-color: #c28b23;
+}
+
+.battle-deck-cost {
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border: 2px solid rgba(255, 255, 255, 0.6);
+  border-radius: 4px;
+  background: linear-gradient(135deg, #00c6ff, #0072ff);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 900;
+  text-align: center;
+  text-shadow: 0 1px 2px #000;
+}
+
+.battle-deck-name,
+.battle-deck-category {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.battle-deck-name {
+  font-size: 17px;
+  font-weight: 900;
+}
+
+.battle-deck-category {
+  color: #7a4a31;
+  font-size: 12px;
+  text-align: right;
+}
+
+.battle-deck-count {
+  color: #5d2e17;
+  font-size: 16px;
+  font-weight: 900;
+  text-align: right;
 }
 
 .battle-history-panel {
