@@ -241,7 +241,7 @@ const view: ClientViewState = {
   shopItems: [],
   aiDifficulty: "normal",
   aiTheme: AI_THEMES[0].id,
-  battleMode: "training",
+  battleMode: "challenge",
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
   sfxVolume: readStoredNumber(sfxVolumeKey, 0.72),
   bgmMuted: readStoredBool(bgmMutedKey, false),
@@ -473,14 +473,19 @@ function renderBattleScreen(): string {
   const accountMode = Boolean(supabase);
   const activeMode = view.battleMode;
   const battleModes: Array<{ value: BattleMode; title: string; description: string }> = [
-    { value: "training", title: "訓練場", description: "快速開一場練習對局" },
-    { value: "challenge", title: "挑戰模式", description: "建立或加入指定房間" },
-    { value: "pvp", title: "玩家對戰", description: "線上配對真人玩家" },
-    { value: "ai", title: "電腦對戰", description: "選擇 AI 主題與難度" }
+    { value: "challenge", title: "挑戰模式", description: "挑戰五大主題魔王" },
+    { value: "ai", title: "電腦模式", description: "與電腦對戰，選擇難度" },
+    { value: "pvp", title: "玩家模式", description: "線上排隊配對真人玩家" },
+    { value: "training", title: "訓練場", description: "敬請期待" }
   ];
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
   const aiEntryDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
-  const trainingDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const aiModeDisabled = view.joining || Boolean(view.matchmaking) || !view.aiDifficultySelected || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string }[] = [
+    { value: "easy", label: "簡單" },
+    { value: "normal", label: "普通" },
+    { value: "hard", label: "困難" }
+  ];
   const deckSlots = accountMode
     ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
     : `<div class="deck-slot saved-deck selected dev-deck-slot">
@@ -518,21 +523,27 @@ function renderBattleScreen(): string {
         </div>
         <div class="battle-selection-actions">
           <div class="battle-start-row">
-            <button id="start-training-match" class="neon-button battle-start-btn" data-testid="start-training-match" ${trainingDisabled ? "disabled" : ""}>
-              ${view.joining ? "連線中..." : "開始訓練"}
-            </button>
+            <button class="neon-button battle-start-btn" data-menu-screen="ai" data-testid="battle-challenge-entry" ${aiEntryDisabled ? "disabled" : ""}>進入挑戰</button>
             <button id="find-match" class="neon-button battle-start-btn" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
-              ${view.joining ? "連線中..." : "開始戰鬥"}
+              ${view.joining ? "連線中..." : "開始排隊"}
             </button>
-            <button class="neon-button battle-start-btn" data-menu-screen="ai" data-testid="battle-ai-entry" ${aiEntryDisabled ? "disabled" : ""}>AI 對戰</button>
           </div>
-          <div class="private-room-section battle-private-room">
-            <button id="create-private-room" class="neon-button secondary" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間代碼</button>
-            <form id="private-join-form" class="private-join-form">
-              <input id="private-join-input" placeholder="輸入房間代碼" maxlength="10" />
-              <button type="submit" class="neon-button secondary" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
-            </form>
-            ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode!) : ""}
+          <div class="battle-ai-mode-section">
+            <h4 class="ai-section-label">難度</h4>
+            <div class="ai-difficulty-options">
+              ${difficulties.map((opt) => `
+                <label class="ai-difficulty-option ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}">
+                  <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
+                  <strong>${escapeHtml(opt.label)}</strong>
+                </label>
+              `).join("")}
+            </div>
+            <button id="start-ai-mode-match" class="neon-button battle-start-btn" data-testid="start-ai-mode-match" ${aiModeDisabled ? "disabled" : ""}>
+              ${view.joining ? "連線中..." : "開始對戰"}
+            </button>
+          </div>
+          <div class="battle-training-section">
+            <p class="battle-training-note">訓練場功能尚在製作中，敬請期待。</p>
           </div>
           <details class="advanced-disclosure battle-advanced">
             <summary>進階設定</summary>
@@ -548,102 +559,6 @@ function renderBattleScreen(): string {
       </div>
       ${renderMatchmakingOverlay()}
     </section>
-  `;
-  const aiDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
-  const difficulties: { value: AiDifficulty; label: string }[] = [
-    { value: "easy", label: "簡單" },
-    { value: "normal", label: "普通" },
-    { value: "hard", label: "困難" }
-  ];
-  return `
-    <section class="screen battle-pick" data-screen="battle">
-      ${renderCloudLayer()}
-      <header class="screen-header">
-        <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回主選單</button>
-        <h2>進入戰鬥</h2>
-      </header>
-      <div class="battle-pick-grid">
-        <section class="parchment-card deck-pick">
-          <div class="panel-heading">
-            <h3>選擇牌組</h3>
-            <button id="new-deck" class="ghost-button">+ 新牌組</button>
-          </div>
-          <div class="deck-list" data-testid="battle-deck-list">
-            ${accountMode ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">尚未建立牌組，請先新增一組。</p>`) : `<p class="muted">Dev mode: server will assign a default deck.</p>`}
-          </div>
-          <p class="muted">${selectedDeck ? `已選：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一套合法的 30 張牌組。" : "Dev mode 不需選牌組。"}</p>
-        </section>
-        <div class="battle-mode-panels">
-          <section class="parchment-card match-panel">
-            <h3>⚔️ 玩家對戰</h3>
-            <p class="muted">系統自動配對另一位玩家。</p>
-            <button id="find-match" class="primary-action" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
-              ${view.joining ? "配對中…" : "開始配對"}
-            </button>
-            <div class="private-room-section">
-              <h4>私人房間</h4>
-              <button id="create-private-room" class="ghost-button" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間並取得代碼</button>
-              <form id="private-join-form" class="private-join-form">
-                <input id="private-join-input" placeholder="輸入 6 碼代碼" maxlength="10" />
-                <button type="submit" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
-              </form>
-              ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode!) : ""}
-            </div>
-            <details class="advanced-disclosure">
-              <summary>進階設定</summary>
-              <form id="join-form-advanced" class="advanced-form">
-                <label>Server URL
-                  <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
-                </label>
-                ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
-              </form>
-            </details>
-          </section>
-          <section class="parchment-card match-panel">
-            <h3>🤖 電腦對戰</h3>
-            <h4 class="ai-section-label">難度</h4>
-            <div class="ai-difficulty-options">
-              ${difficulties.map((opt) => `
-                <label class="ai-difficulty-option ${view.aiDifficulty === opt.value ? "selected" : ""}">
-                  <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficulty === opt.value ? "checked" : ""} />
-                  <strong>${opt.label}</strong>
-                </label>
-              `).join("")}
-            </div>
-            <h4 class="ai-section-label">主題挑戰</h4>
-            <div class="ai-theme-options" data-testid="ai-theme-options">
-              ${AI_THEMES.map(renderAiThemeCard).join("")}
-            </div>
-            <button id="start-ai-match" class="primary-action" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
-              ${view.joining ? "連線中…" : "開始對戰"}
-            </button>
-          </section>
-        </div>
-      </div>
-      ${renderMatchmakingOverlay()}
-    </section>
-  `;
-}
-
-function renderAiThemeCard(theme: (typeof AI_THEMES)[number]): string {
-  const hero = cardCatalog.get(theme.heroCardId);
-  const heroArt = hero ? assetUrl(hero.image) : "";
-  const selected = view.aiTheme === theme.id;
-  return `
-    <button
-      type="button"
-      class="ai-theme-card ${selected ? "selected" : ""}"
-      data-ai-theme="${escapeAttr(theme.id)}"
-      data-testid="ai-theme-${escapeAttr(theme.id)}"
-      aria-pressed="${selected}"
-    >
-      <span class="ai-theme-art" style="background-image:url('${escapeAttr(heroArt)}')"></span>
-      <span class="ai-theme-meta">
-        <strong class="ai-theme-name">${escapeHtml(theme.name)}</strong>
-        <span class="ai-theme-party">${escapeHtml(theme.partyTag)}</span>
-        <span class="ai-theme-label">${escapeHtml(theme.label)}</span>
-      </span>
-    </button>
   `;
 }
 
@@ -741,9 +656,10 @@ function renderMatchmakingOverlay(): string {
     <section class="matchmaking-overlay" data-testid="matchmaking-overlay">
       <div class="matchmaking-card parchment-card">
         <div class="searching-dots" aria-hidden="true"><span></span><span></span><span></span></div>
-        <h3>Looking for an opponent</h3>
+        <h3>排隊配對中</h3>
+        <p class="matchmaking-subtitle">正在為你尋找對手，請稍候…</p>
         <p class="matchmaking-timer" data-testid="matchmaking-elapsed">${mm}:${ss}</p>
-        <button id="matchmaking-cancel" class="danger" data-testid="matchmaking-cancel">Cancel</button>
+        <button id="matchmaking-cancel" class="danger" data-testid="matchmaking-cancel">取消排隊</button>
       </div>
     </section>
   `;
@@ -2259,6 +2175,9 @@ function bindStaticActions(): void {
   document.querySelector<HTMLButtonElement>("#start-ai-match")?.addEventListener("click", () => {
     void startAiMatch();
   });
+  document.querySelector<HTMLButtonElement>("#start-ai-mode-match")?.addEventListener("click", () => {
+    void startAiMatch({ withTheme: false });
+  });
   document.querySelector<HTMLFormElement>("#private-join-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     const input = document.querySelector<HTMLInputElement>("#private-join-input");
@@ -3263,7 +3182,8 @@ async function startTrainingMatch(): Promise<void> {
   }
 }
 
-async function startAiMatch(): Promise<void> {
+async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void> {
+  const { withTheme = true } = options;
   if (view.joining || view.room) return;
   if (!view.aiDifficultySelected) return;
   if (supabase && (!view.session || !view.selectedDeckId)) {
@@ -3281,12 +3201,12 @@ async function startAiMatch(): Promise<void> {
           accessToken: view.session?.access_token,
           deckId: view.selectedDeckId,
           difficulty: view.aiDifficulty,
-          theme: view.aiTheme
+          ...(withTheme ? { theme: view.aiTheme } : {})
         }
       : {
           displayName: view.profile?.display_name ?? "Player",
           difficulty: view.aiDifficulty,
-          theme: view.aiTheme
+          ...(withTheme ? { theme: view.aiTheme } : {})
         };
     const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
     bindRoomMessages(room);

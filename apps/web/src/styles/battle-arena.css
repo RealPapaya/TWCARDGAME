@@ -22,15 +22,19 @@
 .v1-deck-selection,
 .ai-battle-setup {
   background:
-    linear-gradient(180deg, rgba(7, 18, 24, 0.16), rgba(7, 18, 24, 0.36)),
-    url("/images/backgrounds/battle_map_bg.webp") center / cover no-repeat,
+    linear-gradient(180deg, rgba(7, 18, 24, 0.28), rgba(7, 18, 24, 0.48)),
+    url("/images/ui/GameMode.webp") center / cover no-repeat,
     url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
   padding: 0;
   color: #f1e4d1;
 }
 
-.v1-deck-selection.battle-mode-challenge {
-  background: url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
+/* 挑戰模式入口畫面 (ai-battle-setup) keeps its own background — not GameMode.webp. */
+.ai-battle-setup {
+  background:
+    linear-gradient(180deg, rgba(7, 18, 24, 0.16), rgba(7, 18, 24, 0.36)),
+    url("/images/backgrounds/battle_map_bg.webp") center / cover no-repeat,
+    url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
 }
 
 .battle-selection-content {
@@ -246,28 +250,90 @@
   font-size: 22px;
 }
 
-.v1-deck-selection #start-training-match,
+/* Per-mode action panels — only the active mode's controls are shown. */
+.v1-deck-selection [data-testid="battle-challenge-entry"],
 .v1-deck-selection #find-match,
-.v1-deck-selection [data-testid="battle-ai-entry"],
-.v1-deck-selection .battle-private-room,
+.v1-deck-selection .battle-ai-mode-section,
+.v1-deck-selection .battle-training-section {
+  display: none;
+}
+
+.v1-deck-selection.battle-mode-challenge [data-testid="battle-challenge-entry"],
+.v1-deck-selection.battle-mode-pvp #find-match {
+  display: flex;
+}
+
+.v1-deck-selection.battle-mode-ai .battle-ai-mode-section,
+.v1-deck-selection.battle-mode-training .battle-training-section {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* The advanced disclosure is only relevant for online play (玩家模式). */
 .v1-deck-selection .battle-advanced {
   display: none;
 }
 
-.v1-deck-selection.battle-mode-training #start-training-match,
-.v1-deck-selection.battle-mode-pvp #find-match,
-.v1-deck-selection.battle-mode-ai [data-testid="battle-ai-entry"],
-.v1-deck-selection.battle-mode-challenge .battle-private-room,
-.v1-deck-selection.battle-mode-challenge .battle-advanced {
-  display: flex;
-}
-
-.v1-deck-selection.battle-mode-challenge .battle-start-row {
-  display: none;
-}
-
-.v1-deck-selection.battle-mode-challenge .battle-advanced {
+.v1-deck-selection.battle-mode-pvp .battle-advanced {
   display: block;
+}
+
+.battle-ai-mode-section .ai-section-label {
+  margin: 0;
+  color: #f4e4bc;
+  font-size: 18px;
+  text-shadow: 0 2px 5px #000;
+}
+
+.battle-ai-mode-section .ai-difficulty-options {
+  display: flex;
+  flex-direction: row;
+  gap: 14px;
+  margin: 0;
+}
+
+.battle-ai-mode-section .ai-difficulty-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 120px;
+  padding: 12px 22px;
+  border: 3px solid rgba(244, 228, 188, 0.58);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(30, 58, 50, 0.82), rgba(20, 22, 32, 0.88)),
+    rgba(16, 26, 20, 0.8);
+  cursor: pointer;
+}
+
+.battle-ai-mode-section .ai-difficulty-option strong {
+  color: #fff8d8;
+  font-size: 21px;
+  text-shadow: 0 3px 8px rgba(0, 0, 0, 0.78);
+}
+
+.battle-ai-mode-section .ai-difficulty-option input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+
+.battle-ai-mode-section .ai-difficulty-option.selected {
+  border-color: #ffd700;
+  background:
+    linear-gradient(180deg, rgba(79, 96, 47, 0.92), rgba(54, 38, 24, 0.9)),
+    rgba(36, 40, 20, 0.86);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.36);
+}
+
+.battle-training-note {
+  color: #f4e4bc;
+  font-weight: 900;
+  font-size: 18px;
+  text-shadow: 0 2px 6px #000;
 }
 
 .battle-private-room {

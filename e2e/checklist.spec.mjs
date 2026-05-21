@@ -112,7 +112,9 @@ async function openBattleScreen(page, name) {
   await page.goto(devAuthUrl());
   await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
   await page.click('[data-testid="menu-battle"]');
-  await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
+  await page.waitForSelector('[data-testid="battle-mode-pvp"]', { timeout: TIMEOUT });
+  await page.click('[data-testid="battle-mode-pvp"]');
+  await page.waitForSelector('[data-testid="find-match"]:visible', { timeout: TIMEOUT });
   if (SERVER_URL) await page.fill("#server-url-advanced", SERVER_URL);
   if (name) {
     // advanced details may be hidden — open them
@@ -278,19 +280,23 @@ async function submitMulligan(page) {
   p.on("pageerror", (e) => console.error("[P4 ERR]", e.message));
   await injectAccumulator(p);
   try {
-    await openBattleScreen(p, "ChecklistAI");
-
-    // Verify AI section is rendered
-    var hasAiBtn = await p.isVisible('[data-testid="start-ai-match"]');
-    if (!hasAiBtn) throw new Error("start-ai-match button not visible");
-    pass("4a. vs AI — AI match button visible");
+    // 挑戰模式: pick the mode, enter the theme/difficulty setup screen.
+    await p.goto(devAuthUrl());
+    await p.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
+    await p.click('[data-testid="menu-battle"]');
+    await p.waitForSelector('[data-testid="battle-mode-challenge"]', { timeout: TIMEOUT });
+    await p.click('[data-testid="battle-mode-challenge"]');
+    await p.click('[data-testid="battle-challenge-entry"]');
+    await p.waitForSelector('[data-testid="start-ai-match"]', { timeout: TIMEOUT });
+    pass("4a. vs AI — 挑戰模式 setup screen reached");
 
     // Check difficulty options
     var diffCount = await p.locator('input[name="ai-difficulty"]').count();
     if (diffCount >= 3) pass("4b. vs AI — " + diffCount + " difficulty options rendered");
     else throw new Error("expected ≥3 difficulty options, got " + diffCount);
 
-    // Start AI match
+    // Select a difficulty so the start button enables, then start the match.
+    await p.locator('input[name="ai-difficulty"]').first().check();
     await p.click('[data-testid="start-ai-match"]');
     await p.waitForSelector('[data-testid="mulligan-overlay"]', { timeout: TIMEOUT });
     pass("4c. vs AI — mulligan overlay reached after starting AI match");

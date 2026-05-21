@@ -58,7 +58,9 @@ async function joinAndMulligan(page, name) {
   await page.goto(devAuthUrl());
   await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
   await page.click('[data-testid="menu-battle"]');
-  await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
+  await page.waitForSelector('[data-testid="battle-mode-pvp"]', { timeout: TIMEOUT });
+  await page.click('[data-testid="battle-mode-pvp"]');
+  await page.waitForSelector('[data-testid="find-match"]:visible', { timeout: TIMEOUT });
   await page.evaluate(({ serverUrl, displayName }) => {
     var server = document.querySelector("#server-url-advanced");
     var nameInput = document.querySelector("#display-name-advanced");
