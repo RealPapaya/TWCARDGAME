@@ -1,3 +1,4 @@
+import "./polyfills.js";
 import { Client, type Room } from "@colyseus/sdk";
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
