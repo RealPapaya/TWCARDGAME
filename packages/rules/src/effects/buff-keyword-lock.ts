@@ -1,0 +1,46 @@
+import type { EffectHandler } from "../types.js";
+import {
+  buffAdjacent,
+  buffAll,
+  buffCategory,
+  buffHealthAndTauntTarget,
+  buffStatTarget,
+  buffStatTargetCategoryBonus,
+  buffStatTargetTemp,
+  eatFriendly,
+  giveDivineShield,
+  giveDivineShieldAll,
+  giveDivineShieldCategory,
+  giveKeywordAdjacent,
+  lockAllAndBuffCategory,
+  lockAllEnemy,
+  lockAttack,
+  lockSelf,
+  setAttackAll,
+  setDeathTimer,
+  swapAttackHealth,
+  unlockAndBuffHealth
+} from "./core.js";
+
+export const buffKeywordLockHandlers: Record<string, EffectHandler> = {
+  BUFF_ADJACENT: buffAdjacent,
+  BUFF_ALL: buffAll,
+  BUFF_CATEGORY: buffCategory,
+  BUFF_HEALTH_AND_TAUNT_TARGET: buffHealthAndTauntTarget,
+  BUFF_STAT_TARGET: buffStatTarget,
+  BUFF_STAT_TARGET_CATEGORY_BONUS: buffStatTargetCategoryBonus,
+  BUFF_STAT_TARGET_TEMP: buffStatTargetTemp,
+  EAT_FRIENDLY: eatFriendly,
+  GIVE_DIVINE_SHIELD: giveDivineShield,
+  GIVE_DIVINE_SHIELD_ALL: giveDivineShieldAll,
+  GIVE_DIVINE_SHIELD_CATEGORY: giveDivineShieldCategory,
+  GIVE_KEYWORD_ADJACENT: giveKeywordAdjacent,
+  LOCK_ALL_AND_BUFF_CATEGORY: lockAllAndBuffCategory,
+  LOCK_ALL_ENEMY: lockAllEnemy,
+  LOCK_ATTACK: lockAttack,
+  LOCK_SELF: lockSelf,
+  SET_ATTACK_ALL: setAttackAll,
+  SET_DEATH_TIMER: setDeathTimer,
+  SWAP_ATTACK_HEALTH: swapAttackHealth,
+  UNLOCK_AND_BUFF_HEALTH: unlockAndBuffHealth
+};

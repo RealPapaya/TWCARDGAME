@@ -1,5 +1,7 @@
 import { Buffer } from "buffer";
 
-if (!("Buffer" in globalThis)) {
-  (globalThis as typeof globalThis & { Buffer: typeof Buffer }).Buffer = Buffer;
+const browserGlobal = globalThis as unknown as { Buffer?: typeof Buffer };
+
+if (!browserGlobal.Buffer) {
+  browserGlobal.Buffer = Buffer;
 }

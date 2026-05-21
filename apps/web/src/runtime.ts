@@ -38,6 +38,7 @@ import {
   toggleSfxMute
 } from "./app/audio.js";
 import { defaultServerUrl, forceDevAuth, supabase as configuredSupabase } from "./app/config.js";
+import { setAppContext } from "./app/context.js";
 import { cssEscape } from "./app/dom.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
@@ -415,6 +416,7 @@ let renderScheduled = false;
 let lastRenderedHtml = "";
 
 export function startApp(): void {
+  setAppContext({ view, render, supabase, cardCatalog, seats });
   configureAudio(view, render);
   ensureDragLayer();
   installViewportGuards();
