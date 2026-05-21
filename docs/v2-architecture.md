@@ -20,6 +20,8 @@ This folder is a parallel rewrite scaffold. The existing v1 static app is preser
 - `apps/web`: small Vite client that renders synced public state and receives private hand state via direct messages.
 - `packages/db`: Supabase client helpers and initial RLS migration.
 
+For card additions and new mechanics, follow [Card Authoring Workflow](./card-authoring-workflow.md).
+
 ## Current Milestone
 
 The implemented milestone is PvP core scaffolding:

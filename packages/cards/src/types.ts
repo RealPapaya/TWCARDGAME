@@ -126,3 +126,6 @@ export const SUPPORTED_ONGOING_EFFECTS = [
   "REDUCE_NEWS_COST"
 ] as const;
 export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS"] as const;
+export const SUPPORTED_ENRAGE_EFFECTS = ["BUFF_STAT"] as const;
+export const SUPPORTED_QUEST_EFFECTS = ["DAMAGE_ALL_MINIONS"] as const;
+export const SUPPORTED_ON_DISCARD_ACTIONS = ["SUMMON"] as const;

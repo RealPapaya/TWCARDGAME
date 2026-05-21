@@ -142,6 +142,42 @@ describe("phase 2 parity mechanics", () => {
     expect(afterDraw.players[drawFoe].deck.length).toBe(beforeDeck - 2);
   });
 
+  it("divine shield prevents lethal damage and delays deathrattle resolution until a later hit", () => {
+    const { state } = parityMatch();
+    const seat = state.turn.activeSeat;
+    const foe = enemy(seat);
+    const shielded = placeMinion(state, foe, "TW061", { currentHealth: 1 });
+    shielded.keywords.divineShield = true;
+
+    const afterShield = playCard(state, "S006", { type: "MINION", side: foe, instanceId: shielded.instanceId }, "shield-pop").state;
+    const survived = afterShield.players[foe].board.find((minion) => minion.instanceId === shielded.instanceId)!;
+
+    expect(survived.currentHealth).toBe(1);
+    expect(survived.keywords.divineShield).toBe(false);
+    expect(afterShield.players[foe].board.map((minion) => minion.cardId)).not.toContain("TW062");
+
+    const afterLethal = playCard(afterShield, "S006", { type: "MINION", side: foe, instanceId: shielded.instanceId }, "shield-lethal").state;
+    expect(afterLethal.players[foe].board.some((minion) => minion.instanceId === shielded.instanceId)).toBe(false);
+    expect(afterLethal.players[foe].board.map((minion) => minion.cardId)).toContain("TW062");
+  });
+
+  it("bounce returns a fresh catalog card instead of damaged or buffed board stats", () => {
+    const { state } = parityMatch();
+    const seat = state.turn.activeSeat;
+    const foe = enemy(seat);
+    const altered = placeMinion(state, foe, "TW002", { attack: 9, health: 9, currentHealth: 1 });
+    const beforeHand = state.players[foe].hand.length;
+
+    const next = playCard(state, "TW031", { type: "MINION", side: foe, instanceId: altered.instanceId }, "bounce-reset").state;
+    const returned = next.players[foe].hand.find((handCard) => handCard.cardId === "TW002");
+    const original = card("TW002");
+
+    expect(next.players[foe].board.some((minion) => minion.instanceId === altered.instanceId)).toBe(false);
+    expect(next.players[foe].hand.length).toBe(beforeHand + 1);
+    expect(returned?.attack).toBe(original.attack);
+    expect(returned?.health).toBe(original.health);
+  });
+
   it("ongoing adjacent auras apply, remove cleanly, and clamp health", () => {
     const { state } = parityMatch();
     const seat = state.turn.activeSeat;

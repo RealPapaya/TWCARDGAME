@@ -5,6 +5,7 @@ export const EffectSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
     .object({
       type: z.string().min(1).optional(),
       value: z.number().int().optional(),
+      attack: z.number().int().optional(),
       bonus_value: z.number().int().optional(),
       stat: z.enum(["ATTACK", "HEALTH", "ALL"]).optional(),
       target: z
@@ -17,12 +18,18 @@ export const EffectSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       target_category: z.string().optional(),
       target_category_includes: z.string().optional(),
       excluded_categories: z.array(z.string()).optional(),
+      buff_stat: z.enum(["ATTACK", "HEALTH", "ALL"]).optional(),
+      buff_value: z.number().int().optional(),
+      keyword: z.string().min(1).optional(),
       cardId: z.string().optional(),
       count: z.number().int().positive().optional(),
       isTemporary: z.boolean().optional(),
       summon: z.array(z.string()).optional(),
       discardCount: z.number().int().positive().optional(),
       drawCount: z.number().int().positive().optional(),
+      action: z.string().min(1).optional(),
+      turns: z.number().int().positive().optional(),
+      summonCardId: z.string().optional(),
       effect: EffectSchema.optional()
     })
     .passthrough()
