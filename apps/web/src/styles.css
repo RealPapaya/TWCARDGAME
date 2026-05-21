@@ -1164,10 +1164,21 @@ input {
   transform: none;
 }
 
-.mulligan-card:hover,
+/* override rarity border colors, transform, and transition — all mulligan cards start neutral */
+.card.mulligan-card {
+  border-color: #555;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
+  transform: none;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease;
+}
+
+.card.mulligan-card:hover {
+  transform: none;
+}
+
 .mulligan-card.selected {
-  transform: translateY(-16px) scale(1.06);
   border-color: var(--red);
+  box-shadow: 0 0 20px rgba(255, 51, 51, 0.45), 0 8px 20px rgba(0, 0, 0, 0.55);
 }
 
 .mulligan-card.selected .card-art-box {
@@ -2627,19 +2638,27 @@ input {
   font-family: var(--font-display);
 }
 
-/* Version pill → plain version text like V1 */
-.version-pill {
+/* Version corner — top-left absolute position on main menu */
+.version-corner {
+  position: absolute;
+  left: 60px;
+  top: 20px;
+  z-index: 100;
+  pointer-events: none;
+}
+
+.version-corner .version-pill {
   display: block;
-  font-size: 22px;
+  font-size: 14px;
   font-weight: bold;
-  color: #ffffff;
-  letter-spacing: 2px;
-  text-shadow: 0 0 15px rgba(0, 0, 0, 0.8);
+  color: rgba(241, 228, 209, 0.7);
+  letter-spacing: 1px;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.7);
   background: transparent;
   border: none;
   padding: 0;
   border-radius: 0;
-  margin-bottom: 25px;
+  margin: 0;
 }
 
 .menu-buttons {
@@ -4741,6 +4760,10 @@ input {
     right: 12px;
     gap: 10px;
   }
+  .version-corner {
+    left: 12px;
+    top: 12px;
+  }
   .menu-icon-btn {
     width: 50px;
     height: 50px;
@@ -6368,6 +6391,32 @@ input {
   white-space: pre-wrap;
 }
 
+.card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.card-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--wood-medium);
+  background: rgba(93, 46, 23, 0.1);
+  color: var(--wood-dark);
+  font-size: 12px;
+  font-family: var(--font-display);
+  cursor: default;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.card-chip:hover {
+  background: rgba(93, 46, 23, 0.22);
+  border-color: var(--wood-dark);
+}
+
 /* Medieval toast — matches LEGACY .medieval-toast style */
 .medieval-toast {
   position: fixed;
@@ -6956,35 +7005,46 @@ input {
   pointer-events: none;
 }
 
-.battle-surface .opponent .status-cluster {
-  top: 18px;
-  left: 26px;
-  align-items: flex-start;
+.battle-surface .player-area.opponent .status-cluster {
+  top: 28px;
+  left: 38px;
+  right: auto;
+  bottom: auto;
+  align-items: center;
 }
 
-.battle-surface .player .status-cluster {
-  right: 238px;
-  bottom: 76px;
-  align-items: flex-end;
+.battle-surface .player-area:not(.opponent) .status-cluster {
+  right: 34px;
+  bottom: 26px;
+  top: auto;
+  left: auto;
+  align-items: center;
 }
 
 .battle-surface .mana-container {
-  min-width: 0;
-  width: auto;
-  height: 36px;
+  position: relative;
+  width: 455px;
+  height: 104px;
+  min-width: 455px;
+  min-height: 104px;
   justify-content: flex-start;
-  gap: 6px;
-  padding: 0;
+  gap: 8px;
+  padding: 34px 42px 30px 62px;
   border: 0;
   border-radius: 0;
-  background: transparent;
+  background: url("/images/ui/mana_frame.webp") center / 100% 100% no-repeat;
   box-shadow: none;
+  filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.62));
+}
+
+.battle-surface .player-area.opponent .mana-container {
+  filter: sepia(0.14) hue-rotate(-8deg) brightness(0.94) drop-shadow(0 12px 14px rgba(0, 0, 0, 0.58));
 }
 
 .battle-surface .mana-crystal {
-  width: 24px;
-  height: 24px;
-  flex-basis: 24px;
+  width: 31px;
+  height: 31px;
+  flex-basis: 31px;
 }
 
 .battle-surface .mana-crystal.spent {
@@ -6996,14 +7056,20 @@ input {
 }
 
 .battle-surface .mana-text {
-  order: -1;
-  min-width: 42px;
+  position: absolute;
+  left: 50%;
+  top: -30px;
+  min-width: 54px;
+  transform: translateX(-50%);
   color: var(--neon-blue);
-  font-size: 18px;
+  font-size: 24px;
+  line-height: 1;
   text-shadow: 0 0 8px currentColor;
+  text-align: center;
+  z-index: 2;
 }
 
-.battle-surface .opponent .mana-text {
+.battle-surface .player-area.opponent .mana-text {
   color: #ff3333;
 }
 
@@ -7021,12 +7087,14 @@ input {
   transform: translateX(-50%);
 }
 
-.battle-surface .opponent .board {
+.battle-surface .player-area.opponent .board {
   bottom: 0;
+  top: auto;
 }
 
-.battle-surface .player .board {
+.battle-surface .player-area:not(.opponent) .board {
   top: 0;
+  bottom: auto;
 }
 
 .battle-surface .slot {
@@ -7053,7 +7121,7 @@ input {
   pointer-events: none;
 }
 
-.battle-surface .player .hand {
+.battle-surface .player-area:not(.opponent) .hand {
   bottom: -54px;
 }
 
@@ -7158,23 +7226,113 @@ input {
 
 .battle-gear-btn {
   position: fixed;
-  top: calc(50% - (var(--game-height) * var(--app-scale) / 2) + 28px);
-  right: calc(50% - (var(--game-width) * var(--app-scale) / 2) + 78px);
+  top: calc(50% - (var(--game-height) * var(--app-scale) / 2) + 26px);
+  right: calc(50% - (var(--game-width) * var(--app-scale) / 2) + 54px);
   width: 60px;
   height: 60px;
   min-width: 60px;
   padding: 0;
-  border: 4px solid #8b4513;
+  border: 4px solid #5d2e17;
   border-radius: 50%;
+  background:
+    radial-gradient(circle at 45% 35%, #fff2c7 0%, #e4b64d 58%, #c37a24 100%);
+  color: #5d2e17;
   z-index: 1100;
   pointer-events: auto;
   font-size: 30px;
   line-height: 1;
+  box-shadow:
+    inset 0 3px 0 rgba(255, 248, 210, 0.45),
+    0 7px 0 #6b3519,
+    0 12px 16px rgba(0, 0, 0, 0.45);
 }
 
 .controls .battle-gear-btn {
   min-width: 60px;
   min-height: 60px;
+}
+
+.battle-settings-menu {
+  position: fixed;
+  top: calc(50% - (var(--game-height) * var(--app-scale) / 2) + 98px);
+  right: calc(50% - (var(--game-width) * var(--app-scale) / 2) + 96px);
+  width: 220px;
+  padding: 24px 18px 26px;
+  background:
+    radial-gradient(circle at 50% 45%, rgba(255, 255, 255, 0.24), transparent 78%),
+    linear-gradient(180deg, #fff0c8 0%, #f4e4bc 78%, #e6ccb2 100%);
+  border: 5px solid #5d2e17;
+  border-radius: 4px;
+  color: #3d1e0f;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1095;
+  pointer-events: auto;
+  filter: drop-shadow(10px 12px 0 rgba(0, 0, 0, 0.52));
+}
+
+.battle-settings-menu::before {
+  content: "";
+  position: absolute;
+  top: -22px;
+  right: 38px;
+  width: 0;
+  height: 0;
+  border-left: 15px solid transparent;
+  border-right: 15px solid transparent;
+  border-bottom: 22px solid #5d2e17;
+}
+
+.battle-settings-title {
+  margin-bottom: 4px;
+  color: #5d2e17;
+  font-family: var(--font-display);
+  font-size: 20px;
+  font-weight: 900;
+  text-align: center;
+}
+
+.battle-settings-item {
+  width: 100%;
+  min-height: 58px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: #ddb892;
+  border: 4px solid #5d2e17;
+  border-radius: 4px;
+  color: #3d1e0f;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 900;
+  letter-spacing: 0;
+  text-shadow: 1px 1px 0 rgba(255, 255, 255, 0.22);
+  box-shadow: 4px 6px 0 #3d1e0f;
+}
+
+.battle-settings-item .menu-icon {
+  width: 24px;
+  text-align: center;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.battle-settings-item:hover:not(:disabled) {
+  background: #c89f78;
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 8px 0 #3d1e0f;
+}
+
+.battle-settings-item.danger {
+  background: #c5282d;
+  color: #f4e4bc;
+}
+
+.battle-settings-item.danger:hover:not(:disabled) {
+  background: #a91920;
 }
 
 .battle-history-panel {
@@ -7310,7 +7468,7 @@ input {
     transform-origin: left center;
   }
 
-  .battle-surface .player .status-cluster {
+  .battle-surface .player-area:not(.opponent) .status-cluster {
     right: 40px;
   }
 }

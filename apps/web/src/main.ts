@@ -139,6 +139,7 @@ type ClientViewState = {
   bgmMuted: boolean;
   sfxMuted: boolean;
   settingsOpen: boolean;
+  battleSettingsOpen: boolean;
   changelogOpen: boolean;
 };
 
@@ -260,7 +261,7 @@ const rarityLabel: Record<string, string> = {
   COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說"
 };
 
-type PatchNoteItem = { title: string; desc: string };
+type PatchNoteItem = { title: string; desc: string; cardIds?: string[] };
 type PatchNoteVersion = { version: string; date: string; items: PatchNoteItem[] };
 const PATCH_NOTES: PatchNoteVersion[] = [
   {
@@ -272,7 +273,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.8.0", date: "2026-01-20",
     items: [
-      { title: "[新卡片] 王ADEN、卡車司機", desc: "" },
+      { title: "[新卡片] 王ADEN、卡車司機", desc: "", cardIds: ["TW074", "TW073"] },
       { title: "[新增] 好友系統、排行榜系統", desc: "新增好友系統，玩家可以添加好友、查看好友列表、發送好友邀請等。排行榜系統可以讓玩家查看目前伺服器上的玩家 並且以等級為排行" },
       { title: "[商店系統] 新增卡牌分解合成購買以及卡牌庫", desc: "新增卡牌分解合成功能，玩家可以將卡牌分解成消費券，再用消費券合成卡牌" },
       { title: "[音效] 新增卡牌落地和攻擊音效、背景音樂", desc: "新增卡牌落地和攻擊音效，讓遊戲更有互動性" }
@@ -295,7 +296,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.6.0", date: "2026-01-15",
     items: [
-      { title: "[新卡片] 沉默不是金", desc: "" },
+      { title: "[新卡片] 沉默不是金", desc: "", cardIds: ["S027"] },
       { title: "[新增] 預設牌組、對戰紀錄", desc: "提供多個預設牌組，對戰中可查看對戰紀錄以供玩家參考" },
       { title: "[視覺優化] 更新與AI對戰的選擇畫面", desc: "將難度以及牌組整合在同一個畫面" }
     ]
@@ -303,7 +304,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.5.0", date: "2026-01-14",
     items: [
-      { title: "[新卡片] 蠻牛、死亡之握、TOYZ、卓榮泰、大法官、林佳龍", desc: "新增多張全新卡片，包含「蠻牛」(補血抽牌)、「死亡之握」(倒數三回合死亡)、「TOYZ」(高體質負面戰吼) 等。" },
+      { title: "[新卡片] 蠻牛、死亡之握、TOYZ、卓榮泰、大法官、林佳龍", desc: "新增多張全新卡片，包含「蠻牛」(補血抽牌)、「死亡之握」(倒數三回合死亡)、「TOYZ」(高體質負面戰吼) 等。", cardIds: ["TW070", "TW071", "TW072", "TW067", "TW068", "TW069"] },
       { title: "[新增] 箭頭顏色、對戰提示", desc: "摧毀類型箭頭新增黑色並修改形式，新增對戰提示詞" },
       { title: "[修正] 幽靈動畫", desc: "當抽牌時左側有牌由下往上飄出" }
     ]
@@ -311,7 +312,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.4.0", date: "2026-01-13",
     items: [
-      { title: "[新卡片] 8+9、無期徒刑、鉅額交保、普發一萬、停班停課、王定宇", desc: "" },
+      { title: "[新卡片] 8+9、無期徒刑、鉅額交保、普發一萬、停班停課、王定宇", desc: "", cardIds: ["TW065", "S023", "S024", "S025", "S026", "TW066"] },
       { title: "[機制] 群體鎖定與增益", desc: "新增集體沉默與集體增益機制，支援更複雜的控場與反制策略" },
       { title: "[新增] 遊戲主視覺", desc: "新增遊戲主視覺，包含主畫面、選卡畫面、對戰畫面、牌組編輯畫面" },
       { title: "[視覺] 新聞回血特效", desc: "當「王定宇」觸發新聞回血效果時，現在會有綠色的回復數字飄出" }
@@ -321,7 +322,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
     version: "v0.3.1", date: "2026-01-11",
     items: [
       { title: "[新增功能] 自訂游標系統", desc: "全站啟用風格游標，滑鼠懸停互動元素時保持一致外觀，提供更佳的沈浸感。可使用卡牌會出現綠光提示" },
-      { title: "[新卡片] 陳其邁、藍亦明、電子腳鐐、蘇貞昌、哈們、謝和弦、蔡想想、蔡樂樂、民進黨黨部、國民黨黨部、鋼鐵韓粉、青鳥大學生、老鳥中年", desc: "新增「陳其邁」(群體鎖定+召喚藍亦明)、「藍亦明」(存活機制)、「電子腳鐐」(沈默/鎖定)、「蘇貞昌」(衝鋒+回手) 與多張具備陣營特色的卡牌。" },
+      { title: "[新卡片] 陳其邁、藍亦明、電子腳鐐、蘇貞昌、哈們、謝和弦、蔡想想、蔡樂樂、民進黨黨部、國民黨黨部、鋼鐵韓粉、青鳥大學生、老鳥中年", desc: "新增「陳其邁」(群體鎖定+召喚藍亦明)、「藍亦明」(存活機制)、「電子腳鐐」(沈默/鎖定)、「蘇貞昌」(衝鋒+回手) 與多張具備陣營特色的卡牌。", cardIds: ["TW061", "TW062", "S022", "TW060", "S021", "TW059", "TW058", "TW057", "TW056", "TW055", "TW054", "TW052", "TW053"] },
       { title: "[調整] 蔡英文、水電師傅", desc: "蔡英文現在會召喚蔡想想、蔡樂樂，水電師傅生命值提升至4->5" },
       { title: "[系統優化] 代碼重構與機制更新", desc: "分離卡牌資料結構以提升維護性，並實作新的攻守交換戰吼機制 (SWAP_ATTACK_HEALTH)。" }
     ]
@@ -329,7 +330,7 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.3.0", date: "2026-01-10",
     items: [
-      { title: "[新卡片] 武漢肺炎、陳時中、陳建仁、網軍、側翼攻擊、八卦、緋聞、政治清算、查水表(重製)、炎上(重製)", desc: "新增「政治清算」造成單體巨額傷害。重製「查水表」與「炎上」效果。" },
+      { title: "[新卡片] 武漢肺炎、陳時中、陳建仁、網軍、側翼攻擊、八卦、緋聞、政治清算、查水表(重製)、炎上(重製)", desc: "新增「政治清算」造成單體巨額傷害。重製「查水表」與「炎上」效果。", cardIds: ["S015", "TW049", "TW050", "TW048", "S014", "S016", "S017", "S020", "S019", "S018"] },
       { title: "[機制修正] 減費效果與法力驗證系統", desc: "修正「陳建仁」等減費卡牌導致的「0費無法出牌」問題。全面重構法力驗證邏輯，確保顯示費用即為實際支付費用。" },
       { title: "[視覺優化] 震動反饋、波紋擴散、黑暗處決特效", desc: "新增「政治清算」的黑暗處決印記、「查水表」的全場搜查波紋、「武漢肺炎」的毒氣擴散，以及卡牌互動的震動反饋。" },
       { title: "[系統] 數字顯示與預覽修復", desc: "優化傷害數字顯示系統。修復拖曳預覽時的卡頓與遮擋問題。" }
@@ -338,14 +339,14 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.2.2", date: "2026-01-09",
     items: [
-      { title: "[新卡片] 賴清德、高端疫苗、黃捷、抗中保台、芒果乾、蘇巧慧", desc: "新增 6 張全新卡片，包含與民進黨相關的強力效果。" },
+      { title: "[新卡片] 賴清德、高端疫苗、黃捷、抗中保台、芒果乾、蘇巧慧", desc: "新增 6 張全新卡片，包含與民進黨相關的強力效果。", cardIds: ["TW046", "S011", "TW044", "S012", "S013", "TW045"] },
       { title: "[優化] AI 主題牌組與測試模式", desc: "對戰改為選擇主題（綠/藍/白）進行挑戰。測試模式支援編輯電腦主題牌組。" }
     ]
   },
   {
     version: "v0.2.1", date: "2026-01-09",
     items: [
-      { title: "[新卡片] 新增柯文哲(獄中)、蔡璧如、陳珮琪、陳珮琪(老公獄中)。", desc: "包含新的「自殘」與「滿血回復」機制。" },
+      { title: "[新卡片] 新增柯文哲(獄中)、蔡璧如、陳珮琪、陳珮琪(老公獄中)。", desc: "包含新的「自殘」與「滿血回復」機制。", cardIds: ["TW041", "TW042", "TW019", "TW043"] },
       { title: "[優化] AI 主題牌組與測試模式", desc: "對戰改為選擇主題（綠/藍/白）進行挑戰。測試模式支援編輯電腦主題牌組。" },
       { title: "[修正] 介面與名詞調整", desc: "「法術」卡全面更名為「新聞」。統一按鈕樣式與位置。優化受傷數值顯示與補血動畫顏色。" }
     ]
@@ -353,21 +354,21 @@ const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.2.0", date: "2026-01-09",
     items: [
-      { title: "[新卡片] 老榮民、法院傳票、連勝文、倒閣、造勢晚會、921大地震", desc: "新增多張具備政治色彩與強力效果的傳奇/史詩卡片。" },
+      { title: "[新卡片] 老榮民、法院傳票、連勝文、倒閣、造勢晚會、921大地震", desc: "新增多張具備政治色彩與強力效果的傳奇/史詩卡片。", cardIds: ["TW037", "S008", "TW036", "S005", "S004", "S010"] },
       { title: "[優化/機制] 全場視覺特效、AI 智能決策、打擊感強化", desc: "整合碎石噴發特效與畫面震動，大幅提升隨從對陣時的打擊反饋。" }
     ]
   },
   {
     version: "v0.1.2", date: "2026-01-08",
     items: [
-      { title: "[新卡片] 政治切割、謝龍介", desc: "新增具備棄牌連動機制的卡片。謝龍介被丟棄時會直接進入戰場！" },
+      { title: "[新卡片] 政治切割、謝龍介", desc: "新增具備棄牌連動機制的卡片。謝龍介被丟棄時會直接進入戰場！", cardIds: ["S009", "TW040"] },
       { title: "[機制] 棄牌召喚系統", desc: "完善了棄牌連鎖機制，現在卡片被隨機丟棄時能觸發自身或場上的特殊效果。" }
     ]
   },
   {
     version: "v0.1.1", date: "2026-01-08",
     items: [
-      { title: "[新卡片] 傅崐萁、徐巧芯", desc: "新增「花蓮國王」傅崐萁及隨機棄牌連動。支援多重棄牌觸發系統。" }
+      { title: "[新卡片] 傅崐萁、徐巧芯", desc: "新增「花蓮國王」傅崐萁及隨機棄牌連動。支援多重棄牌觸發系統。", cardIds: ["TW038", "TW039"] }
     ]
   },
   {
@@ -413,6 +414,7 @@ const view: ClientViewState = {
   bgmMuted: readStoredBool(bgmMutedKey, false),
   sfxMuted: readStoredBool(sfxMutedKey, false),
   settingsOpen: false,
+  battleSettingsOpen: false,
   changelogOpen: false
 };
 
@@ -444,6 +446,7 @@ function renderNow(): void {
       ${renderConfirmDialog()}
       ${renderToast()}
       ${renderLegacyShopPackOverlay()}
+      ${renderHoverTooltip()}
     </main>
   `;
 
@@ -749,9 +752,11 @@ function renderMainMenu(): string {
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
+      <div class="version-corner">
+        <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
+      </div>
       <div class="main-menu-center">
         <h1 class="game-title">寶島遊戲王</h1>
-        <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
         <nav class="menu-buttons" aria-label="Main menu">
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
           <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
@@ -810,6 +815,14 @@ function renderChangelogModal(): string {
                   <li>
                     <strong>${escapeHtml(item.title)}</strong>
                     ${item.desc ? `<p>${escapeHtml(item.desc)}</p>` : ""}
+                    ${item.cardIds && item.cardIds.length > 0 ? `
+                      <div class="card-chips">
+                        ${item.cardIds.map((id) => {
+                          const card = cardCatalog.get(id);
+                          return card ? `<span class="card-chip" data-hover-card-id="${escapeAttr(id)}">${escapeHtml(card.name)}</span>` : "";
+                        }).filter(Boolean).join("")}
+                      </div>
+                    ` : ""}
                   </li>
                 `).join("")}
               </ul>
@@ -1665,6 +1678,7 @@ function renderGame(status: GameStatus | ""): string {
       ${renderEventCues()}
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
+      ${view.settingsOpen ? renderSettingsModal() : ""}
       ${renderConcedeModal()}
     </section>
     ${renderHoverTooltip()}
@@ -1764,7 +1778,7 @@ function renderMana(current: number, max: number, role: "player" | "opponent"): 
   }).join("");
 
   return `
-    <div class="mana-container ${role === "player" ? "frame-style" : ""}" data-testid="${role}-mana">
+    <div class="mana-container frame-style" data-testid="${role}-mana">
       ${crystals}
       <span class="mana-text">${current}/${max}</span>
     </div>
@@ -1909,7 +1923,8 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
 
   return `
     <section class="center-line controls">
-      <button id="concede" class="battle-gear-btn" data-testid="concede" title="投降" aria-label="投降">⚙</button>
+      <button id="battle-settings-toggle" class="battle-gear-btn" data-testid="battle-settings" title="設定" aria-label="設定">⚙</button>
+      ${renderBattleSettingsMenu()}
       <div id="turn-indicator">Turn: ${readTurnNumber()}</div>
       <div class="turn-stack">
         <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
@@ -1929,6 +1944,27 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
         <button id="attack" ${canAttack ? "" : "disabled"} data-testid="attack-target">Attack Target</button>
       </div>
     </section>
+  `;
+}
+
+function renderBattleSettingsMenu(): string {
+  if (!view.battleSettingsOpen) return "";
+  return `
+    <div id="battle-settings-menu" class="battle-settings-menu" role="menu" aria-label="遊戲設定">
+      <div class="battle-settings-title">遊戲設定</div>
+      <button id="battle-view-deck" class="battle-settings-item" type="button" role="menuitem">
+        <span class="menu-icon">📋</span>
+        <span>查看牌組</span>
+      </button>
+      <button id="battle-audio-settings" class="battle-settings-item" type="button" role="menuitem">
+        <span class="menu-icon">🔊</span>
+        <span>音效選項</span>
+      </button>
+      <button id="concede" class="battle-settings-item danger" type="button" role="menuitem" data-testid="concede">
+        <span class="menu-icon">⚑</span>
+        <span>投降</span>
+      </button>
+    </div>
   `;
 }
 
@@ -2176,7 +2212,23 @@ function bindStaticActions(): void {
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => send({ type: "endTurn" }));
+  document.querySelector<HTMLButtonElement>("#battle-settings-toggle")?.addEventListener("click", () => {
+    view.battleSettingsOpen = !view.battleSettingsOpen;
+    clearHoverTooltip();
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#battle-view-deck")?.addEventListener("click", () => {
+    view.toast = "查看牌組功能準備中";
+    view.battleSettingsOpen = false;
+    render();
+  });
+  document.querySelector<HTMLButtonElement>("#battle-audio-settings")?.addEventListener("click", () => {
+    view.settingsOpen = true;
+    view.battleSettingsOpen = false;
+    render();
+  });
   document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => {
+    view.battleSettingsOpen = false;
     view.confirmingConcede = true;
     clearHoverTooltip();
     render();
@@ -2455,6 +2507,9 @@ function bindStaticActions(): void {
   document.querySelector<HTMLElement>("#changelog-backdrop")?.addEventListener("click", (e) => {
     if (e.target === e.currentTarget) { view.changelogOpen = false; render(); }
   });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-hover-card-id]")) {
+    bindHoverPreview(el, () => el.dataset.hoverCardId);
+  }
   document.querySelector<HTMLButtonElement>("#settings-sign-out")?.addEventListener("click", () => void signOut());
   document.querySelector<HTMLButtonElement>("#settings-bgm-mute")?.addEventListener("click", toggleBgmMute);
   document.querySelector<HTMLButtonElement>("#settings-sfx-mute")?.addEventListener("click", toggleSfxMute);
