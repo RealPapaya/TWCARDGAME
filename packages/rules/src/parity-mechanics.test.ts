@@ -245,6 +245,33 @@ describe("phase 2 parity mechanics", () => {
     expect(healed.attack).toBe(card("TW027").attack);
   });
 
+  it("temporary buffs clean up without drifting aura or enrage stats", () => {
+    const { state } = parityMatch();
+    const seat = state.turn.activeSeat;
+    const target = placeMinion(state, seat, "TW027", { currentHealth: card("TW027").health! - 1 });
+    placeMinion(state, seat, "TW028");
+    updateAuras(state, []);
+
+    expect(target.isEnraged).toBe(true);
+    expect(target.attack).toBe(card("TW027").attack! + 1 + card("TW027").keywords!.enrage!.value!);
+    expect(target.health).toBe(card("TW027").health! + 1);
+
+    const buffed = playCard(state, "S004", { type: "MINION", side: seat, instanceId: target.instanceId }, "temp-buff-aura-enrage").state;
+    const buffedTarget = buffed.players[seat].board.find((minion) => minion.instanceId === target.instanceId)!;
+    expect(buffedTarget.attack).toBe(card("TW027").attack! + 1 + card("TW027").keywords!.enrage!.value! + 2);
+    expect(buffedTarget.health).toBe(card("TW027").health! + 3);
+
+    const afterEnd = endTurn(buffed, seat, "temp-buff-cleanup");
+    const cleaned = afterEnd.players[seat].board.find((minion) => minion.instanceId === target.instanceId)!;
+    expect(cleaned.attack).toBe(card("TW027").attack! + 1);
+    expect(cleaned.health).toBe(card("TW027").health! + 1);
+    expect(cleaned.currentHealth).toBeLessThanOrEqual(cleaned.health);
+    expect(cleaned.tempBuffs).toEqual([]);
+    expect(cleaned.auraAttack).toBe(1);
+    expect(cleaned.auraHealth).toBe(1);
+    expect(cleaned.isEnraged).toBe(false);
+  });
+
   it("quests and timers advance at end of turn and resolve before the next turn starts", () => {
     const summonQuestMatch = parityMatch();
     const summonSeat = summonQuestMatch.state.turn.activeSeat;

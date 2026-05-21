@@ -21,6 +21,8 @@ This folder is a parallel rewrite scaffold. The existing v1 static app is preser
 - `packages/db`: Supabase client helpers and initial RLS migration.
 
 For card additions and new mechanics, follow [Card Authoring Workflow](./card-authoring-workflow.md).
+For web ownership boundaries, follow [Web Module Ownership](./web-module-ownership.md).
+For larger feature additions, follow [Feature Extension Points](./feature-extension-points.md).
 
 ## Current Milestone
 
