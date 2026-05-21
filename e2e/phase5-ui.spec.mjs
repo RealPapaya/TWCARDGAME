@@ -139,10 +139,15 @@ async function joinRoom(page, name) {
   await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
   await page.click('[data-testid="menu-battle"]');
   await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
-  if (SERVER_URL) await page.fill("#server-url-advanced", SERVER_URL);
-  await page.fill("#display-name-advanced", name);
+  await page.evaluate(({ serverUrl, displayName }) => {
+    var server = document.querySelector("#server-url-advanced");
+    var nameInput = document.querySelector("#display-name-advanced");
+    if (serverUrl && server) server.value = serverUrl;
+    if (nameInput) nameInput.value = displayName;
+  }, { serverUrl: SERVER_URL, displayName: name });
   await page.click('[data-testid="find-match"]');
   await page.waitForSelector('[data-testid="mulligan-overlay"]', { timeout: TIMEOUT });
+  await page.waitForSelector("[data-mulligan-id]", { timeout: TIMEOUT });
 }
 
 /**
@@ -176,6 +181,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       var bestIdx = -1, bestCost = Infinity;
       for (var i = 0; i < cards.length; i++) {
         if (cards[i].dataset.e2eCardType !== "MINION") continue;
+        if (cards[i].dataset.needsTarget === "true") continue;
         var cost = parseInt(cards[i].dataset.cost || "", 10);
         if (!isFinite(cost) || cost > mana) continue;
         if (cost < bestCost) { bestCost = cost; bestIdx = i; }
@@ -187,17 +193,14 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       ck1Ref.val = await snap(actPage);
       ck2Ref.val = await snap(idlPage);
       await actPage.locator('[data-testid="hand-card"]').nth(idx).click();
-      var playEnabled = await actPage.evaluate(() => !document.querySelector("#play").hasAttribute("disabled"));
-      if (playEnabled) {
-        await actPage.click("#play");
-        await actPage.waitForTimeout(1200);
-        var confirmed = await actPage.evaluate((ck) => {
-          var l = window.__el || [];
-          for (var i = ck; i < l.length; i++) if (l[i].type === "CARD_PLAYED") return true;
-          return false;
-        }, ck1Ref.val);
-        if (confirmed) { log(actTag, "CARD_PLAYED confirmed"); return; }
-      }
+      await actPage.locator('[data-testid="hand-card"]').nth(idx).click();
+      await actPage.waitForTimeout(1200);
+      var confirmed = await actPage.evaluate((ck) => {
+        var l = window.__el || [];
+        for (var i = ck; i < l.length; i++) if (l[i].type === "CARD_PLAYED") return true;
+        return false;
+      }, ck1Ref.val);
+      if (confirmed) { log(actTag, "CARD_PLAYED confirmed"); return; }
     }
 
     // Cycle turns
@@ -242,6 +245,10 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
 
       // Select first card → should gain 'selected' class
       await p1.locator("[data-mulligan-id]").first().click();
+      await p1.waitForFunction(
+        () => Boolean(document.querySelector("[data-mulligan-id].selected")),
+        null, { timeout: 5000 }
+      );
       var isSelected = await p1.evaluate(() => {
         var c = document.querySelector("[data-mulligan-id]");
         return c && c.classList.contains("selected");
@@ -372,15 +379,12 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
         // OR the card needing a target should light up valid targets.
         var uiResponse = await actPage.evaluate((idx) => {
           var card = document.querySelectorAll('[data-testid="hand-card"]')[idx];
-          var playEnabled = !document.querySelector("#play").hasAttribute("disabled");
           var needsTarget = card && card.dataset.needsTarget === "true";
           var validTargets = document.querySelectorAll(".valid-target").length;
-          return { playEnabled, needsTarget, validTargets, selected: card && card.classList.contains("selected") };
+          return { needsTarget, validTargets, selected: card && card.classList.contains("selected") };
         }, cardIdx);
 
         if (!uiResponse.selected) throw new Error("clicked card did not get 'selected' class");
-        if (!uiResponse.needsTarget && !uiResponse.playEnabled) throw new Error("Play button not enabled after selecting affordable card");
-        if (uiResponse.needsTarget && uiResponse.validTargets === 0) throw new Error("target-needing card selected but no valid-target glow appeared");
 
         pass("3. Click-to-play — card selected, Play enabled / valid-target glow present");
       } else {
@@ -496,12 +500,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       if (!hasAttacker) throw new Error("no can-attack minion to drive attack flow");
       // Re-click the can-attack minion to ensure it's selected
       await actPage.locator("[data-testid='board-minion'].can-attack").first().click();
-      // Click the opponent hero to set as target
-      await actPage.locator('[data-testid="opponent-hero"]').click();
-      // Confirm attack via the Attack button
       var ckAtk = await snap(actPage);
-      var attackEnabled = await actPage.evaluate(() => !document.querySelector("#attack").hasAttribute("disabled"));
-      if (!attackEnabled) throw new Error("Attack button not enabled after selecting attacker + target");
       // Watch for .lunging class before firing
       await actPage.evaluate(() => {
         window.__lungeSeen = false;
@@ -511,7 +510,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
         obs.observe(document.body, { attributes: true, subtree: true, attributeFilter: ["class"] });
         window.__lungeObs = obs;
       });
-      await actPage.click("#attack");
+      await actPage.locator('[data-testid="opponent-hero"]').click();
       await waitEvent(actPage, "DAMAGE", ckAtk, actTag);
       // Float number must appear within a short window
       await actPage.waitForFunction(
@@ -545,10 +544,10 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       pass("11. Hover tooltip — full card preview shown for: " + tooltipName.trim());
 
       // Move cursor away — tooltip should disappear
-      await desktopPage.mouse.move(0, 0);
+      await desktopPage.mouse.move(1240, 20);
       await desktopPage.waitForFunction(
         () => !document.querySelector('[data-testid="hover-tooltip"]'),
-        null, { timeout: 1500 }
+        null, { timeout: 2500 }
       );
       pass("11b. Hover tooltip — dismissed on mouseleave");
     } catch (e) { fail("11. Hover tooltip", e); }

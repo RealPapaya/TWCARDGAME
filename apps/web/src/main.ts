@@ -687,7 +687,7 @@ function renderMenu(): string {
     case "shop":
       return renderLegacyShopScreen();
     case "ai":
-      return renderBattleScreen();
+      return renderAiBattleSetupScreen();
     case "main":
     default:
       return renderMainMenu();
@@ -825,6 +825,58 @@ function renderBattleScreen(): string {
   const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
   const accountMode = Boolean(supabase);
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const aiEntryDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const deckSlots = accountMode
+    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    : `<div class="deck-slot saved-deck selected dev-deck-slot">
+        <button class="deck-select" type="button">
+          <h3>Dev Deck</h3>
+          <span class="slot-info">Server default deck</span>
+        </button>
+      </div>`;
+
+  return `
+    <section class="screen battle-pick v1-deck-selection" data-screen="battle">
+      <div class="battle-selection-content">
+        <button class="back-button neon-button secondary" data-menu-screen="main" data-testid="back-to-menu">返回</button>
+        <h2 id="deck-select-title" class="sub-title">選擇牌組</h2>
+        <div class="deck-slots-container" data-testid="battle-deck-list">
+          ${deckSlots}
+          <button id="new-deck" type="button" class="deck-slot add-deck-slot">
+            <span class="plus-icon">+</span>
+            <span class="slot-info">新增牌組</span>
+          </button>
+        </div>
+        <div class="battle-selection-actions">
+          <div class="battle-start-row">
+            <button id="find-match" class="neon-button battle-start-btn" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
+              ${view.joining ? "連線中..." : "開始戰鬥"}
+            </button>
+            <button class="neon-button battle-start-btn" data-menu-screen="ai" data-testid="battle-ai-entry" ${aiEntryDisabled ? "disabled" : ""}>AI 對戰</button>
+          </div>
+          <div class="private-room-section battle-private-room">
+            <button id="create-private-room" class="neon-button secondary" data-testid="create-private-room" ${findDisabled ? "disabled" : ""}>建立房間代碼</button>
+            <form id="private-join-form" class="private-join-form">
+              <input id="private-join-input" placeholder="輸入房間代碼" maxlength="10" />
+              <button type="submit" class="neon-button secondary" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
+            </form>
+            ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode!) : ""}
+          </div>
+          <details class="advanced-disclosure battle-advanced">
+            <summary>進階設定</summary>
+            <form id="join-form-advanced" class="advanced-form">
+              <label>Server URL
+                <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
+              </label>
+              ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
+            </form>
+          </details>
+          <p class="battle-selected-note">${selectedDeck ? `已選擇：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一組完整 30 張牌組。" : "Dev mode 會使用伺服器預設牌組。"}</p>
+        </div>
+      </div>
+      ${renderMatchmakingOverlay()}
+    </section>
+  `;
   const aiDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
   const difficulties: { value: AiDifficulty; label: string }[] = [
     { value: "easy", label: "簡單" },
@@ -847,7 +899,7 @@ function renderBattleScreen(): string {
           <div class="deck-list" data-testid="battle-deck-list">
             ${accountMode ? (view.decks.map(renderSavedDeck).join("") || `<p class="muted">尚未建立牌組，請先新增一組。</p>`) : `<p class="muted">Dev mode: server will assign a default deck.</p>`}
           </div>
-          <p class="muted">${selectedDeck ? `已選：${escapeHtml(selectedDeck.name)}` : accountMode ? "請選擇一套合法的 30 張牌組。" : "Dev mode 不需選牌組。"}</p>
+          <p class="muted">${selectedDeck ? `已選：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一套合法的 30 張牌組。" : "Dev mode 不需選牌組。"}</p>
         </section>
         <div class="battle-mode-panels">
           <section class="parchment-card match-panel">
@@ -863,7 +915,7 @@ function renderBattleScreen(): string {
                 <input id="private-join-input" placeholder="輸入 6 碼代碼" maxlength="10" />
                 <button type="submit" data-testid="private-join-submit" ${findDisabled ? "disabled" : ""}>加入房間</button>
               </form>
-              ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode) : ""}
+              ${view.privateJoinCode ? renderPrivateCodeBanner(view.privateJoinCode!) : ""}
             </div>
             <details class="advanced-disclosure">
               <summary>進階設定</summary>
@@ -920,6 +972,83 @@ function renderAiThemeCard(theme: (typeof AI_THEMES)[number]): string {
         <span class="ai-theme-label">${escapeHtml(theme.label)}</span>
       </span>
     </button>
+  `;
+}
+
+function renderAiBattleSetupScreen(): string {
+  const accountMode = Boolean(supabase);
+  const aiDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string }[] = [
+    { value: "easy", label: "簡單" },
+    { value: "normal", label: "普通" },
+    { value: "hard", label: "困難" }
+  ];
+  const selectedTheme = AI_THEMES.find((theme) => theme.id === view.aiTheme) ?? AI_THEMES[0];
+  const selectedHero = selectedTheme ? cardCatalog.get(selectedTheme.heroCardId) : undefined;
+  const selectedHeroArt = selectedHero ? assetUrl(selectedHero.image) : "";
+
+  return `
+    <section class="screen ai-battle-setup" data-screen="ai">
+      <div class="battle-setup-container">
+        <div class="setup-preview-panel">
+          <div class="preview-image-container">
+            ${selectedHeroArt ? `<img id="preview-image" src="${escapeAttr(selectedHeroArt)}" alt="${escapeAttr(selectedTheme?.name ?? "AI")}" />` : ""}
+            <div class="preview-illustration-overlay active">
+              <div id="preview-illustration-title" class="illustration-title">${escapeHtml(selectedTheme?.name ?? "AI")}</div>
+              <div id="preview-illustration-subtitle" class="illustration-subtitle">${escapeHtml(selectedTheme?.partyTag ?? "")}</div>
+            </div>
+          </div>
+          <div class="preview-description">
+            <p>${escapeHtml(selectedTheme?.label ?? "選擇一個 AI 主題與難度。")}</p>
+          </div>
+        </div>
+        <div class="setup-options-panel">
+          <img src="/images/ui/AI_Selection.webp" class="ai-selection-decoration" alt="" />
+          <div class="options-scroll-area">
+            <div id="deck-options-container" data-testid="ai-theme-options">
+              ${AI_THEMES.map((theme) => renderAiThemeOption(theme, difficulties)).join("")}
+            </div>
+          </div>
+          <div class="setup-footer">
+            <div id="start-battle-wrapper" class="${aiDisabled ? "disabled" : ""}">
+              <button id="start-ai-match" class="hearth-select-btn" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
+                <div class="btn-ripple"></div>
+                <span class="btn-text">${view.joining ? "連線" : "對戰"}</span>
+                <div class="ring-glow"></div>
+              </button>
+            </div>
+            <button class="neon-button secondary" data-menu-screen="battle">返回</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { value: AiDifficulty; label: string }[]): string {
+  const selected = view.aiTheme === theme.id;
+  return `
+    <div class="deck-option-group ${selected ? "expanded selected" : ""}">
+      <button
+        type="button"
+        class="option-item ai-theme-card ${selected ? "selected" : ""}"
+        data-ai-theme="${escapeAttr(theme.id)}"
+        data-testid="ai-theme-${escapeAttr(theme.id)}"
+        aria-pressed="${selected}"
+      >
+        <span class="option-label">${escapeHtml(theme.name)}</span>
+        <span class="ai-theme-party">${escapeHtml(theme.partyTag)}</span>
+        <span class="expand-arrow">›</span>
+      </button>
+      <div class="difficulty-options">
+        ${difficulties.map((opt) => `
+          <label class="sub-difficulty-btn ${view.aiDifficulty === opt.value ? "selected" : ""}">
+            <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficulty === opt.value ? "checked" : ""} />
+            <span>${opt.label}</span>
+          </label>
+        `).join("")}
+      </div>
+    </div>
   `;
 }
 
@@ -1328,13 +1457,15 @@ function renderSavedDeck(deck: DeckRow): string {
   const selected = deck.id === view.selectedDeckId;
   const incomplete = deck.card_ids.length !== 30;
   return `
-    <div class="saved-deck ${selected ? "selected" : ""}">
+    <div class="deck-slot saved-deck ${selected ? "selected" : ""} ${incomplete ? "incomplete" : ""}">
       <button class="deck-select" data-select-deck="${escapeAttr(deck.id)}" ${incomplete ? `disabled title="牌組未滿 30 張，無法用於對戰"` : ""}>
-        <strong>${escapeHtml(deck.name)}</strong>
+        <h3>${escapeHtml(deck.name)}</h3>
         <span>${incomplete ? "⚠ " : ""}${deck.card_ids.length}/30 張</span>
       </button>
-      <button data-edit-deck="${escapeAttr(deck.id)}">Edit</button>
-      <button class="danger" data-delete-deck="${escapeAttr(deck.id)}">Delete</button>
+      <div class="deck-slot-actions">
+        <button type="button" data-edit-deck="${escapeAttr(deck.id)}">編輯</button>
+        <button type="button" class="danger btn-delete-deck" data-delete-deck="${escapeAttr(deck.id)}">×</button>
+      </div>
     </div>
   `;
 }
@@ -1515,26 +1646,54 @@ function renderGame(status: GameStatus | ""): string {
       : "No selection";
 
   return `
-    <section class="status" data-testid="match-status">
+    <section class="topbar battle-e2e-topbar" aria-hidden="true">
+      <p>Seat: ${escapeHtml(view.mySeat ?? "none")}</p>
+    </section>
+    <section class="status battle-debug-status" data-testid="match-status">
       <span>Status: ${escapeHtml(status || "waiting")}</span>
       <span>Turn: ${readTurnNumber()}</span>
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
       <span>${escapeHtml(targetHint)}</span>
     </section>
     <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""}" data-testid="battle-surface">
+      ${renderBattleHistoryPanel()}
       ${renderConnectionBanner()}
       ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
-      ${renderCenterLine(activeSeat)}
+      ${renderCenterLine(activeSeat, opponentPlayer, myPlayer)}
       ${renderPlayerArea(me ?? "player1", myPlayer, "player")}
+      ${renderBattlePlayerInfo(myPlayer)}
       ${renderEventCues()}
       ${renderMulliganOverlay(status)}
       ${renderResultOverlay(status)}
       ${renderConcedeModal()}
     </section>
     ${renderHoverTooltip()}
-    <section class="log" data-testid="event-log">
-      ${view.events.map(renderEventLine).join("")}
+  `;
+}
+
+function renderBattleHistoryPanel(): string {
+  return `
+    <section id="match-history-panel" class="log battle-history-panel" data-testid="event-log" data-preserve-scroll>
+      <div class="history-tab" aria-hidden="true">▤</div>
+      <div class="history-content">
+        <div class="history-header">戰鬥紀錄</div>
+        <div id="history-list">
+          ${view.events.map(renderEventLine).join("")}
+        </div>
+      </div>
     </section>
+  `;
+}
+
+function renderBattlePlayerInfo(player: PublicPlayer | undefined): string {
+  const displayName = player?.displayName || view.profile?.display_name || "玩家";
+  return `
+    <aside class="player-info-card battle-player-info">
+      <div class="player-details">
+        <div class="player-username">${escapeHtml(displayName)}</div>
+        <div class="player-title">無稱號</div>
+      </div>
+    </aside>
   `;
 }
 
@@ -1557,15 +1716,11 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
 
   return `
     <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
-      <div class="status-cluster">
-        ${renderHero(seat, player, role)}
-        ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role)}
-        <div class="pile-row">
-          <div class="deck-pile" title="Deck">${player?.deckCount ?? 0}</div>
-          <div class="graveyard-pile" title="Graveyard">${player?.graveyardCount ?? 0}</div>
-        </div>
-      </div>
       ${role === "opponent" ? renderOpponentHand(handCount) : ""}
+      ${renderHero(seat, player, role)}
+      <div class="status-cluster">
+        ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role)}
+      </div>
       <div class="${boardClasses}" data-testid="${role}-board">
         ${board.map((minion) => renderMinion(seat, minion)).join("") || renderEmptySlots()}
       </div>
@@ -1611,7 +1766,7 @@ function renderMana(current: number, max: number, role: "player" | "opponent"): 
   return `
     <div class="mana-container ${role === "player" ? "frame-style" : ""}" data-testid="${role}-mana">
       ${crystals}
-      <span class="mana-text">Mana ${current}/${max}</span>
+      <span class="mana-text">${current}/${max}</span>
     </div>
   `;
 }
@@ -1744,7 +1899,7 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
   };
 }
 
-function renderCenterLine(activeSeat: Seat | ""): string {
+function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, myPlayer?: PublicPlayer): string {
   const isMyTurn = activeSeat && activeSeat === view.mySeat;
   const selectedCard = selectedHandCard();
   const selectedNeedsTarget = selectedCard ? cardNeedsTarget(selectedCard.cardId) : false;
@@ -1754,14 +1909,25 @@ function renderCenterLine(activeSeat: Seat | ""): string {
 
   return `
     <section class="center-line controls">
-      <button id="concede" class="danger" data-testid="concede">Concede</button>
+      <button id="concede" class="battle-gear-btn" data-testid="concede" title="投降" aria-label="投降">⚙</button>
+      <div id="turn-indicator">Turn: ${readTurnNumber()}</div>
       <div class="turn-stack">
         <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
         <span id="indicator-player" class="turn-light ${isMyTurn ? "active" : ""}">${isMyTurn ? "Your Turn" : "Waiting"}</span>
       </div>
-      <button id="play" ${canPlay ? "" : "disabled"} data-testid="play-selected">${primaryLabel}</button>
-      <button id="attack" ${canAttack ? "" : "disabled"} data-testid="attack-target">Attack Target</button>
-      <button id="end-turn" class="end-turn-btn" ${view.room ? "" : "disabled"} data-testid="end-turn">End Turn</button>
+      <div class="end-turn-group">
+        <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
+          <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
+        </div>
+        <button id="end-turn" class="end-turn-btn" ${view.room ? "" : "disabled"} data-testid="end-turn">結束回合</button>
+        <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
+          <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
+        </div>
+      </div>
+      <div class="legacy-hidden-actions" aria-hidden="true">
+        <button id="play" ${canPlay ? "" : "disabled"} data-testid="play-selected">${primaryLabel}</button>
+        <button id="attack" ${canAttack ? "" : "disabled"} data-testid="attack-target">Attack Target</button>
+      </div>
     </section>
   `;
 }
@@ -3489,7 +3655,17 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
     el.addEventListener("click", () => {
-      view.selectedHandId = view.selectedHandId === el.dataset.handId ? undefined : el.dataset.handId;
+      const handId = el.dataset.handId;
+      const card = view.hand.find((item) => item.instanceId === handId);
+      if (handId && card && view.selectedHandId === handId && canAfford(card.cost) && !cardNeedsTarget(card.cardId)) {
+        send({ type: "playCard", handInstanceId: handId, target: inferDefaultTarget(card.cardId) });
+        view.selectedHandId = undefined;
+        view.selectedAttackerId = undefined;
+        view.selectedTarget = undefined;
+        render();
+        return;
+      }
+      view.selectedHandId = view.selectedHandId === handId ? undefined : handId;
       view.selectedAttackerId = undefined;
       view.selectedTarget = undefined;
       render();
@@ -3527,12 +3703,25 @@ function bindSelectionActions(): void {
     el.addEventListener("click", () => {
       const target = JSON.parse(el.dataset.target!) as TargetRef;
       if (!isTargetHighlighted(target)) return;
-      if (confirmSelectedTarget(target)) {
+      if (view.selectedAttackerId && isLegalAttackTarget(target)) {
+        send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target });
         view.selectedAttackerId = undefined;
         view.selectedHandId = undefined;
         view.selectedTarget = undefined;
       } else {
-        view.selectedTarget = target;
+        const card = selectedHandCard();
+        if (card && isLegalCardTarget(target)) {
+          send({ type: "playCard", handInstanceId: card.instanceId, target });
+          view.selectedAttackerId = undefined;
+          view.selectedHandId = undefined;
+          view.selectedTarget = undefined;
+        } else if (confirmSelectedTarget(target)) {
+          view.selectedAttackerId = undefined;
+          view.selectedHandId = undefined;
+          view.selectedTarget = undefined;
+        } else {
+          view.selectedTarget = target;
+        }
       }
       render();
     });

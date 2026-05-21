@@ -94,8 +94,12 @@ async function openBattleScreen(page, name) {
   await page.waitForSelector('[data-testid="menu-battle"]', { timeout: TIMEOUT });
   await page.click('[data-testid="menu-battle"]');
   await page.waitForSelector('[data-testid="find-match"]', { timeout: TIMEOUT });
-  if (SERVER_URL) await page.fill("#server-url-advanced", SERVER_URL);
-  await page.fill("#display-name-advanced", name);
+  await page.evaluate(({ serverUrl, displayName }) => {
+    var server = document.querySelector("#server-url-advanced");
+    var nameInput = document.querySelector("#display-name-advanced");
+    if (serverUrl && server) server.value = serverUrl;
+    if (nameInput) nameInput.value = displayName;
+  }, { serverUrl: SERVER_URL, displayName: name });
 }
 
 async function startMatchmaking(page) {
@@ -271,6 +275,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       var bestIdx = -1, bestCost = Infinity;
       for (var i = 0; i < cards.length; i++) {
         if (cards[i].dataset.e2eCardType !== "MINION") continue;
+        if (cards[i].dataset.needsTarget === "true") continue;
         var cost = parseInt(cards[i].dataset.cost || "", 10);
         if (!Number.isFinite(cost)) continue;
         if (cost > mana) continue;
@@ -287,18 +292,13 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       var ck2 = await snap(snapPage2);
 
       await actPage.locator('[data-testid="hand-card"]').nth(idx).click();
-      var playEnabled = await actPage.evaluate(function () {
-        return !document.querySelector("#play").hasAttribute("disabled");
-      });
-      if (playEnabled) {
-        await actPage.click("#play");
-        await actPage.waitForTimeout(1200);
-        if (await hadEvent(actPage, "CARD_PLAYED", ck1)) {
-          log(actTag, "CARD_PLAYED confirmed");
-          return { ck1: ck1, ck2: ck2 };
-        }
-        log(actTag, "play rejected or not confirmed, cycling");
+      await actPage.locator('[data-testid="hand-card"]').nth(idx).click();
+      await actPage.waitForTimeout(1200);
+      if (await hadEvent(actPage, "CARD_PLAYED", ck1)) {
+        log(actTag, "CARD_PLAYED confirmed");
+        return { ck1: ck1, ck2: ck2 };
       }
+      log(actTag, "play rejected or not confirmed, cycling");
     } else {
       log(actTag, "no MINION in hand, cycling turns");
     }
@@ -478,17 +478,9 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     }, null, { timeout: 5000 });
     pass("Step 4: Selecting attacker highlights valid targets");
 
-    // Select target (enemy minion)
+    // Select target (enemy minion); target click now confirms the attack.
     var enemyLoc = actPage.locator(".player:not(.me) .board button.minion").first();
     await enemyLoc.waitFor({ timeout: TIMEOUT });
-    await enemyLoc.click();
-    log(actTag, "target selected");
-
-    // Wait for Attack button to enable
-    await actPage.waitForFunction(
-      function () { return !document.querySelector("#attack").hasAttribute("disabled"); },
-      null, { timeout: 5000 }
-    );
 
     // Record enemy HP before
     var hpBefore = await actPage.evaluate(function () {
@@ -500,8 +492,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     log(actTag, "enemy minion HP before: " + hpBefore);
 
     var ck4a = await snap(p1), ck4b = await snap(p2);
-    await actPage.click("#attack");
-    log(actTag, "Attack Target clicked");
+    await enemyLoc.click();
+    log(actTag, "target clicked");
 
     await Promise.all([
       waitEvent(p1, "DAMAGE", ck4a, "P1"),
