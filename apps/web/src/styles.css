@@ -1170,6 +1170,35 @@ input {
   border-color: var(--red);
 }
 
+.mulligan-card.selected .card-art-box {
+  filter: grayscale(100%) contrast(120%);
+}
+
+.mulligan-card.selected::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: inherit;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.mulligan-card.selected::after {
+  content: '✕';
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 100px;
+  color: #ff3333;
+  font-weight: 900;
+  text-shadow: 0 0 20px rgba(255, 0, 0, 0.8);
+  z-index: 3;
+  pointer-events: none;
+}
+
 .mulligan-card .card-art-box {
   height: 92px;
 }

@@ -1940,13 +1940,13 @@ function renderMulliganOverlay(status: GameStatus | ""): string {
   return `
     <section id="mulligan-modal" class="mulligan-overlay ${ready ? "submitted" : ""}" data-testid="mulligan-overlay">
       <div class="mulligan-content">
-        <h2>Mulligan</h2>
-        <p>${ready ? "Waiting for opponent" : "Select cards to replace, then confirm."}</p>
+        <h2>起手的手牌</h2>
+        <p>${ready ? "等待對手完成換牌..." : "保留或更換卡牌"}</p>
         <div class="mulligan-card-area">
           ${view.hand.map((card) => renderMulliganCard(card, ready)).join("")}
         </div>
         <button id="mulligan" ${ready ? "disabled" : ""} data-testid="mulligan-confirm">
-          ${ready ? "Ready" : `Confirm${selectedCount ? ` (${selectedCount})` : ""}`}
+          ${ready ? "等待中" : `確定${selectedCount ? ` (${selectedCount})` : ""}`}
         </button>
       </div>
     </section>
@@ -1965,7 +1965,7 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
       ${disabled ? "disabled" : ""}
     >
       ${renderCardFace(resolved, "mulligan")}
-      ${selected ? `<span class="mulligan-replace-tag">Replace</span>` : ""}
+      ${selected ? `<span class="mulligan-replace-tag">替換</span>` : ""}
       <span class="sr-e2e">Cost ${card.cost} ${card.type}</span>
     </button>
   `;
