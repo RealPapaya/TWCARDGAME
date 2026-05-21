@@ -1,0 +1,139 @@
+import type { GameEvent } from "@twcardgame/shared";
+
+export type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
+
+export type AudioViewState = {
+  bgmVolume: number;
+  sfxVolume: number;
+  bgmMuted: boolean;
+  sfxMuted: boolean;
+};
+
+export const bgmVolumeKey = "twcardgame.bgmVolume";
+export const sfxVolumeKey = "twcardgame.sfxVolume";
+export const bgmMutedKey = "twcardgame.bgmMuted";
+export const sfxMutedKey = "twcardgame.sfxMuted";
+
+const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
+const sfxPaths: Record<SoundCue, string> = {
+  cardPlay: "/audio/sfx/LowCostMionion.mp3",
+  attack: "/audio/sfx/HeavyHit.mp3",
+  damage: "/audio/sfx/LightHit.mp3",
+  heal: "/audio/sfx/card-draw.mp3",
+  death: "/audio/sfx/MionionDeath.mp3",
+  turn: "/audio/sfx/heavy_sandstone_click.mp3",
+  reject: "/audio/sfx/Retreat.mp3",
+  packFlip: "/audio/sfx/card-draw.mp3"
+};
+
+let audioUnlocked = false;
+let audioView: AudioViewState | undefined;
+let requestRender: (() => void) | undefined;
+
+export function configureAudio(view: AudioViewState, render: () => void): void {
+  audioView = view;
+  requestRender = render;
+}
+
+export function installAudioUnlock(): void {
+  const view = requireAudioView();
+  bgmTrack.loop = true;
+  bgmTrack.preload = "auto";
+  bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  const unlock = () => {
+    audioUnlocked = true;
+    ensureBgm();
+    window.removeEventListener("pointerdown", unlock);
+    window.removeEventListener("keydown", unlock);
+  };
+  window.addEventListener("pointerdown", unlock, { once: true });
+  window.addEventListener("keydown", unlock, { once: true });
+}
+
+export function ensureBgm(): void {
+  const view = audioView;
+  if (!view || !audioUnlocked) return;
+  bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  if (view.bgmMuted) {
+    bgmTrack.pause();
+    return;
+  }
+  if (!bgmTrack.paused) return;
+  void bgmTrack.play().catch(() => {
+    // Browsers may still block playback until a stronger user gesture.
+  });
+}
+
+export function playSfx(cue: SoundCue, volume?: number): void {
+  const view = audioView;
+  if (!view || view.sfxMuted || !audioUnlocked) return;
+  const audio = new Audio(sfxPaths[cue]);
+  audio.preload = "auto";
+  audio.volume = volume ?? view.sfxVolume;
+  void audio.play().catch(() => {
+    // Missing files or browser autoplay policy should never break gameplay.
+  });
+}
+
+export function setBgmVolume(v: number): void {
+  const view = requireAudioView();
+  view.bgmVolume = v;
+  bgmTrack.volume = view.bgmMuted ? 0 : v;
+  saveAudioPrefs(view);
+}
+
+export function setSfxVolume(v: number): void {
+  const view = requireAudioView();
+  view.sfxVolume = v;
+  saveAudioPrefs(view);
+}
+
+export function toggleBgmMute(): void {
+  const view = requireAudioView();
+  view.bgmMuted = !view.bgmMuted;
+  saveAudioPrefs(view);
+  ensureBgm();
+  requestRender?.();
+}
+
+export function toggleSfxMute(): void {
+  const view = requireAudioView();
+  view.sfxMuted = !view.sfxMuted;
+  saveAudioPrefs(view);
+  if (!view.sfxMuted) playSfx("turn");
+  requestRender?.();
+}
+
+export function playEventAudio(events: GameEvent[]): void {
+  const played = new Set<SoundCue>();
+  for (const event of events) {
+    const cue =
+      event.type === "CARD_PLAYED" || event.type === "MINION_SUMMONED" ? "cardPlay"
+      : event.type === "ATTACK" ? "attack"
+      : event.type === "DAMAGE" ? "damage"
+      : event.type === "HEAL" ? "heal"
+      : event.type === "DESTROY" ? "death"
+      : event.type === "TURN_STARTED" ? "turn"
+      : event.type === "COMMAND_REJECTED" ? "reject"
+      : undefined;
+    if (!cue || played.has(cue)) continue;
+    played.add(cue);
+    playSfx(cue);
+  }
+}
+
+function saveAudioPrefs(view: AudioViewState): void {
+  try {
+    localStorage.setItem(bgmVolumeKey, String(view.bgmVolume));
+    localStorage.setItem(sfxVolumeKey, String(view.sfxVolume));
+    localStorage.setItem(bgmMutedKey, String(view.bgmMuted));
+    localStorage.setItem(sfxMutedKey, String(view.sfxMuted));
+  } catch {
+    // Blocked storage; in-memory prefs still work.
+  }
+}
+
+function requireAudioView(): AudioViewState {
+  if (!audioView) throw new Error("Audio has not been configured.");
+  return audioView;
+}
