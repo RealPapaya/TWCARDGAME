@@ -3027,12 +3027,18 @@ input {
   gap: 22px;
   position: relative;
   z-index: 2;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
 }
 
 .battle-mode-panels {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
 }
 
 @media (max-width: 0px) {
@@ -3048,11 +3054,20 @@ input {
   margin-bottom: 12px;
 }
 
+.deck-pick {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 .deck-pick .deck-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  max-height: 450px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
   overflow-y: auto;
 }
 
@@ -3061,13 +3076,23 @@ input {
   flex-direction: column;
   gap: 14px;
   text-align: center;
-  justify-content: center;
+  justify-content: flex-start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.match-panel > h3,
+.match-panel .ai-section-label,
+.match-panel .ai-difficulty-options,
+.match-panel .primary-action {
+  flex-shrink: 0;
 }
 
 .primary-action {
   padding: 14px 22px;
   font-size: 20px;
   background: #d4af37;
+  flex-shrink: 0;
 }
 
 .ghost-button {
@@ -5239,7 +5264,7 @@ input {
   color: var(--wood-dark);
   text-align: left;
 }
-.ai-theme-options { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; }
+.ai-theme-options { display: flex; flex-direction: column; gap: 8px; margin: 4px 0 12px; overflow-y: auto; flex: 1; min-height: 0; }
 .ai-theme-card {
   display: grid;
   grid-template-columns: 52px 1fr;

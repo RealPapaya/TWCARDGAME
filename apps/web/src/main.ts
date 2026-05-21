@@ -83,9 +83,7 @@ type ClientViewState = {
   eventStatus?: GameStatus;
   toast?: string;
   joining: boolean;
-  joinError?: string;
   accountLoading: boolean;
-  accountError?: string;
   session?: Session | null;
   profile?: ProfileRow;
   decks: DeckRow[];
@@ -122,15 +120,12 @@ type ClientViewState = {
   friendRequests: FriendRequestRow[];
   friendsPanel: FriendsPanel;
   friendsLoading?: boolean;
-  friendsError?: string;
   leaderboard: LeaderboardRow[];
   leaderboardLoading?: boolean;
-  leaderboardError?: string;
   leaderboardSortBy: "wins" | "level";
   publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
-  shopError?: string;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
   packOpeningRewards?: PackOpeningReward[];
   packOpeningFlipped?: boolean[];
@@ -710,7 +705,6 @@ function renderAuthPanel(): string {
             <button type="button" class="auth-tab active" ${view.accountLoading ? "disabled" : ""}>登入</button>
             <button type="button" id="sign-up" class="auth-tab" ${view.accountLoading ? "disabled" : ""}>註冊</button>
           </div>
-        ${view.accountError ? `<p class="error-text">${escapeHtml(view.accountError)}</p>` : ""}
         <form id="auth-form" class="auth-form">
           <label class="auth-label">
             <span>帳號</span>
@@ -758,8 +752,6 @@ function renderMainMenu(): string {
       <div class="main-menu-center">
         <h1 class="game-title">寶島遊戲王</h1>
         <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
-        ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-        ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
         <nav class="menu-buttons" aria-label="Main menu">
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
           <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
@@ -846,8 +838,6 @@ function renderBattleScreen(): string {
         <button class="back-button" data-menu-screen="main" data-testid="back-to-menu">← 返回主選單</button>
         <h2>進入戰鬥</h2>
       </header>
-      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
-      ${view.joinError ? `<p class="error-text menu-status">${escapeHtml(view.joinError)}</p>` : ""}
       <div class="battle-pick-grid">
         <section class="parchment-card deck-pick">
           <div class="panel-heading">
@@ -985,7 +975,6 @@ function renderProfileScreen(): string {
         <button class="back-button" data-menu-screen="main">← 返回主選單</button>
         <h2>個人頁面</h2>
       </header>
-      ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
       <div class="parchment-card profile-panel" data-testid="profile-panel">
         <div class="profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
@@ -1127,7 +1116,6 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
               ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" title="一鍵分解所有超過 2 張的多餘卡牌" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
             </div>
           </header>
-          ${view.accountError ? `<p class="error-text menu-status">${escapeHtml(view.accountError)}</p>` : ""}
           <div class="collection-controls-bar">
             <span id="collection-progress">已收集卡片種類: ${ownedTotal}/${collectibles.length}</span>
             <label class="collection-select" aria-label="排序">
@@ -2440,8 +2428,6 @@ function bindPackOpeningActions(): void {
 function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
   view.menuScreen = target;
-  view.accountError = undefined;
-  view.joinError = undefined;
   view.avatarPickerOpen = false;
   view.pinnedCollectionCardId = undefined;
   if (target !== "profile") { view.editingDisplayName = undefined; view.editingDisplayNameActive = false; }
@@ -2480,7 +2466,6 @@ function renderFriendsScreen(): string {
         <button class="back-button" data-menu-screen="main">← 返回主選單</button>
         <h2>好友 · Friends</h2>
       </header>
-      ${view.friendsError ? `<p class="error-text menu-status">${escapeHtml(view.friendsError)}</p>` : ""}
       <div class="friends-grid">
         <nav class="friends-tabs" aria-label="好友分類">
           <button type="button" class="friends-tab ${panel === "friends" ? "active" : ""}" data-friends-panel="friends" aria-pressed="${panel === "friends"}">好友</button>
@@ -2733,9 +2718,7 @@ function renderLeaderboardScreen(): string {
         </div>
         ${view.leaderboardLoading
           ? `<p class="lb-empty">載入中…</p>`
-          : view.leaderboardError
-            ? `<p class="error-text lb-empty">${escapeHtml(view.leaderboardError)}</p>`
-            : `<div class="lb-list" data-testid="leaderboard-table" data-preserve-scroll>
+          : `<div class="lb-list" data-testid="leaderboard-table" data-preserve-scroll>
                 ${sorted.length === 0
                   ? `<p class="lb-empty">暫無排行榜資料</p>`
                   : sorted.map((row, i) => renderLeaderboardPlayerCard(row, i + 1, sortBy)).join("")}
@@ -2762,7 +2745,6 @@ function renderShopScreen(): string {
             <span id="shop-gold-amount">--</span>
           </div>
         </header>
-        ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
         <div class="shop-products" data-preserve-scroll>
           ${view.shopLoading
             ? `<p class="muted">載入中…</p>`
@@ -2878,7 +2860,6 @@ function renderLegacyShopScreen(): string {
             <span id="shop-gold-amount">${gold}</span>
           </div>
         </header>
-        ${view.shopError ? `<p class="error-text menu-status">${escapeHtml(view.shopError)}</p>` : ""}
         <div class="shop-products" data-preserve-scroll>
           ${view.shopLoading
             ? `<p class="muted">載入商店中...</p>`
@@ -3063,7 +3044,6 @@ function signInRequiredScreen(title: string): string {
 async function loadFriends(): Promise<void> {
   if (!supabase || !view.session) return;
   view.friendsLoading = true;
-  view.friendsError = undefined;
   render();
   try {
     const [friendsResult, requestsResult] = await Promise.all([
@@ -3075,7 +3055,7 @@ async function loadFriends(): Promise<void> {
     view.friends = (friendsResult.data as FriendRow[]) ?? [];
     view.friendRequests = (requestsResult.data as FriendRequestRow[]) ?? [];
   } catch (error) {
-    view.friendsError = errorMessage(error);
+    showAlert(errorMessage(error));
   } finally {
     view.friendsLoading = false;
     render();
@@ -3086,12 +3066,10 @@ async function sendFriendRequest(displayName: string): Promise<void> {
   if (!supabase || !view.session) return;
   const target = displayName.trim();
   if (!target) {
-    view.friendsError = "Display name is required.";
-    render();
+    showAlert("請輸入顯示名稱。");
     return;
   }
   view.friendsLoading = true;
-  view.friendsError = undefined;
   render();
   try {
     const { error } = await supabase.rpc("send_friend_request", { p_target_display_name: target });
@@ -3099,7 +3077,7 @@ async function sendFriendRequest(displayName: string): Promise<void> {
     showToast(`已送出好友邀請給 ${target}。`);
     await loadFriends();
   } catch (error) {
-    view.friendsError = errorMessage(error);
+    showAlert(errorMessage(error));
     view.friendsLoading = false;
     render();
   }
@@ -3107,22 +3085,19 @@ async function sendFriendRequest(displayName: string): Promise<void> {
 
 async function removeFriend(friendUserId: string): Promise<void> {
   if (!supabase || !view.session) return;
-  view.friendsError = undefined;
   try {
     const { error } = await supabase.rpc("remove_friend", { p_friend_user_id: friendUserId });
     if (error) throw error;
     showToast("好友已移除。");
     await loadFriends();
   } catch (error) {
-    view.friendsError = errorMessage(error);
-    render();
+    showAlert(errorMessage(error));
   }
 }
 
 async function respondFriendRequest(action: "accept" | "decline" | "cancel", requestId: string): Promise<void> {
   if (!supabase || !view.session) return;
   view.friendsLoading = true;
-  view.friendsError = undefined;
   render();
   try {
     const rpcName =
@@ -3134,7 +3109,7 @@ async function respondFriendRequest(action: "accept" | "decline" | "cancel", req
     showToast(action === "accept" ? "已接受好友邀請。" : "好友邀請已更新。");
     await loadFriends();
   } catch (error) {
-    view.friendsError = errorMessage(error);
+    showAlert(errorMessage(error));
     view.friendsLoading = false;
     render();
   }
@@ -3146,14 +3121,13 @@ async function loadLeaderboard(): Promise<void> {
     return;
   }
   view.leaderboardLoading = true;
-  view.leaderboardError = undefined;
   render();
   try {
     const { data, error } = await supabase.rpc("get_leaderboard", { p_limit: 50 });
     if (error) throw error;
     view.leaderboard = (data as LeaderboardRow[]) ?? [];
   } catch (error) {
-    view.leaderboardError = error instanceof Error ? error.message : "Failed to load leaderboard.";
+    showAlert(error instanceof Error ? error.message : "Failed to load leaderboard.");
   } finally {
     view.leaderboardLoading = false;
     render();
@@ -3163,7 +3137,6 @@ async function loadLeaderboard(): Promise<void> {
 async function loadShopItems(): Promise<void> {
   if (!supabase || !view.session) return;
   view.shopLoading = true;
-  view.shopError = undefined;
   render();
   try {
     const { data, error } = await supabase
@@ -3174,7 +3147,7 @@ async function loadShopItems(): Promise<void> {
     if (error) throw error;
     view.shopItems = (data as ShopItemRow[]) ?? [];
   } catch (error) {
-    view.shopError = error instanceof Error ? error.message : "Failed to load shop.";
+    showAlert(error instanceof Error ? error.message : "Failed to load shop.");
   } finally {
     view.shopLoading = false;
     render();
@@ -3183,7 +3156,6 @@ async function loadShopItems(): Promise<void> {
 
 async function claimShopItem(itemId: string): Promise<void> {
   if (!supabase || !view.session) return;
-  view.shopError = undefined;
   try {
     const { data, error } = await supabase.rpc("purchase_shop_item", { p_item_id: itemId });
     if (error) throw error;
@@ -3197,8 +3169,7 @@ async function claimShopItem(itemId: string): Promise<void> {
     updateShopGoldDisplay(result);
     mountPackOpeningOverlay();
   } catch (error) {
-    view.shopError = error instanceof Error ? error.message : "購買失敗。";
-    render();
+    showAlert(error instanceof Error ? error.message : "購買失敗。");
   }
 }
 
@@ -3255,13 +3226,11 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
 async function startAiMatch(): Promise<void> {
   if (view.joining || view.room) return;
   if (supabase && (!view.session || !view.selectedDeckId)) {
-    view.joinError = "Select a saved deck before starting a match.";
-    render();
+    showAlert("請先選擇已儲存的牌組才能開始對戰。");
     return;
   }
   const serverUrl = defaultServerUrl;
   view.joining = true;
-  view.joinError = undefined;
   render();
   try {
     const client = new Client(serverUrl);
@@ -3281,7 +3250,7 @@ async function startAiMatch(): Promise<void> {
     const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
     bindRoomMessages(room);
   } catch (error) {
-    view.joinError = error instanceof Error ? error.message : "Unable to start AI match.";
+    showAlert(error instanceof Error ? error.message : "Unable to start AI match.");
   } finally {
     view.joining = false;
     render();
@@ -3291,12 +3260,10 @@ async function startAiMatch(): Promise<void> {
 async function createPrivateChallenge(): Promise<void> {
   if (view.joining || view.room) return;
   if (supabase && (!view.session || !view.selectedDeckId)) {
-    view.joinError = "Select a saved deck before challenging a friend.";
-    render();
+    showAlert("請先選擇已儲存的牌組才能挑戰好友。");
     return;
   }
   view.joining = true;
-  view.joinError = undefined;
   render();
   try {
     const client = new Client(defaultServerUrl);
@@ -3318,7 +3285,7 @@ async function createPrivateChallenge(): Promise<void> {
     // in case the server's push arrived before the listener was ready.
     setTimeout(() => room.send("getJoinCode", {}), 300);
   } catch (error) {
-    view.joinError = error instanceof Error ? error.message : "Unable to create private room.";
+    showAlert(error instanceof Error ? error.message : "Unable to create private room.");
   } finally {
     view.joining = false;
     render();
@@ -3329,17 +3296,14 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
   if (view.joining || view.room) return;
   const code = rawCode.trim().toUpperCase();
   if (!code) {
-    view.joinError = "請輸入房間代碼。";
-    render();
+    showAlert("請輸入房間代碼。");
     return;
   }
   if (supabase && (!view.session || !view.selectedDeckId)) {
-    view.joinError = "Select a saved deck before joining a private match.";
-    render();
+    showAlert("請先選擇已儲存的牌組才能加入私人對戰。");
     return;
   }
   view.joining = true;
-  view.joinError = undefined;
   render();
   try {
     const client = new Client(defaultServerUrl);
@@ -3354,7 +3318,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
     const room = await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
     bindRoomMessages(room);
   } catch (error) {
-    view.joinError = error instanceof Error ? error.message : "找不到對應的房間代碼。";
+    showAlert(error instanceof Error ? error.message : "找不到對應的房間代碼。");
   } finally {
     view.joining = false;
     render();
@@ -3412,7 +3376,6 @@ function bindRoomMessages(joined: Room): void {
 async function startMatchmaking(): Promise<void> {
   if (view.matchmaking || view.joining || view.room) return;
   view.matchmaking = { startedAtMs: Date.now(), status: "searching" };
-  view.joinError = undefined;
   scheduleMatchmakingTick();
   render();
   await joinRoomFromBattleScreen();
@@ -3498,8 +3461,7 @@ async function saveProfile(event: Event): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const name = (view.editingDisplayName ?? view.profile?.display_name ?? "").trim();
   if (!name) {
-    view.accountError = "顯示名稱不能為空。";
-    render();
+    showAlert("顯示名稱不能為空。");
     return;
   }
   await withAccountLoading(async () => {
@@ -3856,7 +3818,6 @@ async function joinRoom(event: Event): Promise<void> {
   const serverUrl = (document.querySelector<HTMLInputElement>("#server-url")?.value || defaultServerUrl).trim();
   const displayName = (document.querySelector<HTMLInputElement>("#display-name")?.value || "Player").trim();
   view.joining = true;
-  view.joinError = undefined;
   render();
 
   const client = new Client(serverUrl);
@@ -3922,7 +3883,7 @@ async function joinRoom(event: Event): Promise<void> {
       handleEvents(message);
     });
   } catch (error) {
-    view.joinError = error instanceof Error ? error.message : "Unable to join room.";
+    showAlert(error instanceof Error ? error.message : "Unable to join room.");
     view.matchmaking = undefined;
     stopMatchmakingTick();
   } finally {
@@ -4299,11 +4260,18 @@ function autofillDeck(): void {
   if (!view.editingDeck) return;
   const ids: string[] = [];
   const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  let legendaryCount = 0;
   for (const card of CARD_CATALOG) {
     if (card.collectible === false) continue;
     const owned = hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
     const copies = Math.min(deckCopyLimit(card), owned);
-    for (let i = 0; i < copies && ids.length < 30; i++) ids.push(card.id);
+    for (let i = 0; i < copies && ids.length < 30; i++) {
+      if (card.rarity === "LEGENDARY") {
+        if (legendaryCount >= DECK_LEGENDARY_LIMIT) break;
+        legendaryCount++;
+      }
+      ids.push(card.id);
+    }
     if (ids.length >= 30) break;
   }
   view.editingDeck = { ...view.editingDeck!, card_ids: ids };
@@ -4352,16 +4320,38 @@ function removeCardFromEditor(cardId: string | undefined): void {
 
 async function withAccountLoading(action: () => Promise<void>): Promise<void> {
   view.accountLoading = true;
-  view.accountError = undefined;
   render();
   try {
     await action();
   } catch (error) {
-    view.accountError = errorMessage(error);
+    showAlert(errorMessage(error));
   } finally {
     view.accountLoading = false;
     render();
   }
+}
+
+function showAlert(message: string, title = "提示"): void {
+  document.getElementById("alert-overlay")?.remove();
+  const overlay = document.createElement("section");
+  overlay.id = "alert-overlay";
+  overlay.className = "confirm-overlay";
+  overlay.setAttribute("role", "dialog");
+  overlay.setAttribute("aria-modal", "true");
+  overlay.innerHTML = `
+    <div class="confirm-content">
+      <h3>${escapeHtml(title)}</h3>
+      <p class="confirm-message">${escapeHtml(message)}</p>
+      <div class="confirm-actions">
+        <button id="alert-ok">確定</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(overlay);
+  const dismiss = (): void => { overlay.remove(); };
+  overlay.querySelector<HTMLButtonElement>("#alert-ok")?.addEventListener("click", dismiss);
+  overlay.addEventListener("click", (e) => { if (e.target === overlay) dismiss(); });
+  (overlay.querySelector<HTMLButtonElement>("#alert-ok"))?.focus();
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
