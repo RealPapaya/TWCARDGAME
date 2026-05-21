@@ -1,0 +1,117 @@
+/* Battle screen */
+
+.battle-pick {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.battle-pick-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 22px;
+  position: relative;
+  z-index: 2;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
+}
+
+.battle-mode-panels {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  height: 100%;
+  min-height: 0;
+  align-items: stretch;
+}
+
+@media (max-width: 0px) {
+  .battle-mode-panels {
+    grid-template-columns: 1fr;
+  }
+}
+
+.panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.deck-pick {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.deck-pick .deck-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-height: 0;
+  max-height: none;
+  overflow-y: auto;
+}
+
+.match-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+  justify-content: flex-start;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.match-panel > h3,
+.match-panel .ai-section-label,
+.match-panel .ai-difficulty-options,
+.match-panel .primary-action {
+  flex-shrink: 0;
+}
+
+.primary-action {
+  padding: 14px 22px;
+  font-size: 20px;
+  background: #d4af37;
+  flex-shrink: 0;
+}
+
+.ghost-button {
+  background: transparent;
+  border: 2px solid var(--wood-dark);
+  color: var(--wood-dark);
+  padding: 6px 12px;
+  font-size: 13px;
+  box-shadow: none;
+  text-shadow: none;
+}
+
+.advanced-disclosure summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: #5d2e17;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.advanced-form {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-align: left;
+  font-size: 13px;
+}
+
+.advanced-form input {
+  width: 100%;
+  padding: 6px 8px;
+  border-radius: 4px;
+  border: 2px solid #8b4513;
+  background: #fff8e0;
+  color: #3d1e0f;
+}

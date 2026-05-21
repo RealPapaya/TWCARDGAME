@@ -1,0 +1,147 @@
+/* ============================================================
+   Changelog modal
+   ============================================================ */
+
+.changelog-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.changelog-modal {
+  width: 760px;
+  max-height: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 200, 0.7),
+    0 0 40px rgba(0, 0, 0, 0.65);
+}
+
+.changelog-list {
+  overflow-y: auto;
+  padding: 4px 4px 4px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.changelog-list::-webkit-scrollbar {
+  width: 10px;
+}
+
+.changelog-list::-webkit-scrollbar-track {
+  background: var(--parchment-dark);
+  border-radius: 8px;
+}
+
+.changelog-list::-webkit-scrollbar-thumb {
+  background: var(--wood-medium);
+  border-radius: 8px;
+  border: 2px solid var(--wood-dark);
+}
+
+.changelog-version {
+  border: 2px solid var(--wood-dark);
+  border-radius: 10px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.changelog-version h4 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--wood-dark);
+  margin: 0 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(93, 46, 23, 0.25);
+}
+
+.changelog-version ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.changelog-version li {
+  border-left: 4px solid var(--wood-medium);
+  padding-left: 14px;
+}
+
+.changelog-version li strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 15px;
+  color: var(--wood-dark);
+}
+
+.changelog-version li p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #7a4a3a;
+  font-family: "Noto Sans TC", Inter, sans-serif;
+  white-space: pre-wrap;
+}
+
+.card-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.card-chip {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 14px;
+  border: 1px solid var(--wood-medium);
+  background: rgba(93, 46, 23, 0.1);
+  color: var(--wood-dark);
+  font-size: 12px;
+  font-family: var(--font-display);
+  cursor: default;
+  transition: background 0.15s, border-color 0.15s;
+  user-select: none;
+}
+
+.card-chip:hover {
+  background: rgba(93, 46, 23, 0.22);
+  border-color: var(--wood-dark);
+}
+
+/* Medieval toast — matches LEGACY .medieval-toast style */
+.medieval-toast {
+  position: fixed;
+  bottom: 50px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: #8b4513;
+  color: #f4e4bc;
+  padding: 15px 40px;
+  border: 5px solid #5d2e17;
+  font-family: "Noto Serif TC", serif;
+  font-weight: bold;
+  font-size: 1.2rem;
+  z-index: 99999;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.medieval-toast.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}

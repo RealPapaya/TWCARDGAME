@@ -1,0 +1,72 @@
+/* Deck editor screen */
+
+.deck-editor-screen .editor-panel {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* Responsive */
+
+@media (max-width: 0px) {
+  .battle-pick-grid {
+    grid-template-columns: 1fr;
+  }
+  .profile-panel {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "header"
+      "wallet"
+      "stats"
+      "login"
+      "history";
+  }
+  .profile-header {
+    grid-template-columns: 1fr;
+    text-align: center;
+  }
+  .profile-form {
+    margin: 0 auto;
+  }
+  .stat-list {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 0px) {
+  .menu-button {
+    font-size: 18px;
+    min-height: 56px;
+  }
+  .player-info-card {
+    padding: 8px 10px;
+  }
+  .player-avatar {
+    width: 44px;
+    height: 44px;
+  }
+  .game-title {
+    font-size: clamp(32px, 9vw, 56px);
+  }
+  .collection-grid {
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  }
+  .menu-icon-rail {
+    right: 12px;
+    gap: 10px;
+  }
+  .version-corner {
+    left: 12px;
+    top: 12px;
+  }
+  .menu-icon-btn {
+    width: 50px;
+    height: 50px;
+    font-size: 22px;
+  }
+}
+
+@media (max-width: 0px) {
+  .screen {
+    padding: 16px 12px;
+  }
+}

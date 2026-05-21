@@ -1,0 +1,113 @@
+/* ============================================================
+   Settings modal
+   ============================================================ */
+
+.settings-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-modal {
+  width: min(420px, 90%);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 36px;
+  padding-bottom: 48px;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 244, 200, 0.7),
+    0 0 40px rgba(0, 0, 0, 0.65);
+}
+
+.settings-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 4px;
+}
+
+.settings-modal-header h3 {
+  font-family: var(--font-display);
+  font-size: 24px;
+  color: var(--wood-dark);
+  margin: 0;
+}
+
+.settings-close-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  font-size: 16px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-section-title {
+  font-family: var(--font-display);
+  font-size: 18px;
+  color: var(--wood-dark);
+  margin: 0;
+}
+
+.settings-volume-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.settings-mute-btn {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+
+.settings-mute-btn.muted {
+  filter: grayscale(0.7);
+  opacity: 0.6;
+}
+
+.settings-volume-slider {
+  flex: 1;
+  height: 8px;
+  accent-color: var(--wood);
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  padding: 0;
+  min-height: unset;
+}
+
+.settings-volume-label {
+  flex-shrink: 0;
+  width: 40px;
+  text-align: right;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--wood-dark);
+}
+
+.settings-divider {
+  height: 1px;
+  background: var(--wood-dark);
+  opacity: 0.2;
+  margin: 4px 0;
+}
+
+.settings-signout-btn {
+  align-self: flex-start;
+  padding: 10px 28px;
+}
