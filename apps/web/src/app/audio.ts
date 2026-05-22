@@ -107,9 +107,11 @@ export function toggleSfxMute(): void {
 export function playEventAudio(events: GameEvent[]): void {
   const played = new Set<SoundCue>();
   for (const event of events) {
+    // CARD_PLAYED / MINION_SUMMONED audio is intentionally NOT played here:
+    // the card-play preview drives its own impact SFX so the sound lands
+    // together with the smoke and shake when the minion hits the board.
     const cue =
-      event.type === "CARD_PLAYED" || event.type === "MINION_SUMMONED" ? "cardPlay"
-      : event.type === "ATTACK" ? "attack"
+      event.type === "ATTACK" ? "attack"
       : event.type === "DAMAGE" ? "damage"
       : event.type === "HEAL" ? "heal"
       : event.type === "DESTROY" ? "death"

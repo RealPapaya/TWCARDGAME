@@ -4491,17 +4491,63 @@ let cardPlayTimers: number[] = [];
 // (LEGACY awaits showCardPlayPreview before the board re-renders). The latest
 // publicSync is stashed here and flushed once the cue queue drains.
 let pendingPublicSync: unknown;
+// Seats whose card-play previews have resolved since the last board flush.
+// Their boards get the impact FX (sound + smoke + shake) the instant the
+// minion lands, mirroring LEGACY's board-slam on showCardPlayPreview.
+const pendingImpactSeats = new Set<Seat>();
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
 }
 
 function flushPendingPublicSync(): void {
-  if (pendingPublicSync === undefined) return;
-  const message = pendingPublicSync;
-  pendingPublicSync = undefined;
-  view.publicSync = message as typeof view.publicSync;
-  render();
+  if (pendingPublicSync !== undefined) {
+    const message = pendingPublicSync;
+    pendingPublicSync = undefined;
+    view.publicSync = message as typeof view.publicSync;
+    render();
+  }
+  // The board now shows the new minion(s); fire sound + smoke + shake together.
+  // render() defers the DOM update to the next frame, so the impact waits one
+  // frame too — otherwise it would anchor to the board before the minion lands.
+  const seats = [...pendingImpactSeats];
+  pendingImpactSeats.clear();
+  if (seats.length === 0) return;
+  window.requestAnimationFrame(() => {
+    for (const seat of seats) impactBoardPlay(seat);
+  });
+}
+
+// Plays the landing SFX, shakes the board, and spawns a dust burst — all at
+// once, in the same frame the minion appears (LEGACY board-slam + spawnDust).
+function impactBoardPlay(seat: Seat): void {
+  playSfx("cardPlay");
+  const role = seat === view.mySeat ? "player" : "opponent";
+  const board = document.querySelector<HTMLElement>(`[data-testid="${role}-board"]`);
+  if (!board) return;
+  board.classList.remove("board-slam");
+  void board.offsetWidth; // restart the animation if it is already applied
+  board.classList.add("board-slam");
+  window.setTimeout(() => board.classList.remove("board-slam"), 480);
+  spawnBoardDust(board);
+}
+
+// Imperative dust puff anchored to the board, reusing the death-burst particle
+// spread and dust-fade keyframe so the visual language matches the rest of FX.
+// Appended to .battle-surface (always present in a match) rather than the
+// .event-layer, which only exists while animation cues are live.
+function spawnBoardDust(board: HTMLElement): void {
+  const surface = document.querySelector<HTMLElement>(".battle-surface");
+  if (!surface) return;
+  const surfaceRect = surface.getBoundingClientRect();
+  const r = board.getBoundingClientRect();
+  const burst = document.createElement("div");
+  burst.className = "death-burst board-dust";
+  burst.innerHTML = particleSpread(`board-dust-${crypto.randomUUID()}`);
+  burst.style.left = `${r.left + r.width / 2 - surfaceRect.left}px`;
+  burst.style.top = `${r.top + r.height / 2 - surfaceRect.top}px`;
+  surface.appendChild(burst);
+  window.setTimeout(() => burst.remove(), 700);
 }
 
 // Applies a publicSync, but never ahead of a card-play preview. The server
@@ -4533,6 +4579,7 @@ function resetCardPlayCues(): void {
   cardPlayCueQueue.length = 0;
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
+  pendingImpactSeats.clear();
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
@@ -4557,6 +4604,8 @@ function playNextCardPlayCue(): void {
     playNextCardPlayCue();
     return;
   }
+  // Remember whose board to slam once this preview resolves.
+  if (cue.seat) pendingImpactSeats.add(cue.seat);
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = `event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}`;

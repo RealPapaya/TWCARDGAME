@@ -1274,6 +1274,14 @@ input {
   justify-content: flex-start;
   z-index: 1;
   transform-style: preserve-3d;
+  /* Neutralise the hand-card transform behaviour inherited via `.card`: the
+     0.18s transform transition and `center 130%` origin would otherwise make
+     the slam swing/skew, leaving a ghost streak. The preview animates purely
+     through keyframes and must pivot around its own centre. */
+  transition: none;
+  transform-origin: center center;
+  --rot: 0deg;
+  --y: 0px;
   animation: card-play-enter 0.8s cubic-bezier(0.19, 1, 0.22, 1) both;
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.82), 0 0 24px rgba(0, 243, 255, 0.22);
 }
@@ -1511,18 +1519,18 @@ input {
   100% { opacity: 1; transform: translateZ(0) rotateX(0); }
 }
 
-/* Mirrors LEGACY preview-slam: the card recedes into the board in place —
-   shrinking toward the centre while fading out — never drifting off-screen.
-   It is fully transparent and zero-scale before the board minion appears.
-   Player and opponent share the same recede, so both keyframes are identical. */
+/* Mirrors LEGACY preview-slam: the card recedes into the board while
+   shrinking and fading out — fully gone before the board minion appears.
+   The player card recedes in place; the opponent card drifts up toward the
+   opponent board so it reads as landing there, not flying at the player. */
 @keyframes card-play-slam-down {
-  0% { opacity: 1; transform: translateZ(0) scale(1); }
-  100% { opacity: 0; transform: translateZ(-500px) scale(0); }
+  0% { opacity: 1; transform: translateZ(0) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateZ(-500px) translateY(0) scale(0); }
 }
 
 @keyframes card-play-slam-up {
-  0% { opacity: 1; transform: translateZ(0) scale(1); }
-  100% { opacity: 0; transform: translateZ(-500px) scale(0); }
+  0% { opacity: 1; transform: translateZ(0) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateZ(-500px) translateY(-220px) scale(0); }
 }
 
 @keyframes turn-pulse {
