@@ -1,5 +1,6 @@
 import type { Room } from "@colyseus/sdk";
 import type { Session } from "@supabase/supabase-js";
+import type { DragLineKind } from "../drag.js";
 import type {
   AiDifficulty,
   AiTheme,
@@ -68,6 +69,23 @@ export type ClientViewState = {
   mulliganSelection: Set<string>;
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
+  /**
+   * A targeted-battlecry card mid two-stage play (LEGACY v1 parity). It plays
+   * exactly like any other card — drop, card-play animation, land on the field —
+   * and only then a targeting arrow is shown. No `playCard` command is sent
+   * until a legal target is picked, so cancelling leaves the card untouched in
+   * hand. Phases: `landing` (card-play animation running, nothing on the board
+   * yet), `aiming` (minion on the field, arrow active), `committed` (command
+   * sent — the landed card is kept until the server sync replaces it).
+   */
+  pendingBattlecry?: {
+    handInstanceId: string;
+    cardId: string;
+    isMinion: boolean;
+    boardIndex: number;
+    lineKind: DragLineKind;
+    phase: "landing" | "aiming" | "committed";
+  };
   events: GameEvent[];
   animationCues: AnimationCue[];
   turnAnnouncement?: {

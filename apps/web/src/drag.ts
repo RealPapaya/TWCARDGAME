@@ -110,6 +110,7 @@ function buildArrowMarker(ns: string, id: string, color: string): SVGMarkerEleme
 export function beginHandDrag(opts: HandDragOptions): void {
   ensureDragLayer();
   finishSession(true);
+  endBattlecryTargeting();
 
   session = {
     kind: "hand",
@@ -138,6 +139,7 @@ export function beginHandDrag(opts: HandDragOptions): void {
 export function beginAttackDrag(opts: AttackDragOptions): void {
   ensureDragLayer();
   finishSession(true);
+  endBattlecryTargeting();
 
   session = {
     kind: "attack",
@@ -389,6 +391,139 @@ function hideGhost(): void {
   ghost.innerHTML = "";
   ghost.style.display = "none";
   ghost.style.transform = "translate3d(-9999px, -9999px, 0)";
+}
+
+/**
+ * --- BATTLECRY TARGETING (LEGACY v1 parity) ---
+ *
+ * After a targeted-battlecry card is dropped onto the field, the player aims a
+ * *separate* arrow at the effect's target. Unlike a hand/attack drag, this is a
+ * free-aim gesture with no pointer button held: the arrow follows the pointer
+ * and a click resolves it. The anchor is recomputed every frame so the arrow
+ * tracks the preview minion across the re-renders the v2 client performs.
+ */
+export interface BattlecryTargetingOptions {
+  lineKind: DragLineKind;
+  /** Live screen-space origin of the arrow (preview minion / hero centre). */
+  getAnchor: () => { x: number; y: number } | null;
+  isEligibleTarget: (el: HTMLElement) => boolean;
+  /** A legal target was clicked. */
+  onCommit: (targetEl: HTMLElement) => void;
+  /** A unit was clicked, but it is not a legal target — keep aiming. */
+  onInvalid: () => void;
+  /** Empty space / non-unit clicked, or Escape — abort and refund. */
+  onCancel: () => void;
+}
+
+interface TargetingState extends BattlecryTargetingOptions {
+  pointerX: number;
+  pointerY: number;
+  clickArmed: boolean;
+}
+
+let targeting: TargetingState | null = null;
+
+export function isBattlecryTargetingActive(): boolean {
+  return targeting !== null;
+}
+
+export function beginBattlecryTargeting(opts: BattlecryTargetingOptions): void {
+  ensureDragLayer();
+  finishSession(true);
+  endBattlecryTargeting();
+
+  targeting = { ...opts, pointerX: 0, pointerY: 0, clickArmed: false };
+
+  window.addEventListener("pointermove", onTargetingMove, { passive: false });
+  window.addEventListener("keydown", onTargetingKey);
+
+  // The same pointerup that dropped the card can emit a trailing synthetic
+  // click. Arm the resolver on the next frame so that click is ignored, and
+  // draw the initial arrow once render() has flushed the preview minion.
+  requestAnimationFrame(() => {
+    if (!targeting) return;
+    targeting.clickArmed = true;
+    window.addEventListener("click", onTargetingClick, true);
+    const anchor = targeting.getAnchor();
+    if (anchor) {
+      targeting.pointerX = anchor.x;
+      targeting.pointerY = anchor.y;
+      showLine(targeting.lineKind, anchor.x, anchor.y);
+      drawTargetingLine();
+    }
+  });
+}
+
+export function endBattlecryTargeting(): void {
+  if (!targeting) return;
+  targeting = null;
+  window.removeEventListener("pointermove", onTargetingMove);
+  window.removeEventListener("keydown", onTargetingKey);
+  window.removeEventListener("click", onTargetingClick, true);
+  hideLine();
+}
+
+function onTargetingMove(event: PointerEvent): void {
+  if (!targeting) return;
+  event.preventDefault();
+  targeting.pointerX = event.clientX;
+  targeting.pointerY = event.clientY;
+  drawTargetingLine();
+}
+
+function drawTargetingLine(): void {
+  if (!targeting) return;
+  const line = document.getElementById("drag-line") as SVGLineElement | null;
+  const anchor = targeting.getAnchor();
+  if (!line || !anchor) return;
+
+  let endX = targeting.pointerX;
+  let endY = targeting.pointerY;
+  const hit = document.elementFromPoint(targeting.pointerX, targeting.pointerY);
+  const candidate = hit?.closest<HTMLElement>("[data-target]");
+  if (candidate && targeting.isEligibleTarget(candidate)) {
+    const rect = candidate.getBoundingClientRect();
+    endX = rect.left + rect.width / 2;
+    endY = rect.top + rect.height / 2;
+  }
+
+  const dx = endX - anchor.x;
+  const dy = endY - anchor.y;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  if (dist > ARROW_OFFSET) {
+    const ratio = (dist - ARROW_OFFSET) / dist;
+    endX = anchor.x + dx * ratio;
+    endY = anchor.y + dy * ratio;
+  }
+  line.setAttribute("x1", String(anchor.x));
+  line.setAttribute("y1", String(anchor.y));
+  line.setAttribute("x2", String(endX));
+  line.setAttribute("y2", String(endY));
+}
+
+function onTargetingKey(event: KeyboardEvent): void {
+  if (event.key !== "Escape" || !targeting) return;
+  const cancel = targeting.onCancel;
+  endBattlecryTargeting();
+  cancel();
+}
+
+function onTargetingClick(event: MouseEvent): void {
+  if (!targeting || !targeting.clickArmed) return;
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  const state = targeting;
+  const hit = document.elementFromPoint(event.clientX, event.clientY);
+  const unit = hit?.closest<HTMLElement>("[data-target]");
+  if (unit && state.isEligibleTarget(unit)) {
+    endBattlecryTargeting();
+    state.onCommit(unit);
+  } else if (unit) {
+    state.onInvalid(); // a unit, but not a legal target — stay in targeting
+  } else {
+    endBattlecryTargeting();
+    state.onCancel();
+  }
 }
 
 export function classifyEffectKind(effectType: string | undefined): DragLineKind {

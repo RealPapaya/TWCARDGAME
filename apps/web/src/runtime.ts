@@ -18,7 +18,15 @@ import type {
 } from "@twcardgame/shared";
 import { GameStateSchema } from "./schema.js";
 import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle, opponentFanStyle } from "./ui.js";
-import { beginAttackDrag, beginHandDrag, classifyEffectKind, ensureDragLayer } from "./drag.js";
+import {
+  beginAttackDrag,
+  beginBattlecryTargeting,
+  beginHandDrag,
+  classifyEffectKind,
+  endBattlecryTargeting,
+  ensureDragLayer,
+  type DragLineKind
+} from "./drag.js";
 import {
   bgmMutedKey,
   bgmVolumeKey,
@@ -1236,7 +1244,11 @@ function renderGame(status: GameStatus | ""): string {
   const activeSeat = readActiveSeat();
   const selectedCard = selectedHandCard();
   const battleLocked = isBattleActionLocked();
-  const targetHint = selectedCard
+  const targetHint = view.pendingBattlecry?.phase === "aiming"
+    ? view.pendingBattlecry.isMinion
+      ? "請選擇戰吼的目標！"
+      : "請選擇目標！"
+    : selectedCard
     ? cardNeedsTarget(selectedCard.cardId)
       ? view.selectedTarget
         ? `Target: ${targetLabel(view.selectedTarget)}`
@@ -1330,11 +1342,49 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
         ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role)}
       </div>
       <div class="${boardClasses}" data-testid="${role}-board">
-        ${board.map((minion) => renderMinion(seat, minion)).join("") || renderEmptySlots()}
+        ${renderBoardContents(seat, board, role)}
       </div>
       ${role === "player" ? renderPlayerHand() : ""}
       ${!connected ? `<div class="disconnect-pill">Reconnecting</div>` : ""}
     </section>
+  `;
+}
+
+/**
+ * Renders the minions on a board, splicing in the battlecry preview minion at
+ * its chosen slot while a targeted-battlecry minion is mid two-stage play.
+ */
+function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" | "opponent"): string {
+  const cells = board.map((minion) => renderMinion(seat, minion));
+  const pending = view.pendingBattlecry;
+  if (pending?.isMinion && pending.phase !== "landing" && role === "player") {
+    const slot = Math.max(0, Math.min(pending.boardIndex, cells.length));
+    cells.splice(slot, 0, renderBattlecryPreview(pending.cardId));
+  }
+  return cells.join("") || renderEmptySlots();
+}
+
+/**
+ * A non-interactive minion shown on the board while its battlecry is being
+ * aimed. Uses the exact same `<button class="minion">` markup as `renderMinion`
+ * (LEGACY v1 parity: a battlecry card is no different from any other) so it is
+ * pixel-identical to a real minion — just without target / attacker / hover
+ * hooks. `pointer-events: none` keeps it out of the way of target hit-tests.
+ */
+function renderBattlecryPreview(cardId: string): string {
+  const card = cardCatalog.get(cardId);
+  if (!card) return "";
+  return `
+    <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-testid="battlecry-preview">
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <strong class="card-title">${escapeHtml(card.name)}</strong>
+      <small class="keyword-row"></small>
+      <div class="minion-stats">
+        <span class="stat-atk"><span>${card.attack ?? 0}</span></span>
+        <span class="stat-hp">${card.health ?? 0}</span>
+      </div>
+      <span class="sr-e2e"></span>
+    </button>
   `;
 }
 
@@ -1416,8 +1466,12 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   ]);
 
   // A card mid draw-animation is rendered hidden so only the flying clone shows;
-  // draw-animation.ts restores opacity once the clone lands.
-  const drawingStyle = isHandCardAnimating(card.instanceId) ? " opacity: 0;" : "";
+  // draw-animation.ts restores opacity once the clone lands. A card mid
+  // battlecry targeting is hidden too — it "became" the preview minion on the
+  // field (or the targeting arrow for a NEWS card).
+  const hiddenForBattlecry = view.pendingBattlecry?.handInstanceId === card.instanceId;
+  const drawingStyle =
+    isHandCardAnimating(card.instanceId) || hiddenForBattlecry ? " opacity: 0; pointer-events: none;" : "";
 
   return `
     <button
@@ -1887,18 +1941,18 @@ function bindStaticActions(): void {
     render();
   });
   document.querySelector<HTMLButtonElement>("#play")?.addEventListener("click", () => {
-    if (isBattleActionLocked()) return;
+    if (isBattleActionLocked() || view.pendingBattlecry) return;
     if (!view.selectedHandId) return;
     const selectedCard = view.hand.find((card) => card.instanceId === view.selectedHandId);
     send({ type: "playCard", handInstanceId: view.selectedHandId, target: view.selectedTarget ?? inferDefaultTarget(selectedCard?.cardId) });
   });
   document.querySelector<HTMLButtonElement>("#attack")?.addEventListener("click", () => {
-    if (isBattleActionLocked()) return;
+    if (isBattleActionLocked() || view.pendingBattlecry) return;
     if (!view.selectedAttackerId || !view.selectedTarget) return;
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
   document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => {
-    if (isBattleActionLocked()) return;
+    if (isBattleActionLocked() || view.pendingBattlecry) return;
     send({ type: "endTurn" });
   });
   document.querySelector<HTMLButtonElement>("#battle-settings-toggle")?.addEventListener("click", () => {
@@ -3466,7 +3520,7 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
     el.addEventListener("click", () => {
-      if (isBattleActionLocked()) return;
+      if (isBattleActionLocked() || view.pendingBattlecry) return;
       const handId = el.dataset.handId;
       const card = view.hand.find((item) => item.instanceId === handId);
       if (handId && card && view.selectedHandId === handId && canAfford(card.cost) && !cardNeedsTarget(card.cardId)) {
@@ -3483,7 +3537,7 @@ function bindSelectionActions(): void {
       render();
     });
     el.addEventListener("pointerdown", (event) => {
-      if (isBattleActionLocked()) return;
+      if (isBattleActionLocked() || view.pendingBattlecry) return;
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
     });
@@ -3491,7 +3545,7 @@ function bindSelectionActions(): void {
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
     el.addEventListener("click", (event) => {
-      if (isBattleActionLocked()) return;
+      if (isBattleActionLocked() || view.pendingBattlecry) return;
       event.stopImmediatePropagation();
       view.selectedAttackerId = el.dataset.attackerId;
       view.selectedHandId = undefined;
@@ -3499,7 +3553,7 @@ function bindSelectionActions(): void {
       render();
     });
     el.addEventListener("pointerdown", (event) => {
-      if (isBattleActionLocked()) return;
+      if (isBattleActionLocked() || view.pendingBattlecry) return;
       clearHoverTooltip();
       attachAttackerPointerDrag(event, el);
     });
@@ -3511,7 +3565,7 @@ function bindSelectionActions(): void {
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     el.addEventListener("click", () => {
-      if (isBattleActionLocked()) return;
+      if (isBattleActionLocked() || view.pendingBattlecry) return;
       const target = JSON.parse(el.dataset.target!) as TargetRef;
       if (!isTargetHighlighted(target)) return;
       if (view.selectedAttackerId && isLegalAttackTarget(target)) {
@@ -3556,6 +3610,9 @@ function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | und
   if (!hoverCapable) return;
   el.addEventListener("mouseenter", (event) => {
     if (view.confirmingConcede) return;
+    // No hover-enlarge preview while aiming a battlecry — the arrow passing over
+    // a card must not pop its preview open.
+    if (view.pendingBattlecry) return;
     const card = resolve();
     if (!card) return;
     window.clearTimeout(hoverState.timer);
@@ -3635,7 +3692,7 @@ function suppressNextClick(): void {
 }
 
 function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
-  if (isBattleActionLocked()) return;
+  if (isBattleActionLocked() || view.pendingBattlecry) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   const handId = sourceEl.dataset.handId;
   if (!handId) return;
@@ -3644,7 +3701,10 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   if (!canAfford(card.cost)) return;
   const cardDef = cardCatalog.get(card.cardId);
   const isMinion = (cardDef?.type ?? card.type) === "MINION";
-  const needsTarget = cardNeedsTarget(card.cardId);
+  // Targeted-battlecry cards are played in two stages (LEGACY v1 parity): the
+  // drop just places the card; the effect target is aimed afterwards. The drag
+  // is therefore always placement-only — no arrow snapping during the drag.
+  const isTargeted = cardNeedsTarget(card.cardId);
   const lineKind = classifyEffectKind(cardDef?.keywords?.battlecry?.type);
   const startX = event.clientX;
   const startY = event.clientY;
@@ -3675,31 +3735,29 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
       startY,
       sourceEl: refreshedSource,
       lineKind,
-      needsTarget,
+      needsTarget: false,
       isMinion,
       playerBoardEl,
-      isEligibleTarget: (targetEl) => {
-        const target = parseTargetAttr(targetEl);
-        return Boolean(target && isLegalCardTarget(target));
-      },
-      onResolve: ({ insertionIndex, targetEl }) => {
-        if (isBattleActionLocked()) {
+      isEligibleTarget: () => false,
+      onResolve: ({ insertionIndex }) => {
+        if (isBattleActionLocked() || view.pendingBattlecry) {
           finalizeHandDrag(undefined);
           return;
         }
-        const target = targetEl ? parseTargetAttr(targetEl) : undefined;
-        if (needsTarget && !target) {
+        // Minions must land on the board; dropping off-board returns to hand.
+        if (isMinion && insertionIndex < 0) {
           finalizeHandDrag(undefined);
           return;
         }
-        if (!needsTarget && isMinion && insertionIndex < 0) {
-          finalizeHandDrag(undefined);
+        if (isTargeted) {
+          // Stage 2: card is on the field, now aim the battlecry arrow.
+          enterBattlecryTargeting(card, isMinion ? insertionIndex : -1, lineKind);
           return;
         }
         send({
           type: "playCard",
           handInstanceId: handId,
-          target: target ?? inferDefaultTarget(card.cardId),
+          target: inferDefaultTarget(card.cardId),
           boardIndex: isMinion && insertionIndex >= 0 ? insertionIndex : undefined
         });
         finalizeHandDrag(handId);
@@ -3726,8 +3784,167 @@ function finalizeHandDrag(_handIdConsumed: string | undefined): void {
   render();
 }
 
+// Timers and overlay node for the client-side card-play animation that
+// precedes the battlecry arrow.
+let battlecryLandTimers: number[] = [];
+let battlecryLandEl: HTMLElement | null = null;
+
+/**
+ * Stage 2 of a targeted-battlecry play (LEGACY v1 parity). A battlecry card is
+ * played exactly like any other card: drop → card-play animation → land on the
+ * field. Only once it has landed is a separate targeting arrow shown. No
+ * `playCard` command is sent until a legal target is clicked — see
+ * `commitBattlecry` / `cancelBattlecry`.
+ */
+function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKind: DragLineKind): void {
+  // "如果沒有目標 就不能出手" — with no legal target on the field the card
+  // cannot be played at all; leave it untouched in hand (no animation).
+  if (!hasLegalTargetForCard(card.cardId)) {
+    showToast("目前沒有合法的目標！");
+    finalizeHandDrag(undefined);
+    return;
+  }
+
+  const isMinion = (cardCatalog.get(card.cardId)?.type ?? card.type) === "MINION";
+  clearHoverTooltip();
+  view.selectedHandId = undefined;
+  view.selectedAttackerId = undefined;
+  view.selectedTarget = undefined;
+  view.pendingBattlecry = {
+    handInstanceId: card.instanceId,
+    cardId: card.cardId,
+    isMinion,
+    boardIndex,
+    lineKind,
+    phase: "landing"
+  };
+  render(); // hides the hand card while the card-play animation runs
+
+  // Phase 1: the same card-play animation every card gets, then the arrow.
+  playBattlecryLandAnimation(card.cardId, () => {
+    const pending = view.pendingBattlecry;
+    if (!pending || pending.handInstanceId !== card.instanceId || pending.phase !== "landing") return;
+    pending.phase = "aiming";
+    render(); // the card is now on the field
+    triggerBattlecryLandImpact(card.cardId); // board slam + dust, like any card
+    showToast(isMinion ? "請選擇戰吼的目標！" : "請選擇目標！");
+    beginBattlecryTargeting({
+      lineKind,
+      getAnchor: battlecryAnchor,
+      isEligibleTarget: (el) => {
+        const target = parseTargetAttr(el);
+        return Boolean(target && isLegalCardTarget(target));
+      },
+      onCommit: (el) => commitBattlecry(el),
+      onInvalid: () => showToast("這不是有效的目標！"),
+      onCancel: () => cancelBattlecry()
+    });
+  });
+}
+
+/**
+ * Plays the standard card-play animation (the `#card-play-overlay` entrance +
+ * slam, mirroring `playNextCardPlayCue`) for a card being played locally, then
+ * invokes `onLanded`. Used so a battlecry card looks identical to any other.
+ */
+function playBattlecryLandAnimation(cardId: string, onLanded: () => void): void {
+  const card = cardCatalog.get(cardId);
+  if (!card) {
+    onLanded();
+    return;
+  }
+  const overlay = ensureCardPlayOverlay();
+  const el = document.createElement("div");
+  el.className = "event-card-preview card from-player";
+  el.innerHTML = renderCardFace(resolveCatalogCard(card, `battlecry-${cardId}`), "mulligan");
+  overlay.appendChild(el);
+  battlecryLandEl = el;
+  battlecryLandTimers.push(window.setTimeout(() => el.classList.add("card-play-slam"), 800));
+  battlecryLandTimers.push(window.setTimeout(onLanded, 1100));
+  battlecryLandTimers.push(
+    window.setTimeout(() => {
+      el.remove();
+      if (battlecryLandEl === el) battlecryLandEl = null;
+    }, 1300)
+  );
+}
+
+/**
+ * The board slam + dust puff a minion makes on landing, mirroring
+ * `impactCardPlayLanding` so a battlecry minion lands like any other minion.
+ */
+function triggerBattlecryLandImpact(cardId: string): void {
+  const card = cardCatalog.get(cardId);
+  window.requestAnimationFrame(() => {
+    playSfx("cardPlay");
+    if (!card || card.type !== "MINION") return;
+    slamBoard(view.mySeat);
+    const anchor =
+      document.querySelector<HTMLElement>('[data-testid="battlecry-preview"]') ??
+      document.querySelector<HTMLElement>('[data-testid="player-board"]');
+    if (anchor) spawnBoardDust(anchor, card.cost >= 7 ? 2.5 : 1);
+  });
+}
+
+/** Live screen-space origin of the battlecry arrow (the landed card / hero). */
+function battlecryAnchor(): { x: number; y: number } | null {
+  const pending = view.pendingBattlecry;
+  if (!pending) return null;
+  const selector = pending.isMinion
+    ? '[data-testid="battlecry-preview"]'
+    : '[data-testid="player-hero"]';
+  const el = document.querySelector<HTMLElement>(selector);
+  if (!el) return null;
+  const rect = el.getBoundingClientRect();
+  return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+}
+
+/** A legal target was picked — send the single atomic `playCard` command. */
+function commitBattlecry(targetEl: HTMLElement): void {
+  const pending = view.pendingBattlecry;
+  if (!pending) return;
+  const target = parseTargetAttr(targetEl);
+  if (!target || !isLegalCardTarget(target)) {
+    cancelBattlecry();
+    return;
+  }
+  // The card-play animation already ran locally; suppress the server's echo so
+  // the card does not appear to play a second time.
+  suppressedPlayCues.push({ seat: view.mySeat, cardId: pending.cardId });
+  send({
+    type: "playCard",
+    handInstanceId: pending.handInstanceId,
+    target,
+    boardIndex: pending.isMinion && pending.boardIndex >= 0 ? pending.boardIndex : undefined
+  });
+  // Keep the landed card (and hidden hand card) until the server sync arrives;
+  // `pruneSelections` clears `pendingBattlecry` once the card leaves the hand.
+  pending.phase = "committed";
+  endBattlecryTargeting();
+  render();
+}
+
+/** Silently tears down any pending battlecry — used on cancel and on teardown. */
+function clearPendingBattlecry(): void {
+  endBattlecryTargeting();
+  for (const timer of battlecryLandTimers) window.clearTimeout(timer);
+  battlecryLandTimers = [];
+  battlecryLandEl?.remove();
+  battlecryLandEl = null;
+  view.pendingBattlecry = undefined;
+}
+
+/** "如果點其他地方 如地板 就回手" — abort with no command sent. */
+function cancelBattlecry(): void {
+  const pending = view.pendingBattlecry;
+  if (!pending) return;
+  clearPendingBattlecry();
+  showToast(pending.isMinion ? "取消出牌 (隨從已退回)" : "操作已取消");
+  render();
+}
+
 function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
-  if (isBattleActionLocked()) return;
+  if (isBattleActionLocked() || view.pendingBattlecry) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
   const attackerId = sourceEl.dataset.attackerId;
   if (!attackerId) return;
@@ -3818,6 +4035,7 @@ async function backToLobby(): Promise<void> {
   view.rejectedHandIds.clear();
   view.turnAnnouncement = undefined;
   lastTurnAnnouncementKey = undefined;
+  clearPendingBattlecry();
   view.selectedHandId = undefined;
   view.mulliganSelection.clear();
   view.selectedAttackerId = undefined;
@@ -4466,6 +4684,7 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
     seat,
     untilMs: Date.now() + TURN_ANNOUNCEMENT_LOCK_MS
   };
+  clearPendingBattlecry();
   view.selectedHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
@@ -4487,6 +4706,11 @@ function handleEvents(message: GameEvent[]): void {
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
+    // A rejected battlecry play keeps the card in hand; drop the preview overlay.
+    if (view.pendingBattlecry) {
+      view.rejectedHandIds.add(view.pendingBattlecry.handInstanceId);
+      clearPendingBattlecry();
+    }
     view.toast = String(rejection.payload?.reason ?? "Command rejected.");
     window.setTimeout(() => {
       view.toast = undefined;
@@ -4504,6 +4728,11 @@ function handleEvents(message: GameEvent[]): void {
 const cardPlayCueQueue: AnimationCue[] = [];
 let cardPlayCueActive = false;
 let cardPlayTimers: number[] = [];
+
+// A locally-played battlecry card runs its own card-play animation, so the
+// server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
+// cardId, consumed once) to avoid the card appearing to play twice.
+const suppressedPlayCues: Array<{ seat: Seat | undefined; cardId: string }> = [];
 
 // While a card-play preview is animating, board updates are held back so the
 // card can visibly hit the board before the new state appears. The latest
@@ -4611,6 +4840,8 @@ function ensureCardPlayOverlay(): HTMLElement {
 }
 
 function resetCardPlayCues(): void {
+  clearPendingBattlecry();
+  suppressedPlayCues.length = 0;
   cardPlayCueQueue.length = 0;
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
@@ -4659,8 +4890,24 @@ function playNextCardPlayCue(): void {
   }, 1300));
 }
 
+/** Consumes a one-shot suppression entry matching this play cue, if any. */
+function consumeSuppressedPlayCue(cue: AnimationCue): boolean {
+  const index = suppressedPlayCues.findIndex(
+    (entry) => entry.seat === cue.seat && entry.cardId === cue.cardId
+  );
+  if (index < 0) return false;
+  suppressedPlayCues.splice(index, 1);
+  return true;
+}
+
 function enqueueEventCues(events: GameEvent[]): void {
-  const cues = events.map((event, index) => eventToCue(event, events, index)).filter((cue): cue is AnimationCue => Boolean(cue));
+  const rawCues = events
+    .map((event, index) => eventToCue(event, events, index))
+    .filter((cue): cue is AnimationCue => Boolean(cue));
+  // A locally-played battlecry card already ran its card-play animation. Drop
+  // the server's echoed play cue entirely — keeping it would re-show the card
+  // and, via `has-card-play-focus`, dim the whole field with no card visible.
+  const cues = rawCues.filter((cue) => !(cue.kind === "play" && consumeSuppressedPlayCue(cue)));
   if (cues.length === 0) return;
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
@@ -4729,6 +4976,11 @@ function findLandingTargetKey(events: GameEvent[], startIndex: number, seat: Sea
 function pruneSelections(): void {
   const handIds = new Set(view.hand.map((card) => card.instanceId));
   if (view.selectedHandId && !handIds.has(view.selectedHandId)) view.selectedHandId = undefined;
+  // The pending battlecry card left the hand — the server accepted the play, so
+  // drop the preview/hidden-card overlay and let the synced board take over.
+  if (view.pendingBattlecry && !handIds.has(view.pendingBattlecry.handInstanceId)) {
+    clearPendingBattlecry();
+  }
   for (const id of view.rejectedHandIds) {
     if (!handIds.has(id)) view.rejectedHandIds.delete(id);
   }
@@ -4817,6 +5069,7 @@ function selectedMinionClass(instanceId: string, target: TargetRef): string {
 }
 
 function isTargetHighlighted(target: TargetRef): boolean {
+  if (view.pendingBattlecry) return view.pendingBattlecry.phase === "aiming" && isLegalCardTarget(target);
   if (sameTarget(view.selectedTarget, target)) return true;
   if (view.selectedAttackerId) return isLegalAttackTarget(target);
   if (view.selectedHandId) return isLegalCardTarget(target);
@@ -4824,6 +5077,7 @@ function isTargetHighlighted(target: TargetRef): boolean {
 }
 
 function activeTargeting(): boolean {
+  if (view.pendingBattlecry) return view.pendingBattlecry.phase === "aiming";
   return Boolean(view.selectedAttackerId || (selectedHandCard() && cardNeedsTarget(selectedHandCard()!.cardId)));
 }
 
@@ -4841,14 +5095,35 @@ function isLegalAttackTarget(target: TargetRef): boolean {
   return target.side === enemy && target.type === "MINION" && enemyTaunts.some((minion) => minion.instanceId === target.instanceId);
 }
 
+/** The card currently choosing a battlecry target — selected in hand, or mid two-stage play. */
+function targetingCardId(): string | undefined {
+  if (view.pendingBattlecry) return view.pendingBattlecry.cardId;
+  return view.selectedHandId ? selectedHandCard()?.cardId : undefined;
+}
+
 function isLegalCardTarget(target: TargetRef): boolean {
-  const card = selectedHandCard();
-  if (!card || !view.mySeat) return false;
-  const rule = cardCatalog.get(card.cardId)?.keywords?.battlecry?.target;
+  const cardId = targetingCardId();
+  if (!cardId || !view.mySeat) return false;
+  const rule = cardCatalog.get(cardId)?.keywords?.battlecry?.target;
   if (!rule) return false;
   const expectedSides = targetRuleSides(rule.side);
   const expectedTypes = targetRuleTypes(rule.type);
   return Boolean(target.side && expectedSides.includes(target.side) && expectedTypes.includes(target.type));
+}
+
+/** True if at least one unit on the field satisfies the card's battlecry target rule. */
+function hasLegalTargetForCard(cardId: string): boolean {
+  const rule = cardCatalog.get(cardId)?.keywords?.battlecry?.target;
+  if (!rule || !view.mySeat) return false;
+  const expectedSides = targetRuleSides(rule.side);
+  const expectedTypes = targetRuleTypes(rule.type);
+  for (const seat of expectedSides) {
+    const player = readPlayer(seat);
+    if (!player) continue;
+    if (expectedTypes.includes("HERO") && player.hero) return true;
+    if (expectedTypes.includes("MINION") && (player.board?.length ?? 0) > 0) return true;
+  }
+  return false;
 }
 
 function targetRuleSides(side: "FRIENDLY" | "ENEMY" | "ALL" | undefined): Seat[] {
