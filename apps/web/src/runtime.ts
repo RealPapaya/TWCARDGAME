@@ -1529,7 +1529,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     "minion",
     minion.taunt && "taunt",
     minion.divineShield && "shielded",
-    mine && (minion.canAttack ? "can-attack" : "sleeping"),
+    mine && minion.canAttack && "can-attack",
     minion.isEnraged && "enraged",
     minion.lockedTurns > 0 && "locked",
     selectedMinionClass(minion.instanceId, target),
@@ -1889,19 +1889,23 @@ function renderHoverTooltip(): string {
   const resolved = view.hoveredCard ?? (catalogCard ? resolveCatalogCard(catalogCard, `tooltip-${catalogCard.id}`) : undefined);
   if (!resolved) return "";
   const margin = 16;
+  const gap = 24;
   const tooltipWidth = 224;
-  const approxHeight = 322;
+  const tooltipHeight = 322;
   const anchorLeft = view.hoverAnchor.x - view.hoverAnchor.width / 2;
   const anchorRight = view.hoverAnchor.x + view.hoverAnchor.width / 2;
-  const roomOnRight = window.innerWidth - anchorRight - margin;
-  const roomOnLeft = anchorLeft - margin;
-  let left = anchorRight + margin;
-  if (roomOnRight < tooltipWidth && roomOnLeft > roomOnRight) {
-    left = anchorLeft - tooltipWidth - margin;
-  }
+  const roomOnRight = window.innerWidth - anchorRight - gap - margin;
+  const roomOnLeft = anchorLeft - gap - margin;
+  const preferRight = roomOnRight >= tooltipWidth || roomOnRight >= roomOnLeft;
+  let left = preferRight ? anchorRight + gap : anchorLeft - tooltipWidth - gap;
   left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
-  let top = view.hoverAnchor.y - approxHeight / 2;
-  top = Math.max(margin, Math.min(top, window.innerHeight - approxHeight - margin));
+  if (left < anchorRight && left + tooltipWidth > anchorLeft) {
+    left = preferRight
+      ? Math.min(window.innerWidth - tooltipWidth - margin, anchorRight + gap)
+      : Math.max(margin, anchorLeft - tooltipWidth - gap);
+  }
+  let top = view.hoverAnchor.y - tooltipHeight / 2;
+  top = Math.max(margin, Math.min(top, window.innerHeight - tooltipHeight - margin));
   return `
     <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
       <div class="card rarity-${resolved.rarity.toLowerCase()}">
@@ -3588,34 +3592,10 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
-    on(el, "click", "hand-select", () => {
-      if (isBattleActionLocked() || view.pendingBattlecry) return;
-      const handId = el.dataset.handId;
-      const card = view.hand.find((item) => item.instanceId === handId);
-      if (handId && card && view.selectedHandId === handId && canAfford(card.cost) && !cardNeedsTarget(card.cardId)) {
-        send({ type: "playCard", handInstanceId: handId, target: inferDefaultTarget(card.cardId) });
-        view.selectedHandId = undefined;
-        view.selectedAttackerId = undefined;
-        view.selectedTarget = undefined;
-        render();
-        return;
-      }
-      view.selectedHandId = view.selectedHandId === handId ? undefined : handId;
-      view.selectedAttackerId = undefined;
-      view.selectedTarget = undefined;
-      render();
-    });
     on(el, "pointerdown", "hand-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
-    });
-    bindHoverPreview(el, () => {
-      const handId = el.dataset.handId;
-      const card = view.hand.find((item) => item.instanceId === handId);
-      if (!card) return undefined;
-      const catalogCard = cardCatalog.get(card.cardId);
-      return catalogCard ? resolveCatalogCard(catalogCard, `tooltip-${card.instanceId}`) : undefined;
     });
   }
 
@@ -3686,33 +3666,24 @@ function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | und
     (typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches) ||
     (window as any).__el !== undefined
   );
-  console.log("bindHoverPreview: hoverCapable =", hoverCapable, "window.__el defined =", (window as any).__el !== undefined, "el =", el.tagName, el.className);
   if (!hoverCapable) return;
   on(el, "mouseenter", "hover-preview-enter", (event) => {
-    console.log("mouseenter triggered on card:", el.className);
     if (view.confirmingConcede) return;
     // No hover-enlarge preview while aiming a battlecry — the arrow passing over
     // a card must not pop its preview open.
     if (view.pendingBattlecry) return;
     const card = resolve();
-    if (!card) {
-      console.log("mouseenter resolve() returned undefined");
-      return;
-    }
+    if (!card) return;
     window.clearTimeout(hoverState.timer);
     hoverState.lastEl = el;
     const rect = el.getBoundingClientRect();
     const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
     hoverState.timer = window.setTimeout(() => {
-      if (hoverState.lastEl !== el) {
-        console.log("mouseenter timer ignored because hoverState.lastEl changed");
-        return;
-      }
+      if (hoverState.lastEl !== el) return;
       view.hoveredCardId = card.cardId;
       view.hoveredCard = card;
       view.hoverAnchor = anchor;
       hoverState.lastCardId = card.cardId;
-      console.log("setting hoveredCardId and rendering:", card.cardId);
       render();
     }, 220);
     void event;

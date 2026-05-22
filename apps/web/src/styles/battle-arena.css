@@ -920,9 +920,12 @@
   pointer-events: none;
 }
 
-.battle-surface .hand-row .card:hover,
-.battle-surface .hand-row .card.selected {
+.battle-surface .hand-row .card:hover {
   transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 60px)) scale(1.75);
+  z-index: 1000;
+}
+
+.battle-surface .hand-row .card.selected {
   z-index: 1000;
 }
 

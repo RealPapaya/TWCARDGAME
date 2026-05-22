@@ -650,10 +650,15 @@ input {
   margin: 0 calc((var(--squeeze, 1) * (var(--card-w) + 2 * var(--card-mx)) - var(--card-w)) / 2);
 }
 
-.hand-row .card:hover,
-.hand-row .card.selected {
+.hand-row .card:hover {
   z-index: 50;
   transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 50px)) scale(1.45);
+  border-color: var(--cyan);
+  box-shadow: 0 0 28px rgba(32, 214, 242, 0.68), 0 12px 26px rgba(0, 0, 0, 0.52);
+}
+
+.hand-row .card.selected {
+  z-index: 50;
   border-color: var(--cyan);
   box-shadow: 0 0 28px rgba(32, 214, 242, 0.68), 0 12px 26px rgba(0, 0, 0, 0.52);
 }
@@ -874,10 +879,6 @@ input {
   content: none;
 }
 
-.minion.sleeping {
-  opacity: 0.72;
-  filter: saturate(0.55);
-}
 
 .minion.can-attack {
   border-color: var(--neon-lime) !important;
@@ -1693,8 +1694,7 @@ input {
     height: 158px;
   }
 
-  .hand-row .card:hover,
-  .hand-row .card.selected {
+  .hand-row .card:hover {
     transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 32px)) scale(1.24);
   }
 
@@ -1870,8 +1870,7 @@ input {
     padding: 5px;
   }
 
-  .hand-row .card:hover,
-  .hand-row .card.selected {
+  .hand-row .card:hover {
     transform: rotate(var(--rot, 0deg)) translateY(calc(var(--y, 0px) - 22px)) scale(1.16);
   }
 
