@@ -90,6 +90,35 @@
   animation: dust-fade 0.65s ease-out forwards;
 }
 
+@keyframes board-dust-fade {
+  0% {
+    transform: translate(0, 0) scale(0.5);
+    opacity: 0.99;
+    filter: brightness(2) blur(3px);
+  }
+  100% {
+    transform: translate(var(--dx), var(--dy)) scale(4.5);
+    opacity: 0;
+    filter: blur(15px);
+  }
+}
+
+.board-dust-cloud {
+  position: fixed;
+  pointer-events: none !important;
+  z-index: 45000;
+  width: 0;
+  height: 0;
+}
+
+.board-dust-particle {
+  position: absolute;
+  background: rgba(200, 200, 200, 0.4);
+  border-radius: 50%;
+  filter: blur(2px);
+  animation: board-dust-fade 1s ease-out forwards;
+}
+
 /* Board shake when a played card lands — mirrors LEGACY board-slam, fired
    imperatively the instant the minion appears (alongside the sound + dust).
    The board is centred with `transform: translateX(-50%)`, so every keyframe

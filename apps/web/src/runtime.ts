@@ -4486,68 +4486,81 @@ const cardPlayCueQueue: AnimationCue[] = [];
 let cardPlayCueActive = false;
 let cardPlayTimers: number[] = [];
 
-// While a card-play preview is animating, the board update that puts the new
-// minion down is held back so the card finishes receding into the board first
-// (LEGACY awaits showCardPlayPreview before the board re-renders). The latest
-// publicSync is stashed here and flushed once the cue queue drains.
+// While a card-play preview is animating, board updates are held back so the
+// card can visibly hit the board before the new state appears. The latest
+// publicSync is stashed here and flushed either when a minion lands or when the
+// cue queue drains.
 let pendingPublicSync: unknown;
-// Seats whose card-play previews have resolved since the last board flush.
-// Their boards get the impact FX (sound + smoke + shake) the instant the
-// minion lands, mirroring LEGACY's board-slam on showCardPlayPreview.
-const pendingImpactSeats = new Set<Seat>();
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
 }
 
 function flushPendingPublicSync(): void {
+  applyPendingPublicSyncNow();
+}
+
+function applyPendingPublicSyncNow(): void {
   if (pendingPublicSync !== undefined) {
     const message = pendingPublicSync;
     pendingPublicSync = undefined;
     view.publicSync = message as typeof view.publicSync;
     render();
   }
-  // The board now shows the new minion(s); fire sound + smoke + shake together.
-  // render() defers the DOM update to the next frame, so the impact waits one
-  // frame too — otherwise it would anchor to the board before the minion lands.
-  const seats = [...pendingImpactSeats];
-  pendingImpactSeats.clear();
-  if (seats.length === 0) return;
+}
+
+// Plays the landing SFX, shakes the board, and spawns V1-style smoke right
+// when the preview-card slam reaches the board.
+function impactCardPlayLanding(cue: AnimationCue, card: CardDefinition, previewEl: HTMLElement): void {
+  applyPendingPublicSyncNow();
   window.requestAnimationFrame(() => {
-    for (const seat of seats) impactBoardPlay(seat);
+    if (!document.body.contains(previewEl)) return;
+    playSfx("cardPlay");
+    const board = slamBoard(cue.seat);
+    const landedMinion = cue.targetKey
+      ? document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`)
+      : undefined;
+    const smokeAnchor = landedMinion ?? board ?? previewEl;
+    spawnBoardDust(smokeAnchor, card.cost >= 7 ? 2.5 : 1);
   });
 }
 
-// Plays the landing SFX, shakes the board, and spawns a dust burst — all at
-// once, in the same frame the minion appears (LEGACY board-slam + spawnDust).
-function impactBoardPlay(seat: Seat): void {
-  playSfx("cardPlay");
+function slamBoard(seat: Seat | undefined): HTMLElement | undefined {
+  if (!seat) return undefined;
   const role = seat === view.mySeat ? "player" : "opponent";
   const board = document.querySelector<HTMLElement>(`[data-testid="${role}-board"]`);
-  if (!board) return;
+  if (!board) return undefined;
   board.classList.remove("board-slam");
   void board.offsetWidth; // restart the animation if it is already applied
   board.classList.add("board-slam");
   window.setTimeout(() => board.classList.remove("board-slam"), 480);
-  spawnBoardDust(board);
+  return board;
 }
 
-// Imperative dust puff anchored to the board, reusing the death-burst particle
-// spread and dust-fade keyframe so the visual language matches the rest of FX.
-// Appended to .battle-surface (always present in a match) rather than the
-// .event-layer, which only exists while animation cues are live.
-function spawnBoardDust(board: HTMLElement): void {
-  const surface = document.querySelector<HTMLElement>(".battle-surface");
-  if (!surface) return;
-  const surfaceRect = surface.getBoundingClientRect();
-  const r = board.getBoundingClientRect();
-  const burst = document.createElement("div");
-  burst.className = "death-burst board-dust";
-  burst.innerHTML = particleSpread(`board-dust-${crypto.randomUUID()}`);
-  burst.style.left = `${r.left + r.width / 2 - surfaceRect.left}px`;
-  burst.style.top = `${r.top + r.height / 2 - surfaceRect.top}px`;
-  surface.appendChild(burst);
-  window.setTimeout(() => burst.remove(), 700);
+// Imperative dust puff ported from LEGACY's spawnDustEffect. It is appended to
+// body with a very high z-index so it remains visible over the card preview.
+function spawnBoardDust(anchor: HTMLElement, intensity = 1): void {
+  const rect = anchor.getBoundingClientRect();
+  const cloud = document.createElement("div");
+  cloud.className = "board-dust-cloud";
+  cloud.style.left = `${rect.left + rect.width / 2}px`;
+  cloud.style.top = `${rect.top + rect.height * 0.8}px`;
+  document.body.appendChild(cloud);
+
+  const count = Math.floor(15 * intensity);
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement("div");
+    particle.className = "board-dust-particle";
+    const angle = Math.random() * Math.PI * 2;
+    const distance = (60 + Math.random() * 100) * (intensity > 1 ? 1.8 : 1);
+    const size = (15 + Math.random() * 25) * (intensity > 1 ? 1.6 : 1);
+    particle.style.setProperty("--dx", `${Math.cos(angle) * distance}px`);
+    particle.style.setProperty("--dy", `${Math.sin(angle) * distance}px`);
+    particle.style.width = `${size}px`;
+    particle.style.height = `${size}px`;
+    cloud.appendChild(particle);
+  }
+  window.setTimeout(() => cloud.remove(), 1000);
 }
 
 // Applies a publicSync, but never ahead of a card-play preview. The server
@@ -4555,7 +4568,7 @@ function spawnBoardDust(board: HTMLElement): void {
 // arrives before the matching CARD_PLAYED event has enqueued its cue. We defer
 // the apply by one task tick: the `events` handler runs first (same network
 // flush) and starts the cue, so cardPlayPreviewBusy() then reports true and the
-// board update is held until the card has visibly receded into the board.
+// board update is held until the minion lands or the cue finishes.
 function applyPublicSync(message: typeof view.publicSync): void {
   pendingPublicSync = message;
   window.setTimeout(() => {
@@ -4579,7 +4592,6 @@ function resetCardPlayCues(): void {
   cardPlayCueQueue.length = 0;
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
-  pendingImpactSeats.clear();
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
@@ -4604,16 +4616,20 @@ function playNextCardPlayCue(): void {
     playNextCardPlayCue();
     return;
   }
-  // Remember whose board to slam once this preview resolves.
-  if (cue.seat) pendingImpactSeats.add(cue.seat);
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = `event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}`;
   el.innerHTML = renderCardFace(resolveCatalogCard(card, cue.id), "mulligan");
   overlay.appendChild(el);
   // Two phases mirror LEGACY showCardPlayPreview: a 0.8s entrance + hold, then
-  // a staged shrink-and-fade slam, after which the minion is left on the board.
-  cardPlayTimers.push(window.setTimeout(() => el.classList.add("card-play-slam"), 800));
+  // a staged shrink-and-fade slam. Minions fire smoke + shake during the slam,
+  // matching LEGACY's delayed board impact inside showCardPlayPreview.
+  cardPlayTimers.push(window.setTimeout(() => {
+    el.classList.add("card-play-slam");
+    if (card.type === "MINION") {
+      cardPlayTimers.push(window.setTimeout(() => impactCardPlayLanding(cue, card, el), 300));
+    }
+  }, 800));
   cardPlayTimers.push(window.setTimeout(() => {
     el.remove();
     playNextCardPlayCue();
@@ -4621,7 +4637,7 @@ function playNextCardPlayCue(): void {
 }
 
 function enqueueEventCues(events: GameEvent[]): void {
-  const cues = events.map(eventToCue).filter((cue): cue is AnimationCue => Boolean(cue));
+  const cues = events.map((event, index) => eventToCue(event, events, index)).filter((cue): cue is AnimationCue => Boolean(cue));
   if (cues.length === 0) return;
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
@@ -4640,7 +4656,7 @@ function enqueueEventCues(events: GameEvent[]): void {
   }
 }
 
-function eventToCue(event: GameEvent): AnimationCue | undefined {
+function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): AnimationCue | undefined {
   const payload = event.payload ?? {};
   const target = typeof payload.target === "string" ? payload.target : undefined;
   const amount = typeof payload.amount === "number" ? payload.amount : undefined;
@@ -4648,7 +4664,14 @@ function eventToCue(event: GameEvent): AnimationCue | undefined {
   const id = `${event.seq}-${event.type}-${crypto.randomUUID()}`;
   if (event.type === "CARD_PLAYED") {
     const playedCardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
-    return { id, kind: "play", text: cardName(playedCardId) ?? "Card played", seat: event.seat, cardId: playedCardId };
+    return {
+      id,
+      kind: "play",
+      text: cardName(playedCardId) ?? "Card played",
+      seat: event.seat,
+      cardId: playedCardId,
+      targetKey: findLandingTargetKey(events, index, event.seat, playedCardId)
+    };
   }
   if (event.type === "MINION_SUMMONED") {
     return { id, kind: "summon", text: "Summoned", seat: event.seat, targetKey: target, cardId };
@@ -4665,6 +4688,18 @@ function eventToCue(event: GameEvent): AnimationCue | undefined {
   if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "Command rejected"), seat: event.seat };
+  return undefined;
+}
+
+function findLandingTargetKey(events: GameEvent[], startIndex: number, seat: Seat | undefined, cardId: string | undefined): string | undefined {
+  if (startIndex < 0 || !seat || !cardId) return undefined;
+  for (let i = startIndex + 1; i < events.length; i++) {
+    const event = events[i];
+    if (event.type === "CARD_PLAYED") break;
+    if (event.type !== "MINION_SUMMONED" || event.seat !== seat) continue;
+    if (event.payload?.cardId !== cardId) continue;
+    return typeof event.payload.target === "string" ? event.payload.target : undefined;
+  }
   return undefined;
 }
 
