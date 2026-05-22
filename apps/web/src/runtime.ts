@@ -1699,11 +1699,9 @@ function renderTurnAnnouncementOverlay(): string {
 function renderEventCue(cue: AnimationCue): string {
   const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
   if (cue.kind === "play" && card) {
-    return `
-      <div class="event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}">
-        ${renderCardFace(resolveCatalogCard(card, cue.id), "mulligan")}
-      </div>
-    `;
+    // The big card preview is rendered imperatively via #card-play-overlay so its
+    // animation is not restarted by the surrounding DOM being re-rendered.
+    return "";
   }
   if (cue.kind === "attackerMoves") {
     return "";
@@ -3327,8 +3325,7 @@ function bindRoomMessages(joined: Room): void {
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
     }) => {
-      view.publicSync = message;
-      render();
+      applyPublicSync(message);
     }
   );
   joined.onMessage("events", (message: GameEvent[]) => {
@@ -3810,6 +3807,7 @@ async function backToLobby(): Promise<void> {
   view.selectedTarget = undefined;
   view.events = [];
   view.animationCues = [];
+  resetCardPlayCues();
   view.eventStatus = undefined;
   view.toast = undefined;
   view.matchmaking = undefined;
@@ -3890,8 +3888,7 @@ async function joinRoom(event: Event): Promise<void> {
         result?: any;
         players?: Partial<Record<Seat, PublicPlayer>>;
       }) => {
-      view.publicSync = message;
-      render();
+      applyPublicSync(message);
       }
     );
     joined.onMessage("events", (message: GameEvent[]) => {
@@ -4485,17 +4482,107 @@ function handleEvents(message: GameEvent[]): void {
   render();
 }
 
+const cardPlayCueQueue: AnimationCue[] = [];
+let cardPlayCueActive = false;
+let cardPlayTimers: number[] = [];
+
+// While a card-play preview is animating, the board update that puts the new
+// minion down is held back so the card finishes receding into the board first
+// (LEGACY awaits showCardPlayPreview before the board re-renders). The latest
+// publicSync is stashed here and flushed once the cue queue drains.
+let pendingPublicSync: unknown;
+
+function cardPlayPreviewBusy(): boolean {
+  return cardPlayCueActive || cardPlayCueQueue.length > 0;
+}
+
+function flushPendingPublicSync(): void {
+  if (pendingPublicSync === undefined) return;
+  const message = pendingPublicSync;
+  pendingPublicSync = undefined;
+  view.publicSync = message as typeof view.publicSync;
+  render();
+}
+
+// Applies a publicSync, but never ahead of a card-play preview. The server
+// always sends `publicSync` then `events` back-to-back, so the board update
+// arrives before the matching CARD_PLAYED event has enqueued its cue. We defer
+// the apply by one task tick: the `events` handler runs first (same network
+// flush) and starts the cue, so cardPlayPreviewBusy() then reports true and the
+// board update is held until the card has visibly receded into the board.
+function applyPublicSync(message: typeof view.publicSync): void {
+  pendingPublicSync = message;
+  window.setTimeout(() => {
+    if (cardPlayPreviewBusy()) return; // flushed later by playNextCardPlayCue
+    flushPendingPublicSync();
+  }, 0);
+}
+
+function ensureCardPlayOverlay(): HTMLElement {
+  let overlay = document.getElementById("card-play-overlay");
+  if (!overlay) {
+    overlay = document.createElement("div");
+    overlay.id = "card-play-overlay";
+    overlay.setAttribute("aria-hidden", "true");
+    document.body.appendChild(overlay);
+  }
+  return overlay;
+}
+
+function resetCardPlayCues(): void {
+  cardPlayCueQueue.length = 0;
+  cardPlayCueActive = false;
+  pendingPublicSync = undefined;
+  for (const timer of cardPlayTimers) window.clearTimeout(timer);
+  cardPlayTimers = [];
+  document.getElementById("card-play-overlay")?.replaceChildren();
+}
+
+function enqueueCardPlayCue(cue: AnimationCue): void {
+  if (!cue.cardId || !cardCatalog.get(cue.cardId)) return;
+  cardPlayCueQueue.push(cue);
+  if (!cardPlayCueActive) playNextCardPlayCue();
+}
+
+function playNextCardPlayCue(): void {
+  const cue = cardPlayCueQueue.shift();
+  if (!cue) {
+    cardPlayCueActive = false;
+    flushPendingPublicSync();
+    return;
+  }
+  cardPlayCueActive = true;
+  const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
+  if (!card) {
+    playNextCardPlayCue();
+    return;
+  }
+  const overlay = ensureCardPlayOverlay();
+  const el = document.createElement("div");
+  el.className = `event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}`;
+  el.innerHTML = renderCardFace(resolveCatalogCard(card, cue.id), "mulligan");
+  overlay.appendChild(el);
+  // Two phases mirror LEGACY showCardPlayPreview: a 0.8s entrance + hold, then
+  // a staged shrink-and-fade slam, after which the minion is left on the board.
+  cardPlayTimers.push(window.setTimeout(() => el.classList.add("card-play-slam"), 800));
+  cardPlayTimers.push(window.setTimeout(() => {
+    el.remove();
+    playNextCardPlayCue();
+  }, 1300));
+}
+
 function enqueueEventCues(events: GameEvent[]): void {
   const cues = events.map(eventToCue).filter((cue): cue is AnimationCue => Boolean(cue));
   if (cues.length === 0) return;
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
+    if (cue.kind === "play") enqueueCardPlayCue(cue);
     const lifetime =
-      cue.kind === "play" ? 1250
+      cue.kind === "play" ? 1350
       : cue.kind === "attackerMoves" ? 460
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
       : cue.kind === "destroy" ? 700
-      : cue.kind === "summon" ? 1600
+      : cue.kind === "summon" ? 700
       : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
