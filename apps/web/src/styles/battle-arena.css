@@ -911,7 +911,10 @@
 .battle-surface .opponent-hand .card-back {
   width: 80px;
   height: 110px;
-  margin: 0 -10px;
+  /* Same fixed-width cap as the player's hand: 80px card - 2x10px overlap = a
+     60px per-card step; `opponentFanStyle` supplies `--squeeze` (1 when <= 5
+     cards, 5 / count above that) and the margin is solved back from it. */
+  margin: 0 calc((var(--squeeze, 1) * 60px - 80px) / 2);
   transform: rotate(var(--rot, 0deg)) translateY(var(--y, 0px));
   transform-origin: center -120%;
   pointer-events: none;
