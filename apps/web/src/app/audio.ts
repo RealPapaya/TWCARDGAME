@@ -1,6 +1,6 @@
 import type { GameEvent } from "@twcardgame/shared";
 
-export type SoundCue = "cardPlay" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
+export type SoundCue = "cardPlay" | "cardDraw" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
 
 export type AudioViewState = {
   bgmVolume: number;
@@ -17,6 +17,7 @@ export const sfxMutedKey = "twcardgame.sfxMuted";
 const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
 const sfxPaths: Record<SoundCue, string> = {
   cardPlay: "/audio/sfx/LowCostMionion.mp3",
+  cardDraw: "/audio/sfx/card-draw.mp3",
   attack: "/audio/sfx/HeavyHit.mp3",
   damage: "/audio/sfx/LightHit.mp3",
   heal: "/audio/sfx/card-draw.mp3",

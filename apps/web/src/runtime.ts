@@ -36,6 +36,12 @@ import {
 } from "./app/audio.js";
 import { defaultServerUrl, forceDevAuth, supabase as configuredSupabase } from "./app/config.js";
 import { setAppContext } from "./app/context.js";
+import {
+  isHandCardAnimating,
+  noteOpponentHandSync,
+  notePlayerHandSync,
+  resetDrawTracking
+} from "./app/draw-animation.js";
 import { cssEscape } from "./app/dom.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
@@ -1406,10 +1412,14 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
     rejected && "rejected-card"
   ]);
 
+  // A card mid draw-animation is rendered hidden so only the flying clone shows;
+  // draw-animation.ts restores opacity once the clone lands.
+  const drawingStyle = isHandCardAnimating(card.instanceId) ? " opacity: 0;" : "";
+
   return `
     <button
       class="${classes}"
-      style="${fanStyle(index, total)}"
+      style="${fanStyle(index, total)}${drawingStyle}"
       data-hand-id="${escapeAttr(card.instanceId)}"
       data-card-type="${escapeAttr(card.type)}"
       data-e2e-card-type="${escapeAttr(e2eType)}"
@@ -3310,6 +3320,7 @@ function bindRoomMessages(joined: Room): void {
     view.hand = message.cards;
     pruneSelections();
     render();
+    notePlayerHandSync(message.cards.map((card) => card.instanceId));
   });
   joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
     view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
@@ -3873,6 +3884,7 @@ async function joinRoom(event: Event): Promise<void> {
       view.hand = message.cards;
       pruneSelections();
       render();
+      notePlayerHandSync(message.cards.map((card) => card.instanceId));
     });
     joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
       view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
@@ -4506,6 +4518,9 @@ function applyPendingPublicSyncNow(): void {
     pendingPublicSync = undefined;
     view.publicSync = message as typeof view.publicSync;
     render();
+    const opponentSeat = view.mySeat ? otherSeat(view.mySeat) : undefined;
+    const opponentHandCount = opponentSeat ? readPlayer(opponentSeat)?.handCount : undefined;
+    if (typeof opponentHandCount === "number") noteOpponentHandSync(opponentHandCount);
   }
 }
 
@@ -4595,6 +4610,7 @@ function resetCardPlayCues(): void {
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
+  resetDrawTracking();
 }
 
 function enqueueCardPlayCue(cue: AnimationCue): void {
