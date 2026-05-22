@@ -994,10 +994,10 @@
   display: none;
 }
 
-.battle-gear-btn {
-  position: fixed;
-  top: calc(50% - (var(--game-height) * var(--app-scale) / 2) + 26px);
-  right: calc(50% - (var(--game-width) * var(--app-scale) / 2) + 54px);
+#battle-settings-toggle.battle-gear-btn {
+  position: absolute !important;
+  top: 20px !important;
+  right: 73px !important;
   width: 60px;
   height: 60px;
   min-width: 60px;
@@ -1022,10 +1022,10 @@
   min-height: 60px;
 }
 
-.battle-settings-menu {
-  position: fixed;
-  top: calc(50% - (var(--game-height) * var(--app-scale) / 2) + 98px);
-  right: calc(50% - (var(--game-width) * var(--app-scale) / 2) + 96px);
+#battle-settings-menu.battle-settings-menu {
+  position: absolute !important;
+  top: 92px !important;
+  right: 95px !important;
   width: 220px;
   padding: 24px 18px 26px;
   background:

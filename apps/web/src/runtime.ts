@@ -1260,6 +1260,8 @@ function renderGame(status: GameStatus | ""): string {
       <span>${escapeHtml(targetHint)}</span>
     </section>
     <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""}" data-testid="battle-surface">
+      <button id="battle-settings-toggle" class="battle-gear-btn" data-testid="battle-settings" title="設定" aria-label="設定">⚙</button>
+      ${renderBattleSettingsMenu()}
       ${renderBattleHistoryPanel()}
       ${renderConnectionBanner()}
       ${renderPlayerArea(opponent, opponentPlayer, "opponent")}
@@ -1538,8 +1540,6 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
 
   return `
     <section class="center-line controls">
-      <button id="battle-settings-toggle" class="battle-gear-btn" data-testid="battle-settings" title="設定" aria-label="設定">⚙</button>
-      ${renderBattleSettingsMenu()}
       <div id="turn-indicator">Turn: ${readTurnNumber()}</div>
       <div class="turn-stack">
         <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
