@@ -1494,8 +1494,9 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   // battlecry targeting is hidden too — it "became" the preview minion on the
   // field (or the targeting arrow for a NEWS card).
   const hiddenForBattlecry = activeBattlecryPreview()?.handInstanceId === card.instanceId;
+  const hiddenForDrag = view.draggingHandId === card.instanceId;
   const drawingStyle =
-    isHandCardAnimating(card.instanceId) || hiddenForBattlecry ? " opacity: 0; pointer-events: none;" : "";
+    isHandCardAnimating(card.instanceId) || hiddenForBattlecry || hiddenForDrag ? " opacity: 0; pointer-events: none;" : "";
 
   return `
     <button
@@ -1613,7 +1614,7 @@ function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): st
   return `
     <span class="${costClass}"><span>${card.cost}</span></span>
     <strong class="card-title">${escapeHtml(card.name)}</strong>
-    <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" />
+    <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" draggable="false" />
     <span class="card-category">${escapeHtml(card.category)}</span>
     <span class="card-desc">${escapeHtml(card.description)}</span>
     ${
@@ -3592,8 +3593,12 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
+    on(el, "dragstart", "hand-native-drag", (event) => {
+      event.preventDefault();
+    });
     on(el, "pointerdown", "hand-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
+      event.preventDefault();
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
     });
@@ -3779,6 +3784,7 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
     window.removeEventListener("pointercancel", onCancel);
 
     view.selectedHandId = handId;
+    view.draggingHandId = handId;
     view.selectedAttackerId = undefined;
     view.selectedTarget = undefined;
     suppressNextClick();
@@ -3839,6 +3845,7 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
 
 function finalizeHandDrag(_handIdConsumed: string | undefined): void {
   view.selectedHandId = undefined;
+  view.draggingHandId = undefined;
   view.selectedTarget = undefined;
   render();
 }
@@ -3869,6 +3876,7 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
   const isMinion = (cardCatalog.get(card.cardId)?.type ?? card.type) === "MINION";
   clearHoverTooltip();
   view.selectedHandId = undefined;
+  view.draggingHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
   view.pendingBattlecry = {

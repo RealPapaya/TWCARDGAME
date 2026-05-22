@@ -749,6 +749,8 @@ input {
   height: 58px;
   object-fit: cover;
   object-position: center top;
+  -webkit-user-drag: none;
+  user-select: none;
   border-radius: 6px;
   border: 1px solid rgba(255, 255, 255, 0.16);
   background: #303030;

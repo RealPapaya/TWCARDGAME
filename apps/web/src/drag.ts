@@ -176,6 +176,7 @@ function createGhost(sourceEl: HTMLElement): HTMLElement | null {
   clone.removeAttribute("data-attacker-id");
   clone.removeAttribute("data-target");
   clone.removeAttribute("aria-pressed");
+  clone.style.opacity = "1";
   clone.style.pointerEvents = "none";
   clone.style.position = "static";
   ghost.appendChild(clone);

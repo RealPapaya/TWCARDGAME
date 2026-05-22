@@ -76,6 +76,7 @@ export type ClientViewState = {
   presence: Map<Seat, { connected: boolean; reconnectUntilMs?: number }>;
   rejectedHandIds: Set<string>;
   selectedHandId?: string;
+  draggingHandId?: string;
   mulliganSelection: Set<string>;
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
