@@ -196,6 +196,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       client.send("error", { message: "No seat assigned." });
       return;
     }
+    logger.info("server.handleCommand", { seat, command: message?.command });
     if (!message || typeof message.commandId !== "string" || !message.command) {
       this.rejectCommand(seat, "Invalid command message.");
       return;
@@ -223,6 +224,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
    */
   protected applyEnvelope(envelope: CommandEnvelope): void {
     if (!this.match) return;
+    logger.info("server.applyEnvelope", { seat: envelope.seat, type: envelope.command.type });
     const result = reduce(this.match, envelope, CARD_CATALOG);
     this.match = result.state;
     this.syncPublicState();
@@ -282,6 +284,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   protected afterMatchComplete(): void {
     if (!this.match || !isMatchComplete(this.match)) return;
+    this.lock();
     void this.finalizer.persistOnce(this.match, this.getMatchPersistenceMetadata());
     this.scheduleCleanup();
   }

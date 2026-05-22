@@ -41,26 +41,15 @@ const INIT_SCRIPT = `
   window.__el = [];
   window.__eq = 0;
   var seen = new Set();
-  function processNode(node) {
-    var text = node.textContent || "";
-    if (seen.has(text)) return;
-    seen.add(text);
-    for (var i = 0; i < ALL_TYPES.length; i++) {
-      if (text.indexOf(ALL_TYPES[i]) === 0) {
-        window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
-      }
-    }
-  }
-  function scanAdded(mutations) {
-    for (var m = 0; m < mutations.length; m++) {
-      var added = mutations[m].addedNodes;
-      for (var n = 0; n < added.length; n++) {
-        var node = added[n];
-        if (node.nodeType !== 1) continue;
-        if (node.tagName === "P") processNode(node);
-        else {
-          var ps = node.querySelectorAll("p");
-          for (var k = 0; k < ps.length; k++) processNode(ps[k]);
+  function scanAdded() {
+    var ps = document.querySelectorAll("#history-list p, p");
+    for (var k = 0; k < ps.length; k++) {
+      var text = ps[k].textContent || "";
+      if (seen.has(text)) continue;
+      seen.add(text);
+      for (var i = 0; i < ALL_TYPES.length; i++) {
+        if (text.indexOf(ALL_TYPES[i]) === 0) {
+          window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
         }
       }
     }
@@ -68,7 +57,7 @@ const INIT_SCRIPT = `
   var obs = new MutationObserver(scanAdded);
   function start() {
     var app = document.querySelector("#app");
-    if (app) obs.observe(app, { childList: true, subtree: true });
+    if (app) obs.observe(app, { childList: true, subtree: true, characterData: true });
     else setTimeout(start, 50);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
@@ -221,8 +210,10 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
   var p1 = await mobileCtx.newPage();   // player 1  (mobile viewport)
   var p2 = await desktopCtx.newPage();  // player 2  (desktop viewport)
 
-  p1.on("pageerror", (e) => console.error("[P1 ERR]", e.message));
+   p1.on("pageerror", (e) => console.error("[P1 ERR]", e.message));
   p2.on("pageerror", (e) => console.error("[P2 ERR]", e.message));
+  p1.on("console", (msg) => console.log(`[P1 CONSOLE] ${msg.text()}`));
+  p2.on("console", (msg) => console.log(`[P2 CONSOLE] ${msg.text()}`));
   await p1.addInitScript(INIT_SCRIPT);
   await p2.addInitScript(INIT_SCRIPT);
 
@@ -558,6 +549,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
     try {
       // Whichever page currently has #concede visible (any in-match page)
       var cancelPage = (await isMyTurn(actPage)) ? actPage : idlPage;
+      await cancelPage.click('[data-testid="battle-settings"]');
       await cancelPage.click('[data-testid="concede"]');
       await cancelPage.waitForSelector('[data-testid="concede-overlay"]', { timeout: 5000 });
       pass("12. Concede modal — overlay shown after Concede click");
@@ -605,6 +597,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       var ckCon = await snap(actPage);
       // Find whichever page is currently active and concede
       var concedePage = (await isMyTurn(actPage)) ? actPage : idlPage;
+      await concedePage.click('[data-testid="battle-settings"]');
       await concedePage.click('[data-testid="concede"]');
       await concedePage.waitForSelector('[data-testid="concede-confirm"]', { timeout: 5000 });
       await concedePage.click('[data-testid="concede-confirm"]');

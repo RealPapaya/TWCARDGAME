@@ -21,32 +21,21 @@ const INIT_SCRIPT = `
   window.__el = [];
   window.__eq = 0;
   var seen = new Set();
-  function processNode(node) {
-    var text = node.textContent || "";
-    if (seen.has(text)) return;
-    seen.add(text);
-    if (text.indexOf("COMMAND_REJECTED") === 0 || text.indexOf("TURN_STARTED") === 0) {
-      window.__el.push({ type: text.indexOf("COMMAND_REJECTED") === 0 ? "COMMAND_REJECTED" : "TURN_STARTED", seq: ++window.__eq, text: text });
-    }
-  }
-  function scanAdded(mutations) {
-    for (var m = 0; m < mutations.length; m++) {
-      var added = mutations[m].addedNodes;
-      for (var n = 0; n < added.length; n++) {
-        var node = added[n];
-        if (node.nodeType !== 1) continue;
-        if (node.tagName === "P") processNode(node);
-        else {
-          var ps = node.querySelectorAll("p");
-          for (var k = 0; k < ps.length; k++) processNode(ps[k]);
-        }
+  function scanAdded() {
+    var ps = document.querySelectorAll("#history-list p, p");
+    for (var k = 0; k < ps.length; k++) {
+      var text = ps[k].textContent || "";
+      if (seen.has(text)) continue;
+      seen.add(text);
+      if (text.indexOf("COMMAND_REJECTED") === 0 || text.indexOf("TURN_STARTED") === 0) {
+        window.__el.push({ type: text.indexOf("COMMAND_REJECTED") === 0 ? "COMMAND_REJECTED" : "TURN_STARTED", seq: ++window.__eq, text: text });
       }
     }
   }
   var obs = new MutationObserver(scanAdded);
   function start() {
     var app = document.querySelector("#app");
-    if (app) obs.observe(app, { childList: true, subtree: true });
+    if (app) obs.observe(app, { childList: true, subtree: true, characterData: true });
     else setTimeout(start, 50);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
@@ -85,11 +74,17 @@ async function waitEvent(page, eventType, after) {
 }
 
 (async function () {
-  var browser = await chromium.launch({ headless: false, slowMo: 100 });
+  var browser = await chromium.launch({ headless: false, slowMo: 250 });
   var ctx1 = await browser.newContext();
   var ctx2 = await browser.newContext();
   var p1 = await ctx1.newPage();
   var p2 = await ctx2.newPage();
+
+  p1.on("pageerror", function (e) { console.error("[P1 ERR]", e.message); });
+  p2.on("pageerror", function (e) { console.error("[P2 ERR]", e.message); });
+  p1.on("console", msg => console.log(`[P1 CONSOLE] ${msg.text()}`));
+  p2.on("console", msg => console.log(`[P2 CONSOLE] ${msg.text()}`));
+
   await p1.addInitScript(INIT_SCRIPT);
   await p2.addInitScript(INIT_SCRIPT);
 

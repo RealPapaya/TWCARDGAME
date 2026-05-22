@@ -257,6 +257,7 @@ const view: ClientViewState = {
   publicPlayerProfile: undefined,
   shopItems: [],
   aiDifficulty: "normal",
+  aiDifficultySelected: true,
   aiTheme: AI_THEMES[0].id,
   battleMode: "challenge",
   bgmVolume: readStoredNumber(bgmVolumeKey, 0.22),
@@ -1348,7 +1349,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
   const connected = player?.connected ?? true;
   const handCount = role === "player" ? view.hand.length : player?.handCount ?? 0;
   const areaClasses = classNames(["player-area", "player", role, isMe && "me", active && "active-turn", !connected && "disconnected"]);
-  const boardClasses = classNames(["board", activeTargeting() && "targeting-board"]);
+  const boardClasses = classNames(["board", activeTargeting() && "targeting-board", view.selectedAttackerId && "attacking-board"]);
 
   return `
     <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
@@ -1528,7 +1529,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     "minion",
     minion.taunt && "taunt",
     minion.divineShield && "shielded",
-    minion.canAttack ? "can-attack" : "sleeping",
+    mine && (minion.canAttack ? "can-attack" : "sleeping"),
     minion.isEnraged && "enraged",
     minion.lockedTurns > 0 && "locked",
     selectedMinionClass(minion.instanceId, target),
@@ -3609,6 +3610,13 @@ function bindSelectionActions(): void {
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
     });
+    bindHoverPreview(el, () => {
+      const handId = el.dataset.handId;
+      const card = view.hand.find((item) => item.instanceId === handId);
+      if (!card) return undefined;
+      const catalogCard = cardCatalog.get(card.cardId);
+      return catalogCard ? resolveCatalogCard(catalogCard, `tooltip-${card.instanceId}`) : undefined;
+    });
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
@@ -3672,27 +3680,39 @@ function bindSelectionActions(): void {
 }
 
 const hoverState: { timer?: number; lastCardId?: string; lastEl?: HTMLElement } = {};
-const hoverCapable = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches;
 
 function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | undefined): void {
+  const hoverCapable = typeof window !== "undefined" && (
+    (typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches) ||
+    (window as any).__el !== undefined
+  );
+  console.log("bindHoverPreview: hoverCapable =", hoverCapable, "window.__el defined =", (window as any).__el !== undefined, "el =", el.tagName, el.className);
   if (!hoverCapable) return;
   on(el, "mouseenter", "hover-preview-enter", (event) => {
+    console.log("mouseenter triggered on card:", el.className);
     if (view.confirmingConcede) return;
     // No hover-enlarge preview while aiming a battlecry — the arrow passing over
     // a card must not pop its preview open.
     if (view.pendingBattlecry) return;
     const card = resolve();
-    if (!card) return;
+    if (!card) {
+      console.log("mouseenter resolve() returned undefined");
+      return;
+    }
     window.clearTimeout(hoverState.timer);
     hoverState.lastEl = el;
     const rect = el.getBoundingClientRect();
     const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
     hoverState.timer = window.setTimeout(() => {
-      if (hoverState.lastEl !== el) return;
+      if (hoverState.lastEl !== el) {
+        console.log("mouseenter timer ignored because hoverState.lastEl changed");
+        return;
+      }
       view.hoveredCardId = card.cardId;
       view.hoveredCard = card;
       view.hoverAnchor = anchor;
       hoverState.lastCardId = card.cardId;
+      console.log("setting hoveredCardId and rendering:", card.cardId);
       render();
     }, 220);
     void event;

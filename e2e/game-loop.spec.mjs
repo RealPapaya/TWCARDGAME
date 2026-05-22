@@ -47,27 +47,15 @@ const INIT_SCRIPT = `
   window.__eq = 0;    // sequence counter
   var seen = new Set();
 
-  function processNode(node) {
-    var text = node.textContent || "";
-    if (seen.has(text)) return;
-    seen.add(text);
-    for (var i = 0; i < ALL_TYPES.length; i++) {
-      if (text.indexOf(ALL_TYPES[i]) === 0) {
-        window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
-      }
-    }
-  }
-
-  function scanAdded(mutations) {
-    for (var m = 0; m < mutations.length; m++) {
-      var added = mutations[m].addedNodes;
-      for (var n = 0; n < added.length; n++) {
-        var node = added[n];
-        if (node.nodeType !== 1) continue;
-        if (node.tagName === "P") { processNode(node); }
-        else {
-          var ps = node.querySelectorAll("p");
-          for (var k = 0; k < ps.length; k++) processNode(ps[k]);
+  function scanAdded() {
+    var ps = document.querySelectorAll("#history-list p, p");
+    for (var k = 0; k < ps.length; k++) {
+      var text = ps[k].textContent || "";
+      if (seen.has(text)) continue;
+      seen.add(text);
+      for (var i = 0; i < ALL_TYPES.length; i++) {
+        if (text.indexOf(ALL_TYPES[i]) === 0) {
+          window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
         }
       }
     }
@@ -76,7 +64,7 @@ const INIT_SCRIPT = `
   var obs = new MutationObserver(scanAdded);
   function start() {
     var app = document.querySelector("#app");
-    if (app) { obs.observe(app, { childList: true, subtree: true }); }
+    if (app) { obs.observe(app, { childList: true, subtree: true, characterData: true }); }
     else { setTimeout(start, 50); }
   }
   if (document.readyState === "loading") {
@@ -329,6 +317,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
 
   p1.on("pageerror", function (e) { console.error("[P1 ERR]", e.message); });
   p2.on("pageerror", function (e) { console.error("[P2 ERR]", e.message); });
+  p1.on("console", msg => console.log(`[P1 CONSOLE] ${msg.text()}`));
+  p2.on("console", msg => console.log(`[P2 CONSOLE] ${msg.text()}`));
 
   await injectEventAccumulator(p1);
   await injectEventAccumulator(p2);
@@ -488,8 +478,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     var hpBefore = await actPage.evaluate(function () {
       var btn = document.querySelector(".player:not(.me) .board button.minion");
       if (!btn) return -1;
-      var m = btn.textContent.match(/(\d+)\/\d+\/\d+/);
-      return m ? parseInt(m[1], 10) : -1;
+      var hpEl = btn.querySelector(".stat-hp");
+      return hpEl ? parseInt(hpEl.textContent, 10) : -1;
     });
     log(actTag, "enemy minion HP before: " + hpBefore);
 
@@ -510,8 +500,8 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
       var hpAfter = await actPage.evaluate(function () {
         var btn = document.querySelector(".player:not(.me) .board button.minion");
         if (!btn) return -1;
-        var m = btn.textContent.match(/(\d+)\/\d+\/\d+/);
-        return m ? parseInt(m[1], 10) : -1;
+        var hpEl = btn.querySelector(".stat-hp");
+        return hpEl ? parseInt(hpEl.textContent, 10) : -1;
       });
       log(actTag, "enemy minion HP after: " + hpAfter);
       if (hpAfter !== -1 && hpBefore !== -1 && hpAfter < hpBefore) pass("Step 4: Enemy HP decreased");
@@ -543,6 +533,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, idlTag, snapPage1, sn
     // ── STEP 5: concede → MATCH_ENDED ────────────────────────────────────────
     log("TEST", "Step 5 – concede");
     var ck5a = await snap(p1), ck5b = await snap(p2);
+    await actPage.click("#battle-settings-toggle");
     await actPage.click("#concede");
     await actPage.waitForSelector('[data-testid="concede-confirm"]', { timeout: 5000 });
     await actPage.click('[data-testid="concede-confirm"]');

@@ -38,31 +38,23 @@ const INIT_SCRIPT = `
   window.__el = [];
   window.__eq = 0;
   var seen = new Set();
-  function processNode(node) {
-    var text = node.textContent || "";
-    if (seen.has(text)) return;
-    seen.add(text);
-    for (var i = 0; i < ALL_TYPES.length; i++) {
-      if (text.indexOf(ALL_TYPES[i]) === 0) {
-        window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
-      }
-    }
-  }
-  function scanAdded(mutations) {
-    for (var m = 0; m < mutations.length; m++) {
-      var added = mutations[m].addedNodes;
-      for (var n = 0; n < added.length; n++) {
-        var node = added[n];
-        if (node.nodeType !== 1) continue;
-        if (node.tagName === "P") processNode(node);
-        else { var ps = node.querySelectorAll("p"); for (var k = 0; k < ps.length; k++) processNode(ps[k]); }
+  function scanAdded() {
+    var ps = document.querySelectorAll("#history-list p, p");
+    for (var k = 0; k < ps.length; k++) {
+      var text = ps[k].textContent || "";
+      if (seen.has(text)) continue;
+      seen.add(text);
+      for (var i = 0; i < ALL_TYPES.length; i++) {
+        if (text.indexOf(ALL_TYPES[i]) === 0) {
+          window.__el.push({ type: ALL_TYPES[i], seq: ++window.__eq });
+        }
       }
     }
   }
   var obs = new MutationObserver(scanAdded);
   function start() {
     var app = document.querySelector("#app");
-    if (app) obs.observe(app, { childList: true, subtree: true });
+    if (app) obs.observe(app, { childList: true, subtree: true, characterData: true });
     else setTimeout(start, 50);
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
