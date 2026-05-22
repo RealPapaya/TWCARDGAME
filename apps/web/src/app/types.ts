@@ -58,6 +58,10 @@ export type AnimationCue = {
   cardId?: string;
   attackerInstanceId?: string;
   amount?: number;
+  delayMs?: number;
+  readyAtMs?: number;
+  anchorX?: number;
+  anchorY?: number;
 };
 
 export type ClientViewState = {

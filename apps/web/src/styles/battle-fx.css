@@ -4,20 +4,46 @@
   0% {
     transform: translate(0, 0) scale(1);
   }
-  45% {
-    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.15);
+  24% {
+    transform: translate(0, var(--attack-lift, -24px)) scale(1.06);
   }
-  55% {
-    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.15);
+  58% {
+    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.08);
+  }
+  68% {
+    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.06);
   }
   100% {
     transform: translate(0, 0) scale(1);
   }
 }
 
-.minion.lunging,
+@keyframes hero-attack-lunge {
+  0% {
+    transform: translateX(-50%) translate(0, 0) scale(1);
+  }
+  24% {
+    transform: translateX(-50%) translate(0, var(--attack-lift, -24px)) scale(1.06);
+  }
+  58% {
+    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.08);
+  }
+  68% {
+    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.06);
+  }
+  100% {
+    transform: translateX(-50%) translate(0, 0) scale(1);
+  }
+}
+
+.minion.lunging {
+  animation: attack-lunge 0.72s cubic-bezier(0.18, 0.86, 0.22, 1) both;
+  z-index: 200;
+  box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
+}
+
 .hero.lunging {
-  animation: attack-lunge 0.42s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: hero-attack-lunge 0.72s cubic-bezier(0.18, 0.86, 0.22, 1) both;
   z-index: 200;
   box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
 }
@@ -45,7 +71,8 @@
   line-height: 1;
   text-shadow: 0 0 8px currentColor, 1px 1px 3px rgba(0, 0, 0, 0.8);
   -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
-  animation: float-number 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: float-number 1.1s cubic-bezier(0.25, 0.46, 0.45, 0.94) both;
+  animation-delay: var(--cue-delay, 0ms);
   pointer-events: none;
   z-index: 80;
 }
@@ -87,7 +114,8 @@
   height: 10px;
   border-radius: 50%;
   background: rgba(200, 195, 185, 0.85);
-  animation: dust-fade 0.65s ease-out forwards;
+  animation: dust-fade 0.65s ease-out both;
+  animation-delay: var(--cue-delay, 0ms);
 }
 
 @keyframes board-dust-fade {

@@ -14,9 +14,19 @@ import { GameRoom, type GameRoomCreateOptions } from "./GameRoom.js";
 import { defaultDeckIds, type JoinOptions, type PlayerSetup } from "./accounts.js";
 import type { MatchPersistenceMetadata } from "./persistence.js";
 
-const BOT_MULLIGAN_DELAY_MS = parseInt(process.env.BOT_MULLIGAN_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "800", 10);
-const BOT_TURN_START_DELAY_MS = parseInt(process.env.BOT_TURN_START_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1600", 10);
-const BOT_ACTION_DELAY_MS = parseInt(process.env.BOT_ACTION_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1200", 10);
+const BOT_MULLIGAN_DELAY_MS = parseInt(process.env.BOT_MULLIGAN_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1000", 10);
+const BOT_DRAW_DELAY_MS = parseInt(
+  process.env.BOT_DRAW_DELAY_MS ?? process.env.BOT_TURN_START_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "2200",
+  10
+);
+const BOT_PLAY_INTERVAL_MS = parseInt(
+  process.env.BOT_PLAY_INTERVAL_MS ?? process.env.BOT_ACTION_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1700",
+  10
+);
+const BOT_END_TURN_DELAY_MS = parseInt(
+  process.env.BOT_END_TURN_DELAY_MS ?? process.env.BOT_ACTION_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "900",
+  10
+);
 
 const ALLOWED_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"];
 
@@ -146,7 +156,7 @@ export class BotRoom extends GameRoom {
     this.clock.setTimeout(() => {
       this.botStepScheduled = false;
       this.runBotTurnStep();
-    }, isFirstStepThisTurn ? BOT_TURN_START_DELAY_MS : BOT_ACTION_DELAY_MS);
+    }, isFirstStepThisTurn ? BOT_DRAW_DELAY_MS : BOT_PLAY_INTERVAL_MS);
   }
 
   private runBotMulligan(): void {
@@ -168,23 +178,18 @@ export class BotRoom extends GameRoom {
     const moves = legalMoves(this.match, this.botSeat);
     if (moves.length === 0) {
       // Defensive: always end the turn if the bot somehow has nothing legal.
-      this.applyEnvelope({
-        commandId: this.nextCommandId("end"),
-        seat: this.botSeat,
-        nowMs: Date.now(),
-        command: { type: "endTurn" }
-      });
+      this.scheduleBotEndTurn();
       return;
     }
 
     const move = decide(this.match, this.botSeat, this.difficulty, this.botRng, CARD_CATALOG, Date.now());
     if (!move) {
-      this.applyEnvelope({
-        commandId: this.nextCommandId("end"),
-        seat: this.botSeat,
-        nowMs: Date.now(),
-        command: { type: "endTurn" }
-      });
+      this.scheduleBotEndTurn();
+      return;
+    }
+
+    if (move.type === "endTurn") {
+      this.scheduleBotEndTurn();
       return;
     }
 
@@ -194,6 +199,23 @@ export class BotRoom extends GameRoom {
       nowMs: Date.now(),
       command: move
     });
+  }
+
+  private scheduleBotEndTurn(): void {
+    if (this.botStepScheduled) return;
+    this.botStepScheduled = true;
+    this.clock.setTimeout(() => {
+      this.botStepScheduled = false;
+      if (!this.match) return;
+      if (this.match.status !== "in_progress") return;
+      if (this.match.turn.activeSeat !== this.botSeat) return;
+      this.applyEnvelope({
+        commandId: this.nextCommandId("end"),
+        seat: this.botSeat,
+        nowMs: Date.now(),
+        command: { type: "endTurn" }
+      });
+    }, BOT_END_TURN_DELAY_MS);
   }
 
   private nextCommandId(tag: string): string {

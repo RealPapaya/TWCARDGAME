@@ -17,9 +17,9 @@ import { playSfx } from "./audio.js";
 type Side = "player" | "opponent";
 
 // LEGACY timing — see `animateCardFromDeck`.
-const FLIGHT_MS = 600;
+const FLIGHT_MS = 850;
 const FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
-const FAIL_SAFE_MS = 1000;
+const FAIL_SAFE_MS = 1400;
 
 // `instanceId` for the previous local hand sync, in slot order. The first sync
 // of a match seeds this (no animation for the opening hand).

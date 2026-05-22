@@ -79,6 +79,7 @@ import { installViewportGuards } from "./app/viewport.js";
 const PROFILE_SELECT =
   "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
+const ATTACK_LUNGE_MS = 720;
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
@@ -1526,6 +1527,8 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const mine = seat === view.mySeat;
   const targetKey = targetKeyFor(target);
   const domKey = minionDomKey(seat, minion, index);
+  const attackLunge = activeAttackLunges.get(minion.instanceId);
+  const attackLungeStyle = attackLunge ? ` style="--lunge-dx: ${attackLunge.dx}px; --lunge-dy: ${attackLunge.dy}px;"` : "";
   const classes = classNames([
     "minion",
     minion.taunt && "taunt",
@@ -1533,6 +1536,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     mine && minion.canAttack && "can-attack",
     minion.isEnraged && "enraged",
     minion.lockedTurns > 0 && "locked",
+    attackLunge && "lunging",
     selectedMinionClass(minion.instanceId, target),
     isTargetHighlighted(target) && "valid-target",
     hasCue(targetKey, "damage") && "taking-damage",
@@ -1545,6 +1549,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   return `
     <button
       class="${classes}"
+      ${attackLungeStyle}
       ${mine ? `data-attacker-id="${escapeAttr(minion.instanceId)}"` : ""}
       data-target='${targetAttr(target)}'
       data-dom-key="${escapeAttr(domKey)}"
@@ -1834,6 +1839,7 @@ function renderTurnAnnouncementOverlay(): string {
 
 function renderEventCue(cue: AnimationCue): string {
   const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
+  const cueStyle = cueStyleAttr(cue);
   if (cue.kind === "play" && card) {
     // The big card preview is rendered imperatively via #card-play-overlay so its
     // animation is not restarted by the surrounding DOM being re-rendered.
@@ -1851,14 +1857,24 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "damage" || cue.kind === "heal") {
     if (!cue.targetKey || cue.amount === undefined) return "";
     const sign = cue.kind === "damage" ? "-" : "+";
-    return `<div class="float-number ${cue.kind}" data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
+    return `<div class="float-number ${cue.kind}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
   }
   if (cue.kind === "destroy") {
     if (!cue.targetKey) return "";
     const particles = particleSpread(cue.id);
-    return `<div class="death-burst" data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
+    return `<div class="death-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
   }
-  return `<div class="event-cue event-${cue.kind}" data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
+  return `<div class="event-cue event-${cue.kind}"${cueStyle} data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
+}
+
+function cueStyleAttr(cue: AnimationCue): string {
+  const styles: string[] = [];
+  const delay = Math.max(0, Math.round(cue.delayMs ?? 0));
+  if (delay > 0) styles.push(`--cue-delay:${delay}ms`);
+  if (cue.anchorX !== undefined && cue.anchorY !== undefined) {
+    styles.push(`left:${Math.round(cue.anchorX)}px`, `top:${Math.round(cue.anchorY)}px`);
+  }
+  return styles.length > 0 ? ` style="${styles.join(";")}"` : "";
 }
 
 function particleSpread(seed: string): string {
@@ -4842,6 +4858,9 @@ function handleEvents(message: GameEvent[]): void {
 const cardPlayCueQueue: AnimationCue[] = [];
 let cardPlayCueActive = false;
 let cardPlayTimers: number[] = [];
+const CARD_PLAY_CUE_TOTAL_MS = 1300;
+const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_CUE_TOTAL_MS + 160;
+const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -4850,22 +4869,40 @@ const suppressedPlayCues: Array<{ seat: Seat | undefined; cardId: string }> = []
 
 // While a card-play preview is animating, board updates are held back so the
 // card can visibly hit the board before the new state appears. The latest
-// publicSync is stashed here and flushed either when a minion lands or when the
-// cue queue drains.
+// publicSync is stashed here and flushed when the visual cue reaches the point
+// where the resulting board state should become visible.
 let pendingPublicSync: unknown;
+let pendingPublicSyncHoldUntilMs = 0;
+let pendingPublicSyncFlushTimer: number | undefined;
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
 }
 
-function flushPendingPublicSync(): void {
+function attackAnimationBusy(): boolean {
+  return activeAttackLunges.size > 0;
+}
+
+function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): void {
+  if (pendingPublicSync === undefined) return;
+  if (attackAnimationBusy() || (!opts.ignoreCardPlayBusy && cardPlayPreviewBusy())) return;
+  const holdRemaining = pendingPublicSyncHoldUntilMs - performance.now();
+  if (holdRemaining > 0) {
+    schedulePendingPublicSyncFlush(holdRemaining, opts);
+    return;
+  }
   applyPendingPublicSyncNow();
 }
 
 function applyPendingPublicSyncNow(): void {
   if (pendingPublicSync !== undefined) {
+    if (pendingPublicSyncFlushTimer !== undefined) {
+      window.clearTimeout(pendingPublicSyncFlushTimer);
+      pendingPublicSyncFlushTimer = undefined;
+    }
     const message = pendingPublicSync;
     pendingPublicSync = undefined;
+    pendingPublicSyncHoldUntilMs = 0;
     view.publicSync = message as typeof view.publicSync;
     renderNow();
     if (clearAcceptedBattlecryAfterRender()) renderNow();
@@ -4875,10 +4912,22 @@ function applyPendingPublicSyncNow(): void {
   }
 }
 
+function holdPendingPublicSyncFor(delayMs: number): void {
+  pendingPublicSyncHoldUntilMs = Math.max(pendingPublicSyncHoldUntilMs, performance.now() + delayMs);
+}
+
+function schedulePendingPublicSyncFlush(delayMs: number, opts: { ignoreCardPlayBusy?: boolean } = {}): void {
+  if (pendingPublicSyncFlushTimer !== undefined) window.clearTimeout(pendingPublicSyncFlushTimer);
+  pendingPublicSyncFlushTimer = window.setTimeout(() => {
+    pendingPublicSyncFlushTimer = undefined;
+    flushPendingPublicSync(opts);
+  }, Math.max(0, delayMs));
+}
+
 // Plays the landing SFX, shakes the board, and spawns V1-style smoke right
 // when the preview-card slam reaches the board.
 function impactCardPlayLanding(cue: AnimationCue, card: CardDefinition, previewEl: HTMLElement): void {
-  applyPendingPublicSyncNow();
+  flushPendingPublicSync({ ignoreCardPlayBusy: true });
   window.requestAnimationFrame(() => {
     if (!document.body.contains(previewEl)) return;
     playSfx("cardPlay");
@@ -4929,16 +4978,14 @@ function spawnBoardDust(anchor: HTMLElement, intensity = 1): void {
   window.setTimeout(() => cloud.remove(), 1000);
 }
 
-// Applies a publicSync, but never ahead of a card-play preview. The server
-// always sends `publicSync` then `events` back-to-back, so the board update
-// arrives before the matching CARD_PLAYED event has enqueued its cue. We defer
-// the apply by one task tick: the `events` handler runs first (same network
-// flush) and starts the cue, so cardPlayPreviewBusy() then reports true and the
-// board update is held until the minion lands or the cue finishes.
+// Applies a publicSync, but never ahead of an animation that needs the old
+// board. The server sends `publicSync` then `events` back-to-back, so we defer
+// by one task tick: the events handler can start card-play / attack cues first,
+// then the board update is held until that visible motion finishes.
 function applyPublicSync(message: typeof view.publicSync): void {
   pendingPublicSync = message;
   window.setTimeout(() => {
-    if (cardPlayPreviewBusy()) return; // flushed later by playNextCardPlayCue
+    if (cardPlayPreviewBusy() || attackAnimationBusy()) return; // flushed later by animation completion
     flushPendingPublicSync();
   }, 0);
 }
@@ -4960,6 +5007,11 @@ function resetCardPlayCues(): void {
   cardPlayCueQueue.length = 0;
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
+  pendingPublicSyncHoldUntilMs = 0;
+  if (pendingPublicSyncFlushTimer !== undefined) {
+    window.clearTimeout(pendingPublicSyncFlushTimer);
+    pendingPublicSyncFlushTimer = undefined;
+  }
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
@@ -5003,7 +5055,7 @@ function playNextCardPlayCue(): void {
   cardPlayTimers.push(window.setTimeout(() => {
     el.remove();
     playNextCardPlayCue();
-  }, 1300));
+  }, CARD_PLAY_CUE_TOTAL_MS));
 }
 
 /** Consumes a one-shot suppression entry matching this play cue, if any. */
@@ -5020,17 +5072,18 @@ function enqueueEventCues(events: GameEvent[]): void {
   const rawCues = events
     .map((event, index) => eventToCue(event, events, index))
     .filter((cue): cue is AnimationCue => Boolean(cue));
-  // A locally-played battlecry card already ran its card-play animation. Drop
-  // the server's echoed play cue entirely — keeping it would re-show the card
-  // and, via `has-card-play-focus`, dim the whole field with no card visible.
-  const cues = rawCues.filter((cue) => !(cue.kind === "play" && consumeSuppressedPlayCue(cue)));
+  // Keep battlecry effects visually behind their card-play cue. The helper also
+  // consumes local targeted-battlecry echoes that already animated before send.
+  const cues = applyPostPlayEffectDelays(rawCues);
   if (cues.length === 0) return;
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
     if (cue.kind === "play") enqueueCardPlayCue(cue);
+    if (cue.kind === "attackerMoves") startAttackLunge(cue);
+    if ((cue.delayMs ?? 0) > 0) window.setTimeout(render, cue.delayMs);
     const lifetime =
       cue.kind === "play" ? 1350
-      : cue.kind === "attackerMoves" ? 460
+      : cue.kind === "attackerMoves" ? ATTACK_LUNGE_MS
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
       : cue.kind === "destroy" ? 700
       : cue.kind === "summon" ? 700
@@ -5038,8 +5091,55 @@ function enqueueEventCues(events: GameEvent[]): void {
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
       render();
-    }, lifetime);
+    }, lifetime + (cue.delayMs ?? 0));
   }
+}
+
+function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
+  const cues: AnimationCue[] = [];
+  let queuedPlaySlot = cardPlayCueQueue.length + (cardPlayCueActive ? 1 : 0);
+  let currentPostPlayDelay = 0;
+  let currentLandingTargetKey: string | undefined;
+
+  for (const cue of rawCues) {
+    if (cue.kind === "play") {
+      // Targeted battlecries played locally already ran their card-play
+      // animation before the command was sent, so their effects can fire now.
+      if (consumeSuppressedPlayCue(cue)) {
+        currentPostPlayDelay = 0;
+        currentLandingTargetKey = undefined;
+        continue;
+      }
+      currentPostPlayDelay = queuedPlaySlot * CARD_PLAY_CUE_TOTAL_MS + CARD_PLAY_EFFECT_DELAY_MS;
+      currentLandingTargetKey = cue.targetKey;
+      queuedPlaySlot += 1;
+      cues.push(cue);
+      continue;
+    }
+
+    const isLandingSummon = cue.kind === "summon" && cue.targetKey === currentLandingTargetKey;
+    if (currentPostPlayDelay > 0 && !isLandingSummon && isPostPlayEffectCue(cue)) {
+      holdPendingPublicSyncFor(currentPostPlayDelay + POST_PLAY_STATE_SYNC_LAG_MS);
+      cues.push({
+        ...cue,
+        delayMs: Math.max(cue.delayMs ?? 0, currentPostPlayDelay),
+        readyAtMs: performance.now() + currentPostPlayDelay
+      });
+      continue;
+    }
+
+    cues.push(cue);
+  }
+
+  return cues;
+}
+
+function isPostPlayEffectCue(cue: AnimationCue): boolean {
+  return cue.kind === "damage"
+    || cue.kind === "heal"
+    || cue.kind === "buff"
+    || cue.kind === "destroy"
+    || cue.kind === "summon";
 }
 
 function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): AnimationCue | undefined {
@@ -5293,34 +5393,64 @@ function targetKeyFor(target: TargetRef): string {
 
 function hasCue(targetKey: string | undefined, kind?: AnimationKind): boolean {
   if (!targetKey) return false;
-  return view.animationCues.some((cue) => cue.targetKey === targetKey && (!kind || cue.kind === kind));
+  return view.animationCues.some((cue) => cue.targetKey === targetKey && (!kind || cue.kind === kind) && cueIsReady(cue));
+}
+
+function cueIsReady(cue: AnimationCue): boolean {
+  return !cue.readyAtMs || performance.now() >= cue.readyAtMs;
 }
 
 const appliedLunges = new Set<string>();
+const activeAttackLunges = new Map<string, { dx: number; dy: number }>();
+
+function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: number; dy: number } {
+  const rawDx = targetRect.left + targetRect.width / 2 - (attackerRect.left + attackerRect.width / 2);
+  const rawDy = targetRect.top + targetRect.height / 2 - (attackerRect.top + attackerRect.height / 2);
+  const distance = Math.hypot(rawDx, rawDy);
+  if (distance <= 0) return { dx: 0, dy: 0 };
+
+  const ux = rawDx / distance;
+  const uy = rawDy / distance;
+  const attackerEdge = Math.abs(ux) * attackerRect.width / 2 + Math.abs(uy) * attackerRect.height / 2;
+  const targetEdge = Math.abs(ux) * targetRect.width / 2 + Math.abs(uy) * targetRect.height / 2;
+  const contactOverlap = Math.min(14, Math.max(8, attackerEdge * 0.14));
+  const travel = Math.max(0, distance - attackerEdge - targetEdge + contactOverlap);
+
+  return {
+    dx: Math.round(ux * travel),
+    dy: Math.round(uy * travel)
+  };
+}
+
+function startAttackLunge(cue: AnimationCue): boolean {
+  if (cue.kind !== "attackerMoves" || !cue.attackerInstanceId || !cue.targetKey || appliedLunges.has(cue.id)) return false;
+  const attacker = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`);
+  const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
+  if (!attacker || !target) return false;
+
+  const attackerRect = attacker.getBoundingClientRect();
+  const targetRect = target.getBoundingClientRect();
+  const { dx, dy } = attackLungeDelta(attackerRect, targetRect);
+
+  appliedLunges.add(cue.id);
+  activeAttackLunges.set(cue.attackerInstanceId, { dx, dy });
+  render();
+
+  window.setTimeout(() => {
+    activeAttackLunges.delete(cue.attackerInstanceId!);
+    appliedLunges.delete(cue.id);
+    flushPendingPublicSync();
+    render();
+  }, ATTACK_LUNGE_MS);
+  return true;
+}
 
 function applyPostRenderEffects(): void {
   const surface = document.querySelector<HTMLElement>(".battle-surface");
   const eventLayer = document.querySelector<HTMLElement>(".event-layer");
   for (const cue of view.animationCues) {
     if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
-      const attacker = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`);
-      const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
-      if (attacker && target) {
-        const a = attacker.getBoundingClientRect();
-        const t = target.getBoundingClientRect();
-        const dx = Math.round(t.left + t.width / 2 - (a.left + a.width / 2));
-        const dy = Math.round(t.top + t.height / 2 - (a.top + a.height / 2));
-        attacker.style.setProperty("--lunge-dx", `${dx}px`);
-        attacker.style.setProperty("--lunge-dy", `${dy}px`);
-        attacker.classList.add("lunging");
-        appliedLunges.add(cue.id);
-        window.setTimeout(() => {
-          attacker.classList.remove("lunging");
-          attacker.style.removeProperty("--lunge-dx");
-          attacker.style.removeProperty("--lunge-dy");
-          appliedLunges.delete(cue.id);
-        }, 460);
-      }
+      startAttackLunge(cue);
     }
   }
   if (surface && eventLayer) {
@@ -5333,6 +5463,12 @@ function applyPostRenderEffects(): void {
       const r = target.getBoundingClientRect();
       const x = r.left + r.width / 2 - surfaceRect.left;
       const y = r.top + r.height / 2 - surfaceRect.top;
+      const cueId = node.dataset.cueId;
+      const cue = cueId ? view.animationCues.find((item) => item.id === cueId) : undefined;
+      if (cue) {
+        cue.anchorX = x;
+        cue.anchorY = y;
+      }
       node.style.left = `${x}px`;
       node.style.top = `${y}px`;
       node.dataset.anchored = "true";
