@@ -1449,6 +1449,7 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
     minion.divineShield && "shielded",
     minion.canAttack ? "can-attack" : "sleeping",
     minion.isEnraged && "enraged",
+    minion.lockedTurns > 0 && "locked",
     selectedMinionClass(minion.instanceId, target),
     isTargetHighlighted(target) && "valid-target",
     hasCue(targetKey, "damage") && "taking-damage",
@@ -1471,8 +1472,8 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
       aria-pressed="${view.selectedAttackerId === minion.instanceId || sameTarget(view.selectedTarget, target) ? "true" : "false"}"
     >
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
+      ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
-      <small class="keyword-row">${minionKeywords(minion).join(" ")}</small>
       <div class="minion-stats">
         <span class="${attackClass}"><span>${minion.attack}</span></span>
         <span class="${healthClass}">${minion.currentHealth}</span>
@@ -1719,6 +1720,9 @@ function renderEventCue(cue: AnimationCue): string {
     return "";
   }
   if (cue.kind === "summon") {
+    return "";
+  }
+  if (cue.kind === "buff") {
     return "";
   }
   if (cue.kind === "damage" || cue.kind === "heal") {
@@ -4953,15 +4957,18 @@ function findMinion(instanceId: string): PublicMinion | undefined {
   return undefined;
 }
 
-function minionKeywords(minion: PublicMinion): string[] {
-  return [
-    minion.taunt ? "taunt" : "",
-    minion.divineShield ? "shield" : "",
-    minion.canAttack ? "ready" : "",
-    minion.lockedTurns > 0 ? `lock ${minion.lockedTurns}` : "",
-    minion.deathTimer !== undefined && minion.deathTimer >= 0 ? `timer ${minion.deathTimer}` : "",
-    minion.questTurns !== undefined && minion.questTurns >= 0 ? `quest ${minion.questTurns}` : ""
-  ].filter(Boolean);
+function renderCountdownBadges(minion: PublicMinion): string {
+  let html = "";
+  if (minion.lockedTurns > 0) {
+    html += `<div class="countdown-badge lock-countdown">🔒 ${minion.lockedTurns}</div>`;
+  }
+  if (minion.questTurns !== undefined && minion.questTurns >= 0) {
+    html += `<div class="countdown-badge quest-countdown">⏳ ${minion.questTurns}</div>`;
+  }
+  if (minion.deathTimer !== undefined && minion.deathTimer >= 0) {
+    html += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">💀 ${minion.deathTimer}</div>`;
+  }
+  return html;
 }
 
 function canAfford(cost: number): boolean {
