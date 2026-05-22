@@ -7,9 +7,9 @@ description: Use when working on the TWCARDGAME v2 rewrite, including its Colyse
 
 ## Use This Skill When
 
-- Implementing or reviewing gameplay in `packages/rules`.
+- Implementing or reviewing gameplay in `packages/rules` (engine, effects, deck, bot AI).
 - Adding or changing cards/effect types in `packages/cards`.
-- Touching Colyseus room logic in `apps/server`.
+- Touching Colyseus room logic in `apps/server` (PvP `GameRoom`, PvE `BotRoom`).
 - Touching the Vite client in `apps/web`.
 - Migrating behavior or assets from `LEGACY/`.
 
@@ -20,9 +20,9 @@ Read `docs/製作.md` for the current project rules if the task is more than a t
 Also inspect the relevant package before editing:
 
 - Cards: `packages/cards/src/types.ts`, `packages/cards/src/validation.ts`, `packages/cards/src/catalog.generated.ts`
-- Rules: `packages/rules/src/engine.ts`, `packages/rules/src/effects.ts`, `packages/rules/src/state.ts`
-- Server: `apps/server/src/GameRoom.ts`, `apps/server/src/schema.ts`
-- Web: `apps/web/src/main.ts`
+- Rules: `packages/rules/src/engine.ts`, `packages/rules/src/state.ts`, `packages/rules/src/effects/registry.ts` (effect handlers grouped by domain under `effects/`), `packages/rules/src/legalMoves.ts`, `packages/rules/src/bot.ts` (AI decisions)
+- Server: `apps/server/src/GameRoom.ts`, `apps/server/src/BotRoom.ts`, `apps/server/src/schema.ts`
+- Web: `apps/web/src/runtime.ts` (`startApp`; `main.ts` is just the entry point) and the `apps/web/src/app/` modules
 
 ## Hard Rules
 
@@ -32,6 +32,8 @@ Also inspect the relevant package before editing:
 - Do not use DOM, Colyseus, Supabase, `Date.now()`, or `Math.random()` inside `packages/rules`.
 - Preserve private information: public state shows counts only; hand/deck order stay private.
 - For Colyseus Schema, use `defineTypes(...)` and keep `useDefineForClassFields: false`.
+- New effect types need a domain handler under `packages/rules/src/effects/` registered in `effects/registry.ts`; an unregistered type throws at runtime.
+- PvE AI decisions live in `packages/rules/src/bot.ts` and must stay deterministic (seeded `BotRngState`). `BotRoom` only paces and submits the bot's commands — keep decision logic out of it.
 
 ## Validation
 

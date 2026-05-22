@@ -8,8 +8,8 @@ This is the TWCARDGAME **v2** rewrite — a TypeScript npm-workspaces monorepo (
 
 Workspaces (TS project references are wired in [tsconfig.json](tsconfig.json)):
 
-- [apps/server](apps/server/) — `@twcardgame/server`, Colyseus authoritative PvP room (Railway deployable, see [railway.json](railway.json) / [Dockerfile](apps/server/Dockerfile)).
-- [apps/web](apps/web/) — `@twcardgame/web`, Vite vanilla-TS client using `@colyseus/sdk`.
+- [apps/server](apps/server/) — `@twcardgame/server`, Colyseus authoritative server (Railway deployable, see [railway.json](railway.json) / [Dockerfile](apps/server/Dockerfile)). Defines two room types: `pvp` ([GameRoom](apps/server/src/GameRoom.ts), human-vs-human, private-room join codes) and `pve` ([BotRoom](apps/server/src/BotRoom.ts), human-vs-AI). It also owns accounts, persistence, and match finalization ([accounts.ts](apps/server/src/accounts.ts), [persistence.ts](apps/server/src/persistence.ts), [matchFinalizer.ts](apps/server/src/matchFinalizer.ts), [privateRooms.ts](apps/server/src/privateRooms.ts)).
+- [apps/web](apps/web/) — `@twcardgame/web`, Vite vanilla-TS client using `@colyseus/sdk`. Entry [main.ts](apps/web/src/main.ts) just calls `startApp` in [runtime.ts](apps/web/src/runtime.ts); rendering, animation, audio, and DOM patching are split into [apps/web/src/app/](apps/web/src/app/).
 - [packages/cards](packages/cards/) — source-controlled card catalog, Zod schemas, validation, CLI.
 - [packages/rules](packages/rules/) — deterministic gameplay engine (pure, no I/O).
 - [packages/shared](packages/shared/) — command / state-view / event contracts shared by client + server + rules.
@@ -59,7 +59,9 @@ The client never mutates state; it sends `CommandEnvelope`s and renders synced s
 
 **Deck rules.** PvP decks are strict 30-card public decks validated by `validateDeck` in [packages/rules/src/deck.ts](packages/rules/src/deck.ts) against the card catalog. The catalog is the single source of truth: cards live in [packages/cards/src/catalog.generated.ts](packages/cards/src/catalog.generated.ts), shapes in [types.ts](packages/cards/src/types.ts)/[schema.ts](packages/cards/src/schema.ts), version exported as `CARD_CATALOG_VERSION` and embedded in `MatchState.cardCatalogVersion`.
 
-**Adding card effects.** New battlecry / effect types need both (a) a schema entry in `packages/cards` so `validate:cards` accepts them, and (b) a handler in [packages/rules/src/effects.ts](packages/rules/src/effects.ts) reachable from `resolveEffect`. If either side is missing, validation or runtime fails closed.
+**Adding card effects.** New battlecry / effect types need both (a) a schema entry in `packages/cards` so `validate:cards` accepts them, and (b) a handler under [packages/rules/src/effects/](packages/rules/src/effects/) registered in [effects/registry.ts](packages/rules/src/effects/registry.ts) so `resolveEffect` can dispatch it. Handlers are grouped by domain (`damage-heal.ts`, `hand.ts`, `summon-destroy-bounce.ts`, `buff-keyword-lock.ts`, `core.ts`); [effects.ts](packages/rules/src/effects.ts) is just the public re-export façade. An unregistered effect type throws `Unhandled effect type` at runtime — if either side is missing, validation or runtime fails closed.
+
+**AI / bot determinism.** The PvE opponent's decisions live in [packages/rules/src/bot.ts](packages/rules/src/bot.ts) (`decide`, fed by `legalMoves` in [legalMoves.ts](packages/rules/src/legalMoves.ts)) and obey the same purity rules as the rest of `packages/rules` — the bot is seeded from a `BotRngState` so a recorded command log replays identically. `BotRoom` is only the server-side adapter that paces and submits the bot's commands; it must not contain decision logic.
 
 ## Workflow expectations
 

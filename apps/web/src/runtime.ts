@@ -58,6 +58,7 @@ import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import type {
   AnimationCue,
   AnimationKind,
+  BattlecryPreviewState,
   BattleMode,
   ClientViewState,
   CollectionFilter,
@@ -1371,7 +1372,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
  */
 function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" | "opponent"): string {
   const cells = board.map((minion, index) => renderMinion(seat, minion, index));
-  const pending = view.pendingBattlecry;
+  const pending = activeBattlecryPreview();
   if (
     pending?.isMinion &&
     pending.phase !== "landing" &&
@@ -1394,7 +1395,8 @@ function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" |
 function renderBattlecryPreview(cardId: string): string {
   const card = cardCatalog.get(cardId);
   if (!card) return "";
-  const domKey = view.pendingBattlecry ? `battlecry-preview-${view.pendingBattlecry.handInstanceId}` : `battlecry-preview-${cardId}`;
+  const battlecry = activeBattlecryPreview();
+  const domKey = battlecry ? `battlecry-preview-${battlecry.handInstanceId}` : `battlecry-preview-${cardId}`;
   return `
     <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-dom-key="${escapeAttr(domKey)}" data-testid="battlecry-preview">
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
@@ -1490,7 +1492,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   // draw-animation.ts restores opacity once the clone lands. A card mid
   // battlecry targeting is hidden too — it "became" the preview minion on the
   // field (or the targeting arrow for a NEWS card).
-  const hiddenForBattlecry = view.pendingBattlecry?.handInstanceId === card.instanceId;
+  const hiddenForBattlecry = activeBattlecryPreview()?.handInstanceId === card.instanceId;
   const drawingStyle =
     isHandCardAnimating(card.instanceId) || hiddenForBattlecry ? " opacity: 0; pointer-events: none;" : "";
 
@@ -1566,7 +1568,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
 function minionDomKey(seat: Seat, minion: PublicMinion, index: number): string {
   const existing = minionDomKeys.get(minion.instanceId);
   if (existing) return existing;
-  const pending = view.pendingBattlecry;
+  const pending = activeBattlecryPreview();
   const shouldAdoptPreviewKey =
     pending?.phase === "committed" &&
     pending.isMinion &&
@@ -1581,14 +1583,14 @@ function minionDomKey(seat: Seat, minion: PublicMinion, index: number): string {
 
 function hasBattlecryReplacement(
   board: PublicMinion[],
-  pending: NonNullable<ClientViewState["pendingBattlecry"]>
+  pending: BattlecryPreviewState
 ): boolean {
   return battlecryReplacementIndex(board, pending) !== -1;
 }
 
 function battlecryReplacementIndex(
   board: PublicMinion[],
-  pending: NonNullable<ClientViewState["pendingBattlecry"]>
+  pending: BattlecryPreviewState
 ): number {
   if (pending.phase !== "committed") return -1;
   const candidates = board
@@ -3854,6 +3856,8 @@ function finalizeHandDrag(_handIdConsumed: string | undefined): void {
 // precedes the battlecry arrow.
 let battlecryLandTimers: number[] = [];
 let battlecryLandEl: HTMLElement | null = null;
+let battlecryCommitPinEl: HTMLElement | null = null;
+let battlecryCommitPinTimer: number | undefined;
 
 /**
  * Stage 2 of a targeted-battlecry play (LEGACY v1 parity). A battlecry card is
@@ -3886,6 +3890,7 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
     lineKind,
     phase: "landing"
   };
+  view.acceptedBattlecry = undefined;
   render(); // hides the hand card while the card-play animation runs
 
   // Phase 1: the same card-play animation every card gets, then the arrow.
@@ -3982,7 +3987,9 @@ function commitBattlecry(targetEl: HTMLElement): void {
   // Freeze the landed preview before the command can echo private/public sync
   // back to the client. Otherwise a very fast hand sync can clear an "aiming"
   // pending battlecry and leave the board blank for a frame.
+  pinBattlecryCommitPreview();
   pending.phase = "committed";
+  view.acceptedBattlecry = { ...pending };
   endBattlecryTargeting();
   renderNow();
   send({
@@ -4000,7 +4007,44 @@ function clearPendingBattlecry(): void {
   battlecryLandTimers = [];
   battlecryLandEl?.remove();
   battlecryLandEl = null;
+  clearBattlecryCommitPin();
   view.pendingBattlecry = undefined;
+  view.acceptedBattlecry = undefined;
+}
+
+function pinBattlecryCommitPreview(): void {
+  clearBattlecryCommitPin();
+  const source = document.querySelector<HTMLElement>('[data-testid="battlecry-preview"]');
+  if (!source) return;
+  const rect = source.getBoundingClientRect();
+  if (rect.width <= 0 || rect.height <= 0) return;
+  const clone = source.cloneNode(true) as HTMLElement;
+  clone.removeAttribute("data-testid");
+  clone.removeAttribute("data-dom-key");
+  clone.classList.add("battlecry-commit-pin");
+  Object.assign(clone.style, {
+    position: "fixed",
+    left: `${rect.left}px`,
+    top: `${rect.top}px`,
+    width: `${rect.width}px`,
+    height: `${rect.height}px`,
+    margin: "0",
+    pointerEvents: "none",
+    zIndex: "620",
+    transform: "none"
+  });
+  document.body.appendChild(clone);
+  battlecryCommitPinEl = clone;
+  battlecryCommitPinTimer = window.setTimeout(clearBattlecryCommitPin, 2500);
+}
+
+function clearBattlecryCommitPin(): void {
+  if (battlecryCommitPinTimer !== undefined) {
+    window.clearTimeout(battlecryCommitPinTimer);
+    battlecryCommitPinTimer = undefined;
+  }
+  battlecryCommitPinEl?.remove();
+  battlecryCommitPinEl = null;
 }
 
 /** "如果點其他地方 如地板 就回手" — abort with no command sent. */
@@ -4824,8 +4868,8 @@ function applyPendingPublicSyncNow(): void {
     const message = pendingPublicSync;
     pendingPublicSync = undefined;
     view.publicSync = message as typeof view.publicSync;
-    render();
-    clearAcceptedBattlecryAfterRender();
+    renderNow();
+    if (clearAcceptedBattlecryAfterRender()) renderNow();
     const opponentSeat = view.mySeat ? otherSeat(view.mySeat) : undefined;
     const opponentHandCount = opponentSeat ? readPlayer(opponentSeat)?.handCount : undefined;
     if (typeof opponentHandCount === "number") noteOpponentHandSync(opponentHandCount);
@@ -5071,15 +5115,20 @@ function pruneSelections(): void {
 }
 
 function canClearPendingBattlecry(handIds = new Set(view.hand.map((card) => card.instanceId))): boolean {
-  const pending = view.pendingBattlecry;
+  const pending = activeBattlecryPreview();
   if (!pending || handIds.has(pending.handInstanceId)) return false;
   if (!pending.isMinion || pending.phase !== "committed") return true;
   return hasBattlecryReplacement(Array.from(readPlayer(view.mySeat ?? "player1")?.board ?? []), pending);
 }
 
-function clearAcceptedBattlecryAfterRender(): void {
-  if (!canClearPendingBattlecry()) return;
+function activeBattlecryPreview(): BattlecryPreviewState | undefined {
+  return view.pendingBattlecry ?? view.acceptedBattlecry;
+}
+
+function clearAcceptedBattlecryAfterRender(): boolean {
+  if (!canClearPendingBattlecry()) return false;
   clearPendingBattlecry();
+  return true;
 }
 
 function readPlayer(seat: Seat): PublicPlayer | undefined {

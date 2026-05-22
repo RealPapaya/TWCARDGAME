@@ -25,6 +25,16 @@ export type CollectionFilter = "all" | "owned" | "missing";
 export type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
 export type FriendsPanel = "friends" | "recommended" | "add";
 
+export type BattlecryPreviewState = {
+  handInstanceId: string;
+  cardId: string;
+  isMinion: boolean;
+  boardIndex: number;
+  boardInstanceIdsBefore: string[];
+  lineKind: DragLineKind;
+  phase: "landing" | "aiming" | "committed";
+};
+
 export type PublicPlayerProfile = {
   userId: string;
   displayName: string;
@@ -78,15 +88,8 @@ export type ClientViewState = {
    * yet), `aiming` (minion on the field, arrow active), `committed` (command
    * sent — the landed card is kept until the server sync replaces it).
    */
-  pendingBattlecry?: {
-    handInstanceId: string;
-    cardId: string;
-    isMinion: boolean;
-    boardIndex: number;
-    boardInstanceIdsBefore: string[];
-    lineKind: DragLineKind;
-    phase: "landing" | "aiming" | "committed";
-  };
+  pendingBattlecry?: BattlecryPreviewState;
+  acceptedBattlecry?: BattlecryPreviewState;
   events: GameEvent[];
   animationCues: AnimationCue[];
   turnAnnouncement?: {

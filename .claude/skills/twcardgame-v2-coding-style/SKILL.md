@@ -21,11 +21,11 @@ Prefer:
 
 Keep these responsibilities separate:
 
-- `packages/rules`: authoritative gameplay only. Pure TypeScript. No DOM, Colyseus, Supabase, timers, network, `Math.random()`, or `Date.now()`.
+- `packages/rules`: authoritative gameplay only, including the PvE bot's decision logic (`bot.ts`, `legalMoves.ts`). Pure TypeScript. No DOM, Colyseus, Supabase, timers, network, `Math.random()`, or `Date.now()`.
 - `packages/cards`: card catalog, card schemas, supported effect-type lists, catalog validation.
 - `packages/shared`: DTOs and cross-package contracts only. Avoid business logic here.
-- `apps/server`: Colyseus adapter. Seat assignment, room lifecycle, command routing, public sync, private hand messages.
-- `apps/web`: rendering and input only. It sends commands and renders server state; it does not apply authoritative game state changes.
+- `apps/server`: Colyseus adapter — `GameRoom` (PvP) and `BotRoom` (PvE). Seat assignment, room lifecycle, command routing, public sync, private hand messages, account/persistence wiring, bot pacing.
+- `apps/web`: rendering and input only, organized as a thin entry (`main.ts` → `runtime.ts`) plus focused `app/` modules (DOM rendering/patching, animations, audio, viewport, storage). It sends commands and renders server state; it does not apply authoritative game state changes.
 - `packages/db`: persistence adapters and migrations only.
 - `LEGACY`: reference only. Do not spread v1 architecture back into v2.
 
@@ -55,6 +55,7 @@ Rules engine code should be deterministic and replayable:
 - Return events for animation/replay, but treat `MatchState` as truth.
 - Resolve deaths, auras, triggers, and win conditions in rules code, not the client.
 - Keep private state in `MatchState.private`; never expose hand contents or deck order through public state.
+- Keep PvE AI logic in `bot.ts`/`legalMoves.ts` deterministic — drive it from a seeded `BotRngState`, never `Math.random()`. `BotRoom` only paces and submits the resulting commands.
 
 When adding a command:
 
@@ -72,7 +73,7 @@ When adding a new effect type:
 
 1. Add the effect type to `packages/cards/src/types.ts`.
 2. Validate it in `packages/cards/src/validation.ts` if needed.
-3. Implement the handler in `packages/rules/src/effects.ts`.
+3. Implement the handler in the matching domain file under `packages/rules/src/effects/` (`damage-heal.ts`, `hand.ts`, `summon-destroy-bounce.ts`, `buff-keyword-lock.ts`, `core.ts`) and register it in `effects/registry.ts` so `resolveEffect` can dispatch it. An unregistered type throws `Unhandled effect type`.
 4. Add catalog/rules tests.
 5. Run `npm run validate:cards`, `npm test`, and `npm run check`.
 
