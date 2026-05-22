@@ -276,6 +276,7 @@ let lastRenderedHtml = "";
 let turnAnnouncementTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 const minionDomKeys = new Map<string, string>();
+const appliedDeathShatters = new Set<string>();
 
 export function startApp(): void {
   setAppContext({ view, render, supabase, cardCatalog, seats });
@@ -3964,7 +3965,7 @@ function playBattlecryLandAnimation(cardId: string, onLanded: () => void): void 
 function triggerBattlecryLandImpact(cardId: string): void {
   const card = cardCatalog.get(cardId);
   window.requestAnimationFrame(() => {
-    playSfx("cardPlay");
+    playSfx(card && card.cost >= 8 ? "cardPlayHeavy" : "cardPlay");
     if (!card || card.type !== "MINION") return;
     slamBoard(view.mySeat);
     const anchor =
@@ -4930,7 +4931,7 @@ function impactCardPlayLanding(cue: AnimationCue, card: CardDefinition, previewE
   flushPendingPublicSync({ ignoreCardPlayBusy: true });
   window.requestAnimationFrame(() => {
     if (!document.body.contains(previewEl)) return;
-    playSfx("cardPlay");
+    playSfx(card.cost >= 8 ? "cardPlayHeavy" : "cardPlay");
     const board = slamBoard(cue.seat);
     const landedMinion = cue.targetKey
       ? document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`)
@@ -5445,12 +5446,61 @@ function startAttackLunge(cue: AnimationCue): boolean {
   return true;
 }
 
+function applyDeathShatter(cue: AnimationCue): void {
+  if (cue.kind !== "destroy" || !cue.targetKey || appliedDeathShatters.has(cue.id)) return;
+  const minionEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
+  if (!minionEl) return;
+  appliedDeathShatters.add(cue.id);
+
+  const rect = minionEl.getBoundingClientRect();
+  const artEl = minionEl.querySelector<HTMLElement>(".minion-art");
+  const bgImg = artEl ? artEl.style.backgroundImage : null;
+
+  const container = document.createElement("div");
+  container.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;pointer-events:none;z-index:2000;overflow:visible;`;
+  document.body.appendChild(container);
+
+  const cols = 4, rows = 5;
+  const fragW = rect.width / cols;
+  const fragH = rect.height / rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const frag = document.createElement("div");
+      frag.className = "shatter-fragment";
+      frag.style.width = `${fragW}px`;
+      frag.style.height = `${fragH}px`;
+      frag.style.left = `${c * fragW}px`;
+      frag.style.top = `${r * fragH}px`;
+      if (bgImg) {
+        frag.style.backgroundImage = bgImg;
+        frag.style.backgroundSize = `${rect.width}px ${rect.height}px`;
+        frag.style.backgroundPosition = `-${c * fragW}px -${r * fragH}px`;
+      } else {
+        frag.style.background = "linear-gradient(135deg,#444,#111)";
+      }
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 50 + Math.random() * 150;
+      frag.style.setProperty("--dx", `${Math.round(Math.cos(angle) * dist)}px`);
+      frag.style.setProperty("--dy", `${Math.round(Math.sin(angle) * dist)}px`);
+      frag.style.setProperty("--dr", `${Math.round((Math.random() - 0.5) * 600)}deg`);
+      container.appendChild(frag);
+    }
+  }
+  window.setTimeout(() => {
+    container.remove();
+    appliedDeathShatters.delete(cue.id);
+  }, 800);
+}
+
 function applyPostRenderEffects(): void {
   const surface = document.querySelector<HTMLElement>(".battle-surface");
   const eventLayer = document.querySelector<HTMLElement>(".event-layer");
   for (const cue of view.animationCues) {
     if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
       startAttackLunge(cue);
+    }
+    if (cue.kind === "destroy" && cue.targetKey) {
+      applyDeathShatter(cue);
     }
   }
   if (surface && eventLayer) {

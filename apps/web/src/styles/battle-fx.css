@@ -279,12 +279,36 @@
   }
 }
 
+/* --- Minion death shatter fragments (matched from LEGACY animateShatter) --- */
+.shatter-fragment {
+  position: absolute;
+  background-size: cover;
+  background-repeat: no-repeat;
+  border-radius: 2px;
+  animation: shatter-fly 0.78s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+
+@keyframes shatter-fly {
+  0% {
+    transform: translate(0, 0) rotate(0deg) scale(1);
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(var(--dx, 0px), var(--dy, 0px)) rotate(var(--dr, 0deg)) scale(0.15);
+    opacity: 0;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .minion.lunging,
   .hero.lunging,
   .float-number,
   .death-burst > span,
-  .disintegrate-particle {
+  .disintegrate-particle,
+  .shatter-fragment {
     animation: none;
   }
 }

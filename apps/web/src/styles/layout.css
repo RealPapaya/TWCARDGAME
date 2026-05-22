@@ -937,7 +937,10 @@ input {
   filter: drop-shadow(0 0 8px #ff4b2b);
 }
 
-.hero.taking-damage,
+.hero.taking-damage {
+  animation: hero-hit-flash 0.5s ease-out;
+}
+
 .minion.taking-damage {
   animation: hit-shake 0.42s cubic-bezier(.36, .07, .19, .97);
 }
@@ -1483,6 +1486,21 @@ input {
   }
   75% {
     transform: rotate(var(--rot, 0deg)) translate(-4px, var(--y, 0px));
+  }
+}
+
+@keyframes hero-hit-flash {
+  0% {
+    box-shadow: 0 0 15px rgba(255, 238, 0, 0.3), inset 0 0 14px rgba(0, 0, 0, 0.45);
+    filter: none;
+  }
+  25% {
+    box-shadow: 0 0 0 6px rgba(255, 50, 50, 0.85), 0 0 30px rgba(255, 0, 0, 0.6), inset 0 0 14px rgba(0, 0, 0, 0.45);
+    filter: brightness(1.4) sepia(0.5) hue-rotate(-30deg);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(255, 238, 0, 0.3), inset 0 0 14px rgba(0, 0, 0, 0.45);
+    filter: none;
   }
 }
 

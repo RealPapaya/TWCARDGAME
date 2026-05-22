@@ -1,6 +1,6 @@
 import type { GameEvent } from "@twcardgame/shared";
 
-export type SoundCue = "cardPlay" | "cardDraw" | "attack" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
+export type SoundCue = "cardPlay" | "cardPlayHeavy" | "cardDraw" | "attack" | "attackHeavy" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
 
 export type AudioViewState = {
   bgmVolume: number;
@@ -17,8 +17,10 @@ export const sfxMutedKey = "twcardgame.sfxMuted";
 const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
 const sfxPaths: Record<SoundCue, string> = {
   cardPlay: "/audio/sfx/LowCostMionion.mp3",
+  cardPlayHeavy: "/audio/sfx/HighCostMionion.mp3",
   cardDraw: "/audio/sfx/card-draw.mp3",
-  attack: "/audio/sfx/HeavyHit.mp3",
+  attack: "/audio/sfx/LightHit.mp3",
+  attackHeavy: "/audio/sfx/HeavyHit.mp3",
   damage: "/audio/sfx/LightHit.mp3",
   heal: "/audio/sfx/card-draw.mp3",
   death: "/audio/sfx/MionionDeath.mp3",
@@ -107,18 +109,28 @@ export function toggleSfxMute(): void {
 
 export function playEventAudio(events: GameEvent[]): void {
   const played = new Set<SoundCue>();
-  for (const event of events) {
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
     // CARD_PLAYED / MINION_SUMMONED audio is intentionally NOT played here:
     // the card-play preview drives its own impact SFX so the sound lands
     // together with the smoke and shake when the minion hits the board.
-    const cue =
-      event.type === "ATTACK" ? "attack"
-      : event.type === "DAMAGE" ? "damage"
-      : event.type === "HEAL" ? "heal"
-      : event.type === "DESTROY" ? "death"
-      : event.type === "TURN_STARTED" ? "turn"
-      : event.type === "COMMAND_REJECTED" ? "reject"
-      : undefined;
+    let cue: SoundCue | undefined;
+    if (event.type === "ATTACK") {
+      // Mirror LEGACY: heavy hit when the first DAMAGE from this attack is >= 7
+      const nextDamage = events.slice(i + 1).find(e => e.type === "DAMAGE");
+      const dmg = typeof nextDamage?.payload?.amount === "number" ? nextDamage.payload.amount : 0;
+      cue = dmg >= 7 ? "attackHeavy" : "attack";
+    } else if (event.type === "DAMAGE") {
+      cue = "damage";
+    } else if (event.type === "HEAL") {
+      cue = "heal";
+    } else if (event.type === "DESTROY") {
+      cue = "death";
+    } else if (event.type === "TURN_STARTED") {
+      cue = "turn";
+    } else if (event.type === "COMMAND_REJECTED") {
+      cue = "reject";
+    }
     if (!cue || played.has(cue)) continue;
     played.add(cue);
     playSfx(cue);
