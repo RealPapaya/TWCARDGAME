@@ -521,6 +521,16 @@
   box-shadow: 0 0 15px rgba(255, 215, 0, 0.3);
 }
 
+.deck-option-group.selected .option-item {
+  background: var(--parchment-light);
+  color: var(--wood-dark);
+}
+
+.deck-option-group.selected .option-item:hover {
+  background: #fff0d0;
+  color: var(--wood-dark);
+}
+
 .option-label {
   flex: 1;
   font-weight: 900;
@@ -535,6 +545,10 @@
 .deck-option-group.expanded .expand-arrow {
   transform: rotate(90deg);
   color: #ffd700;
+}
+
+.deck-option-group.selected .expand-arrow {
+  color: var(--wood-dark);
 }
 
 .difficulty-options {
