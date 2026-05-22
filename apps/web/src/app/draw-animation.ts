@@ -84,20 +84,18 @@ export function noteOpponentHandSync(handCount: number): void {
  * real card can be re-found after a re-render; omitted for the opponent.
  */
 function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): void {
-  const deckEl = document.querySelector<HTMLElement>(`.deck-pile.battle-deck-pile.${side}-deck`);
-  if (!deckEl) {
-    if (handId) animatingHandIds.delete(handId);
-    return;
-  }
-
   playSfx("cardDraw");
 
   // Wait two frames so the freshly rendered hand has stable coordinates
-  // (render() defers the DOM update by a frame).
+  // (render() defers the DOM update by a frame). The deck pile must be
+  // re-queried *inside* this wait: render() rebuilds the whole battle surface,
+  // so any node captured before the rebuild is detached and would measure as
+  // (0,0) — flying the card from the top-left corner instead of the deck.
   requestAnimationFrame(() => {
     requestAnimationFrame(() => {
+      const deckEl = document.querySelector<HTMLElement>(`.deck-pile.battle-deck-pile.${side}-deck`);
       const targetEl = resolveSlotElement(side, slotIndex, handId);
-      if (!targetEl) {
+      if (!deckEl || !targetEl) {
         if (handId) animatingHandIds.delete(handId);
         return;
       }
@@ -105,30 +103,47 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): vo
       const deckRect = deckEl.getBoundingClientRect();
       const cardRect = targetEl.getBoundingClientRect();
       // Layout not ready — skip rather than fly to (0,0).
-      if (cardRect.width === 0 || (cardRect.left === 0 && cardRect.top === 0)) {
+      if (
+        cardRect.width === 0 ||
+        deckRect.width === 0 ||
+        (cardRect.left === 0 && cardRect.top === 0) ||
+        (deckRect.left === 0 && deckRect.top === 0)
+      ) {
         if (handId) animatingHandIds.delete(handId);
         return;
       }
+
+      const cloneW = targetEl.offsetWidth || 128;
+      const cloneH = targetEl.offsetHeight || 184;
+      // Anchor by centre, not top-left: a hand card (128x184) dwarfs the deck
+      // pile (54x72), so a corner anchor would start the flight well below and
+      // right of the deck. Centring makes the card visibly fly *out of* the
+      // deck pile. `scale()` keeps the centre fixed, so the shrunk start frame
+      // also sits centred on the deck.
+      const startX = deckRect.left + deckRect.width / 2 - cloneW / 2;
+      const startY = deckRect.top + deckRect.height / 2 - cloneH / 2;
+      const endX = cardRect.left + cardRect.width / 2 - cloneW / 2;
+      const endY = cardRect.top + cardRect.height / 2 - cloneH / 2;
 
       const clone = targetEl.cloneNode(true) as HTMLElement;
       clone.style.position = "fixed";
       clone.style.left = "0";
       clone.style.top = "0";
-      clone.style.width = `${targetEl.offsetWidth || 128}px`;
-      clone.style.height = `${targetEl.offsetHeight || 184}px`;
+      clone.style.width = `${cloneW}px`;
+      clone.style.height = `${cloneH}px`;
       clone.style.margin = "0";
       clone.style.zIndex = "9999";
       clone.style.pointerEvents = "none";
       clone.style.opacity = "1";
       clone.style.transition = "none";
-      clone.style.transform = `translate(${deckRect.left}px, ${deckRect.top}px) scale(0.5)`;
+      clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
 
       document.body.appendChild(clone);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           clone.style.transition = `transform ${FLIGHT_MS}ms ${FLIGHT_EASING}, opacity 0.3s ease`;
-          clone.style.transform = `translate(${cardRect.left}px, ${cardRect.top}px) scale(1)`;
+          clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
         });
       });
 

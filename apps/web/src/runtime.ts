@@ -42,6 +42,7 @@ import {
   notePlayerHandSync,
   resetDrawTracking
 } from "./app/draw-animation.js";
+import { playDiscardAnimations } from "./app/discard-animation.js";
 import { cssEscape } from "./app/dom.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
@@ -1421,6 +1422,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
       class="${classes}"
       style="${fanStyle(index, total)}${drawingStyle}"
       data-hand-id="${escapeAttr(card.instanceId)}"
+      data-card-id="${escapeAttr(card.cardId)}"
       data-card-type="${escapeAttr(card.type)}"
       data-e2e-card-type="${escapeAttr(e2eType)}"
       data-cost="${card.cost}"
@@ -4477,6 +4479,7 @@ function handleEvents(message: GameEvent[]): void {
   maybeShowTurnAnnouncement(message);
   enqueueEventCues(message);
   playEventAudio(message);
+  playDiscardAnimations(message, view.mySeat);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
