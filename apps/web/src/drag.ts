@@ -516,7 +516,6 @@ function onTargetingClick(event: MouseEvent): void {
   const hit = document.elementFromPoint(event.clientX, event.clientY);
   const unit = hit?.closest<HTMLElement>("[data-target]");
   if (unit && state.isEligibleTarget(unit)) {
-    endBattlecryTargeting();
     state.onCommit(unit);
   } else if (unit) {
     state.onInvalid(); // a unit, but not a legal target — stay in targeting

@@ -83,6 +83,7 @@ export type ClientViewState = {
     cardId: string;
     isMinion: boolean;
     boardIndex: number;
+    boardInstanceIdsBefore: string[];
     lineKind: DragLineKind;
     phase: "landing" | "aiming" | "committed";
   };

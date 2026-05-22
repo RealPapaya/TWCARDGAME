@@ -52,6 +52,7 @@ import {
 } from "./app/draw-animation.js";
 import { playDiscardAnimations } from "./app/discard-animation.js";
 import { cssEscape } from "./app/dom.js";
+import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import type {
@@ -271,6 +272,7 @@ let renderScheduled = false;
 let lastRenderedHtml = "";
 let turnAnnouncementTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
+const minionDomKeys = new Map<string, string>();
 
 export function startApp(): void {
   setAppContext({ view, render, supabase, cardCatalog, seats });
@@ -307,7 +309,8 @@ function renderNow(): void {
 
   if (nextHtml !== lastRenderedHtml) {
     const snapshot = captureRenderSnapshot();
-    app.innerHTML = nextHtml;
+    if (app.firstChild) patchHtml(app, nextHtml);
+    else app.innerHTML = nextHtml;
     lastRenderedHtml = nextHtml;
     bindStaticActions();
     bindSelectionActions();
@@ -315,6 +318,16 @@ function renderNow(): void {
   }
   applyPostRenderEffects();
   ensureBgm();
+}
+
+function on(
+  target: EventTarget | null | undefined,
+  type: string,
+  key: string,
+  listener: (event: any) => void,
+  options?: AddEventListenerOptions | boolean
+): void {
+  bindOnce(target, type, key, listener as EventListener, options);
 }
 
 function renderLanding(): string {
@@ -503,7 +516,7 @@ function renderBattleScreen(): string {
   ];
   const deckSlots = accountMode
     ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
-    : `<div class="deck-slot saved-deck selected dev-deck-slot">
+    : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
         <button class="deck-select" type="button">
           <h3>Dev Deck</h3>
           <span class="slot-info">Server default deck</span>
@@ -511,7 +524,7 @@ function renderBattleScreen(): string {
       </div>`;
 
   return `
-    <section class="screen battle-pick v1-deck-selection battle-mode-${activeMode}" data-screen="battle">
+    <section class="screen battle-pick v1-deck-selection battle-mode-${activeMode}" data-screen="battle" data-dom-key="screen-battle">
       <div class="battle-selection-content">
         <button class="back-button neon-button secondary" data-menu-screen="main" data-testid="back-to-menu">返回</button>
         <h2 id="deck-select-title" class="sub-title">選擇戰鬥模式</h2>
@@ -521,6 +534,7 @@ function renderBattleScreen(): string {
               type="button"
               class="battle-mode-card ${activeMode === mode.value ? "selected" : ""}"
               data-battle-mode="${mode.value}"
+              data-dom-key="battle-mode-${mode.value}"
               data-testid="battle-mode-${mode.value}"
               aria-pressed="${activeMode === mode.value}"
             >
@@ -547,7 +561,7 @@ function renderBattleScreen(): string {
             <h4 class="ai-section-label">難度</h4>
             <div class="ai-difficulty-options">
               ${difficulties.map((opt) => `
-                <label class="ai-difficulty-option ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}">
+                <label class="ai-difficulty-option ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}" data-dom-key="battle-difficulty-${opt.value}">
                   <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
                   <strong>${escapeHtml(opt.label)}</strong>
                 </label>
@@ -592,7 +606,7 @@ function renderAiBattleSetupScreen(): string {
   const selectedThemeDescription = AI_THEME_DESCRIPTIONS[selectedTheme.id] ?? selectedThemeLabel;
 
   return `
-    <section class="screen ai-battle-setup" data-screen="ai">
+    <section class="screen ai-battle-setup" data-screen="ai" data-dom-key="screen-ai">
       <div class="battle-setup-container">
         <div class="setup-preview-panel">
           <div class="preview-image-container">
@@ -633,11 +647,12 @@ function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { 
   const selected = view.aiTheme === theme.id;
   const themeLabel = formatAiThemeLabel(theme.label);
   return `
-    <div class="deck-option-group ${selected ? "expanded selected" : ""}">
+    <div class="deck-option-group ${selected ? "expanded selected" : ""}" data-dom-key="ai-theme-group-${escapeAttr(theme.id)}">
       <button
         type="button"
         class="option-item ai-theme-card ${selected ? "selected" : ""}"
         data-ai-theme="${escapeAttr(theme.id)}"
+        data-dom-key="ai-theme-${escapeAttr(theme.id)}"
         data-testid="ai-theme-${escapeAttr(theme.id)}"
         aria-pressed="${selected}"
       >
@@ -646,7 +661,7 @@ function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { 
       </button>
       <div class="difficulty-options">
         ${difficulties.map((opt) => `
-          <label class="sub-difficulty-btn ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}">
+          <label class="sub-difficulty-btn ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}" data-dom-key="ai-theme-${escapeAttr(theme.id)}-difficulty-${opt.value}">
             <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
             <span>${opt.label}</span>
             <span class="difficulty-reward"><img src="/images/ui/gold_coin.webp" alt="" />${opt.reward}</span>
@@ -1067,7 +1082,7 @@ function renderSavedDeck(deck: DeckRow): string {
   const selected = deck.id === view.selectedDeckId;
   const incomplete = deck.card_ids.length !== 30;
   return `
-    <div class="deck-slot saved-deck ${selected ? "selected" : ""} ${incomplete ? "incomplete" : ""}">
+    <div class="deck-slot saved-deck ${selected ? "selected" : ""} ${incomplete ? "incomplete" : ""}" data-dom-key="deck-${escapeAttr(deck.id)}">
       <button class="deck-select" data-select-deck="${escapeAttr(deck.id)}" ${incomplete ? `disabled title="牌組未滿 30 張，無法用於對戰"` : ""}>
         <h3>${escapeHtml(deck.name)}</h3>
         <span>${incomplete ? "⚠ " : ""}${deck.card_ids.length}/30 張</span>
@@ -1355,9 +1370,14 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
  * its chosen slot while a targeted-battlecry minion is mid two-stage play.
  */
 function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" | "opponent"): string {
-  const cells = board.map((minion) => renderMinion(seat, minion));
+  const cells = board.map((minion, index) => renderMinion(seat, minion, index));
   const pending = view.pendingBattlecry;
-  if (pending?.isMinion && pending.phase !== "landing" && role === "player") {
+  if (
+    pending?.isMinion &&
+    pending.phase !== "landing" &&
+    role === "player" &&
+    battlecryReplacementIndex(board, pending) === -1
+  ) {
     const slot = Math.max(0, Math.min(pending.boardIndex, cells.length));
     cells.splice(slot, 0, renderBattlecryPreview(pending.cardId));
   }
@@ -1374,8 +1394,9 @@ function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" |
 function renderBattlecryPreview(cardId: string): string {
   const card = cardCatalog.get(cardId);
   if (!card) return "";
+  const domKey = view.pendingBattlecry ? `battlecry-preview-${view.pendingBattlecry.handInstanceId}` : `battlecry-preview-${cardId}`;
   return `
-    <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-testid="battlecry-preview">
+    <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-dom-key="${escapeAttr(domKey)}" data-testid="battlecry-preview">
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <small class="keyword-row"></small>
@@ -1478,6 +1499,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
       class="${classes}"
       style="${fanStyle(index, total)}${drawingStyle}"
       data-hand-id="${escapeAttr(card.instanceId)}"
+      data-dom-key="hand-${escapeAttr(card.instanceId)}"
       data-card-id="${escapeAttr(card.cardId)}"
       data-card-type="${escapeAttr(card.type)}"
       data-e2e-card-type="${escapeAttr(e2eType)}"
@@ -1492,13 +1514,14 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   `;
 }
 
-function renderMinion(seat: Seat, minion: PublicMinion): string {
+function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const catalogCard = cardCatalog.get(minion.cardId);
   const attackClass = classNames(["stat-atk", valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)]);
   const healthClass = classNames(["stat-hp", valueDeltaClass(minion.currentHealth, minion.health)]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
   const targetKey = targetKeyFor(target);
+  const domKey = minionDomKey(seat, minion, index);
   const classes = classNames([
     "minion",
     minion.taunt && "taunt",
@@ -1520,6 +1543,7 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
       class="${classes}"
       ${mine ? `data-attacker-id="${escapeAttr(minion.instanceId)}"` : ""}
       data-target='${targetAttr(target)}'
+      data-dom-key="${escapeAttr(domKey)}"
       data-card-type="MINION"
       data-cost="${catalogCard?.cost ?? 0}"
       data-seat="${seat}"
@@ -1537,6 +1561,46 @@ function renderMinion(seat: Seat, minion: PublicMinion): string {
       <span class="sr-e2e">${minion.canAttack ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
     </button>
   `;
+}
+
+function minionDomKey(seat: Seat, minion: PublicMinion, index: number): string {
+  const existing = minionDomKeys.get(minion.instanceId);
+  if (existing) return existing;
+  const pending = view.pendingBattlecry;
+  const shouldAdoptPreviewKey =
+    pending?.phase === "committed" &&
+    pending.isMinion &&
+    seat === view.mySeat &&
+    index === battlecryReplacementIndex(Array.from(readPlayer(seat)?.board ?? []), pending);
+  const key = shouldAdoptPreviewKey
+    ? `battlecry-preview-${pending.handInstanceId}`
+    : `minion-${seat}-${minion.instanceId}`;
+  minionDomKeys.set(minion.instanceId, key);
+  return key;
+}
+
+function hasBattlecryReplacement(
+  board: PublicMinion[],
+  pending: NonNullable<ClientViewState["pendingBattlecry"]>
+): boolean {
+  return battlecryReplacementIndex(board, pending) !== -1;
+}
+
+function battlecryReplacementIndex(
+  board: PublicMinion[],
+  pending: NonNullable<ClientViewState["pendingBattlecry"]>
+): number {
+  if (pending.phase !== "committed") return -1;
+  const candidates = board
+    .map((minion, index) => ({ minion, index }))
+    .filter(({ minion }) =>
+      minion.cardId === pending.cardId &&
+      !pending.boardInstanceIdsBefore.includes(minion.instanceId)
+    );
+  candidates.sort((a, b) =>
+    Math.abs(a.index - pending.boardIndex) - Math.abs(b.index - pending.boardIndex)
+  );
+  return candidates[0]?.index ?? -1;
 }
 
 function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): string {
@@ -1713,6 +1777,7 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
     <button
       class="card mulligan-card ${selected ? "selected" : ""}"
       data-mulligan-id="${escapeAttr(card.instanceId)}"
+      data-dom-key="mulligan-${escapeAttr(card.instanceId)}"
       data-card-type="${escapeAttr(card.type)}"
       data-cost="${card.cost}"
       ${disabled ? "disabled" : ""}
@@ -1782,14 +1847,14 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "damage" || cue.kind === "heal") {
     if (!cue.targetKey || cue.amount === undefined) return "";
     const sign = cue.kind === "damage" ? "-" : "+";
-    return `<div class="float-number ${cue.kind}" data-cue-id="${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
+    return `<div class="float-number ${cue.kind}" data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
   }
   if (cue.kind === "destroy") {
     if (!cue.targetKey) return "";
     const particles = particleSpread(cue.id);
-    return `<div class="death-burst" data-cue-id="${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
+    return `<div class="death-burst" data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
   }
-  return `<div class="event-cue event-${cue.kind}">${escapeHtml(cue.text)}</div>`;
+  return `<div class="event-cue event-${cue.kind}" data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
 }
 
 function particleSpread(seed: string): string {
@@ -1913,100 +1978,100 @@ function renderEmptySlots(): string {
 }
 
 function bindStaticActions(): void {
-  document.querySelector<HTMLButtonElement>("#themed-confirm-ok")?.addEventListener("click", () => settleConfirmDialog(true));
-  document.querySelector<HTMLButtonElement>("#themed-confirm-cancel")?.addEventListener("click", () => settleConfirmDialog(false));
-  document.querySelector<HTMLElement>("#themed-confirm-overlay")?.addEventListener("click", (event) => {
+  on(document.querySelector<HTMLButtonElement>("#themed-confirm-ok"), "click", "themed-confirm-ok", () => settleConfirmDialog(true));
+  on(document.querySelector<HTMLButtonElement>("#themed-confirm-cancel"), "click", "themed-confirm-cancel", () => settleConfirmDialog(false));
+  on(document.querySelector<HTMLElement>("#themed-confirm-overlay"), "click", "themed-confirm-overlay", (event) => {
     if (event.target === event.currentTarget) settleConfirmDialog(false);
   });
-  document.querySelector<HTMLFormElement>("#join-form")?.addEventListener("submit", joinRoom);
-  document.querySelector<HTMLFormElement>("#auth-form")?.addEventListener("submit", (event) => void signInWithPassword(event));
-  document.querySelector<HTMLButtonElement>("#sign-up")?.addEventListener("click", () => void signUpWithPassword());
-  document.querySelector<HTMLButtonElement>("#google-sign-in")?.addEventListener("click", () => void signInWithGoogle());
-  document.querySelector<HTMLButtonElement>("#sign-out")?.addEventListener("click", () => void signOut());
-  document.querySelector<HTMLButtonElement>("#refresh-account")?.addEventListener("click", () => void loadAccountData());
-  document.querySelector<HTMLButtonElement>("#sync-collection")?.addEventListener("click", () => void syncCollection());
-  document.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLFormElement>("#join-form"), "submit", "join-form", joinRoom);
+  on(document.querySelector<HTMLFormElement>("#auth-form"), "submit", "auth-form", (event) => void signInWithPassword(event));
+  on(document.querySelector<HTMLButtonElement>("#sign-up"), "click", "sign-up", () => void signUpWithPassword());
+  on(document.querySelector<HTMLButtonElement>("#google-sign-in"), "click", "google-sign-in", () => void signInWithGoogle());
+  on(document.querySelector<HTMLButtonElement>("#sign-out"), "click", "sign-out", () => void signOut());
+  on(document.querySelector<HTMLButtonElement>("#refresh-account"), "click", "refresh-account", () => void loadAccountData());
+  on(document.querySelector<HTMLButtonElement>("#sync-collection"), "click", "sync-collection", () => void syncCollection());
+  on(document.querySelector<HTMLButtonElement>("#new-deck"), "click", "new-deck", () => {
     beginNewDeck();
   });
-  document.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
-  document.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
-  document.querySelector<HTMLInputElement>("#deck-name")?.addEventListener("input", (event) => {
+  on(document.querySelector<HTMLButtonElement>("#autofill-deck"), "click", "autofill-deck", autofillDeck);
+  on(document.querySelector<HTMLButtonElement>("#clear-deck"), "click", "clear-deck", clearDeck);
+  on(document.querySelector<HTMLInputElement>("#deck-name"), "input", "deck-name", (event) => {
     if (!view.editingDeck) return;
     view.editingDeck = { ...view.editingDeck, name: (event.currentTarget as HTMLInputElement).value };
   });
-  document.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
-  document.querySelector<HTMLButtonElement>("#mulligan")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLFormElement>("#deck-form"), "submit", "deck-form", (event) => void saveEditingDeck(event));
+  on(document.querySelector<HTMLButtonElement>("#mulligan"), "click", "mulligan", () => {
     send({ type: "submitMulligan", replaceHandInstanceIds: [...view.mulliganSelection] });
     view.mulliganSelection.clear();
     render();
   });
-  document.querySelector<HTMLButtonElement>("#play")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#play"), "click", "play", () => {
     if (isBattleActionLocked() || view.pendingBattlecry) return;
     if (!view.selectedHandId) return;
     const selectedCard = view.hand.find((card) => card.instanceId === view.selectedHandId);
     send({ type: "playCard", handInstanceId: view.selectedHandId, target: view.selectedTarget ?? inferDefaultTarget(selectedCard?.cardId) });
   });
-  document.querySelector<HTMLButtonElement>("#attack")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#attack"), "click", "attack", () => {
     if (isBattleActionLocked() || view.pendingBattlecry) return;
     if (!view.selectedAttackerId || !view.selectedTarget) return;
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
-  document.querySelector<HTMLButtonElement>("#end-turn")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#end-turn"), "click", "end-turn", () => {
     if (isBattleActionLocked() || view.pendingBattlecry) return;
     send({ type: "endTurn" });
   });
-  document.querySelector<HTMLButtonElement>("#battle-settings-toggle")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#battle-settings-toggle"), "click", "battle-settings-toggle", () => {
     view.battleSettingsOpen = !view.battleSettingsOpen;
     clearHoverTooltip();
     render();
   });
-  document.querySelector<HTMLButtonElement>("#battle-view-deck")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#battle-view-deck"), "click", "battle-view-deck", () => {
     view.battleDeckOpen = true;
     view.battleSettingsOpen = false;
     render();
   });
-  document.querySelector<HTMLButtonElement>("#battle-audio-settings")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#battle-audio-settings"), "click", "battle-audio-settings", () => {
     view.settingsOpen = true;
     view.battleSettingsOpen = false;
     render();
   });
-  document.querySelector<HTMLButtonElement>("#concede")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#concede"), "click", "concede", () => {
     view.battleSettingsOpen = false;
     view.confirmingConcede = true;
     clearHoverTooltip();
     render();
   });
-  document.querySelector<HTMLButtonElement>("#concede-cancel")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#concede-cancel"), "click", "concede-cancel", () => {
     view.confirmingConcede = false;
     render();
   });
-  document.querySelector<HTMLButtonElement>("#concede-confirm")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#concede-confirm"), "click", "concede-confirm", () => {
     view.confirmingConcede = false;
     send({ type: "concede" });
     render();
   });
-  document.querySelector<HTMLButtonElement>("#battle-deck-close")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#battle-deck-close"), "click", "battle-deck-close", () => {
     view.battleDeckOpen = false;
     clearHoverTooltip();
     render();
   });
-  document.querySelector<HTMLElement>("#battle-deck-backdrop")?.addEventListener("click", (e) => {
+  on(document.querySelector<HTMLElement>("#battle-deck-backdrop"), "click", "battle-deck-backdrop", (e) => {
     if (e.target === e.currentTarget) {
       view.battleDeckOpen = false;
       clearHoverTooltip();
       render();
     }
   });
-  document.querySelector<HTMLButtonElement>("#back-to-lobby")?.addEventListener("click", () => void backToLobby());
+  on(document.querySelector<HTMLButtonElement>("#back-to-lobby"), "click", "back-to-lobby", () => void backToLobby());
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "select-deck", () => {
       view.selectedDeckId = el.dataset.selectDeck;
       render();
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-edit-deck]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "edit-deck", () => {
       const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
       if (deck) {
         view.selectedDeckId = deck.id;
@@ -2017,10 +2082,10 @@ function bindStaticActions(): void {
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-delete-deck]")) {
-    el.addEventListener("click", () => void deleteDeck(el.dataset.deleteDeck));
+    on(el, "click", "delete-deck", () => void deleteDeck(el.dataset.deleteDeck));
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-add-card]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "add-card", () => {
       if (view.editingDeck) {
         addCardToEditor(el.dataset.addCard);
       } else {
@@ -2030,54 +2095,54 @@ function bindStaticActions(): void {
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-remove-card]")) {
-    el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
+    on(el, "click", "remove-card", () => removeCardFromEditor(el.dataset.removeCard));
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-menu-screen]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "menu-screen", () => {
       const target = el.dataset.menuScreen as MenuScreen | undefined;
       if (!target) return;
       navigateToScreen(target);
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-battle-mode]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "battle-mode", () => {
       const mode = el.dataset.battleMode as BattleMode | undefined;
       if (!mode) return;
       view.battleMode = mode;
       render();
     });
   }
-  document.querySelector<HTMLButtonElement>("#start-training-match")?.addEventListener("click", () => void startTrainingMatch());
-  document.querySelector<HTMLButtonElement>("#find-match")?.addEventListener("click", () => void startMatchmaking());
-  document.querySelector<HTMLButtonElement>("#matchmaking-cancel")?.addEventListener("click", () => void cancelMatchmaking());
-  document.querySelector<HTMLFormElement>("#profile-form")?.addEventListener("submit", (event) => void saveProfile(event));
-  document.querySelector<HTMLButtonElement>("#open-avatar-picker")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#start-training-match"), "click", "start-training-match", () => void startTrainingMatch());
+  on(document.querySelector<HTMLButtonElement>("#find-match"), "click", "find-match", () => void startMatchmaking());
+  on(document.querySelector<HTMLButtonElement>("#matchmaking-cancel"), "click", "matchmaking-cancel", () => void cancelMatchmaking());
+  on(document.querySelector<HTMLFormElement>("#profile-form"), "submit", "profile-form", (event) => void saveProfile(event));
+  on(document.querySelector<HTMLButtonElement>("#open-avatar-picker"), "click", "open-avatar-picker", () => {
     view.avatarPickerOpen = !view.avatarPickerOpen;
     render();
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-avatar]")) {
-    el.addEventListener("click", () => void pickAvatar(el.dataset.pickAvatar));
+    on(el, "click", "pick-avatar", () => void pickAvatar(el.dataset.pickAvatar));
   }
-  document.querySelector<HTMLInputElement>("#show-unowned-checkbox")?.addEventListener("change", (event) => {
+  on(document.querySelector<HTMLInputElement>("#show-unowned-checkbox"), "change", "show-unowned-checkbox", (event) => {
     const checked = (event.currentTarget as HTMLInputElement).checked;
     view.collectionFilter = checked ? "all" : "owned";
     render();
   });
-  document.querySelector<HTMLSelectElement>("#collection-sort-select")?.addEventListener("change", (event) => {
+  on(document.querySelector<HTMLSelectElement>("#collection-sort-select"), "change", "collection-sort-select", (event) => {
     const value = (event.currentTarget as HTMLSelectElement).value as CollectionSort;
     view.collectionSort = value;
     render();
   });
-  document.querySelector<HTMLSelectElement>("#collection-category-select")?.addEventListener("change", (event) => {
+  on(document.querySelector<HTMLSelectElement>("#collection-category-select"), "change", "collection-category-select", (event) => {
     view.collectionCategory = (event.currentTarget as HTMLSelectElement).value;
     render();
   });
-  document.querySelector<HTMLSelectElement>("#collection-rarity-select")?.addEventListener("change", (event) => {
+  on(document.querySelector<HTMLSelectElement>("#collection-rarity-select"), "change", "collection-rarity-select", (event) => {
     view.collectionRarity = (event.currentTarget as HTMLSelectElement).value;
     render();
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-lb-sort]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "lb-sort", () => {
       const value = el.dataset.lbSort as "wins" | "level" | undefined;
       if (!value) return;
       view.leaderboardSortBy = value;
@@ -2085,22 +2150,22 @@ function bindStaticActions(): void {
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-view-player-profile]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "view-player-profile", () => {
       const userId = el.dataset.viewPlayerProfile;
       if (userId) openPublicPlayerProfile(userId);
     });
   }
-  document.querySelector<HTMLElement>("#public-profile-backdrop")?.addEventListener("click", (event) => {
+  on(document.querySelector<HTMLElement>("#public-profile-backdrop"), "click", "public-profile-backdrop", (event) => {
     if (event.target === event.currentTarget) {
       view.publicPlayerProfile = undefined;
       render();
     }
   });
-  document.querySelector<HTMLButtonElement>("#close-public-profile")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#close-public-profile"), "click", "close-public-profile", () => {
     view.publicPlayerProfile = undefined;
     render();
   });
-  document.querySelector<HTMLInputElement>("#collection-search-input")?.addEventListener("input", (event) => {
+  on(document.querySelector<HTMLInputElement>("#collection-search-input"), "input", "collection-search-input", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     view.collectionSearch = input.value;
     render();
@@ -2111,31 +2176,31 @@ function bindStaticActions(): void {
     });
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-collection-card]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "collection-card", () => {
       view.pinnedCollectionCardId = el.dataset.collectionCard;
       render();
     });
   }
-  document.querySelector<HTMLButtonElement>("#pinned-card-close")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#pinned-card-close"), "click", "pinned-card-close", () => {
     view.pinnedCollectionCardId = undefined;
     render();
   });
-  document.querySelector<HTMLElement>("#pinned-card-overlay")?.addEventListener("click", (event) => {
+  on(document.querySelector<HTMLElement>("#pinned-card-overlay"), "click", "pinned-card-overlay", (event) => {
     if (event.target === event.currentTarget) {
       view.pinnedCollectionCardId = undefined;
       render();
     }
   });
-  document.querySelector<HTMLButtonElement>("#card-op-disenchant")?.addEventListener("click", (event) => {
+  on(document.querySelector<HTMLButtonElement>("#card-op-disenchant"), "click", "card-op-disenchant", (event) => {
     const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
     if (cardId) void disenchantCard(cardId, 1);
   });
-  document.querySelector<HTMLButtonElement>("#card-op-craft")?.addEventListener("click", (event) => {
+  on(document.querySelector<HTMLButtonElement>("#card-op-craft"), "click", "card-op-craft", (event) => {
     const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
     if (cardId) void craftCard(cardId);
   });
-  document.querySelector<HTMLButtonElement>("#bulk-disenchant")?.addEventListener("click", () => void bulkDisenchantExtras());
-  document.querySelector<HTMLButtonElement>("#edit-display-name")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#bulk-disenchant"), "click", "bulk-disenchant", () => void bulkDisenchantExtras());
+  on(document.querySelector<HTMLButtonElement>("#edit-display-name"), "click", "edit-display-name", () => {
     view.editingDisplayNameActive = true;
     view.editingDisplayName = view.profile?.display_name ?? "";
     render();
@@ -2145,24 +2210,24 @@ function bindStaticActions(): void {
       inp?.select();
     });
   });
-  document.querySelector<HTMLButtonElement>("#cancel-edit-name")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#cancel-edit-name"), "click", "cancel-edit-name", () => {
     view.editingDisplayNameActive = false;
     view.editingDisplayName = undefined;
     render();
   });
   const displayInput = document.querySelector<HTMLInputElement>("#profile-display-name");
   if (displayInput) {
-    displayInput.addEventListener("input", () => {
+    on(displayInput, "input", "profile-display-name", () => {
       view.editingDisplayName = displayInput.value;
     });
   }
-  document.querySelector<HTMLFormElement>("#add-friend-form")?.addEventListener("submit", (event) => {
+  on(document.querySelector<HTMLFormElement>("#add-friend-form"), "submit", "add-friend-form", (event) => {
     event.preventDefault();
     const input = document.querySelector<HTMLInputElement>("#add-friend-input");
     void sendFriendRequest(input?.value ?? "");
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-friends-panel]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "friends-panel", () => {
       const panel = el.dataset.friendsPanel as FriendsPanel | undefined;
       if (!panel) return;
       view.friendsPanel = panel;
@@ -2170,36 +2235,36 @@ function bindStaticActions(): void {
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-remove-friend]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "remove-friend", () => {
       const id = el.dataset.removeFriend;
       if (id) void removeFriend(id);
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-accept-friend-request]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "accept-friend-request", () => {
       const id = el.dataset.acceptFriendRequest;
       if (id) void respondFriendRequest("accept", id);
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-decline-friend-request]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "decline-friend-request", () => {
       const id = el.dataset.declineFriendRequest;
       if (id) void respondFriendRequest("decline", id);
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-cancel-friend-request]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "cancel-friend-request", () => {
       const id = el.dataset.cancelFriendRequest;
       if (id) void respondFriendRequest("cancel", id);
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-challenge-friend]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "challenge-friend", () => {
       void createPrivateChallenge();
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-copy-code]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "copy-code", () => {
       const code = el.dataset.copyCode ?? "";
       if (!code) return;
       void navigator.clipboard?.writeText(code).catch(() => {
@@ -2208,20 +2273,20 @@ function bindStaticActions(): void {
       showToast(`已複製代碼 ${code}`);
     });
   }
-  document.querySelector<HTMLButtonElement>("#cancel-private-room")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#cancel-private-room"), "click", "cancel-private-room", () => {
     void cancelMatchmaking();
     view.privateJoinCode = undefined;
     render();
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-claim-shop]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "claim-shop", () => {
       const id = el.dataset.claimShop;
       if (id) void claimShopItem(id);
     });
   }
   bindPackOpeningActions();
   for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
-    el.addEventListener("change", () => {
+    on(el, "change", "ai-difficulty", () => {
       const value = el.value as AiDifficulty;
       if (value === "easy" || value === "normal" || value === "hard") {
         view.aiDifficulty = value;
@@ -2231,7 +2296,7 @@ function bindStaticActions(): void {
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-ai-theme]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "ai-theme", () => {
       const theme = AI_THEMES.find((entry) => entry.id === el.dataset.aiTheme);
       if (theme) {
         if (view.aiTheme !== theme.id) view.aiDifficultySelected = false;
@@ -2240,40 +2305,40 @@ function bindStaticActions(): void {
       }
     });
   }
-  document.querySelector<HTMLButtonElement>("#start-ai-match")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#start-ai-match"), "click", "start-ai-match", () => {
     void startAiMatch();
   });
-  document.querySelector<HTMLButtonElement>("#start-ai-mode-match")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#start-ai-mode-match"), "click", "start-ai-mode-match", () => {
     void startAiMatch({ withTheme: false });
   });
-  document.querySelector<HTMLFormElement>("#private-join-form")?.addEventListener("submit", (event) => {
+  on(document.querySelector<HTMLFormElement>("#private-join-form"), "submit", "private-join-form", (event) => {
     event.preventDefault();
     const input = document.querySelector<HTMLInputElement>("#private-join-input");
     void joinPrivateByCode(input?.value ?? "");
   });
-  document.querySelector<HTMLButtonElement>("#create-private-room")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#create-private-room"), "click", "create-private-room", () => {
     void createPrivateChallenge();
   });
-  document.querySelector<HTMLButtonElement>("#settings-toggle")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#settings-toggle"), "click", "settings-toggle", () => {
     view.settingsOpen = true;
     render();
   });
-  document.querySelector<HTMLButtonElement>("#settings-close")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#settings-close"), "click", "settings-close", () => {
     view.settingsOpen = false;
     render();
   });
-  document.querySelector<HTMLElement>("#settings-backdrop")?.addEventListener("click", (e) => {
+  on(document.querySelector<HTMLElement>("#settings-backdrop"), "click", "settings-backdrop", (e) => {
     if (e.target === e.currentTarget) { view.settingsOpen = false; render(); }
   });
-  document.querySelector<HTMLButtonElement>("#changelog-open")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#changelog-open"), "click", "changelog-open", () => {
     view.changelogOpen = true;
     render();
   });
-  document.querySelector<HTMLButtonElement>("#changelog-close")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#changelog-close"), "click", "changelog-close", () => {
     view.changelogOpen = false;
     render();
   });
-  document.querySelector<HTMLElement>("#changelog-backdrop")?.addEventListener("click", (e) => {
+  on(document.querySelector<HTMLElement>("#changelog-backdrop"), "click", "changelog-backdrop", (e) => {
     if (e.target === e.currentTarget) { view.changelogOpen = false; render(); }
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-hover-card-id]")) {
@@ -2282,28 +2347,28 @@ function bindStaticActions(): void {
       return card ? resolveCatalogCard(card, `tooltip-${card.id}`) : undefined;
     });
   }
-  document.querySelector<HTMLButtonElement>("#settings-sign-out")?.addEventListener("click", () => void signOut());
-  document.querySelector<HTMLButtonElement>("#settings-bgm-mute")?.addEventListener("click", toggleBgmMute);
-  document.querySelector<HTMLButtonElement>("#settings-sfx-mute")?.addEventListener("click", toggleSfxMute);
-  document.querySelector<HTMLInputElement>("#settings-bgm-volume")?.addEventListener("input", (e) => {
+  on(document.querySelector<HTMLButtonElement>("#settings-sign-out"), "click", "settings-sign-out", () => void signOut());
+  on(document.querySelector<HTMLButtonElement>("#settings-bgm-mute"), "click", "settings-bgm-mute", toggleBgmMute);
+  on(document.querySelector<HTMLButtonElement>("#settings-sfx-mute"), "click", "settings-sfx-mute", toggleSfxMute);
+  on(document.querySelector<HTMLInputElement>("#settings-bgm-volume"), "input", "settings-bgm-volume", (e) => {
     setBgmVolume(parseFloat((e.currentTarget as HTMLInputElement).value));
   });
-  document.querySelector<HTMLInputElement>("#settings-sfx-volume")?.addEventListener("input", (e) => {
+  on(document.querySelector<HTMLInputElement>("#settings-sfx-volume"), "input", "settings-sfx-volume", (e) => {
     setSfxVolume(parseFloat((e.currentTarget as HTMLInputElement).value));
   });
 }
 
 function bindCollectionDeckControls(root: ParentNode): void {
-  root.querySelector<HTMLButtonElement>("#new-deck")?.addEventListener("click", beginNewDeck);
-  root.querySelector<HTMLButtonElement>("#autofill-deck")?.addEventListener("click", autofillDeck);
-  root.querySelector<HTMLButtonElement>("#clear-deck")?.addEventListener("click", clearDeck);
-  root.querySelector<HTMLInputElement>("#deck-name")?.addEventListener("input", (event) => {
+  on(root.querySelector<HTMLButtonElement>("#new-deck"), "click", "new-deck", beginNewDeck);
+  on(root.querySelector<HTMLButtonElement>("#autofill-deck"), "click", "autofill-deck", autofillDeck);
+  on(root.querySelector<HTMLButtonElement>("#clear-deck"), "click", "clear-deck", clearDeck);
+  on(root.querySelector<HTMLInputElement>("#deck-name"), "input", "deck-name", (event) => {
     if (!view.editingDeck) return;
     view.editingDeck = { ...view.editingDeck, name: (event.currentTarget as HTMLInputElement).value };
   });
-  root.querySelector<HTMLFormElement>("#deck-form")?.addEventListener("submit", (event) => void saveEditingDeck(event));
+  on(root.querySelector<HTMLFormElement>("#deck-form"), "submit", "deck-form", (event) => void saveEditingDeck(event));
   for (const el of root.querySelectorAll<HTMLElement>("[data-edit-deck]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "edit-deck", () => {
       const deck = view.decks.find((item) => item.id === el.dataset.editDeck);
       if (deck) {
         view.selectedDeckId = deck.id;
@@ -2313,30 +2378,30 @@ function bindCollectionDeckControls(root: ParentNode): void {
     });
   }
   for (const el of root.querySelectorAll<HTMLElement>("[data-delete-deck]")) {
-    el.addEventListener("click", () => void deleteDeck(el.dataset.deleteDeck));
+    on(el, "click", "delete-deck", () => void deleteDeck(el.dataset.deleteDeck));
   }
   for (const el of root.querySelectorAll<HTMLElement>("[data-remove-card]")) {
-    el.addEventListener("click", () => removeCardFromEditor(el.dataset.removeCard));
+    on(el, "click", "remove-card", () => removeCardFromEditor(el.dataset.removeCard));
   }
   const openCoverPicker = (): void => {
     if (!view.editingDeck || view.editingDeck.card_ids.length === 0) return;
     view.coverPickerOpen = true;
     refreshCollectionDeckWorkspace();
   };
-  root.querySelector<HTMLButtonElement>("#edit-cover")?.addEventListener("click", openCoverPicker);
-  root.querySelector<HTMLButtonElement>("#edit-cover-thumb")?.addEventListener("click", openCoverPicker);
-  root.querySelector<HTMLButtonElement>("#cover-picker-close")?.addEventListener("click", () => {
+  on(root.querySelector<HTMLButtonElement>("#edit-cover"), "click", "edit-cover", openCoverPicker);
+  on(root.querySelector<HTMLButtonElement>("#edit-cover-thumb"), "click", "edit-cover-thumb", openCoverPicker);
+  on(root.querySelector<HTMLButtonElement>("#cover-picker-close"), "click", "cover-picker-close", () => {
     view.coverPickerOpen = false;
     refreshCollectionDeckWorkspace();
   });
-  root.querySelector<HTMLElement>("#cover-picker-overlay")?.addEventListener("click", (event) => {
+  on(root.querySelector<HTMLElement>("#cover-picker-overlay"), "click", "cover-picker-overlay", (event) => {
     if (event.target === event.currentTarget) {
       view.coverPickerOpen = false;
       refreshCollectionDeckWorkspace();
     }
   });
   for (const el of root.querySelectorAll<HTMLElement>("[data-cover-card]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "cover-card", () => {
       if (!view.editingDeck) return;
       view.editingDeck = { ...view.editingDeck, cover_card_id: el.dataset.coverCard };
       view.coverPickerOpen = false;
@@ -2358,7 +2423,7 @@ function refreshCollectionDeckWorkspace(): void {
     render();
     return;
   }
-  column.innerHTML = renderCollectionDeckColumnContent();
+  patchHtml(column, renderCollectionDeckColumnContent());
   lastRenderedHtml = "";
   bindCollectionDeckControls(column);
   updateCollectionCardButtons();
@@ -2400,7 +2465,7 @@ function bindPackOpeningActions(): void {
   const overlay = document.querySelector("#pack-opening-overlay");
   if (!overlay) return;
   for (const el of overlay.querySelectorAll<HTMLElement>("[data-flip-index]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "pack-flip", () => {
       if (!view.packOpeningFlipped || !view.packOpeningRewards) return;
       const idx = parseInt(el.dataset.flipIndex ?? "-1", 10);
       if (idx < 0 || view.packOpeningFlipped[idx]) return;
@@ -2409,7 +2474,7 @@ function bindPackOpeningActions(): void {
       flipPackRewardCard(idx);
     });
   }
-  document.querySelector<HTMLButtonElement>("#btn-pack-done")?.addEventListener("click", () => {
+  on(document.querySelector<HTMLButtonElement>("#btn-pack-done"), "click", "pack-done", () => {
     view.packOpeningRewards = undefined;
     view.packOpeningFlipped = undefined;
     view.packOpeningKind = undefined;
@@ -3356,6 +3421,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
 
 function bindRoomMessages(joined: Room): void {
   view.room = joined;
+  minionDomKeys.clear();
   view.eventStatus = undefined;
   view.publicSync = undefined;
   view.presence.clear();
@@ -3519,7 +3585,7 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
 
 function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-hand-id]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "hand-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       const handId = el.dataset.handId;
       const card = view.hand.find((item) => item.instanceId === handId);
@@ -3536,7 +3602,7 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
-    el.addEventListener("pointerdown", (event) => {
+    on(el, "pointerdown", "hand-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
@@ -3544,7 +3610,7 @@ function bindSelectionActions(): void {
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-attacker-id]")) {
-    el.addEventListener("click", (event) => {
+    on(el, "click", "attacker-select", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       event.stopImmediatePropagation();
       view.selectedAttackerId = el.dataset.attackerId;
@@ -3552,7 +3618,7 @@ function bindSelectionActions(): void {
       view.selectedTarget = undefined;
       render();
     });
-    el.addEventListener("pointerdown", (event) => {
+    on(el, "pointerdown", "attacker-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       clearHoverTooltip();
       attachAttackerPointerDrag(event, el);
@@ -3564,7 +3630,7 @@ function bindSelectionActions(): void {
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       const target = JSON.parse(el.dataset.target!) as TargetRef;
       if (!isTargetHighlighted(target)) return;
@@ -3593,7 +3659,7 @@ function bindSelectionActions(): void {
   }
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-mulligan-id]")) {
-    el.addEventListener("click", () => {
+    on(el, "click", "mulligan-select", () => {
       const id = el.dataset.mulliganId;
       if (!id) return;
       if (view.mulliganSelection.has(id)) view.mulliganSelection.delete(id);
@@ -3608,7 +3674,7 @@ const hoverCapable = typeof window !== "undefined" && typeof window.matchMedia =
 
 function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | undefined): void {
   if (!hoverCapable) return;
-  el.addEventListener("mouseenter", (event) => {
+  on(el, "mouseenter", "hover-preview-enter", (event) => {
     if (view.confirmingConcede) return;
     // No hover-enlarge preview while aiming a battlecry — the arrow passing over
     // a card must not pop its preview open.
@@ -3629,7 +3695,7 @@ function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | und
     }, 220);
     void event;
   });
-  el.addEventListener("mouseleave", () => {
+  on(el, "mouseleave", "hover-preview-leave", () => {
     if (hoverState.lastEl === el) hoverState.lastEl = undefined;
     window.clearTimeout(hoverState.timer);
     hoverState.timer = undefined;
@@ -3815,6 +3881,8 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
     cardId: card.cardId,
     isMinion,
     boardIndex,
+    boardInstanceIdsBefore: Array.from(readPlayer(view.mySeat ?? "player1")?.board ?? [])
+      .map((minion) => minion.instanceId),
     lineKind,
     phase: "landing"
   };
@@ -3911,17 +3979,18 @@ function commitBattlecry(targetEl: HTMLElement): void {
   // The card-play animation already ran locally; suppress the server's echo so
   // the card does not appear to play a second time.
   suppressedPlayCues.push({ seat: view.mySeat, cardId: pending.cardId });
+  // Freeze the landed preview before the command can echo private/public sync
+  // back to the client. Otherwise a very fast hand sync can clear an "aiming"
+  // pending battlecry and leave the board blank for a frame.
+  pending.phase = "committed";
+  endBattlecryTargeting();
+  renderNow();
   send({
     type: "playCard",
     handInstanceId: pending.handInstanceId,
     target,
     boardIndex: pending.isMinion && pending.boardIndex >= 0 ? pending.boardIndex : undefined
   });
-  // Keep the landed card (and hidden hand card) until the server sync arrives;
-  // `pruneSelections` clears `pendingBattlecry` once the card leaves the hand.
-  pending.phase = "committed";
-  endBattlecryTargeting();
-  render();
 }
 
 /** Silently tears down any pending battlecry — used on cancel and on teardown. */
@@ -4042,6 +4111,7 @@ async function backToLobby(): Promise<void> {
   view.selectedTarget = undefined;
   view.events = [];
   view.animationCues = [];
+  minionDomKeys.clear();
   resetCardPlayCues();
   view.eventStatus = undefined;
   view.toast = undefined;
@@ -4086,6 +4156,7 @@ async function joinRoom(event: Event): Promise<void> {
       : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
 
     view.room = joined;
+    minionDomKeys.clear();
     view.eventStatus = undefined;
     view.publicSync = undefined;
     view.presence.clear();
@@ -4754,6 +4825,7 @@ function applyPendingPublicSyncNow(): void {
     pendingPublicSync = undefined;
     view.publicSync = message as typeof view.publicSync;
     render();
+    clearAcceptedBattlecryAfterRender();
     const opponentSeat = view.mySeat ? otherSeat(view.mySeat) : undefined;
     const opponentHandCount = opponentSeat ? readPlayer(opponentSeat)?.handCount : undefined;
     if (typeof opponentHandCount === "number") noteOpponentHandSync(opponentHandCount);
@@ -4848,6 +4920,7 @@ function resetCardPlayCues(): void {
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
+  minionDomKeys.clear();
   resetDrawTracking();
 }
 
@@ -4976,9 +5049,9 @@ function findLandingTargetKey(events: GameEvent[], startIndex: number, seat: Sea
 function pruneSelections(): void {
   const handIds = new Set(view.hand.map((card) => card.instanceId));
   if (view.selectedHandId && !handIds.has(view.selectedHandId)) view.selectedHandId = undefined;
-  // The pending battlecry card left the hand — the server accepted the play, so
-  // drop the preview/hidden-card overlay and let the synced board take over.
-  if (view.pendingBattlecry && !handIds.has(view.pendingBattlecry.handInstanceId)) {
+  // Keep a committed battlecry preview until the synced board has a real
+  // replacement minion that can adopt its DOM key.
+  if (canClearPendingBattlecry(handIds)) {
     clearPendingBattlecry();
   }
   for (const id of view.rejectedHandIds) {
@@ -4995,6 +5068,18 @@ function pruneSelections(): void {
       view.selectedTarget = undefined;
     }
   }
+}
+
+function canClearPendingBattlecry(handIds = new Set(view.hand.map((card) => card.instanceId))): boolean {
+  const pending = view.pendingBattlecry;
+  if (!pending || handIds.has(pending.handInstanceId)) return false;
+  if (!pending.isMinion || pending.phase !== "committed") return true;
+  return hasBattlecryReplacement(Array.from(readPlayer(view.mySeat ?? "player1")?.board ?? []), pending);
+}
+
+function clearAcceptedBattlecryAfterRender(): void {
+  if (!canClearPendingBattlecry()) return;
+  clearPendingBattlecry();
 }
 
 function readPlayer(seat: Seat): PublicPlayer | undefined {
