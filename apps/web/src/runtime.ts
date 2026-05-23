@@ -79,7 +79,11 @@ import { installViewportGuards } from "./app/viewport.js";
 const PROFILE_SELECT =
   "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
-const ATTACK_LUNGE_MS = 1000;
+const ATTACK_LUNGE_MS = 800;
+const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
+const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
+const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
+const ATTACK_ANIMATION_LOG_PREFIX = "[attack-animation]";
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
@@ -4828,11 +4832,29 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
   }, TURN_ANNOUNCEMENT_LOCK_MS);
 }
 
+function logAttackAnimation(event: string, data: Record<string, unknown> = {}): void {
+  try {
+    console.info(`${ATTACK_ANIMATION_LOG_PREFIX} ${event} ${JSON.stringify(data)}`);
+  } catch {
+    console.info(`${ATTACK_ANIMATION_LOG_PREFIX} ${event}`);
+  }
+}
+
+function rectLog(rect: DOMRect): Record<string, number> {
+  return {
+    left: Math.round(rect.left),
+    top: Math.round(rect.top),
+    width: Math.round(rect.width),
+    height: Math.round(rect.height)
+  };
+}
+
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
   maybeShowTurnAnnouncement(message);
   enqueueEventCues(message);
-  playEventAudio(message);
+  scheduleAttackImpactAudio(message);
+  playEventAudio(immediateAudioEvents(message));
   playDiscardAnimations(message, view.mySeat);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
@@ -4854,6 +4876,34 @@ function handleEvents(message: GameEvent[]): void {
     view.eventStatus = "in_progress";
   }
   render();
+}
+
+function scheduleAttackImpactAudio(events: GameEvent[]): void {
+  for (let i = 0; i < events.length; i++) {
+    const event = events[i];
+    if (event.type !== "ATTACK") continue;
+    const nextDamage = events.slice(i + 1).find((item) => item.type === "DAMAGE");
+    const dmg = typeof nextDamage?.payload?.amount === "number" ? nextDamage.payload.amount : 0;
+    const cue = dmg >= 7 ? "attackHeavy" : "attack";
+    window.setTimeout(() => playSfx(cue), ATTACK_IMPACT_DELAY_MS);
+  }
+}
+
+function immediateAudioEvents(events: GameEvent[]): GameEvent[] {
+  const attackDamageIndexes = new Set<number>();
+  for (let i = 0; i < events.length; i++) {
+    if (events[i].type !== "ATTACK") continue;
+    for (let j = i + 1; j < events.length; j++) {
+      const type = events[j].type;
+      if (type === "DAMAGE") {
+        attackDamageIndexes.add(j);
+        continue;
+      }
+      if (type === "DESTROY" || type === "GAME_FINISHED") continue;
+      break;
+    }
+  }
+  return events.filter((event, index) => event.type !== "ATTACK" && !attackDamageIndexes.has(index));
 }
 
 const cardPlayCueQueue: AnimationCue[] = [];
@@ -4889,10 +4939,31 @@ function attackAnimationBusy(): boolean {
 }
 
 function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): void {
-  if (pendingPublicSync === undefined) return;
-  if (attackAnimationBusy() || (!opts.ignoreCardPlayBusy && cardPlayPreviewBusy())) return;
+  const hasPendingSync = pendingPublicSync !== undefined;
+  const attackBusy = attackAnimationBusy();
+  const cardPlayBusy = cardPlayPreviewBusy();
   const holdRemaining = pendingPublicSyncHoldUntilMs - performance.now();
+  logAttackAnimation("publicSync flush attempt", {
+    hasPendingSync,
+    attackAnimationBusy: attackBusy,
+    cardPlayPreviewBusy: cardPlayBusy,
+    ignoreCardPlayBusy: Boolean(opts.ignoreCardPlayBusy),
+    holdRemainingMs: Math.max(0, Math.round(holdRemaining))
+  });
+  if (!hasPendingSync) {
+    logAttackAnimation("publicSync flush abort", { reason: "no pending publicSync" });
+    return;
+  }
+  if (attackBusy) {
+    logAttackAnimation("publicSync flush abort", { reason: "attack animation busy" });
+    return;
+  }
+  if (!opts.ignoreCardPlayBusy && cardPlayBusy) {
+    logAttackAnimation("publicSync flush abort", { reason: "card play preview busy" });
+    return;
+  }
   if (holdRemaining > 0) {
+    logAttackAnimation("publicSync flush delayed", { holdRemainingMs: Math.round(holdRemaining) });
     schedulePendingPublicSyncFlush(holdRemaining, opts);
     return;
   }
@@ -4908,6 +4979,10 @@ function applyPendingPublicSyncNow(): void {
     const message = pendingPublicSync;
     pendingPublicSync = undefined;
     pendingPublicSyncHoldUntilMs = 0;
+    logAttackAnimation("publicSync apply now", {
+      attackAnimationBusy: attackAnimationBusy(),
+      cardPlayPreviewBusy: cardPlayPreviewBusy()
+    });
     view.publicSync = message as typeof view.publicSync;
     renderNow();
     if (clearAcceptedBattlecryAfterRender()) renderNow();
@@ -4923,6 +4998,11 @@ function holdPendingPublicSyncFor(delayMs: number): void {
 
 function schedulePendingPublicSyncFlush(delayMs: number, opts: { ignoreCardPlayBusy?: boolean } = {}): void {
   if (pendingPublicSyncFlushTimer !== undefined) window.clearTimeout(pendingPublicSyncFlushTimer);
+  logAttackAnimation("publicSync flush scheduled", {
+    delayMs: Math.max(0, Math.round(delayMs)),
+    ignoreCardPlayBusy: Boolean(opts.ignoreCardPlayBusy),
+    attackAnimationBusy: attackAnimationBusy()
+  });
   pendingPublicSyncFlushTimer = window.setTimeout(() => {
     pendingPublicSyncFlushTimer = undefined;
     flushPendingPublicSync(opts);
@@ -4984,15 +5064,19 @@ function spawnBoardDust(anchor: HTMLElement, intensity = 1): void {
 }
 
 // Applies a publicSync, but never ahead of an animation that needs the old
-// board. The server sends `publicSync` then `events` back-to-back, so we defer
-// by one task tick: the events handler can start card-play / attack cues first,
+// board. The server sends `publicSync` then `events` back-to-back, so we give
+// the paired events a short grace window to enqueue card-play / attack cues;
 // then the board update is held until that visible motion finishes.
 function applyPublicSync(message: typeof view.publicSync): void {
   pendingPublicSync = message;
-  window.setTimeout(() => {
-    if (cardPlayPreviewBusy() || attackAnimationBusy()) return; // flushed later by animation completion
-    flushPendingPublicSync();
-  }, 0);
+  logAttackAnimation("publicSync received", {
+    status: message?.status,
+    activeSeat: message?.activeSeat,
+    turnNumber: message?.turnNumber,
+    attackAnimationBusy: attackAnimationBusy(),
+    cardPlayPreviewBusy: cardPlayPreviewBusy()
+  });
+  schedulePendingPublicSyncFlush(PUBLIC_SYNC_EVENT_GRACE_MS);
 }
 
 function ensureCardPlayOverlay(): HTMLElement {
@@ -5079,10 +5163,21 @@ function enqueueEventCues(events: GameEvent[]): void {
     .filter((cue): cue is AnimationCue => Boolean(cue));
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
-  const cues = applyPostPlayEffectDelays(rawCues);
+  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues));
   if (cues.length === 0) return;
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
+    if (cue.kind === "attackerMoves") {
+      logAttackAnimation("attackerMoves cue enqueued", {
+        cueId: cue.id,
+        attackerInstanceId: cue.attackerInstanceId,
+        targetKey: cue.targetKey,
+        delayMs: cue.delayMs ?? 0,
+        readyAtMs: cue.readyAtMs,
+        pendingPublicSync: pendingPublicSync !== undefined,
+        publicSyncHoldRemainingMs: Math.max(0, Math.round(pendingPublicSyncHoldUntilMs - performance.now()))
+      });
+    }
     if (cue.kind === "play") enqueueCardPlayCue(cue);
     if ((cue.delayMs ?? 0) > 0) window.setTimeout(render, cue.delayMs);
     const lifetime =
@@ -5144,6 +5239,36 @@ function isPostPlayEffectCue(cue: AnimationCue): boolean {
     || cue.kind === "buff"
     || cue.kind === "destroy"
     || cue.kind === "summon";
+}
+
+function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
+  const cues: AnimationCue[] = [];
+  let pendingAttackEffectDelayMs = 0;
+
+  for (const cue of rawCues) {
+    if (cue.kind === "attackerMoves") {
+      pendingAttackEffectDelayMs = ATTACK_IMPACT_DELAY_MS;
+      holdPendingPublicSyncFor(ATTACK_LUNGE_MS + POST_ATTACK_STATE_SYNC_LAG_MS);
+      cues.push(cue);
+      continue;
+    }
+    if (pendingAttackEffectDelayMs > 0 && isPostAttackEffectCue(cue)) {
+      const delayMs = cue.kind === "destroy" ? ATTACK_LUNGE_MS : pendingAttackEffectDelayMs;
+      const effectDelayMs = Math.max(cue.delayMs ?? 0, delayMs);
+      cues.push({
+        ...cue,
+        delayMs: effectDelayMs,
+        readyAtMs: performance.now() + effectDelayMs
+      });
+      continue;
+    }
+    cues.push(cue);
+  }
+  return cues;
+}
+
+function isPostAttackEffectCue(cue: AnimationCue): boolean {
+  return cue.kind === "damage" || cue.kind === "heal" || cue.kind === "buff" || cue.kind === "destroy";
 }
 
 function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): AnimationCue | undefined {
@@ -5417,7 +5542,7 @@ function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: num
   const uy = rawDy / distance;
   const attackerEdge = Math.abs(ux) * attackerRect.width / 2 + Math.abs(uy) * attackerRect.height / 2;
   const targetEdge = Math.abs(ux) * targetRect.width / 2 + Math.abs(uy) * targetRect.height / 2;
-  const contactOverlap = Math.min(14, Math.max(8, attackerEdge * 0.14));
+  const contactOverlap = Math.min(targetEdge * 0.72, Math.max(24, attackerEdge * 0.45));
   const travel = Math.max(0, distance - attackerEdge - targetEdge + contactOverlap);
 
   return {
@@ -5427,10 +5552,53 @@ function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: num
 }
 
 function startAttackLunge(cue: AnimationCue): boolean {
-  if (cue.kind !== "attackerMoves" || !cue.attackerInstanceId || !cue.targetKey || appliedLunges.has(cue.id)) return false;
-  const attacker = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`);
-  const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
-  if (!attacker || !target) return false;
+  logAttackAnimation("startAttackLunge called", {
+    cueId: cue.id,
+    kind: cue.kind,
+    attackerInstanceId: cue.attackerInstanceId,
+    targetKey: cue.targetKey,
+    alreadyApplied: appliedLunges.has(cue.id)
+  });
+  if (cue.kind !== "attackerMoves") {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "wrong cue kind", kind: cue.kind });
+    return false;
+  }
+  if (!cue.attackerInstanceId) {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing attackerInstanceId" });
+    return false;
+  }
+  if (!cue.targetKey) {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing targetKey" });
+    return false;
+  }
+  if (appliedLunges.has(cue.id)) {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "already applied" });
+    return false;
+  }
+  const attackerSelector = `[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`;
+  const targetSelector = `[data-target-key="${cssEscape(cue.targetKey)}"]`;
+  const attacker = document.querySelector<HTMLElement>(attackerSelector);
+  const target = document.querySelector<HTMLElement>(targetSelector);
+  logAttackAnimation("attacker DOM lookup", {
+    cueId: cue.id,
+    key: cue.attackerInstanceId,
+    selector: attackerSelector,
+    exists: Boolean(attacker)
+  });
+  logAttackAnimation("target DOM lookup", {
+    cueId: cue.id,
+    key: cue.targetKey,
+    selector: targetSelector,
+    exists: Boolean(target)
+  });
+  if (!attacker) {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing attacker DOM" });
+    return false;
+  }
+  if (!target) {
+    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing target DOM" });
+    return false;
+  }
 
   const attackerRect = attacker.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
@@ -5438,11 +5606,25 @@ function startAttackLunge(cue: AnimationCue): boolean {
 
   appliedLunges.add(cue.id);
   activeAttackLunges.set(cue.attackerInstanceId, { dx, dy });
+  logAttackAnimation("startAttackLunge success", {
+    cueId: cue.id,
+    attackerInstanceId: cue.attackerInstanceId,
+    targetKey: cue.targetKey,
+    attackerRect: rectLog(attackerRect),
+    targetRect: rectLog(targetRect),
+    dx,
+    dy
+  });
   render();
 
   window.setTimeout(() => {
     activeAttackLunges.delete(cue.attackerInstanceId!);
     appliedLunges.delete(cue.id);
+    logAttackAnimation("startAttackLunge complete", {
+      cueId: cue.id,
+      attackerInstanceId: cue.attackerInstanceId,
+      attackAnimationBusy: attackAnimationBusy()
+    });
     flushPendingPublicSync();
     render();
   }, ATTACK_LUNGE_MS);
@@ -5502,7 +5684,7 @@ function applyPostRenderEffects(): void {
     if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
       startAttackLunge(cue);
     }
-    if (cue.kind === "destroy" && cue.targetKey) {
+    if (cue.kind === "destroy" && cue.targetKey && cueIsReady(cue)) {
       applyDeathShatter(cue);
     }
   }
@@ -5511,7 +5693,14 @@ function applyPostRenderEffects(): void {
     for (const node of eventLayer.querySelectorAll<HTMLElement>("[data-anchor-key]")) {
       if (node.dataset.anchored === "true") continue;
       const anchorKey = node.dataset.anchorKey ?? "";
-      const target = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(anchorKey)}"]`);
+      const selector = `[data-target-key="${cssEscape(anchorKey)}"]`;
+      const target = document.querySelector<HTMLElement>(selector);
+      logAttackAnimation("event-layer target DOM lookup", {
+        cueId: node.dataset.cueId,
+        key: anchorKey,
+        selector,
+        exists: Boolean(target)
+      });
       if (!target) continue;
       const r = target.getBoundingClientRect();
       const x = r.left + r.width / 2 - surfaceRect.left;
