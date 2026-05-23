@@ -3,15 +3,19 @@
 @keyframes attack-lunge {
   0% {
     transform: translate(0, 0) scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  24% {
-    transform: translate(0, var(--attack-lift, -24px)) scale(1.06);
+  25% {
+    transform: translate(0, -10px) scale(1.05);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.6, 1);
   }
-  58% {
-    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.08);
+  55% {
+    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.05);
+    animation-timing-function: linear;
   }
-  68% {
-    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.06);
+  70% {
+    transform: translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.05);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.3, 1);
   }
   100% {
     transform: translate(0, 0) scale(1);
@@ -21,15 +25,19 @@
 @keyframes hero-attack-lunge {
   0% {
     transform: translateX(-50%) translate(0, 0) scale(1);
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   }
-  24% {
-    transform: translateX(-50%) translate(0, var(--attack-lift, -24px)) scale(1.06);
+  25% {
+    transform: translateX(-50%) translate(0, -10px) scale(1.05);
+    animation-timing-function: cubic-bezier(0.55, 0, 0.6, 1);
   }
-  58% {
-    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.08);
+  55% {
+    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.05);
+    animation-timing-function: linear;
   }
-  68% {
-    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.06);
+  70% {
+    transform: translateX(-50%) translate(var(--lunge-dx, 0), var(--lunge-dy, 0)) scale(1.05);
+    animation-timing-function: cubic-bezier(0.2, 0, 0.3, 1);
   }
   100% {
     transform: translateX(-50%) translate(0, 0) scale(1);
@@ -37,13 +45,13 @@
 }
 
 .minion.lunging {
-  animation: attack-lunge 0.72s cubic-bezier(0.18, 0.86, 0.22, 1) both;
+  animation: attack-lunge 1s both;
   z-index: 200;
   box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
 }
 
 .hero.lunging {
-  animation: hero-attack-lunge 0.72s cubic-bezier(0.18, 0.86, 0.22, 1) both;
+  animation: hero-attack-lunge 1s both;
   z-index: 200;
   box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
 }

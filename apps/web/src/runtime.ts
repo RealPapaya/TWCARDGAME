@@ -79,7 +79,7 @@ import { installViewportGuards } from "./app/viewport.js";
 const PROFILE_SELECT =
   "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
-const ATTACK_LUNGE_MS = 720;
+const ATTACK_LUNGE_MS = 1000;
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
@@ -4881,7 +4881,11 @@ function cardPlayPreviewBusy(): boolean {
 }
 
 function attackAnimationBusy(): boolean {
-  return activeAttackLunges.size > 0;
+  if (activeAttackLunges.size > 0) return true;
+  for (const cue of view.animationCues) {
+    if (cue.kind === "attackerMoves" && !appliedLunges.has(cue.id)) return true;
+  }
+  return false;
 }
 
 function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): void {
@@ -5080,7 +5084,6 @@ function enqueueEventCues(events: GameEvent[]): void {
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
     if (cue.kind === "play") enqueueCardPlayCue(cue);
-    if (cue.kind === "attackerMoves") startAttackLunge(cue);
     if ((cue.delayMs ?? 0) > 0) window.setTimeout(render, cue.delayMs);
     const lifetime =
       cue.kind === "play" ? 1350
