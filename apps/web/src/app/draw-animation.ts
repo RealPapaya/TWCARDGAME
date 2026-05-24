@@ -47,15 +47,16 @@ export function isHandCardAnimating(instanceId: string): boolean {
  * Animates any card whose `instanceId` was not present in the previous hand.
  * The first call of a match only seeds the baseline (opening hand, no fly-in).
  */
-export function notePlayerHandSync(handIds: string[]): void {
+export function notePlayerHandSync(handIds: string[], opts: { suppressNewIds?: readonly string[] } = {}): void {
   const previous = prevPlayerHandIds;
   prevPlayerHandIds = [...handIds];
   if (previous === undefined) return; // opening hand — baseline only
 
   const prevSet = new Set(previous);
+  const suppressed = new Set(opts.suppressNewIds ?? []);
   for (let slot = 0; slot < handIds.length; slot += 1) {
     const id = handIds[slot];
-    if (prevSet.has(id)) continue;
+    if (prevSet.has(id) || suppressed.has(id)) continue;
     animatingHandIds.add(id);
     animateCardFromDeck("player", slot, id);
   }

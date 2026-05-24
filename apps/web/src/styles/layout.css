@@ -954,6 +954,10 @@ input {
   animation: buff-pop 0.7s ease-out;
 }
 
+.minion.receiving-bounce {
+  animation: bounce-return-pulse 0.72s ease-out;
+}
+
 .minion.being-destroyed {
   animation: death-fade 0.78s ease-out;
 }

@@ -102,6 +102,69 @@
   color: #33ff66;
 }
 
+@keyframes bounce-burst-ring {
+  0% {
+    transform: translate(-50%, -50%) scale(0.25);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1.85);
+    opacity: 0;
+  }
+}
+
+@keyframes bounce-return-pulse {
+  0% {
+    transform: translateY(0) scale(1);
+    filter: brightness(1);
+  }
+  35% {
+    transform: translateY(-10px) scale(1.08);
+    filter: brightness(1.45) drop-shadow(0 0 14px rgba(163, 53, 238, 0.95));
+  }
+  100% {
+    transform: translateY(-2px) scale(0.98);
+    filter: brightness(1);
+  }
+}
+
+.bounce-burst {
+  position: absolute;
+  pointer-events: none;
+  width: 0;
+  height: 0;
+  z-index: 90;
+}
+
+.bounce-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 74px;
+  height: 74px;
+  border: 3px solid rgba(163, 53, 238, 0.92);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(163, 53, 238, 0.72), inset 0 0 14px rgba(255, 255, 255, 0.22);
+  opacity: 0;
+  animation: bounce-burst-ring 0.72s ease-out forwards;
+  animation-delay: var(--cue-delay, 0ms);
+}
+
+.bounce-burst > span:nth-child(2) {
+  width: 52px;
+  height: 52px;
+  animation-delay: calc(var(--cue-delay, 0ms) + 90ms);
+}
+
+.bounce-burst > span:nth-child(3) {
+  width: 32px;
+  height: 32px;
+  animation-delay: calc(var(--cue-delay, 0ms) + 170ms);
+}
+
 @keyframes dust-fade {
   0% {
     transform: translate(-50%, -50%) scale(0.5);
@@ -322,8 +385,10 @@
 
 @media (prefers-reduced-motion: reduce) {
   .minion.lunging,
+  .minion.receiving-bounce,
   .hero.lunging,
   .float-number,
+  .bounce-burst > span,
   .death-burst > span,
   .disintegrate-particle,
   .shatter-fragment {
@@ -337,5 +402,10 @@
 
   .death-burst > span {
     opacity: 0.9;
+  }
+
+  .bounce-burst > span {
+    opacity: 0.9;
+    transform: translate(-50%, -50%) scale(1);
   }
 }

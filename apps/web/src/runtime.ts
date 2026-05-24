@@ -1478,6 +1478,7 @@ function renderSummonPreview(cue: AnimationCue): string {
     hasCue(targetKey, "damage") && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "destroy") && "being-destroyed"
   ]);
   return `
@@ -1633,6 +1634,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     hasCue(targetKey, "damage") && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "summon") && "summoning",
     hasCue(targetKey, "destroy") && "being-destroyed"
   ]);
@@ -1944,6 +1946,10 @@ function renderEventCue(cue: AnimationCue): string {
   }
   if (cue.kind === "buff") {
     return "";
+  }
+  if (cue.kind === "bounce") {
+    if (!cue.targetKey) return "";
+    return `<div class="bounce-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="bounce-burst"><span></span><span></span><span></span></div>`;
   }
   if (cue.kind === "damage" || cue.kind === "heal") {
     if (!cue.targetKey || cue.amount === undefined) return "";
@@ -3558,12 +3564,7 @@ function bindRoomMessages(joined: Room): void {
     render();
   });
   joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
-    blog("hand received", { ids: message.cards.map((card) => card.instanceId) });
-    view.hand = message.cards;
-    pruneSelections();
-    render();
-    blog("hand render done");
-    notePlayerHandSync(message.cards.map((card) => card.instanceId));
+    handleHandSync(message.cards);
   });
   joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
     view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
@@ -4368,10 +4369,7 @@ async function joinRoom(event: Event): Promise<void> {
       render();
     });
     joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
-      view.hand = message.cards;
-      pruneSelections();
-      render();
-      notePlayerHandSync(message.cards.map((card) => card.instanceId));
+      handleHandSync(message.cards);
     });
     joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
       view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
@@ -5036,6 +5034,7 @@ const CARD_PLAY_FULL_MS = Math.max(
 );
 const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
+const BOUNCE_EFFECT_SYNC_LAG_MS = 650;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -5049,6 +5048,10 @@ const suppressedPlayCues: Array<{ seat: Seat | undefined; cardId: string }> = []
 let pendingPublicSync: unknown;
 let pendingPublicSyncHoldUntilMs = 0;
 let pendingPublicSyncFlushTimer: number | undefined;
+
+let pendingHandSync: { cards: HandCardView[]; suppressDrawIds: string[] } | undefined;
+let pendingHandSyncHoldUntilMs = 0;
+let pendingHandSyncFlushTimer: number | undefined;
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
@@ -5128,6 +5131,81 @@ function schedulePendingPublicSyncFlush(delayMs: number, opts: { ignoreCardPlayB
     pendingPublicSyncFlushTimer = undefined;
     flushPendingPublicSync(opts);
   }, Math.max(0, delayMs));
+}
+
+function handleHandSync(cards: HandCardView[]): void {
+  const ids = cards.map((card) => card.instanceId);
+  blog("hand received", { ids });
+
+  let holdRemaining = pendingHandSyncHoldUntilMs - performance.now();
+  if (pendingHandSync && holdRemaining <= 0) {
+    flushPendingHandSync();
+    holdRemaining = pendingHandSyncHoldUntilMs - performance.now();
+  }
+
+  const currentIds = new Set(view.hand.map((card) => card.instanceId));
+  const addedIds = ids.filter((id) => !currentIds.has(id));
+  if (holdRemaining > 0 && addedIds.length > 0) {
+    pendingHandSync = { cards, suppressDrawIds: addedIds };
+    schedulePendingHandSyncFlush(holdRemaining);
+    const visibleCards = cards.filter((card) => currentIds.has(card.instanceId));
+    blog("hand sync held", {
+      holdRemaining: Math.round(holdRemaining),
+      withheldIds: addedIds
+    });
+    applyHandSyncNow(visibleCards);
+    return;
+  }
+
+  if (pendingHandSync) clearPendingHandSyncHold();
+  applyHandSyncNow(cards);
+}
+
+function applyHandSyncNow(cards: HandCardView[], suppressDrawIds: readonly string[] = []): void {
+  view.hand = cards;
+  pruneSelections();
+  render();
+  blog("hand render done", { suppressedDrawIds: suppressDrawIds });
+  notePlayerHandSync(cards.map((card) => card.instanceId), { suppressNewIds: suppressDrawIds });
+}
+
+function holdPlayerHandSyncFor(delayMs: number): void {
+  pendingHandSyncHoldUntilMs = Math.max(pendingHandSyncHoldUntilMs, performance.now() + delayMs);
+  blog("hold hand sync", { delayMs: Math.round(delayMs) });
+  if (pendingHandSync) {
+    schedulePendingHandSyncFlush(pendingHandSyncHoldUntilMs - performance.now());
+  }
+}
+
+function schedulePendingHandSyncFlush(delayMs: number): void {
+  if (pendingHandSyncFlushTimer !== undefined) window.clearTimeout(pendingHandSyncFlushTimer);
+  pendingHandSyncFlushTimer = window.setTimeout(() => {
+    pendingHandSyncFlushTimer = undefined;
+    flushPendingHandSync();
+  }, Math.max(0, delayMs));
+}
+
+function flushPendingHandSync(): void {
+  if (!pendingHandSync) return;
+  const holdRemaining = pendingHandSyncHoldUntilMs - performance.now();
+  if (holdRemaining > 0) {
+    schedulePendingHandSyncFlush(holdRemaining);
+    return;
+  }
+  const sync = pendingHandSync;
+  pendingHandSync = undefined;
+  pendingHandSyncHoldUntilMs = 0;
+  blog("hand sync release", { ids: sync.cards.map((card) => card.instanceId), suppressedDrawIds: sync.suppressDrawIds });
+  applyHandSyncNow(sync.cards, sync.suppressDrawIds);
+}
+
+function clearPendingHandSyncHold(): void {
+  pendingHandSync = undefined;
+  pendingHandSyncHoldUntilMs = 0;
+  if (pendingHandSyncFlushTimer !== undefined) {
+    window.clearTimeout(pendingHandSyncFlushTimer);
+    pendingHandSyncFlushTimer = undefined;
+  }
 }
 
 // Plays the landing SFX, shakes the board, and spawns V1-style smoke right
@@ -5213,6 +5291,7 @@ function resetCardPlayCues(): void {
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
   pendingPublicSyncHoldUntilMs = 0;
+  clearPendingHandSyncHold();
   if (pendingPublicSyncFlushTimer !== undefined) {
     window.clearTimeout(pendingPublicSyncFlushTimer);
     pendingPublicSyncFlushTimer = undefined;
@@ -5295,6 +5374,7 @@ function enqueueEventCues(events: GameEvent[]): void {
       cue.kind === "play" ? 1350
       : cue.kind === "attackerMoves" ? ATTACK_LUNGE_MS
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
+      : cue.kind === "bounce" ? 900
       : cue.kind === "destroy" ? 700
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
       : 900;
@@ -5345,7 +5425,9 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
       continue;
     }
     if (currentPostPlayDelay > 0 && !isLandingSummon && isPostPlayEffectCue(cue)) {
-      holdPendingPublicSyncFor(currentPostPlayDelay + POST_PLAY_STATE_SYNC_LAG_MS);
+      const syncLag = cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS : POST_PLAY_STATE_SYNC_LAG_MS;
+      holdPendingPublicSyncFor(currentPostPlayDelay + syncLag);
+      if (cue.kind === "bounce") holdPlayerHandSyncFor(currentPostPlayDelay + syncLag);
       cues.push({
         ...cue,
         delayMs: Math.max(cue.delayMs ?? 0, currentPostPlayDelay),
@@ -5364,6 +5446,7 @@ function isPostPlayEffectCue(cue: AnimationCue): boolean {
   return cue.kind === "damage"
     || cue.kind === "heal"
     || cue.kind === "buff"
+    || cue.kind === "bounce"
     || cue.kind === "destroy"
     || cue.kind === "summon";
 }
@@ -5382,6 +5465,10 @@ function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
     if (pendingAttackEffectDelayMs > 0 && isPostAttackEffectCue(cue)) {
       const delayMs = cue.kind === "destroy" ? ATTACK_LUNGE_MS : pendingAttackEffectDelayMs;
       const effectDelayMs = Math.max(cue.delayMs ?? 0, delayMs);
+      if (cue.kind === "bounce") {
+        holdPendingPublicSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
+        holdPlayerHandSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
+      }
       cues.push({
         ...cue,
         delayMs: effectDelayMs,
@@ -5395,7 +5482,7 @@ function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
 }
 
 function isPostAttackEffectCue(cue: AnimationCue): boolean {
-  return cue.kind === "damage" || cue.kind === "heal" || cue.kind === "buff" || cue.kind === "destroy";
+  return cue.kind === "damage" || cue.kind === "heal" || cue.kind === "buff" || cue.kind === "bounce" || cue.kind === "destroy";
 }
 
 function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): AnimationCue | undefined {
@@ -5427,6 +5514,7 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): Ani
   if (event.type === "DAMAGE") return { id, kind: "damage", text: amount ? `-${amount}` : "Damage", seat: event.seat, targetKey: target, amount };
   if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target, amount };
   if (event.type === "BUFF" || event.type === "SHIELD_POPPED") return { id, kind: "buff", text: "Buff", seat: event.seat, targetKey: target };
+  if (event.type === "BOUNCE") return { id, kind: "bounce", text: "Bounce", seat: event.seat, targetKey: target, cardId };
   if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "Command rejected"), seat: event.seat };

@@ -18,7 +18,7 @@ import type {
 
 export type { ShopItemRow } from "@twcardgame/shared";
 
-export type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "destroy" | "turn" | "reject";
+export type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "bounce" | "destroy" | "turn" | "reject";
 export type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai";
 export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
