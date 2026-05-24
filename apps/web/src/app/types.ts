@@ -60,6 +60,7 @@ export type AnimationCue = {
   amount?: number;
   delayMs?: number;
   readyAtMs?: number;
+  suppressBoardAnimation?: boolean;
   anchorX?: number;
   anchorY?: number;
 };

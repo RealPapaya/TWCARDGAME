@@ -296,6 +296,16 @@ let turnAnnouncementTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
+const summonPreviewedTargets = new Set<string>();
+const loggedSummonPreviewSlots = new Set<string>();
+const loggedSkippedSummonAnimations = new Set<string>();
+
+function resetMinionVisualTracking(): void {
+  minionDomKeys.clear();
+  summonPreviewedTargets.clear();
+  loggedSummonPreviewSlots.clear();
+  loggedSkippedSummonAnimations.clear();
+}
 
 export function startApp(): void {
   setAppContext({ view, render, supabase, cardCatalog, seats });
@@ -1394,7 +1404,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
  */
 function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" | "opponent"): string {
   const cells = board.map((minion, index) => renderMinion(seat, minion, index));
-  const summonPreviews = summonPreviewCuesForBoard(seat, board);
+  const summonPreviews = summonPreviewSlotsForBoard(seat, board);
   const pending = activeBattlecryPreview();
   let splicedPreview = false;
   if (
@@ -1407,8 +1417,14 @@ function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" |
     cells.splice(slot, 0, renderBattlecryPreview(pending.cardId));
     splicedPreview = true;
   }
-  for (const cue of summonPreviews) {
-    cells.push(renderSummonPreview(cue));
+  for (const preview of summonPreviews) {
+    const html = renderSummonPreview(preview.cue);
+    if (!html) continue;
+    if (preview.index === undefined) {
+      cells.push(html);
+    } else {
+      cells.splice(Math.max(0, Math.min(preview.index, cells.length)), 0, html);
+    }
   }
   if (role === "player" && (pending || board.length > 0)) {
     blog("renderBoardContents player", {
@@ -1417,27 +1433,49 @@ function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" |
       pendingPhase: pending?.phase,
       replacementIdx: pending ? battlecryReplacementIndex(board, pending) : undefined,
       splicedPreview,
-      summonPreviewIds: summonPreviews.map((cue) => cue.targetKey),
+      summonPreviewIds: summonPreviews.map(({ cue }) => cue.targetKey),
       boardIds: board.map((m) => m.instanceId)
     });
   }
   return cells.join("") || renderEmptySlots();
 }
 
-function summonPreviewCuesForBoard(seat: Seat, board: PublicMinion[]): AnimationCue[] {
+type SummonPreviewSlot = { cue: AnimationCue; index?: number };
+
+function summonPreviewSlotsForBoard(seat: Seat, board: PublicMinion[]): SummonPreviewSlot[] {
   const boardIds = new Set(board.map((minion) => minion.instanceId));
   const battlecry = activeBattlecryPreview();
   const seen = new Set<string>();
-  const cues: AnimationCue[] = [];
+  const slots: SummonPreviewSlot[] = [];
+  const futureBoard = pendingPublicBoardForSeat(seat);
   for (const cue of view.animationCues) {
     if (cue.kind !== "summon" || cue.seat !== seat || !cue.targetKey || !cue.cardId || !cueIsReady(cue)) continue;
     if (battlecry?.isMinion && battlecry.phase !== "landing" && seat === view.mySeat && cue.cardId === battlecry.cardId) continue;
     if (boardIds.has(cue.targetKey) || seen.has(cue.targetKey)) continue;
     seen.add(cue.targetKey);
-    cues.push(cue);
+    summonPreviewedTargets.add(cue.targetKey);
+    const futureIndex = futureBoard?.findIndex((minion) => minion.instanceId === cue.targetKey);
+    const index = futureIndex !== undefined && futureIndex >= 0 ? futureIndex : undefined;
+    const logKey = `${seat}:${cue.targetKey}`;
+    if (!loggedSummonPreviewSlots.has(logKey)) {
+      loggedSummonPreviewSlots.add(logKey);
+      blog("summon preview slot", {
+        seat,
+        targetKey: cue.targetKey,
+        futureIndex: index,
+        currentBoardIds: board.map((minion) => minion.instanceId),
+        futureBoardIds: futureBoard?.map((minion) => minion.instanceId)
+      });
+    }
+    slots.push({ cue, index });
   }
-  cues.reverse();
-  return cues;
+  return slots.sort((a, b) => (a.index ?? Number.MAX_SAFE_INTEGER) - (b.index ?? Number.MAX_SAFE_INTEGER));
+}
+
+function pendingPublicBoardForSeat(seat: Seat): PublicMinion[] | undefined {
+  const sync = pendingPublicSync as typeof view.publicSync | undefined;
+  const board = sync?.players?.[seat]?.board;
+  return board ? Array.from(board) : undefined;
 }
 
 /**
@@ -1474,7 +1512,7 @@ function renderSummonPreview(cue: AnimationCue): string {
   const classes = classNames([
     "minion",
     "summon-preview",
-    "summoning",
+    !cue.suppressBoardAnimation && "summoning",
     hasCue(targetKey, "damage") && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
@@ -1489,7 +1527,7 @@ function renderSummonPreview(cue: AnimationCue): string {
       aria-hidden="true"
       data-target='${targetAttr(target)}'
       data-target-key="${escapeAttr(targetKey)}"
-      data-dom-key="summon-preview-${escapeAttr(cue.targetKey)}"
+      data-dom-key="minion-${cue.seat}-${escapeAttr(cue.targetKey)}"
       data-card-type="MINION"
       data-seat="${cue.seat}"
       data-testid="summon-preview"
@@ -1621,6 +1659,21 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const domKey = minionDomKey(seat, minion, index);
   const attackLunge = activeAttackLunges.get(minion.instanceId);
   const attackLungeStyle = attackLunge ? ` style="--lunge-dx: ${attackLunge.dx}px; --lunge-dy: ${attackLunge.dy}px;"` : "";
+  const hasSuppressedSummonCue = view.animationCues.some(
+    (cue) => cue.kind === "summon" && cue.targetKey === targetKey && cue.suppressBoardAnimation && cueIsReady(cue)
+  );
+  const adoptedBattlecryKey = minionDomKeys.get(minion.instanceId)?.startsWith("battlecry-preview-") ?? false;
+  const skipSummonAnimation = summonPreviewedTargets.has(minion.instanceId) || hasSuppressedSummonCue || adoptedBattlecryKey;
+  if (skipSummonAnimation && hasCue(targetKey, "summon") && !loggedSkippedSummonAnimations.has(minion.instanceId)) {
+    loggedSkippedSummonAnimations.add(minion.instanceId);
+    blog("summon animation skipped after preview", {
+      seat,
+      targetKey: minion.instanceId,
+      previewed: summonPreviewedTargets.has(minion.instanceId),
+      suppressedCue: hasSuppressedSummonCue,
+      adoptedBattlecryKey
+    });
+  }
   const classes = classNames([
     "minion",
     minion.taunt && "taunt",
@@ -1635,7 +1688,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
     hasCue(targetKey, "bounce") && "receiving-bounce",
-    hasCue(targetKey, "summon") && "summoning",
+    hasCue(targetKey, "summon") && !skipSummonAnimation && "summoning",
     hasCue(targetKey, "destroy") && "being-destroyed"
   ]);
 
@@ -3542,7 +3595,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
 
 function bindRoomMessages(joined: Room): void {
   view.room = joined;
-  minionDomKeys.clear();
+  resetMinionVisualTracking();
   view.eventStatus = undefined;
   view.publicSync = undefined;
   view.presence.clear();
@@ -3964,8 +4017,6 @@ function finalizeHandDrag(_handIdConsumed: string | undefined): void {
 // precedes the battlecry arrow.
 let battlecryLandTimers: number[] = [];
 let battlecryLandEl: HTMLElement | null = null;
-let battlecryCommitPinEl: HTMLElement | null = null;
-let battlecryCommitPinTimer: number | undefined;
 // `performance.now()` of the most recent local battlecry landing animation
 // start. Used by `applyPostPlayEffectDelays` to keep the suppressed-play branch
 // gated symmetrically with the normal branch (effects wait until the local
@@ -4106,12 +4157,13 @@ function commitBattlecry(targetEl: HTMLElement): void {
   // The card-play animation already ran locally; suppress the server's echo so
   // the card does not appear to play a second time.
   suppressedPlayCues.push({ seat: view.mySeat, cardId: pending.cardId });
-  // Freeze the landed preview before the command can echo private/public sync
-  // back to the client. Otherwise a very fast hand sync can clear an "aiming"
-  // pending battlecry and leave the board blank for a frame.
-  pinBattlecryCommitPreview();
   pending.phase = "committed";
   view.acceptedBattlecry = { ...pending };
+  blog("battlecry committed preview handoff start", {
+    handInstanceId: pending.handInstanceId,
+    cardId: pending.cardId,
+    boardIndex: pending.boardIndex
+  });
   blog("phase aiming→committed; accepted=set", {
     handInstanceId: pending.handInstanceId,
     cardId: pending.cardId,
@@ -4131,12 +4183,11 @@ function commitBattlecry(targetEl: HTMLElement): void {
 
 /** Silently tears down any pending battlecry — used on cancel and on teardown. */
 function clearPendingBattlecry(): void {
-  if (view.pendingBattlecry || view.acceptedBattlecry || battlecryLandEl || battlecryCommitPinEl) {
-    blog("clear pending+accepted; pin removed", {
+  if (view.pendingBattlecry || view.acceptedBattlecry || battlecryLandEl) {
+    blog("clear pending+accepted", {
       hadPending: Boolean(view.pendingBattlecry),
       hadAccepted: Boolean(view.acceptedBattlecry),
       hadLandEl: Boolean(battlecryLandEl),
-      hadPin: Boolean(battlecryCommitPinEl),
       caller: new Error().stack?.split("\n")[2]?.trim()
     });
   }
@@ -4146,54 +4197,8 @@ function clearPendingBattlecry(): void {
   battlecryLandEl?.remove();
   battlecryLandEl = null;
   battlecryLocalLandingStartMs = undefined;
-  clearBattlecryCommitPin();
   view.pendingBattlecry = undefined;
   view.acceptedBattlecry = undefined;
-}
-
-function pinBattlecryCommitPreview(): void {
-  clearBattlecryCommitPin();
-  const source = document.querySelector<HTMLElement>('[data-testid="battlecry-preview"]');
-  if (!source) {
-    blog("pin source missing");
-    return;
-  }
-  const rect = source.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) {
-    blog("pin source has zero rect", { left: rect.left, top: rect.top, w: rect.width, h: rect.height });
-    return;
-  }
-  const clone = source.cloneNode(true) as HTMLElement;
-  clone.removeAttribute("data-testid");
-  clone.removeAttribute("data-dom-key");
-  clone.classList.add("battlecry-commit-pin");
-  Object.assign(clone.style, {
-    position: "fixed",
-    left: `${rect.left}px`,
-    top: `${rect.top}px`,
-    width: `${rect.width}px`,
-    height: `${rect.height}px`,
-    margin: "0",
-    pointerEvents: "none",
-    zIndex: "620",
-    transform: "none"
-  });
-  document.body.appendChild(clone);
-  battlecryCommitPinEl = clone;
-  battlecryCommitPinTimer = window.setTimeout(clearBattlecryCommitPin, 2500);
-  blog("pin attached", { left: rect.left, top: rect.top, w: rect.width, h: rect.height });
-}
-
-function clearBattlecryCommitPin(): void {
-  if (battlecryCommitPinTimer !== undefined) {
-    window.clearTimeout(battlecryCommitPinTimer);
-    battlecryCommitPinTimer = undefined;
-  }
-  if (battlecryCommitPinEl) {
-    blog("pin removed");
-  }
-  battlecryCommitPinEl?.remove();
-  battlecryCommitPinEl = null;
 }
 
 /** "如果點其他地方 如地板 就回手" — abort with no command sent. */
@@ -4304,7 +4309,7 @@ async function backToLobby(): Promise<void> {
   view.selectedTarget = undefined;
   view.events = [];
   view.animationCues = [];
-  minionDomKeys.clear();
+  resetMinionVisualTracking();
   resetCardPlayCues();
   view.eventStatus = undefined;
   view.toast = undefined;
@@ -4349,7 +4354,7 @@ async function joinRoom(event: Event): Promise<void> {
       : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
 
     view.room = joined;
-    minionDomKeys.clear();
+    resetMinionVisualTracking();
     view.eventStatus = undefined;
     view.publicSync = undefined;
     view.presence.clear();
@@ -5035,6 +5040,7 @@ const CARD_PLAY_FULL_MS = Math.max(
 const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 const BOUNCE_EFFECT_SYNC_LAG_MS = 650;
+const DESTROY_EFFECT_SYNC_LAG_MS = 820;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -5299,7 +5305,7 @@ function resetCardPlayCues(): void {
   for (const timer of cardPlayTimers) window.clearTimeout(timer);
   cardPlayTimers = [];
   document.getElementById("card-play-overlay")?.replaceChildren();
-  minionDomKeys.clear();
+  resetMinionVisualTracking();
   resetDrawTracking();
 }
 
@@ -5416,18 +5422,31 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
     }
 
     const isLandingSummon = cue.kind === "summon" && cue.targetKey === currentLandingTargetKey;
-    if (isLandingSummon && currentSummonPreviewDelay > 0) {
+    if (isLandingSummon) {
+      const delayMs = currentSummonPreviewDelay > 0
+        ? Math.max(cue.delayMs ?? 0, currentSummonPreviewDelay)
+        : cue.delayMs;
       cues.push({
         ...cue,
-        delayMs: Math.max(cue.delayMs ?? 0, currentSummonPreviewDelay),
-        readyAtMs: performance.now() + currentSummonPreviewDelay
+        delayMs,
+        readyAtMs: delayMs !== undefined ? performance.now() + delayMs : cue.readyAtMs,
+        suppressBoardAnimation: true
       });
       continue;
     }
     if (currentPostPlayDelay > 0 && !isLandingSummon && isPostPlayEffectCue(cue)) {
-      const syncLag = cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS : POST_PLAY_STATE_SYNC_LAG_MS;
+      const syncLag =
+        cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS
+        : cue.kind === "destroy" ? DESTROY_EFFECT_SYNC_LAG_MS
+        : POST_PLAY_STATE_SYNC_LAG_MS;
       holdPendingPublicSyncFor(currentPostPlayDelay + syncLag);
       if (cue.kind === "bounce") holdPlayerHandSyncFor(currentPostPlayDelay + syncLag);
+      if (cue.kind === "destroy") {
+        blog("hold publicSync for destroy visual", {
+          delayMs: Math.round(currentPostPlayDelay + syncLag),
+          targetKey: cue.targetKey
+        });
+      }
       cues.push({
         ...cue,
         delayMs: Math.max(cue.delayMs ?? 0, currentPostPlayDelay),
@@ -5584,6 +5603,10 @@ function clearAcceptedBattlecryAfterRender(): boolean {
     });
   }
   if (!canClearPendingBattlecry()) return false;
+  blog("battlecry committed preview handoff end", {
+    handInstanceId: activeBattlecryPreview()?.handInstanceId,
+    cardId: activeBattlecryPreview()?.cardId
+  });
   clearPendingBattlecry();
   return true;
 }
