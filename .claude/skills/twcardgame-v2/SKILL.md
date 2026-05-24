@@ -35,6 +35,12 @@ Also inspect the relevant package before editing:
 - New effect types need a domain handler under `packages/rules/src/effects/` registered in `effects/registry.ts`; an unregistered type throws at runtime.
 - PvE AI decisions live in `packages/rules/src/bot.ts` and must stay deterministic (seeded `BotRngState`). `BotRoom` only paces and submits the bot's commands — keep decision logic out of it.
 
+## Web Animation Lessons
+
+- Attack/death animations need the old DOM. `publicSync` can arrive before paired `events`, so give events a short grace window to enqueue cues and then hold sync while `attackAnimationBusy()` is true.
+- Keep attack timing constants and CSS keyframes in lockstep. If contact is 70% of `ATTACK_LUNGE_MS`, schedule damage numbers and attack SFX from that derived delay; delay `destroy` cues until the full lunge returns to origin.
+- For lethal or mutual-destruction animation bugs, add scoped logs for cue enqueue, DOM lookup, lunge start/abort/success, and publicSync flush/apply before changing behavior.
+
 ## Validation
 
 After meaningful changes, run the smallest relevant set:

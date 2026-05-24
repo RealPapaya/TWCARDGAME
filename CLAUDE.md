@@ -63,6 +63,12 @@ The client never mutates state; it sends `CommandEnvelope`s and renders synced s
 
 **AI / bot determinism.** The PvE opponent's decisions live in [packages/rules/src/bot.ts](packages/rules/src/bot.ts) (`decide`, fed by `legalMoves` in [legalMoves.ts](packages/rules/src/legalMoves.ts)) and obey the same purity rules as the rest of `packages/rules` — the bot is seeded from a `BotRngState` so a recorded command log replays identically. `BotRoom` is only the server-side adapter that paces and submits the bot's commands; it must not contain decision logic.
 
+## Web animation lessons
+
+- Attack animations depend on the pre-sync DOM. `publicSync` can arrive before the paired `events` message, so attack/death visuals must give events a short grace window to enqueue cues, then hold public sync while `attackAnimationBusy()` is true.
+- Keep attack timing constants and CSS keyframes coupled. If contact is at 70% of `ATTACK_LUNGE_MS`, schedule damage numbers and attack SFX at that derived impact delay; delay `destroy` cues and board removal until the full lunge has returned to origin.
+- For lethal or mutual-destruction bugs, instrument with scoped logs around cue enqueue, DOM lookup, lunge start/abort/success, and publicSync flush/apply before changing gameplay or animation logic.
+
 ## Workflow expectations
 
 The repo's own skills document the project workflow and coding style:
