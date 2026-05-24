@@ -976,6 +976,10 @@ input {
   pointer-events: none;
 }
 
+.minion.summon-preview {
+  pointer-events: none;
+}
+
 /* While aiming a target, cards must not hover-zoom as the arrow passes over. */
 .targeting-board .minion:hover {
   transform: none;

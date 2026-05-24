@@ -83,7 +83,22 @@ const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
-const ATTACK_ANIMATION_LOG_PREFIX = "[attack-animation]";
+
+const BATTLECRY_LOG = true;
+function blog(label: string, data?: Record<string, unknown>): void {
+  if (!BATTLECRY_LOG) return;
+  const t = performance.now().toFixed(1);
+  let payload = "";
+  if (data) {
+    try {
+      payload = " " + JSON.stringify(data);
+    } catch {
+      payload = " [unserializable]";
+    }
+  }
+  // eslint-disable-next-line no-console
+  console.log(`[battlecry +${t}ms] ${label}${payload}`);
+}
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
@@ -1379,7 +1394,9 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
  */
 function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" | "opponent"): string {
   const cells = board.map((minion, index) => renderMinion(seat, minion, index));
+  const summonPreviews = summonPreviewCuesForBoard(seat, board);
   const pending = activeBattlecryPreview();
+  let splicedPreview = false;
   if (
     pending?.isMinion &&
     pending.phase !== "landing" &&
@@ -1388,8 +1405,39 @@ function renderBoardContents(seat: Seat, board: PublicMinion[], role: "player" |
   ) {
     const slot = Math.max(0, Math.min(pending.boardIndex, cells.length));
     cells.splice(slot, 0, renderBattlecryPreview(pending.cardId));
+    splicedPreview = true;
+  }
+  for (const cue of summonPreviews) {
+    cells.push(renderSummonPreview(cue));
+  }
+  if (role === "player" && (pending || board.length > 0)) {
+    blog("renderBoardContents player", {
+      boardCount: board.length,
+      hasPending: Boolean(pending),
+      pendingPhase: pending?.phase,
+      replacementIdx: pending ? battlecryReplacementIndex(board, pending) : undefined,
+      splicedPreview,
+      summonPreviewIds: summonPreviews.map((cue) => cue.targetKey),
+      boardIds: board.map((m) => m.instanceId)
+    });
   }
   return cells.join("") || renderEmptySlots();
+}
+
+function summonPreviewCuesForBoard(seat: Seat, board: PublicMinion[]): AnimationCue[] {
+  const boardIds = new Set(board.map((minion) => minion.instanceId));
+  const battlecry = activeBattlecryPreview();
+  const seen = new Set<string>();
+  const cues: AnimationCue[] = [];
+  for (const cue of view.animationCues) {
+    if (cue.kind !== "summon" || cue.seat !== seat || !cue.targetKey || !cue.cardId || !cueIsReady(cue)) continue;
+    if (battlecry?.isMinion && battlecry.phase !== "landing" && seat === view.mySeat && cue.cardId === battlecry.cardId) continue;
+    if (boardIds.has(cue.targetKey) || seen.has(cue.targetKey)) continue;
+    seen.add(cue.targetKey);
+    cues.push(cue);
+  }
+  cues.reverse();
+  return cues;
 }
 
 /**
@@ -1409,6 +1457,44 @@ function renderBattlecryPreview(cardId: string): string {
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <small class="keyword-row"></small>
+      <div class="minion-stats">
+        <span class="stat-atk"><span>${card.attack ?? 0}</span></span>
+        <span class="stat-hp">${card.health ?? 0}</span>
+      </div>
+      <span class="sr-e2e"></span>
+    </button>
+  `;
+}
+
+function renderSummonPreview(cue: AnimationCue): string {
+  const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
+  if (!card || !cue.targetKey || !cue.seat) return "";
+  const target: TargetRef = { type: "MINION", side: cue.seat, instanceId: cue.targetKey };
+  const targetKey = targetKeyFor(target);
+  const classes = classNames([
+    "minion",
+    "summon-preview",
+    "summoning",
+    hasCue(targetKey, "damage") && "taking-damage",
+    hasCue(targetKey, "heal") && "receiving-heal",
+    hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "destroy") && "being-destroyed"
+  ]);
+  return `
+    <button
+      class="${classes}"
+      type="button"
+      tabindex="-1"
+      aria-hidden="true"
+      data-target='${targetAttr(target)}'
+      data-target-key="${escapeAttr(targetKey)}"
+      data-dom-key="summon-preview-${escapeAttr(cue.targetKey)}"
+      data-card-type="MINION"
+      data-seat="${cue.seat}"
+      data-testid="summon-preview"
+    >
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <strong class="card-title">${escapeHtml(card.name)}</strong>
       <div class="minion-stats">
         <span class="stat-atk"><span>${card.attack ?? 0}</span></span>
         <span class="stat-hp">${card.health ?? 0}</span>
@@ -3472,9 +3558,11 @@ function bindRoomMessages(joined: Room): void {
     render();
   });
   joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
+    blog("hand received", { ids: message.cards.map((card) => card.instanceId) });
     view.hand = message.cards;
     pruneSelections();
     render();
+    blog("hand render done");
     notePlayerHandSync(message.cards.map((card) => card.instanceId));
   });
   joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
@@ -3877,6 +3965,11 @@ let battlecryLandTimers: number[] = [];
 let battlecryLandEl: HTMLElement | null = null;
 let battlecryCommitPinEl: HTMLElement | null = null;
 let battlecryCommitPinTimer: number | undefined;
+// `performance.now()` of the most recent local battlecry landing animation
+// start. Used by `applyPostPlayEffectDelays` to keep the suppressed-play branch
+// gated symmetrically with the normal branch (effects wait until the local
+// overlay + dust have settled).
+let battlecryLocalLandingStartMs: number | undefined;
 
 /**
  * Stage 2 of a targeted-battlecry play (LEGACY v1 parity). A battlecry card is
@@ -3911,6 +4004,12 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
     phase: "landing"
   };
   view.acceptedBattlecry = undefined;
+  blog("set pending=landing", {
+    handInstanceId: card.instanceId,
+    cardId: card.cardId,
+    isMinion,
+    boardIndex
+  });
   render(); // hides the hand card while the card-play animation runs
 
   // Phase 1: the same card-play animation every card gets, then the arrow.
@@ -3918,6 +4017,7 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
     const pending = view.pendingBattlecry;
     if (!pending || pending.handInstanceId !== card.instanceId || pending.phase !== "landing") return;
     pending.phase = "aiming";
+    blog("phase landing→aiming", { handInstanceId: card.instanceId, cardId: card.cardId });
     render(); // the card is now on the field
     triggerBattlecryLandImpact(card.cardId); // board slam + dust, like any card
     showToast(isMinion ? "請選擇戰吼的目標！" : "請選擇目標！");
@@ -3946,6 +4046,7 @@ function playBattlecryLandAnimation(cardId: string, onLanded: () => void): void 
     onLanded();
     return;
   }
+  battlecryLocalLandingStartMs = performance.now();
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = "event-card-preview card from-player";
@@ -4010,6 +4111,13 @@ function commitBattlecry(targetEl: HTMLElement): void {
   pinBattlecryCommitPreview();
   pending.phase = "committed";
   view.acceptedBattlecry = { ...pending };
+  blog("phase aiming→committed; accepted=set", {
+    handInstanceId: pending.handInstanceId,
+    cardId: pending.cardId,
+    boardIndex: pending.boardIndex,
+    currentBoardIds: Array.from(readPlayer(view.mySeat ?? "player1")?.board ?? [])
+      .map((minion) => minion.instanceId)
+  });
   endBattlecryTargeting();
   renderNow();
   send({
@@ -4022,11 +4130,21 @@ function commitBattlecry(targetEl: HTMLElement): void {
 
 /** Silently tears down any pending battlecry — used on cancel and on teardown. */
 function clearPendingBattlecry(): void {
+  if (view.pendingBattlecry || view.acceptedBattlecry || battlecryLandEl || battlecryCommitPinEl) {
+    blog("clear pending+accepted; pin removed", {
+      hadPending: Boolean(view.pendingBattlecry),
+      hadAccepted: Boolean(view.acceptedBattlecry),
+      hadLandEl: Boolean(battlecryLandEl),
+      hadPin: Boolean(battlecryCommitPinEl),
+      caller: new Error().stack?.split("\n")[2]?.trim()
+    });
+  }
   endBattlecryTargeting();
   for (const timer of battlecryLandTimers) window.clearTimeout(timer);
   battlecryLandTimers = [];
   battlecryLandEl?.remove();
   battlecryLandEl = null;
+  battlecryLocalLandingStartMs = undefined;
   clearBattlecryCommitPin();
   view.pendingBattlecry = undefined;
   view.acceptedBattlecry = undefined;
@@ -4035,9 +4153,15 @@ function clearPendingBattlecry(): void {
 function pinBattlecryCommitPreview(): void {
   clearBattlecryCommitPin();
   const source = document.querySelector<HTMLElement>('[data-testid="battlecry-preview"]');
-  if (!source) return;
+  if (!source) {
+    blog("pin source missing");
+    return;
+  }
   const rect = source.getBoundingClientRect();
-  if (rect.width <= 0 || rect.height <= 0) return;
+  if (rect.width <= 0 || rect.height <= 0) {
+    blog("pin source has zero rect", { left: rect.left, top: rect.top, w: rect.width, h: rect.height });
+    return;
+  }
   const clone = source.cloneNode(true) as HTMLElement;
   clone.removeAttribute("data-testid");
   clone.removeAttribute("data-dom-key");
@@ -4056,12 +4180,16 @@ function pinBattlecryCommitPreview(): void {
   document.body.appendChild(clone);
   battlecryCommitPinEl = clone;
   battlecryCommitPinTimer = window.setTimeout(clearBattlecryCommitPin, 2500);
+  blog("pin attached", { left: rect.left, top: rect.top, w: rect.width, h: rect.height });
 }
 
 function clearBattlecryCommitPin(): void {
   if (battlecryCommitPinTimer !== undefined) {
     window.clearTimeout(battlecryCommitPinTimer);
     battlecryCommitPinTimer = undefined;
+  }
+  if (battlecryCommitPinEl) {
+    blog("pin removed");
   }
   battlecryCommitPinEl?.remove();
   battlecryCommitPinEl = null;
@@ -4832,23 +4960,6 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
   }, TURN_ANNOUNCEMENT_LOCK_MS);
 }
 
-function logAttackAnimation(event: string, data: Record<string, unknown> = {}): void {
-  try {
-    console.info(`${ATTACK_ANIMATION_LOG_PREFIX} ${event} ${JSON.stringify(data)}`);
-  } catch {
-    console.info(`${ATTACK_ANIMATION_LOG_PREFIX} ${event}`);
-  }
-}
-
-function rectLog(rect: DOMRect): Record<string, number> {
-  return {
-    left: Math.round(rect.left),
-    top: Math.round(rect.top),
-    width: Math.round(rect.width),
-    height: Math.round(rect.height)
-  };
-}
-
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
   maybeShowTurnAnnouncement(message);
@@ -4909,8 +5020,21 @@ function immediateAudioEvents(events: GameEvent[]): GameEvent[] {
 const cardPlayCueQueue: AnimationCue[] = [];
 let cardPlayCueActive = false;
 let cardPlayTimers: number[] = [];
+// Card play visual phases (relative to play-cue start):
+//   0–800ms   overlay entrance + hold
+//   800ms     `card-play-slam` class added
+//   1100ms    impactCardPlayLanding → board slam shake (480ms) + dust cloud (1000ms)
+//   1300ms    overlay element removed                  (CARD_PLAY_CUE_TOTAL_MS)
+//   1580ms    board slam shake ends                    (1100 + 480)
+//   2100ms    dust cloud removed                       (CARD_PLAY_FULL_MS)
 const CARD_PLAY_CUE_TOTAL_MS = 1300;
-const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_CUE_TOTAL_MS + 160;
+const CARD_PLAY_IMPACT_OFFSET_MS = 1100;
+const BOARD_LANDING_SETTLE_MS = 1000;
+const CARD_PLAY_FULL_MS = Math.max(
+  CARD_PLAY_CUE_TOTAL_MS,
+  CARD_PLAY_IMPACT_OFFSET_MS + BOARD_LANDING_SETTLE_MS
+);
+const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 
 // A locally-played battlecry card runs its own card-play animation, so the
@@ -4943,27 +5067,17 @@ function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): vo
   const attackBusy = attackAnimationBusy();
   const cardPlayBusy = cardPlayPreviewBusy();
   const holdRemaining = pendingPublicSyncHoldUntilMs - performance.now();
-  logAttackAnimation("publicSync flush attempt", {
-    hasPendingSync,
-    attackAnimationBusy: attackBusy,
-    cardPlayPreviewBusy: cardPlayBusy,
-    ignoreCardPlayBusy: Boolean(opts.ignoreCardPlayBusy),
-    holdRemainingMs: Math.max(0, Math.round(holdRemaining))
-  });
-  if (!hasPendingSync) {
-    logAttackAnimation("publicSync flush abort", { reason: "no pending publicSync" });
-    return;
-  }
+  if (!hasPendingSync) return;
   if (attackBusy) {
-    logAttackAnimation("publicSync flush abort", { reason: "attack animation busy" });
+    blog("flush skip", { reason: "attack-busy" });
     return;
   }
   if (!opts.ignoreCardPlayBusy && cardPlayBusy) {
-    logAttackAnimation("publicSync flush abort", { reason: "card play preview busy" });
+    blog("flush skip", { reason: "card-play-busy", queued: cardPlayCueQueue.length, active: cardPlayCueActive });
     return;
   }
   if (holdRemaining > 0) {
-    logAttackAnimation("publicSync flush delayed", { holdRemainingMs: Math.round(holdRemaining) });
+    blog("flush skip", { reason: "held", holdRemaining: Math.round(holdRemaining) });
     schedulePendingPublicSyncFlush(holdRemaining, opts);
     return;
   }
@@ -4979,13 +5093,24 @@ function applyPendingPublicSyncNow(): void {
     const message = pendingPublicSync;
     pendingPublicSync = undefined;
     pendingPublicSyncHoldUntilMs = 0;
-    logAttackAnimation("publicSync apply now", {
-      attackAnimationBusy: attackAnimationBusy(),
-      cardPlayPreviewBusy: cardPlayPreviewBusy()
+    const mySeat = view.mySeat ?? "player1";
+    const beforeBoardIds = Array.from(readPlayer(mySeat)?.board ?? []).map((m) => m.instanceId);
+    blog("flush start", {
+      hasPending: Boolean(view.pendingBattlecry),
+      hasAccepted: Boolean(view.acceptedBattlecry),
+      boardIdsBefore: beforeBoardIds
     });
     view.publicSync = message as typeof view.publicSync;
     renderNow();
-    if (clearAcceptedBattlecryAfterRender()) renderNow();
+    const cleared = clearAcceptedBattlecryAfterRender();
+    if (cleared) renderNow();
+    const afterBoardIds = Array.from(readPlayer(mySeat)?.board ?? []).map((m) => m.instanceId);
+    blog("flush done", {
+      hasPending: Boolean(view.pendingBattlecry),
+      hasAccepted: Boolean(view.acceptedBattlecry),
+      boardIdsAfter: afterBoardIds,
+      clearedAccepted: cleared
+    });
     const opponentSeat = view.mySeat ? otherSeat(view.mySeat) : undefined;
     const opponentHandCount = opponentSeat ? readPlayer(opponentSeat)?.handCount : undefined;
     if (typeof opponentHandCount === "number") noteOpponentHandSync(opponentHandCount);
@@ -4994,15 +5119,11 @@ function applyPendingPublicSyncNow(): void {
 
 function holdPendingPublicSyncFor(delayMs: number): void {
   pendingPublicSyncHoldUntilMs = Math.max(pendingPublicSyncHoldUntilMs, performance.now() + delayMs);
+  blog("hold publicSync", { delayMs: Math.round(delayMs) });
 }
 
 function schedulePendingPublicSyncFlush(delayMs: number, opts: { ignoreCardPlayBusy?: boolean } = {}): void {
   if (pendingPublicSyncFlushTimer !== undefined) window.clearTimeout(pendingPublicSyncFlushTimer);
-  logAttackAnimation("publicSync flush scheduled", {
-    delayMs: Math.max(0, Math.round(delayMs)),
-    ignoreCardPlayBusy: Boolean(opts.ignoreCardPlayBusy),
-    attackAnimationBusy: attackAnimationBusy()
-  });
   pendingPublicSyncFlushTimer = window.setTimeout(() => {
     pendingPublicSyncFlushTimer = undefined;
     flushPendingPublicSync(opts);
@@ -5012,6 +5133,7 @@ function schedulePendingPublicSyncFlush(delayMs: number, opts: { ignoreCardPlayB
 // Plays the landing SFX, shakes the board, and spawns V1-style smoke right
 // when the preview-card slam reaches the board.
 function impactCardPlayLanding(cue: AnimationCue, card: CardDefinition, previewEl: HTMLElement): void {
+  blog("impact", { cardId: cue.cardId, targetKey: cue.targetKey, seat: cue.seat });
   flushPendingPublicSync({ ignoreCardPlayBusy: true });
   window.requestAnimationFrame(() => {
     if (!document.body.contains(previewEl)) return;
@@ -5069,13 +5191,7 @@ function spawnBoardDust(anchor: HTMLElement, intensity = 1): void {
 // then the board update is held until that visible motion finishes.
 function applyPublicSync(message: typeof view.publicSync): void {
   pendingPublicSync = message;
-  logAttackAnimation("publicSync received", {
-    status: message?.status,
-    activeSeat: message?.activeSeat,
-    turnNumber: message?.turnNumber,
-    attackAnimationBusy: attackAnimationBusy(),
-    cardPlayPreviewBusy: cardPlayPreviewBusy()
-  });
+  blog("publicSync received; scheduled flush", { delayMs: PUBLIC_SYNC_EVENT_GRACE_MS });
   schedulePendingPublicSyncFlush(PUBLIC_SYNC_EVENT_GRACE_MS);
 }
 
@@ -5127,6 +5243,7 @@ function playNextCardPlayCue(): void {
     playNextCardPlayCue();
     return;
   }
+  blog("play cue start", { cardId: cue.cardId, seat: cue.seat });
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = `event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}`;
@@ -5143,6 +5260,7 @@ function playNextCardPlayCue(): void {
   }, 800));
   cardPlayTimers.push(window.setTimeout(() => {
     el.remove();
+    blog("play cue end", { cardId: cue.cardId, seat: cue.seat });
     playNextCardPlayCue();
   }, CARD_PLAY_CUE_TOTAL_MS));
 }
@@ -5158,6 +5276,7 @@ function consumeSuppressedPlayCue(cue: AnimationCue): boolean {
 }
 
 function enqueueEventCues(events: GameEvent[]): void {
+  blog("events received", { types: events.map((e) => e.type) });
   const rawCues = events
     .map((event, index) => eventToCue(event, events, index))
     .filter((cue): cue is AnimationCue => Boolean(cue));
@@ -5165,19 +5284,11 @@ function enqueueEventCues(events: GameEvent[]): void {
   // consumes local targeted-battlecry echoes that already animated before send.
   const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues));
   if (cues.length === 0) return;
+  blog("events cues", {
+    cues: cues.map((c) => ({ kind: c.kind, delayMs: c.delayMs, targetKey: c.targetKey, cardId: c.cardId }))
+  });
   view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
   for (const cue of cues) {
-    if (cue.kind === "attackerMoves") {
-      logAttackAnimation("attackerMoves cue enqueued", {
-        cueId: cue.id,
-        attackerInstanceId: cue.attackerInstanceId,
-        targetKey: cue.targetKey,
-        delayMs: cue.delayMs ?? 0,
-        readyAtMs: cue.readyAtMs,
-        pendingPublicSync: pendingPublicSync !== undefined,
-        publicSyncHoldRemainingMs: Math.max(0, Math.round(pendingPublicSyncHoldUntilMs - performance.now()))
-      });
-    }
     if (cue.kind === "play") enqueueCardPlayCue(cue);
     if ((cue.delayMs ?? 0) > 0) window.setTimeout(render, cue.delayMs);
     const lifetime =
@@ -5185,7 +5296,7 @@ function enqueueEventCues(events: GameEvent[]): void {
       : cue.kind === "attackerMoves" ? ATTACK_LUNGE_MS
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
       : cue.kind === "destroy" ? 700
-      : cue.kind === "summon" ? 700
+      : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
       : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
@@ -5198,18 +5309,26 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
   const cues: AnimationCue[] = [];
   let queuedPlaySlot = cardPlayCueQueue.length + (cardPlayCueActive ? 1 : 0);
   let currentPostPlayDelay = 0;
+  let currentSummonPreviewDelay = 0;
   let currentLandingTargetKey: string | undefined;
 
   for (const cue of rawCues) {
     if (cue.kind === "play") {
       // Targeted battlecries played locally already ran their card-play
-      // animation before the command was sent, so their effects can fire now.
+      // animation before the command was sent. Effects still need to wait until
+      // that local landing has fully settled (overlay removed AND dust cleared)
+      // so the battlecry doesn't fire mid-animation when the user clicks fast.
       if (consumeSuppressedPlayCue(cue)) {
-        currentPostPlayDelay = 0;
-        currentLandingTargetKey = undefined;
+        const settleAtMs = (battlecryLocalLandingStartMs ?? performance.now()) + CARD_PLAY_FULL_MS;
+        const remaining = Math.max(0, settleAtMs - performance.now());
+        currentPostPlayDelay = remaining;
+        currentSummonPreviewDelay = 0;
+        currentLandingTargetKey = cue.targetKey;
+        if (remaining > 0) holdPendingPublicSyncFor(remaining + POST_PLAY_STATE_SYNC_LAG_MS);
         continue;
       }
       currentPostPlayDelay = queuedPlaySlot * CARD_PLAY_CUE_TOTAL_MS + CARD_PLAY_EFFECT_DELAY_MS;
+      currentSummonPreviewDelay = queuedPlaySlot * CARD_PLAY_CUE_TOTAL_MS + CARD_PLAY_IMPACT_OFFSET_MS;
       currentLandingTargetKey = cue.targetKey;
       queuedPlaySlot += 1;
       cues.push(cue);
@@ -5217,6 +5336,14 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
     }
 
     const isLandingSummon = cue.kind === "summon" && cue.targetKey === currentLandingTargetKey;
+    if (isLandingSummon && currentSummonPreviewDelay > 0) {
+      cues.push({
+        ...cue,
+        delayMs: Math.max(cue.delayMs ?? 0, currentSummonPreviewDelay),
+        readyAtMs: performance.now() + currentSummonPreviewDelay
+      });
+      continue;
+    }
     if (currentPostPlayDelay > 0 && !isLandingSummon && isPostPlayEffectCue(cue)) {
       holdPendingPublicSyncFor(currentPostPlayDelay + POST_PLAY_STATE_SYNC_LAG_MS);
       cues.push({
@@ -5324,6 +5451,7 @@ function pruneSelections(): void {
   // Keep a committed battlecry preview until the synced board has a real
   // replacement minion that can adopt its DOM key.
   if (canClearPendingBattlecry(handIds)) {
+    blog("pruneSelections clearing battlecry");
     clearPendingBattlecry();
   }
   for (const id of view.rejectedHandIds) {
@@ -5354,6 +5482,19 @@ function activeBattlecryPreview(): BattlecryPreviewState | undefined {
 }
 
 function clearAcceptedBattlecryAfterRender(): boolean {
+  const pending = activeBattlecryPreview();
+  if (pending) {
+    const seat = view.mySeat ?? "player1";
+    const board = Array.from(readPlayer(seat)?.board ?? []);
+    const handIds = new Set(view.hand.map((card) => card.instanceId));
+    blog("clearAcceptedBattlecryAfterRender check", {
+      canClear: canClearPendingBattlecry(handIds),
+      phase: pending.phase,
+      handHasCard: handIds.has(pending.handInstanceId),
+      hasReplacement: hasBattlecryReplacement(board as PublicMinion[], pending),
+      boardIds: board.map((m) => (m as PublicMinion).instanceId)
+    });
+  }
   if (!canClearPendingBattlecry()) return false;
   clearPendingBattlecry();
   return true;
@@ -5552,53 +5693,12 @@ function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: num
 }
 
 function startAttackLunge(cue: AnimationCue): boolean {
-  logAttackAnimation("startAttackLunge called", {
-    cueId: cue.id,
-    kind: cue.kind,
-    attackerInstanceId: cue.attackerInstanceId,
-    targetKey: cue.targetKey,
-    alreadyApplied: appliedLunges.has(cue.id)
-  });
-  if (cue.kind !== "attackerMoves") {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "wrong cue kind", kind: cue.kind });
-    return false;
-  }
-  if (!cue.attackerInstanceId) {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing attackerInstanceId" });
-    return false;
-  }
-  if (!cue.targetKey) {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing targetKey" });
-    return false;
-  }
-  if (appliedLunges.has(cue.id)) {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "already applied" });
-    return false;
-  }
+  if (cue.kind !== "attackerMoves" || !cue.attackerInstanceId || !cue.targetKey || appliedLunges.has(cue.id)) return false;
   const attackerSelector = `[data-target-key="${cssEscape(cue.attackerInstanceId)}"]`;
   const targetSelector = `[data-target-key="${cssEscape(cue.targetKey)}"]`;
   const attacker = document.querySelector<HTMLElement>(attackerSelector);
   const target = document.querySelector<HTMLElement>(targetSelector);
-  logAttackAnimation("attacker DOM lookup", {
-    cueId: cue.id,
-    key: cue.attackerInstanceId,
-    selector: attackerSelector,
-    exists: Boolean(attacker)
-  });
-  logAttackAnimation("target DOM lookup", {
-    cueId: cue.id,
-    key: cue.targetKey,
-    selector: targetSelector,
-    exists: Boolean(target)
-  });
-  if (!attacker) {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing attacker DOM" });
-    return false;
-  }
-  if (!target) {
-    logAttackAnimation("startAttackLunge abort", { cueId: cue.id, reason: "missing target DOM" });
-    return false;
-  }
+  if (!attacker || !target) return false;
 
   const attackerRect = attacker.getBoundingClientRect();
   const targetRect = target.getBoundingClientRect();
@@ -5606,25 +5706,11 @@ function startAttackLunge(cue: AnimationCue): boolean {
 
   appliedLunges.add(cue.id);
   activeAttackLunges.set(cue.attackerInstanceId, { dx, dy });
-  logAttackAnimation("startAttackLunge success", {
-    cueId: cue.id,
-    attackerInstanceId: cue.attackerInstanceId,
-    targetKey: cue.targetKey,
-    attackerRect: rectLog(attackerRect),
-    targetRect: rectLog(targetRect),
-    dx,
-    dy
-  });
   render();
 
   window.setTimeout(() => {
     activeAttackLunges.delete(cue.attackerInstanceId!);
     appliedLunges.delete(cue.id);
-    logAttackAnimation("startAttackLunge complete", {
-      cueId: cue.id,
-      attackerInstanceId: cue.attackerInstanceId,
-      attackAnimationBusy: attackAnimationBusy()
-    });
     flushPendingPublicSync();
     render();
   }, ATTACK_LUNGE_MS);
@@ -5695,12 +5781,6 @@ function applyPostRenderEffects(): void {
       const anchorKey = node.dataset.anchorKey ?? "";
       const selector = `[data-target-key="${cssEscape(anchorKey)}"]`;
       const target = document.querySelector<HTMLElement>(selector);
-      logAttackAnimation("event-layer target DOM lookup", {
-        cueId: node.dataset.cueId,
-        key: anchorKey,
-        selector,
-        exists: Boolean(target)
-      });
       if (!target) continue;
       const r = target.getBoundingClientRect();
       const x = r.left + r.width / 2 - surfaceRect.left;
