@@ -182,7 +182,7 @@
 
 .menu-icon-btn:nth-child(1):hover:not(:disabled) {
   background-color: #ede0d4;
-  transform: rotate(20deg) scale(1.1);
+  transform: scale(1.1);
   border-color: #8b4513;
   filter: drop-shadow(8px 10px 0px #3d1e0f);
 }
@@ -227,7 +227,7 @@
 .menu-icon-btn:nth-child(3):hover:not(:disabled),
 .menu-icon-btn:nth-child(4):hover:not(:disabled) {
   background-color: #ede0d4;
-  transform: rotate(20deg) scale(1.1);
+  transform: scale(1.1);
   border-color: #8b4513;
   filter: drop-shadow(8px 10px 0px #3d1e0f);
 }
@@ -296,7 +296,7 @@
 }
 
 .menu-corner-btn:hover:not(:disabled) {
-  transform: scale(1.1) rotate(5deg);
+  transform: scale(1.1);
   background: linear-gradient(to bottom, #fff0c8, #f4e4bc);
   box-shadow:
     0 12px 30px rgba(212, 175, 55, 0.6),
@@ -305,7 +305,7 @@
 }
 
 .menu-corner-btn:nth-child(1):hover:not(:disabled) {
-  transform: scale(1.1) rotate(-5deg);
+  transform: scale(1.1);
 }
 
 .menu-corner-btn:active:not(:disabled) {

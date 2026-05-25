@@ -3022,7 +3022,7 @@ function renderShopScreen(): string {
 function renderShopItem(item: ShopItemRow): string {
   const cardIds = item.contents?.cards ?? [];
   const cards = cardIds.map((id) => cardCatalog.get(id)).filter(Boolean) as CardDefinition[];
-  const icon = item.kind === "CARD_PACK" ? "📖" : "✨";
+  const icon = shopItemIcon(item.kind);
 
   const ratesHtml = cards.length > 0 ? `
     <div class="product-rates-side">
@@ -3058,6 +3058,16 @@ function renderShopItem(item: ShopItemRow): string {
       </div>
     </section>
   `;
+}
+
+function shopItemIcon(kind: string): string {
+  if (kind === "CARD_PACK") {
+    return `<img src="/images/ui/Carddeck.webp" alt="卡牌包" onerror="this.style.display='none';this.parentElement.textContent='🎴'">`;
+  }
+  if (kind === "COSMETIC_PACK") {
+    return `<img src="/images/ui/accessory.webp" alt="炫彩包" onerror="this.style.display='none';this.parentElement.textContent='✨'">`;
+  }
+  return `<span aria-hidden="true">✨</span>`;
 }
 
 
@@ -3137,9 +3147,7 @@ function renderLegacyShopScreen(): string {
 function renderLegacyShopItem(item: ShopItemRow): string {
   const isCardPack = item.kind === "CARD_PACK";
   const affordable = (view.profile?.gold ?? 0) >= item.price_gold;
-  const icon = isCardPack
-    ? `<img src="/images/card_pack_book.webp" alt="卡牌包" onerror="this.style.display='none';this.parentElement.textContent='🎴'">`
-    : `<span aria-hidden="true">✨</span>`;
+  const icon = shopItemIcon(item.kind);
   const rates = item.contents?.dropRates ?? legacyShopDropRates(item.kind);
   const ratesHtml = rates.length > 0 ? `
     <div class="product-rates-side">
