@@ -3522,11 +3522,12 @@ async function startTrainingMatch(): Promise<void> {
       ? {
           displayName: view.profile?.display_name,
           accessToken: view.session?.access_token,
-          deckId: view.selectedDeckId,
+          ...selectedDeckJoinOptions(),
           difficulty: "easy"
         }
       : {
           displayName: view.profile?.display_name ?? "Player",
+          ...selectedDeckJoinOptions(),
           difficulty: "easy"
         };
     const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
@@ -3537,6 +3538,14 @@ async function startTrainingMatch(): Promise<void> {
     view.joining = false;
     render();
   }
+}
+
+function selectedDeckJoinOptions(): { deckId?: string; deckIds?: string[] } {
+  const selectedDeck = view.selectedDeckId ? view.decks.find((deck) => deck.id === view.selectedDeckId) : undefined;
+  return {
+    ...(view.selectedDeckId ? { deckId: view.selectedDeckId } : {}),
+    ...(selectedDeck?.card_ids.length === 30 ? { deckIds: [...selectedDeck.card_ids] } : {})
+  };
 }
 
 async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void> {
@@ -3556,12 +3565,13 @@ async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void
       ? {
           displayName: view.profile?.display_name,
           accessToken: view.session?.access_token,
-          deckId: view.selectedDeckId,
+          ...selectedDeckJoinOptions(),
           difficulty: view.aiDifficulty,
           ...(withTheme ? { theme: view.aiTheme } : {})
         }
       : {
           displayName: view.profile?.display_name ?? "Player",
+          ...selectedDeckJoinOptions(),
           difficulty: view.aiDifficulty,
           ...(withTheme ? { theme: view.aiTheme } : {})
         };
@@ -3589,10 +3599,10 @@ async function createPrivateChallenge(): Promise<void> {
       ? {
           displayName: view.profile?.display_name,
           accessToken: view.session?.access_token,
-          deckId: view.selectedDeckId,
+          ...selectedDeckJoinOptions(),
           private: true
         }
-      : { displayName: view.profile?.display_name ?? "Player", private: true };
+      : { displayName: view.profile?.display_name ?? "Player", ...selectedDeckJoinOptions(), private: true };
     const room = await client.create("pvp", joinOptions, GameStateSchema);
     bindRoomMessages(room);
     room.onMessage("joinCode", (message: { code: string }) => {
@@ -3629,10 +3639,10 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
       ? {
           displayName: view.profile?.display_name,
           accessToken: view.session?.access_token,
-          deckId: view.selectedDeckId,
+          ...selectedDeckJoinOptions(),
           joinCode: code
         }
-      : { displayName: view.profile?.display_name ?? "Player", joinCode: code };
+      : { displayName: view.profile?.display_name ?? "Player", ...selectedDeckJoinOptions(), joinCode: code };
     const room = await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
     bindRoomMessages(room);
   } catch (error) {
@@ -4396,9 +4406,9 @@ async function joinRoom(event: Event): Promise<void> {
       ? {
           displayName: view.profile?.display_name ?? displayName,
           accessToken: view.session?.access_token,
-          deckId: view.selectedDeckId
+          ...selectedDeckJoinOptions()
         }
-      : { displayName };
+      : { displayName, ...selectedDeckJoinOptions() };
     const joined: Room = reconnectToken
       ? await (client as any).reconnect(reconnectToken, GameStateSchema)
       : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
@@ -5882,6 +5892,13 @@ const activeAttackLunges = new Map<string, { dx: number; dy: number }>();
 function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect, targetIsHero = false): { dx: number; dy: number } {
   const rawDx = targetRect.left + targetRect.width / 2 - (attackerRect.left + attackerRect.width / 2);
   const rawDy = targetRect.top + targetRect.height / 2 - (attackerRect.top + attackerRect.height / 2);
+  if (targetIsHero) {
+    return {
+      dx: Math.round(rawDx),
+      dy: Math.round(rawDy)
+    };
+  }
+
   const distance = Math.hypot(rawDx, rawDy);
   if (distance <= 0) return { dx: 0, dy: 0 };
 
@@ -5889,9 +5906,7 @@ function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect, targetIsHe
   const uy = rawDy / distance;
   const attackerEdge = Math.abs(ux) * attackerRect.width / 2 + Math.abs(uy) * attackerRect.height / 2;
   const targetEdge = Math.abs(ux) * targetRect.width / 2 + Math.abs(uy) * targetRect.height / 2;
-  const contactOverlap = targetIsHero
-    ? Math.min(attackerEdge + targetEdge * 0.9, Math.max(72, targetEdge + attackerEdge * 0.58))
-    : Math.min(targetEdge * 0.72, Math.max(24, attackerEdge * 0.45));
+  const contactOverlap = Math.min(targetEdge * 0.72, Math.max(24, attackerEdge * 0.45));
   const travel = Math.max(0, distance - attackerEdge - targetEdge + contactOverlap);
 
   return {
