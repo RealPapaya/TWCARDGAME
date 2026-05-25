@@ -332,3 +332,15 @@ export function assertDeckOwnership(deck: Pick<DeckRow, "id" | "user_id"> | null
   if (!deck) throw new Error("Deck not found.");
   if (deck.user_id !== userId) throw new Error(`Deck ${deck.id} does not belong to user ${userId}.`);
 }
+
+/**
+ * Grants the starter card collection (20 types × 2 copies) and creates a
+ * ready-to-play 30-card starter deck for the calling user if they don't have
+ * one yet. Mirrors the legacy generateStarterCollection() from auth_manager.js.
+ * Useful as a backfill for accounts created before migration 0011.
+ */
+export async function ensureStarterCollection(client: SupabaseClient): Promise<number> {
+  const { data, error } = await client.rpc("ensure_starter_collection");
+  if (error) throw error;
+  return data as number;
+}
