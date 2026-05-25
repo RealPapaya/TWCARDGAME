@@ -10,6 +10,7 @@ RUN npm ci
 
 FROM deps AS build
 COPY tsconfig*.json ./
+COPY LEGACY/assets LEGACY/assets
 COPY apps apps
 COPY packages packages
 RUN npm run build
