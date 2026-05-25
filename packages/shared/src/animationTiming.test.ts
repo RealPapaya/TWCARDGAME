@@ -13,10 +13,16 @@ describe("estimateEventAnimationMs", () => {
     expect(estimateEventAnimationMs([])).toBe(0);
   });
 
-  it("returns 0 for non-visual events only (CARD_DRAWN, AURA_UPDATED, TURN_STARTED)", () => {
+  it("returns 0 for non-visual events only (AURA_UPDATED, TURN_STARTED)", () => {
     expect(
-      estimateEventAnimationMs([ev("CARD_DRAWN"), ev("AURA_UPDATED"), ev("TURN_STARTED")])
+      estimateEventAnimationMs([ev("AURA_UPDATED"), ev("TURN_STARTED")])
     ).toBe(0);
+  });
+
+  it("CARD_DRAWN queues multiple draw flights one by one", () => {
+    expect(estimateEventAnimationMs([ev("CARD_DRAWN"), ev("CARD_DRAWN")])).toBe(
+      C.DRAW_ANIMATION_MS * 2
+    );
   });
 
   it("CARD_PLAYED reserves a full card-play slot tail", () => {
@@ -32,6 +38,23 @@ describe("estimateEventAnimationMs", () => {
   it("CARD_PLAYED + DAMAGE (single-target battlecry) absorbs damage into play tail", () => {
     const tail = estimateEventAnimationMs([ev("CARD_PLAYED"), ev("DAMAGE")]);
     expect(tail).toBe(C.CARD_PLAY_EFFECT_DELAY_MS + C.POST_PLAY_STATE_SYNC_LAG_MS);
+  });
+
+  it("CARD_PLAYED + CARD_DRAWN waits for the play effect point before drawing", () => {
+    const tail = estimateEventAnimationMs([ev("CARD_PLAYED"), ev("CARD_DRAWN")]);
+    expect(tail).toBe(C.CARD_PLAY_EFFECT_DELAY_MS + C.DRAW_ANIMATION_MS);
+  });
+
+  it("CARD_PLAYED + DISCARD + two draws waits for discard body before queued draws", () => {
+    const tail = estimateEventAnimationMs([
+      ev("CARD_PLAYED"),
+      ev("DISCARD"),
+      ev("CARD_DRAWN"),
+      ev("CARD_DRAWN")
+    ]);
+    expect(tail).toBe(
+      C.CARD_PLAY_EFFECT_DELAY_MS + C.DISCARD_CARD_BODY_MS + C.DRAW_ANIMATION_MS * 2
+    );
   });
 
   it("CARD_PLAYED + DESTROY (mass-destroy battlecry) extends to destroy sync lag", () => {

@@ -51,7 +51,7 @@ import {
   notePlayerHandSync,
   resetDrawTracking
 } from "./app/draw-animation.js";
-import { playDiscardAnimations } from "./app/discard-animation.js";
+import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
 import { cssEscape } from "./app/dom.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
@@ -5026,10 +5026,11 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
   maybeShowTurnAnnouncement(message);
+  const handGate = scheduleHandEventGates(message);
   const cues = enqueueEventCues(message);
   scheduleCueAudio(cues, message);
   playEventAudio(immediateAudioEvents(message));
-  playDiscardAnimations(message, view.mySeat);
+  playDiscardAnimations(message, view.mySeat, { delayMs: handGate.discardDelayMs });
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
@@ -5050,6 +5051,68 @@ function handleEvents(message: GameEvent[]): void {
     view.eventStatus = "in_progress";
   }
   render();
+}
+
+function scheduleHandEventGates(events: GameEvent[]): { discardDelayMs: number } {
+  let queuedPlaySlot = cardPlayCueQueue.length + (cardPlayCueActive ? 1 : 0);
+  let currentPostPlayDelay = 0;
+  let discardDelayMs = 0;
+  let publicHandHoldMs = 0;
+  let localHandHoldMs = 0;
+  const localPreserveCardIds: string[] = [];
+  const localOmitHandIds: string[] = [];
+
+  for (const event of events) {
+    const payload = event.payload ?? {};
+    if (event.type === "CARD_PLAYED") {
+      currentPostPlayDelay = postPlayDelayForEvent(event, queuedPlaySlot);
+      if (!willSuppressPlayCue(event)) queuedPlaySlot += 1;
+      const handInstanceId = typeof payload.handInstanceId === "string" ? payload.handInstanceId : undefined;
+      if (handInstanceId && event.seat === view.mySeat) localOmitHandIds.push(handInstanceId);
+      continue;
+    }
+
+    if (event.type === "DISCARD") {
+      const delayMs = currentPostPlayDelay > 0 ? currentPostPlayDelay : 0;
+      discardDelayMs = Math.max(discardDelayMs, delayMs);
+      publicHandHoldMs = Math.max(publicHandHoldMs, delayMs + DISCARD_CARD_BODY_MS);
+      if (event.seat === view.mySeat) {
+        localHandHoldMs = Math.max(localHandHoldMs, delayMs + DISCARD_CARD_BODY_MS);
+        const cardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
+        if (cardId) localPreserveCardIds.push(cardId);
+      }
+      continue;
+    }
+
+    if (event.type === "CARD_DRAWN" && typeof payload.cardId === "string") {
+      const drawReadyMs = Math.max(currentPostPlayDelay, publicHandHoldMs);
+      publicHandHoldMs = Math.max(publicHandHoldMs, drawReadyMs);
+      if (event.seat === view.mySeat) localHandHoldMs = Math.max(localHandHoldMs, drawReadyMs);
+    }
+  }
+
+  if (publicHandHoldMs > 0) holdPendingPublicSyncFor(publicHandHoldMs);
+  if (localHandHoldMs > 0) {
+    holdPlayerHandSyncFor(localHandHoldMs, {
+      preserveMissingCardIds: localPreserveCardIds,
+      omitHandIds: localOmitHandIds
+    });
+  }
+  return { discardDelayMs };
+}
+
+function postPlayDelayForEvent(event: GameEvent, queuedPlaySlot: number): number {
+  if (willSuppressPlayCue(event)) {
+    const settleAtMs = (battlecryLocalLandingStartMs ?? performance.now()) + CARD_PLAY_FULL_MS;
+    return Math.max(0, settleAtMs - performance.now());
+  }
+  return queuedPlaySlot * CARD_PLAY_CUE_TOTAL_MS + CARD_PLAY_EFFECT_DELAY_MS;
+}
+
+function willSuppressPlayCue(event: GameEvent): boolean {
+  if (event.type !== "CARD_PLAYED") return false;
+  const cardId = typeof event.payload?.cardId === "string" ? event.payload.cardId : undefined;
+  return Boolean(cardId && suppressedPlayCues.some((entry) => entry.seat === event.seat && entry.cardId === cardId));
 }
 
 function immediateAudioEvents(events: GameEvent[]): GameEvent[] {
@@ -5162,6 +5225,9 @@ let pendingPublicSyncFlushTimer: number | undefined;
 let pendingHandSync: { cards: HandCardView[]; suppressDrawIds: string[] } | undefined;
 let pendingHandSyncHoldUntilMs = 0;
 let pendingHandSyncFlushTimer: number | undefined;
+let pendingHandSyncSuppressNewIds = false;
+let pendingHandSyncPreserveCardIds: string[] = [];
+let pendingHandSyncOmitIds = new Set<string>();
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
@@ -5252,16 +5318,25 @@ function handleHandSync(cards: HandCardView[]): void {
     flushPendingHandSync();
     holdRemaining = pendingHandSyncHoldUntilMs - performance.now();
   }
+  if (!pendingHandSync && holdRemaining <= 0 && pendingHandSyncHoldUntilMs > 0) {
+    clearPendingHandSyncHold();
+  }
 
   const currentIds = new Set(view.hand.map((card) => card.instanceId));
   const addedIds = ids.filter((id) => !currentIds.has(id));
-  if (holdRemaining > 0 && addedIds.length > 0) {
-    pendingHandSync = { cards, suppressDrawIds: addedIds };
+  const changed = ids.length !== view.hand.length || ids.some((id, index) => id !== view.hand[index]?.instanceId);
+  if (holdRemaining > 0 && changed) {
+    pendingHandSync = {
+      cards,
+      suppressDrawIds: pendingHandSyncSuppressNewIds ? addedIds : []
+    };
     schedulePendingHandSyncFlush(holdRemaining);
-    const visibleCards = cards.filter((card) => currentIds.has(card.instanceId));
+    const visibleCards = heldHandView(cards);
     blog("hand sync held", {
       holdRemaining: Math.round(holdRemaining),
-      withheldIds: addedIds
+      withheldIds: addedIds,
+      suppressDrawIds: pendingHandSync.suppressDrawIds,
+      preserveCardIds: pendingHandSyncPreserveCardIds
     });
     applyHandSyncNow(visibleCards);
     return;
@@ -5279,12 +5354,43 @@ function applyHandSyncNow(cards: HandCardView[], suppressDrawIds: readonly strin
   notePlayerHandSync(cards.map((card) => card.instanceId), { suppressNewIds: suppressDrawIds });
 }
 
-function holdPlayerHandSyncFor(delayMs: number): void {
+function holdPlayerHandSyncFor(
+  delayMs: number,
+  opts: { suppressNewIds?: boolean; preserveMissingCardIds?: readonly string[]; omitHandIds?: readonly string[] } = {}
+): void {
   pendingHandSyncHoldUntilMs = Math.max(pendingHandSyncHoldUntilMs, performance.now() + delayMs);
-  blog("hold hand sync", { delayMs: Math.round(delayMs) });
+  pendingHandSyncSuppressNewIds = pendingHandSyncSuppressNewIds || Boolean(opts.suppressNewIds);
+  pendingHandSyncPreserveCardIds = [
+    ...pendingHandSyncPreserveCardIds,
+    ...(opts.preserveMissingCardIds ?? [])
+  ];
+  for (const id of opts.omitHandIds ?? []) pendingHandSyncOmitIds.add(id);
+  blog("hold hand sync", {
+    delayMs: Math.round(delayMs),
+    suppressNewIds: pendingHandSyncSuppressNewIds,
+    preserveCardIds: pendingHandSyncPreserveCardIds
+  });
   if (pendingHandSync) {
     schedulePendingHandSyncFlush(pendingHandSyncHoldUntilMs - performance.now());
   }
+}
+
+function heldHandView(finalCards: HandCardView[]): HandCardView[] {
+  const finalIds = new Set(finalCards.map((card) => card.instanceId));
+  const preserveCounts = countCards(pendingHandSyncPreserveCardIds);
+  const visible: HandCardView[] = [];
+  for (const card of view.hand) {
+    if (pendingHandSyncOmitIds.has(card.instanceId)) continue;
+    if (finalIds.has(card.instanceId)) {
+      visible.push(card);
+      continue;
+    }
+    const remaining = preserveCounts.get(card.cardId) ?? 0;
+    if (remaining <= 0) continue;
+    preserveCounts.set(card.cardId, remaining - 1);
+    visible.push(card);
+  }
+  return visible;
 }
 
 function schedulePendingHandSyncFlush(delayMs: number): void {
@@ -5305,6 +5411,9 @@ function flushPendingHandSync(): void {
   const sync = pendingHandSync;
   pendingHandSync = undefined;
   pendingHandSyncHoldUntilMs = 0;
+  pendingHandSyncSuppressNewIds = false;
+  pendingHandSyncPreserveCardIds = [];
+  pendingHandSyncOmitIds.clear();
   blog("hand sync release", { ids: sync.cards.map((card) => card.instanceId), suppressedDrawIds: sync.suppressDrawIds });
   applyHandSyncNow(sync.cards, sync.suppressDrawIds);
 }
@@ -5312,6 +5421,9 @@ function flushPendingHandSync(): void {
 function clearPendingHandSyncHold(): void {
   pendingHandSync = undefined;
   pendingHandSyncHoldUntilMs = 0;
+  pendingHandSyncSuppressNewIds = false;
+  pendingHandSyncPreserveCardIds = [];
+  pendingHandSyncOmitIds.clear();
   if (pendingHandSyncFlushTimer !== undefined) {
     window.clearTimeout(pendingHandSyncFlushTimer);
     pendingHandSyncFlushTimer = undefined;
@@ -5545,7 +5657,7 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
         : cue.kind === "destroy" ? DESTROY_EFFECT_SYNC_LAG_MS
         : POST_PLAY_STATE_SYNC_LAG_MS;
       holdPendingPublicSyncFor(currentPostPlayDelay + syncLag);
-      if (cue.kind === "bounce") holdPlayerHandSyncFor(currentPostPlayDelay + syncLag);
+      if (cue.kind === "bounce") holdPlayerHandSyncFor(currentPostPlayDelay + syncLag, { suppressNewIds: true });
       if (cue.kind === "destroy") {
         blog("hold publicSync for destroy visual", {
           delayMs: Math.round(currentPostPlayDelay + syncLag),
@@ -5591,7 +5703,7 @@ function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
       const effectDelayMs = Math.max(cue.delayMs ?? 0, delayMs);
       if (cue.kind === "bounce") {
         holdPendingPublicSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
-        holdPlayerHandSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
+        holdPlayerHandSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS, { suppressNewIds: true });
       }
       cues.push({
         ...cue,

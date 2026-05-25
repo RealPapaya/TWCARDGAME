@@ -16,9 +16,20 @@ const PARTICLE_COUNT = 80;
 const PARTICLE_COLORS = ["#a335ee", "#444444", "#888888", "#ffffff"];
 const PARTICLE_LIFETIME_MS = 2100;
 const CLONE_LIFETIME_MS = 1500;
+export const DISCARD_CARD_BODY_MS = CLONE_LIFETIME_MS;
 
 /** Disintegrates the hand card behind each `DISCARD` event in `events`. */
-export function playDiscardAnimations(events: GameEvent[], mySeat: Seat | undefined): void {
+export function playDiscardAnimations(
+  events: GameEvent[],
+  mySeat: Seat | undefined,
+  opts: { delayMs?: number } = {}
+): void {
+  const delayMs = Math.max(0, opts.delayMs ?? 0);
+  if (delayMs > 0) {
+    window.setTimeout(() => playDiscardAnimations(events, mySeat), delayMs);
+    return;
+  }
+
   for (const event of events) {
     if (event.type !== "DISCARD") continue;
     const payload = event.payload ?? {};

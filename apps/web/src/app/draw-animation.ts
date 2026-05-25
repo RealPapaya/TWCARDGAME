@@ -20,6 +20,7 @@ type Side = "player" | "opponent";
 const FLIGHT_MS = 850;
 const FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
 const FAIL_SAFE_MS = 1400;
+export const DRAW_ANIMATION_MS = FAIL_SAFE_MS;
 
 // `instanceId` for the previous local hand sync, in slot order. The first sync
 // of a match seeds this (no animation for the opening hand).
@@ -29,12 +30,18 @@ let prevOpponentHandCount: number | undefined;
 
 // Local hand cards currently mid-flight; their real elements stay hidden.
 const animatingHandIds = new Set<string>();
+const drawQueue: Array<{ side: Side; slotIndex: number; handId?: string }> = [];
+let drawQueueActive = false;
+let drawQueueGeneration = 0;
 
 /** Clears all draw tracking. Call on match start/teardown. */
 export function resetDrawTracking(): void {
   prevPlayerHandIds = undefined;
   prevOpponentHandCount = undefined;
   animatingHandIds.clear();
+  drawQueue.length = 0;
+  drawQueueActive = false;
+  drawQueueGeneration += 1;
 }
 
 /** True while a drawn local hand card is still flying — used by renderHandCard. */
@@ -58,7 +65,7 @@ export function notePlayerHandSync(handIds: string[], opts: { suppressNewIds?: r
     const id = handIds[slot];
     if (prevSet.has(id) || suppressed.has(id)) continue;
     animatingHandIds.add(id);
-    animateCardFromDeck("player", slot, id);
+    enqueueDrawAnimation("player", slot, id);
   }
 }
 
@@ -75,8 +82,27 @@ export function noteOpponentHandSync(handCount: number): void {
   if (drawn <= 0 || drawn > 15) return; // ignore shrink / implausible jumps
   for (let i = 0; i < drawn; i += 1) {
     // New opponent cards land at the end of the fan.
-    animateCardFromDeck("opponent", handCount - drawn + i);
+    enqueueDrawAnimation("opponent", handCount - drawn + i);
   }
+}
+
+function enqueueDrawAnimation(side: Side, slotIndex: number, handId?: string): void {
+  drawQueue.push({ side, slotIndex, handId });
+  if (!drawQueueActive) playNextDrawAnimation();
+}
+
+function playNextDrawAnimation(): void {
+  const next = drawQueue.shift();
+  if (!next) {
+    drawQueueActive = false;
+    return;
+  }
+  drawQueueActive = true;
+  const generation = drawQueueGeneration;
+  animateCardFromDeck(next.side, next.slotIndex, next.handId, () => {
+    if (generation !== drawQueueGeneration) return;
+    playNextDrawAnimation();
+  });
 }
 
 /**
@@ -84,7 +110,14 @@ export function noteOpponentHandSync(handCount: number): void {
  * LEGACY `animateCardFromDeck`. `handId` is set for the local player so the
  * real card can be re-found after a re-render; omitted for the opponent.
  */
-function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): void {
+function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onDone?: () => void): void {
+  let doneCalled = false;
+  const done = (): void => {
+    if (doneCalled) return;
+    doneCalled = true;
+    onDone?.();
+  };
+
   playSfx("cardDraw");
 
   // Wait two frames so the freshly rendered hand has stable coordinates
@@ -98,6 +131,7 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): vo
       const targetEl = resolveSlotElement(side, slotIndex, handId);
       if (!deckEl || !targetEl) {
         if (handId) animatingHandIds.delete(handId);
+        done();
         return;
       }
 
@@ -111,6 +145,7 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): vo
         (deckRect.left === 0 && deckRect.top === 0)
       ) {
         if (handId) animatingHandIds.delete(handId);
+        done();
         return;
       }
 
@@ -163,6 +198,7 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string): vo
           );
           if (real) real.style.opacity = "";
         }
+        done();
       };
       const onEnd = (event: TransitionEvent): void => {
         if (event.propertyName === "transform") cleanup();

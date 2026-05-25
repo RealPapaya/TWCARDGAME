@@ -13,6 +13,8 @@ export const ANIMATION_COSTS = {
   POST_PLAY_STATE_SYNC_LAG_MS: 180,
   BOUNCE_EFFECT_SYNC_LAG_MS: 650,
   DESTROY_EFFECT_SYNC_LAG_MS: 820,
+  DRAW_ANIMATION_MS: 1400,
+  DISCARD_CARD_BODY_MS: 1500,
   ATTACK_LUNGE_MS: 800,
   POST_ATTACK_STATE_SYNC_LAG_MS: 120,
   STANDALONE_EFFECT_MS: 1150,
@@ -28,6 +30,8 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
   let total = 0;
   let playSlots = 0;
   let currentPostPlayDelay = 0;
+  let latestDiscardBodyEnd = 0;
+  let latestDrawEnd = 0;
   let inAttack = false;
 
   for (const event of events) {
@@ -36,6 +40,8 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
         const postPlayDelay =
           playSlots * C.CARD_PLAY_CUE_TOTAL_MS + C.CARD_PLAY_EFFECT_DELAY_MS;
         currentPostPlayDelay = postPlayDelay;
+        latestDiscardBodyEnd = 0;
+        latestDrawEnd = 0;
         const tail = postPlayDelay + C.POST_PLAY_STATE_SYNC_LAG_MS;
         if (tail > total) total = tail;
         playSlots += 1;
@@ -55,7 +61,23 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
       case "ATTACK": {
         inAttack = true;
         currentPostPlayDelay = 0;
+        latestDiscardBodyEnd = 0;
+        latestDrawEnd = 0;
         const tail = C.ATTACK_LUNGE_MS + C.POST_ATTACK_STATE_SYNC_LAG_MS;
+        if (tail > total) total = tail;
+        break;
+      }
+      case "DISCARD": {
+        const start = currentPostPlayDelay > 0 ? currentPostPlayDelay : 0;
+        const tail = start + C.DISCARD_CARD_BODY_MS;
+        latestDiscardBodyEnd = Math.max(latestDiscardBodyEnd, tail);
+        if (tail > total) total = tail;
+        break;
+      }
+      case "CARD_DRAWN": {
+        const start = Math.max(currentPostPlayDelay, latestDiscardBodyEnd, latestDrawEnd);
+        const tail = start + C.DRAW_ANIMATION_MS;
+        latestDrawEnd = tail;
         if (tail > total) total = tail;
         break;
       }
