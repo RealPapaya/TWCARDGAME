@@ -1897,6 +1897,7 @@ function ensureFallbackRewardSummary(status: GameStatus | ""): void {
       result: won ? "win" : "loss",
       mode: "pvp",
       source: "none",
+      diagnostic: "missing_reward_summary",
       aiTheme: null,
       aiDifficulty: null,
       xp: { before: view.profile?.xp ?? 0, after: view.profile?.xp ?? 0, gained: 0 },
@@ -3762,6 +3763,9 @@ function bindRoomMessages(joined: Room): void {
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
   });
+  joined.onMessage("error", (message: { message?: string }) => {
+    showAlert(message?.message ?? "Room error.");
+  });
   joined.onMessage("reward_summary", (message: RewardSummary) => {
     view.rewardSummary = message;
     // Keep local profile in sync with the server-confirmed deltas so reopening
@@ -4538,6 +4542,9 @@ async function joinRoom(event: Event): Promise<void> {
     );
     joined.onMessage("events", (message: GameEvent[]) => {
       handleEvents(message);
+    });
+    joined.onMessage("error", (message: { message?: string }) => {
+      showAlert(message?.message ?? "Room error.");
     });
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Unable to join room.");

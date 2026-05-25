@@ -71,7 +71,9 @@ describe("noopMatchRewards", () => {
     const result = await noopMatchRewards.grantForMatch(state, { isVsAi: false });
     expect(result.get("player1")?.result).toBe("win");
     expect(result.get("player1")?.xp.gained).toBe(0);
+    expect(result.get("player1")?.diagnostic).toBe("rewards_disabled");
     expect(result.get("player2")?.result).toBe("loss");
+    expect(result.get("player2")?.diagnostic).toBeUndefined();
   });
 });
 
@@ -197,6 +199,7 @@ describe("createMatchRewardsWithClient", () => {
     expect(winner.result).toBe("win");
     expect(winner.source).toBe("none");
     expect(winner.xp.gained).toBe(0);
+    expect(winner.diagnostic).toBe("rpc_failed");
   });
 
   it("never calls the RPC for a bot opponent's seat", async () => {

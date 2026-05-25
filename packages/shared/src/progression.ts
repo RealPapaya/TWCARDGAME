@@ -100,6 +100,7 @@ export interface RewardSummary {
   result: "win" | "loss";
   mode: "pvp" | "pve";
   source: RewardSource;
+  diagnostic?: "rewards_disabled" | "rpc_failed" | "missing_reward_summary";
   /** PvE only: which AI was beaten. Null for PvP or losses. */
   aiTheme: AiTheme | null;
   /** Difficulty of the match. Null for PvP. */

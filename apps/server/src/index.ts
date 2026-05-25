@@ -7,6 +7,7 @@ import { lookupRoomIdByJoinCode, normalizeJoinCode } from "./privateRooms.js";
 
 const port = Number.parseInt(process.env.PORT || "2567", 10);
 const host = process.env.HOST || "0.0.0.0";
+const supabaseConfigured = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
 
 process.on("unhandledRejection", (reason) => {
   logger.error("unhandledRejection", { reason });
@@ -24,7 +25,10 @@ const gameServer = new Server({
         ok: true,
         service: "twcardgame",
         supabase: {
-          configured: Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+          configured: supabaseConfigured
+        },
+        rewards: {
+          enabled: supabaseConfigured
         }
       });
     });
@@ -53,4 +57,4 @@ gameServer.onBeforeShutdown(() => {
 });
 
 await gameServer.listen(port, host);
-logger.info("server.listen", { host, port });
+logger.info("server.listen", { host, port, supabaseConfigured, rewardsEnabled: supabaseConfigured });

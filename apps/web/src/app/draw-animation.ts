@@ -196,7 +196,10 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
           const real = document.querySelector<HTMLElement>(
             `.hand-row .card[data-hand-id="${cssAttr(handId)}"]`
           );
-          if (real) real.style.opacity = "";
+          if (real) {
+            real.style.opacity = "";
+            real.style.pointerEvents = "";
+          }
         }
         done();
       };

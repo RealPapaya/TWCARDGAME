@@ -330,6 +330,8 @@ export function resetRewardScreen(view: ClientViewState): void {
 
 function renderSourceText(summary: RewardSummary | undefined): string {
   if (!summary || summary.result !== "win") return "";
+  const diagnostic = renderRewardDiagnostic(summary);
+  if (diagnostic) return diagnostic;
   switch (summary.source) {
     case "pve_first":
       return `首勝 · ${themeName(summary.aiTheme)}（${difficultyLabel(summary.aiDifficulty)}）+${summary.xp.gained} XP`;
@@ -337,6 +339,20 @@ function renderSourceText(summary: RewardSummary | undefined): string {
       return `挑戰勝利 · ${themeName(summary.aiTheme)}（${difficultyLabel(summary.aiDifficulty)}）+${summary.xp.gained} XP`;
     case "pvp":
       return `對戰勝利 +${summary.xp.gained} XP`;
+    default:
+      return "";
+  }
+}
+
+function renderRewardDiagnostic(summary: RewardSummary): string {
+  if (summary.source !== "none") return "";
+  switch (summary.diagnostic) {
+    case "rewards_disabled":
+      return "No rewards were granted: server Supabase rewards are disabled.";
+    case "rpc_failed":
+      return "No rewards were granted: reward database RPC failed. Check server logs.";
+    case "missing_reward_summary":
+      return "No rewards were granted: server did not send a reward summary.";
     default:
       return "";
   }

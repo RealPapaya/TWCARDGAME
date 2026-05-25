@@ -77,7 +77,7 @@ export function createMatchRewardsWithClient(
             userId: player.userId,
             error
           });
-          summaries.set(seat, zeroSummary(state, metadata, seat, winnerSeat));
+          summaries.set(seat, zeroSummary(state, metadata, seat, winnerSeat, "rpc_failed"));
         }
       }
 
@@ -94,13 +94,15 @@ function zeroSummary(
   state: MatchState,
   metadata: MatchPersistenceMetadata | undefined,
   seat: Seat,
-  winnerSeat: Seat | undefined
+  winnerSeat: Seat | undefined,
+  diagnostic?: RewardSummary["diagnostic"]
 ): RewardSummary {
   const isWin = seat === winnerSeat;
   return {
     result: isWin ? "win" : "loss",
     mode: metadata?.isVsAi ? "pve" : "pvp",
     source: "none",
+    ...(diagnostic && isWin ? { diagnostic } : {}),
     aiTheme: metadata?.aiTheme ?? null,
     aiDifficulty: metadata?.aiDifficulty ?? null,
     xp: { before: 0, after: 0, gained: 0 },
@@ -116,6 +118,6 @@ function buildLocalSummaries(
 ): Map<Seat, RewardSummary> {
   const map = new Map<Seat, RewardSummary>();
   const winner = state.result?.winnerSeat;
-  for (const seat of SEATS) map.set(seat, zeroSummary(state, metadata, seat, winner));
+  for (const seat of SEATS) map.set(seat, zeroSummary(state, metadata, seat, winner, "rewards_disabled"));
   return map;
 }
