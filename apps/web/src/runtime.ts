@@ -91,6 +91,7 @@ const PROFILE_SELECT =
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
+const APP_VERSION = "v1.0.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
 
@@ -355,7 +356,7 @@ function renderMainMenu(): string {
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
       <div class="version-corner">
-        <span class="version-pill">${escapeHtml(CARD_CATALOG_VERSION)}</span>
+        <span class="version-pill">${APP_VERSION}</span>
       </div>
       <div class="main-menu-center">
         <h1 class="game-title">寶島遊戲王</h1>

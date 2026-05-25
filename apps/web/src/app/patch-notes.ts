@@ -3,6 +3,17 @@ export type PatchNoteVersion = { version: string; date: string; items: PatchNote
 
 export const PATCH_NOTES: PatchNoteVersion[] = [
   {
+    version: "v1.0.0", date: "2026-05-25",
+    items: [
+      { title: "[正式版] V1.0 上線", desc: "主選單版號改為單純的 v1.0.0 顯示，並同步更新專案版本號。" },
+      { title: "[新增] 對戰模式上線", desc: "透過線上對戰功能，玩家可以與其他玩家進行即時對戰。" },
+      { title: "[系統] 架構重整", desc: "改寫架構，提升系統穩定性與可維護性。" },
+      { title: "[系統] 資料庫轉移", desc: "資料庫轉移線上" },
+      { title: "[系統] 登入系統", desc: "新增帳戶認證以及GOOGLE EMAIL登入功能" },
+      { title: "[修正] 對戰獎勵整理", desc: "確認挑戰模式、玩家對戰與電腦模式的勝敗經驗值與金幣取得規則。" }
+    ]
+  },
+  {
     version: "v0.9.0", date: "2026-01-20",
     items: [
       { title: "[新增] 對戰系統", desc: "新增對戰系統，玩家可以與其他玩家進行對戰，為甚麼只有這一條更新，因為超難做" }
