@@ -835,6 +835,10 @@
   transform: translateX(-50%);
 }
 
+.battle-surface .board.lunging-board {
+  z-index: 1900;
+}
+
 .battle-surface .player-area.opponent .board {
   bottom: -54px;
   top: auto;

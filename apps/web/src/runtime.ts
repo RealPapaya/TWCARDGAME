@@ -1381,7 +1381,8 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
   const connected = player?.connected ?? true;
   const handCount = role === "player" ? view.hand.length : player?.handCount ?? 0;
   const areaClasses = classNames(["player-area", "player", role, isMe && "me", active && "active-turn", !connected && "disconnected"]);
-  const boardClasses = classNames(["board", activeTargeting() && "targeting-board", view.selectedAttackerId && "attacking-board"]);
+  const boardHasActiveAttackLunge = board.some((minion) => activeAttackLunges.has(minion.instanceId));
+  const boardClasses = classNames(["board", boardHasActiveAttackLunge && "lunging-board", activeTargeting() && "targeting-board", view.selectedAttackerId && "attacking-board"]);
 
   return `
     <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
@@ -1653,7 +1654,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
 function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const catalogCard = cardCatalog.get(minion.cardId);
   const attackClass = classNames(["stat-atk", valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)]);
-  const healthClass = classNames(["stat-hp", valueDeltaClass(minion.currentHealth, minion.health)]);
+  const healthClass = classNames(["stat-hp", valueDeltaClass(minion.currentHealth, catalogCard?.health)]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
   const targetKey = targetKeyFor(target);
@@ -3951,7 +3952,7 @@ function minionCardFromElement(el: HTMLElement): ResolvedCardView | undefined {
     attack: minion.attack,
     baseAttack: minion.baseAttack ?? catalogCard?.attack,
     health: minion.currentHealth,
-    baseHealth: minion.health
+    baseHealth: catalogCard?.health
   };
 }
 
@@ -5878,7 +5879,7 @@ function cueIsReady(cue: AnimationCue): boolean {
 const appliedLunges = new Set<string>();
 const activeAttackLunges = new Map<string, { dx: number; dy: number }>();
 
-function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: number; dy: number } {
+function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect, targetIsHero = false): { dx: number; dy: number } {
   const rawDx = targetRect.left + targetRect.width / 2 - (attackerRect.left + attackerRect.width / 2);
   const rawDy = targetRect.top + targetRect.height / 2 - (attackerRect.top + attackerRect.height / 2);
   const distance = Math.hypot(rawDx, rawDy);
@@ -5888,13 +5889,22 @@ function attackLungeDelta(attackerRect: DOMRect, targetRect: DOMRect): { dx: num
   const uy = rawDy / distance;
   const attackerEdge = Math.abs(ux) * attackerRect.width / 2 + Math.abs(uy) * attackerRect.height / 2;
   const targetEdge = Math.abs(ux) * targetRect.width / 2 + Math.abs(uy) * targetRect.height / 2;
-  const contactOverlap = Math.min(targetEdge * 0.72, Math.max(24, attackerEdge * 0.45));
+  const contactOverlap = targetIsHero
+    ? Math.min(attackerEdge + targetEdge * 0.9, Math.max(72, targetEdge + attackerEdge * 0.58))
+    : Math.min(targetEdge * 0.72, Math.max(24, attackerEdge * 0.45));
   const travel = Math.max(0, distance - attackerEdge - targetEdge + contactOverlap);
 
   return {
     dx: Math.round(ux * travel),
     dy: Math.round(uy * travel)
   };
+}
+
+function attackTargetRect(target: HTMLElement, targetKey: string): DOMRect {
+  if (targetKey.endsWith(":hero")) {
+    return target.querySelector<HTMLElement>(".avatar")?.getBoundingClientRect() ?? target.getBoundingClientRect();
+  }
+  return target.getBoundingClientRect();
 }
 
 function startAttackLunge(cue: AnimationCue): boolean {
@@ -5906,8 +5916,8 @@ function startAttackLunge(cue: AnimationCue): boolean {
   if (!attacker || !target) return false;
 
   const attackerRect = attacker.getBoundingClientRect();
-  const targetRect = target.getBoundingClientRect();
-  const { dx, dy } = attackLungeDelta(attackerRect, targetRect);
+  const targetRect = attackTargetRect(target, cue.targetKey);
+  const { dx, dy } = attackLungeDelta(attackerRect, targetRect, cue.targetKey.endsWith(":hero"));
 
   appliedLunges.add(cue.id);
   activeAttackLunges.set(cue.attackerInstanceId, { dx, dy });
