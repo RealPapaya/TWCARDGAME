@@ -12,7 +12,7 @@
  *   8. End-of-match screen  — result overlay shown; Back to Lobby clears the board
  *   9. Mobile RWD           — 390 px viewport: battle surface doesn't overflow
  *  10. Attack lunge + floating damage number on attack
- *  11. Hover tooltip        — full card preview on desktop hover
+ *  11. Hover tooltip        — board card preview stays anchored across viewport sizes
  *  12. Concede modal        — confirmation modal intercepts surrender
  *
  * Prerequisites:
@@ -120,6 +120,58 @@ async function isMyTurn(page) {
     }
     return Boolean(seat && seat === active);
   });
+}
+
+async function assertCueAnchored(page, cueSelector, targetSelector, label) {
+  var delta = await page.evaluate((args) => {
+    var cue = document.querySelector(args.cueSelector);
+    var target = document.querySelector(args.targetSelector);
+    if (!cue || !target) return null;
+    var c = cue.getBoundingClientRect();
+    var t = target.getBoundingClientRect();
+    return {
+      dx: Math.abs((c.left + c.width / 2) - (t.left + t.width / 2)),
+      dy: Math.abs((c.top + c.height / 2) - (t.top + t.height / 2))
+    };
+  }, { cueSelector, targetSelector });
+  if (!delta) throw new Error(label + " missing cue or target");
+  if (delta.dx > 50 || delta.dy > 170) {
+    throw new Error(label + " not anchored near target: dx=" + Math.round(delta.dx) + " dy=" + Math.round(delta.dy));
+  }
+}
+
+async function assertBoardTooltipAnchored(page, viewport) {
+  await page.setViewportSize(viewport);
+  await page.waitForTimeout(150);
+  var hasBoardMinion = await page.evaluate(() => document.querySelectorAll('[data-testid="board-minion"]').length > 0);
+  if (!hasBoardMinion) throw new Error("no board minion to hover");
+  await page.locator('[data-testid="board-minion"]').first().hover();
+  await page.waitForSelector('[data-testid="hover-tooltip"]', { timeout: 1500 });
+  var metrics = await page.evaluate(() => {
+    var target = document.querySelector('[data-testid="board-minion"]');
+    var tip = document.querySelector('[data-testid="hover-tooltip"]');
+    if (!target || !tip) return null;
+    var t = target.getBoundingClientRect();
+    var h = tip.getBoundingClientRect();
+    return {
+      dy: Math.abs((h.top + h.height / 2) - (t.top + t.height / 2)),
+      sideGap: Math.min(Math.abs(h.left - t.right), Math.abs(t.left - h.right)),
+      visible: h.right > 0 && h.bottom > 0 && h.left < window.innerWidth && h.top < window.innerHeight
+    };
+  });
+  if (!metrics) throw new Error("missing board minion or tooltip");
+  if (!metrics.visible) throw new Error("tooltip is outside viewport");
+  if (metrics.dy > 170 || metrics.sideGap > 140) {
+    throw new Error(
+      "tooltip not anchored at " + viewport.width + "x" + viewport.height +
+      ": dy=" + Math.round(metrics.dy) + " sideGap=" + Math.round(metrics.sideGap)
+    );
+  }
+  await page.mouse.move(20, 20);
+  await page.waitForFunction(
+    () => !document.querySelector('[data-testid="hover-tooltip"]'),
+    null, { timeout: 2500 }
+  );
 }
 
 /** Navigate to lobby and join a PvP room without submitting mulligan. Returns once the mulligan overlay is visible. */
@@ -512,6 +564,7 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       );
       var floatText = await actPage.locator('[data-testid="float-number"]').first().textContent();
       if (!floatText || !floatText.trim().startsWith("-")) throw new Error("float-number did not render damage value, got: " + floatText);
+      await assertCueAnchored(actPage, '[data-testid="float-number"]', '[data-testid="opponent-hero"]', "damage float-number");
       pass("10. Floating damage number — " + floatText.trim() + " floated from target");
 
       var lungeSeen = await actPage.evaluate(() => Boolean(window.__lungeSeen));
@@ -520,29 +573,13 @@ async function rampAndPlayMinion(actPage, idlPage, actTag, ck1Ref, ck2Ref) {
       attackTested = true;
     } catch (e) { fail("10. Attack lunge + floating number", e); }
 
-    // ── TEST 11: Hover tooltip on hand card ─────────────────────────────────
+    // ── TEST 11: Hover tooltip on board card ────────────────────────────────
     try {
       // p2 is desktop (mobile=false), so hover should work there
       var desktopPage = p2;
-      var hasHand = await desktopPage.evaluate(() => document.querySelectorAll('[data-testid="hand-card"]').length > 0);
-      if (!hasHand) throw new Error("no hand card to hover on desktop page");
-      await desktopPage.locator('[data-testid="hand-card"]').first().hover();
-      // Tooltip has a 220ms debounce
-      await desktopPage.waitForSelector('[data-testid="hover-tooltip"]', { timeout: 1500 });
-      var tooltipName = await desktopPage.evaluate(() => {
-        var el = document.querySelector('[data-testid="hover-tooltip"] .card-title');
-        return el ? el.textContent : "";
-      });
-      if (!tooltipName || tooltipName.trim().length === 0) throw new Error("hover tooltip is empty");
-      pass("11. Hover tooltip — full card preview shown for: " + tooltipName.trim());
-
-      // Move cursor away — tooltip should disappear
-      await desktopPage.mouse.move(1240, 20);
-      await desktopPage.waitForFunction(
-        () => !document.querySelector('[data-testid="hover-tooltip"]'),
-        null, { timeout: 2500 }
-      );
-      pass("11b. Hover tooltip — dismissed on mouseleave");
+      await assertBoardTooltipAnchored(desktopPage, { width: 1280, height: 800 });
+      await assertBoardTooltipAnchored(desktopPage, { width: 1600, height: 900 });
+      pass("11. Board hover tooltip anchored across 1280x800 and 1600x900");
     } catch (e) { fail("11. Hover tooltip", e); }
 
     // ── TEST 12: Concede confirmation modal — cancel path ───────────────────

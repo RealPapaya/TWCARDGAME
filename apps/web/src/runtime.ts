@@ -2074,24 +2074,28 @@ function renderHoverTooltip(): string {
   const catalogCard = view.hoveredCardId ? cardCatalog.get(view.hoveredCardId) : undefined;
   const resolved = view.hoveredCard ?? (catalogCard ? resolveCatalogCard(catalogCard, `tooltip-${catalogCard.id}`) : undefined);
   if (!resolved) return "";
+  const shell = document.querySelector<HTMLElement>(".app-shell");
+  const anchor = shell ? localAnchorFromViewport(shell, view.hoverAnchor) : view.hoverAnchor;
   const margin = 16;
   const gap = 24;
   const tooltipWidth = 224;
   const tooltipHeight = 322;
-  const anchorLeft = view.hoverAnchor.x - view.hoverAnchor.width / 2;
-  const anchorRight = view.hoverAnchor.x + view.hoverAnchor.width / 2;
-  const roomOnRight = window.innerWidth - anchorRight - gap - margin;
+  const viewportWidth = shell?.offsetWidth || window.innerWidth;
+  const viewportHeight = shell?.offsetHeight || window.innerHeight;
+  const anchorLeft = anchor.x - anchor.width / 2;
+  const anchorRight = anchor.x + anchor.width / 2;
+  const roomOnRight = viewportWidth - anchorRight - gap - margin;
   const roomOnLeft = anchorLeft - gap - margin;
   const preferRight = roomOnRight >= tooltipWidth || roomOnRight >= roomOnLeft;
   let left = preferRight ? anchorRight + gap : anchorLeft - tooltipWidth - gap;
-  left = Math.max(margin, Math.min(left, window.innerWidth - tooltipWidth - margin));
+  left = Math.max(margin, Math.min(left, viewportWidth - tooltipWidth - margin));
   if (left < anchorRight && left + tooltipWidth > anchorLeft) {
     left = preferRight
-      ? Math.min(window.innerWidth - tooltipWidth - margin, anchorRight + gap)
+      ? Math.min(viewportWidth - tooltipWidth - margin, anchorRight + gap)
       : Math.max(margin, anchorLeft - tooltipWidth - gap);
   }
-  let top = view.hoverAnchor.y - tooltipHeight / 2;
-  top = Math.max(margin, Math.min(top, window.innerHeight - tooltipHeight - margin));
+  let top = anchor.y - tooltipHeight / 2;
+  top = Math.max(margin, Math.min(top, viewportHeight - tooltipHeight - margin));
   return `
     <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
       <div class="card rarity-${resolved.rarity.toLowerCase()}">
@@ -2099,6 +2103,32 @@ function renderHoverTooltip(): string {
       </div>
     </div>
   `;
+}
+
+function localPointFromViewport(container: HTMLElement, x: number, y: number): { x: number; y: number } {
+  const rect = container.getBoundingClientRect();
+  const scaleX = rect.width > 0 ? container.offsetWidth / rect.width : 1;
+  const scaleY = rect.height > 0 ? container.offsetHeight / rect.height : 1;
+  return {
+    x: (x - rect.left) * scaleX,
+    y: (y - rect.top) * scaleY
+  };
+}
+
+function localAnchorFromViewport(
+  container: HTMLElement,
+  anchor: { x: number; y: number; width: number; height: number }
+): { x: number; y: number; width: number; height: number } {
+  const rect = container.getBoundingClientRect();
+  const scaleX = rect.width > 0 ? container.offsetWidth / rect.width : 1;
+  const scaleY = rect.height > 0 ? container.offsetHeight / rect.height : 1;
+  const point = localPointFromViewport(container, anchor.x, anchor.y);
+  return {
+    x: point.x,
+    y: point.y,
+    width: anchor.width * scaleX,
+    height: anchor.height * scaleY
+  };
 }
 
 function renderConcedeModal(): string {
@@ -5939,7 +5969,6 @@ function applyDeathShatter(cue: AnimationCue): void {
 }
 
 function applyPostRenderEffects(): void {
-  const surface = document.querySelector<HTMLElement>(".battle-surface");
   const eventLayer = document.querySelector<HTMLElement>(".event-layer");
   for (const cue of view.animationCues) {
     if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
@@ -5949,8 +5978,7 @@ function applyPostRenderEffects(): void {
       applyDeathShatter(cue);
     }
   }
-  if (surface && eventLayer) {
-    const surfaceRect = surface.getBoundingClientRect();
+  if (eventLayer) {
     for (const node of eventLayer.querySelectorAll<HTMLElement>("[data-anchor-key]")) {
       if (node.dataset.anchored === "true") continue;
       const anchorKey = node.dataset.anchorKey ?? "";
@@ -5958,8 +5986,7 @@ function applyPostRenderEffects(): void {
       const target = document.querySelector<HTMLElement>(selector);
       if (!target) continue;
       const r = target.getBoundingClientRect();
-      const x = r.left + r.width / 2 - surfaceRect.left;
-      const y = r.top + r.height / 2 - surfaceRect.top;
+      const { x, y } = localPointFromViewport(eventLayer, r.left + r.width / 2, r.top + r.height / 2);
       const cueId = node.dataset.cueId;
       const cue = cueId ? view.animationCues.find((item) => item.id === cueId) : undefined;
       if (cue) {

@@ -293,7 +293,7 @@
 }
 
 .hover-tooltip {
-  position: fixed;
+  position: absolute;
   width: 128px;
   height: 184px;
   z-index: 1500;
