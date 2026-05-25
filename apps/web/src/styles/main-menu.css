@@ -175,31 +175,33 @@
   position: relative;
 }
 
-/* First icon (settings): circular */
+/* Side rail icons */
 .menu-icon-btn:nth-child(1) {
-  border-radius: 50%;
-  background: rgba(139, 69, 19, 0.3);
-  border: 3px solid #8b4513;
-  width: 70px;
-  height: 70px;
-  font-size: 36px;
-  filter: none;
-  box-shadow:
-    inset 0 2px 4px rgba(0, 0, 0, 0.2),
-    0 4px 8px rgba(0, 0, 0, 0.3);
-  color: #f1e4d1;
-  align-self: flex-end;
+  border-radius: 50% 50% 46% 54% / 50% 46% 54% 50%;
 }
 
 .menu-icon-btn:nth-child(1):hover:not(:disabled) {
-  background: rgba(139, 69, 19, 0.5);
-  transform: rotate(90deg) scale(1.1);
-  border-color: #d2691e;
+  background-color: #ede0d4;
+  transform: rotate(20deg) scale(1.1);
+  border-color: #8b4513;
+  filter: drop-shadow(8px 10px 0px #3d1e0f);
 }
 
-/* Leaderboard (2nd) and friends (3rd): parchment ovals */
 .menu-icon-btn:nth-child(2) {
   border-radius: 48% 52% 45% 55% / 55% 45% 52% 48%;
+}
+
+.menu-image-btn {
+  overflow: hidden;
+}
+
+.rail-icon-image {
+  width: 86px;
+  height: 86px;
+  object-fit: contain;
+  display: block;
+  filter: drop-shadow(2px 3px 2px rgba(0, 0, 0, 0.45));
+  pointer-events: none;
 }
 
 .menu-icon-btn:nth-child(3) {
@@ -220,6 +222,7 @@
   filter: grayscale(0.6) drop-shadow(4px 5px 0px #3d1e0f);
 }
 
+.menu-icon-btn:nth-child(1):hover:not(:disabled),
 .menu-icon-btn:nth-child(2):hover:not(:disabled),
 .menu-icon-btn:nth-child(3):hover:not(:disabled),
 .menu-icon-btn:nth-child(4):hover:not(:disabled) {
@@ -315,8 +318,8 @@
 }
 
 .corner-icon {
-  width: 90px;
-  height: 90px;
+  width: 104px;
+  height: 104px;
   object-fit: contain;
   filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.6));
   display: block;
@@ -431,6 +434,11 @@
   border-radius: 5px;
   transition: width 0.5s ease;
   box-shadow: 0 0 5px rgba(74, 222, 128, 0.3);
+}
+
+.player-xp-readout {
+  color: #5d2e17;
+  font-size: 12px;
 }
 
 .player-stats {

@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
-  publicDir: "../../LEGACY/assets",
+  publicDir: "public",
   resolve: {
     alias: [
       {

@@ -154,6 +154,60 @@ investigate room disposal before launch. Start at ~25 rooms, then ramp.
 
 ---
 
+## 9. Cost and traffic notes
+
+These estimates describe the current Vercel + Railway + Supabase deployment
+shape. They are planning numbers, not billing guarantees. Re-check provider
+pricing before launch because quotas and overage prices can change.
+
+### Local development vs hosted traffic
+
+| Scenario | Railway usage? | Network used | Notes |
+| --- | --- | --- | --- |
+| `npm run dev:server` and clients connect to `localhost` | No | Local machine only | No Railway traffic is involved. |
+| `npm run dev:server` and LAN clients connect to the host machine | No | Host machine and player network | Useful for local playtests; Railway is not in the path. |
+| `npm run dev:server` exposed through ngrok or Cloudflare Tunnel | No | Host machine plus tunnel provider | Railway is not charged, but the tunnel provider may have limits. |
+| Production clients connect to a Railway-hosted Colyseus server | Yes | Railway egress plus player network | This is the normal PvP production path. |
+| Local or hosted server talks to remote Supabase | No Railway egress unless the server is on Railway | Supabase plus caller network | Auth, deck reads, match history, rewards, and RPC calls hit Supabase. |
+
+### Per-match traffic estimate
+
+| Item | Rough traffic per match/session | Billed mostly to | Notes |
+| --- | ---: | --- | --- |
+| Vercel first page load | 5-30 MB per player | Vercel | Images, audio, JS, CSS, and cache misses dominate. Repeat visits are much lower. |
+| Railway Colyseus WebSocket match traffic | 0.5-2 MB per PvP match total | Railway | Card-game state sync is small; commands, `publicSync`, events, and private hand messages are the main frames. |
+| Supabase auth/deck/collection reads | 50-500 KB per player session | Supabase | Depends on account data size and table reads. |
+| Supabase match result/reward writes | 10-100 KB per match | Supabase | Mostly end-of-match persistence and reward RPCs. |
+| Player-side total download | 5-35 MB first session, then 1-5 MB cached | Player network | Frontend assets are the visible cost to players. |
+
+For Railway planning, use 1 MB per PvP match as the normal estimate and
+2 MB per match as a conservative estimate.
+
+| Railway egress budget | At 1 MB per match | At 2 MB per match |
+| ---: | ---: | ---: |
+| 10 GB | ~10,000 matches | ~5,000 matches |
+| 50 GB | ~50,000 matches | ~25,000 matches |
+| 100 GB | ~100,000 matches | ~50,000 matches |
+
+### Service limits and scaling watchpoints
+
+| Service | Role | Main quota/watchpoint | Traffic triggers | Rough planning scale |
+| --- | --- | --- | --- | --- |
+| Vercel | Web client hosting and static asset delivery | Fast Data Transfer: Hobby 100 GB/month, Pro 1 TB/month, then overage on Pro | Opening the site, downloading new builds, loading uncached images/audio | At 20 MB first load, 100 GB is about 5,000 first-time player sessions; 1 TB is about 50,000. |
+| Railway | Colyseus authoritative game server | CPU, RAM, and network egress are usage-based; egress is priced per GB | PvP WebSocket connections, matchmaking, room sync, reconnects | Traffic allows many matches; CPU/RAM/concurrent sockets are likely to limit first. Start by load testing 100-500 concurrent players. |
+| Supabase Database/Auth | Accounts, decks, collections, match history, rewards | Free: 50,000 MAU, 500 MB DB, 5 GB egress. Pro: 100,000 MAU, 250 GB egress | Login, profile/deck/collection reads, match writes, leaderboard/shop reads | Free is fine for tests and small beta; Pro is safer for a public launch. |
+| Supabase Realtime | Optional realtime features, not the current PvP path | Free: 200 concurrent connections and 2M messages. Pro: 500 concurrent connections and 5M messages | Only used if chat, presence, notifications, or realtime DB listeners use Supabase Realtime | Current PvP uses Colyseus, so this should not cap match concurrency unless new features depend on it. |
+
+Provider references captured on 2026-05-25:
+
+- Railway pricing: https://docs.railway.com/pricing/plans
+- Vercel pricing: https://vercel.com/pricing
+- Supabase pricing: https://supabase.com/pricing
+- Supabase Realtime pricing: https://supabase.com/docs/guides/realtime/pricing
+- Supabase Realtime limits: https://supabase.com/docs/guides/realtime/limits
+
+---
+
 ## Done criteria
 
 - `/health` on the Fly app returns `ok` with `supabase.configured = true`.

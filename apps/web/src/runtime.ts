@@ -349,8 +349,11 @@ function renderMainMenu(): string {
   const ownedCount = view.collection.filter((row) => row.quantity > 0).length;
   const totalCatalog = CARD_CATALOG.filter((card) => card.collectible !== false).length;
   const accountMode = Boolean(supabase);
-  const xpFraction = stats.total > 0 ? Math.min((stats.wins % 10) / 10, 1) : 0;
-  const level = Math.floor(stats.wins / 10) + 1;
+  const level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(view.profile?.level ?? 1)));
+  const xp = Math.max(0, Math.floor(view.profile?.xp ?? 0));
+  const xpRequired = getXPRequiredForLevel(level);
+  const xpFraction = level >= MAX_LEVEL || xpRequired <= 0 ? 1 : Math.min(1, xp / xpRequired);
+  const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
   const playerTitle = "#菜鳥";
   return `
     <section class="screen main-menu" data-screen="main">
@@ -368,9 +371,15 @@ function renderMainMenu(): string {
         </nav>
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
-        <button id="settings-toggle" class="menu-icon-btn" data-testid="menu-settings" title="設定">⚙️</button>
-        <button class="menu-icon-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">🏆</button>
-        <button class="menu-icon-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>🤝</button>
+        <button id="settings-toggle" class="menu-icon-btn menu-image-btn" data-testid="menu-settings" title="設定">
+          <img class="rail-icon-image" src="/images/ui/Setting.webp" alt="設定" />
+        </button>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">
+          <img class="rail-icon-image" src="/images/ui/Dashboard.webp" alt="排行榜" />
+        </button>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>
+          <img class="rail-icon-image" src="/images/ui/Friend.webp" alt="好友" />
+        </button>
       </nav>
       <div class="main-menu-bottom">
         <aside class="player-info-card" data-testid="player-chip">
@@ -378,19 +387,20 @@ function renderMainMenu(): string {
           <div class="player-info-text">
             <strong>${escapeHtml(displayName)}</strong>
             <span class="player-title-text">${escapeHtml(playerTitle)}</span>
-            <span class="player-level-row">Lv.${level} <span class="player-card-count">${ownedCount}/${totalCatalog}</span></span>
+            <span class="player-level-row">Lv.${level}</span>
             <div class="xp-bar-track"><div class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></div></div>
+            <span class="player-xp-readout">${xpDisplay}</span>
             <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
           </div>
         </aside>
         <nav class="menu-corner-rail" aria-label="底部功能">
           <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
-            <img class="corner-icon" src="/images/ui/collection_logo.webp" alt="收藏庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <img class="corner-icon" src="/images/ui/Vault.webp" alt="收藏庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">🃏</span>
             <span class="corner-label">收藏庫</span>
           </button>
           <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
-            <img class="corner-icon" src="/images/ui/shop_logo.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <img class="corner-icon" src="/images/ui/Shop.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">💰</span>
             <span class="corner-label">商店</span>
           </button>
@@ -814,7 +824,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
   const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
   const filtered = filterCollectionCards(collectibles, collectionMap);
-  const ownedTotal = collectibles.filter((card) => (collectionMap.get(card.id) ?? 0) > 0).length;
+  const ownedTotal = collectibles.filter((card) => collectionQuantityFor(card, collectionMap) > 0).length;
   const categories = uniqueCollectionCategories(collectibles);
   const rarities = uniqueCollectionRarities(collectibles);
   const deck = view.editingDeck;
@@ -873,7 +883,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
             </label>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
               ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
-                const qty = collectionMap.get(card.id) ?? 0;
+                const qty = collectionQuantityFor(card, collectionMap);
                 return renderCollectionTile(card, qty, selectedCounts.get(card.id) ?? 0, selectedTotal);
               }).join("")}
             </div>
@@ -909,7 +919,7 @@ function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: 
   const search = view.collectionSearch.trim().toLowerCase();
   return cards
     .filter((card) => {
-      const qty = collectionMap.get(card.id) ?? 0;
+      const qty = collectionQuantityFor(card, collectionMap);
       if (view.collectionFilter === "owned" && qty <= 0) return false;
       if (view.collectionFilter === "missing" && qty > 0) return false;
       if (view.collectionCategory !== "all" && card.category !== view.collectionCategory) return false;
@@ -922,6 +932,10 @@ function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: 
       );
     })
     .sort(compareCollectionCards);
+}
+
+function collectionQuantityFor(card: CardDefinition, collectionMap: Map<string, number>): number {
+  return hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
 }
 
 function compareCollectionCards(a: CardDefinition, b: CardDefinition): number {
