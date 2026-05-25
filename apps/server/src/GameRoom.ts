@@ -68,7 +68,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     logger.info("room.create", { roomId: this.roomId, private: Boolean(this.registeredJoinCode) });
   }
 
-  async onAuth(client: Client, options: JoinOptions = {}): Promise<PlayerSetup> {
+  async onAuth(client: Client, options: JoinOptions = {}, _context?: any): Promise<PlayerSetup> {
     return resolvePlayerSetup(client.sessionId, options, this.accountStore);
   }
 
@@ -135,6 +135,12 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     releaseJoinCodeForRoom(this.roomId);
     logger.info("room.dispose", { roomId: this.roomId });
     if (!this.match) return;
+    if (!this.shouldPersistMatchSideEffects()) {
+      if (!isMatchComplete(this.match)) {
+        this.finalizer.finish(this.match, { reason: "abandoned" });
+      }
+      return;
+    }
     if (!isMatchComplete(this.match)) {
       this.finalizer.finish(this.match, { reason: "abandoned" });
     }
@@ -174,6 +180,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
         { seat: "player2", userId: player2.userId, displayName: player2.displayName, deckIds: player2.deckIds }
       ]
     });
+    this.customizeInitialMatch(created.state, created.events);
     this.match = created.state;
     void this.lock();
     this.syncPublicState();
@@ -185,6 +192,11 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   /** Hook for subclasses; runs once after the initial match state is built. */
   protected afterMatchCreated(): void {
+    // no-op in the base PvP room.
+  }
+
+  /** Hook for subclasses to adjust initial match state before first sync/broadcast. */
+  protected customizeInitialMatch(_state: MatchState, _events: GameEvent[]): void {
     // no-op in the base PvP room.
   }
 
@@ -287,9 +299,17 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   protected afterMatchComplete(): void {
     if (!this.match || !isMatchComplete(this.match)) return;
     this.lock();
+    if (!this.shouldPersistMatchSideEffects()) {
+      this.scheduleCleanup();
+      return;
+    }
     const metadata = this.getMatchPersistenceMetadata();
     void this.finalizeAndReward(metadata);
     this.scheduleCleanup();
+  }
+
+  protected shouldPersistMatchSideEffects(): boolean {
+    return true;
   }
 
   private async finalizeAndReward(metadata: MatchPersistenceMetadata | undefined): Promise<void> {
@@ -314,7 +334,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     return undefined;
   }
 
-  private scheduleCleanup(): void {
+  protected scheduleCleanup(): void {
     if (this.cleanupScheduled) return;
     this.cleanupScheduled = true;
     if (this.match) {

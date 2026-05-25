@@ -25,6 +25,18 @@ export interface AiThemeDefinition {
   partyTag: AiPartyTag;
 }
 
+export interface DevTestMatchSetup {
+  handCardIds?: string[];
+  playerBoardCardIds?: string[];
+  opponentBoardCardIds?: string[];
+  playerHp?: number;
+  opponentHp?: number;
+  playerMana?: { current?: number; max?: number };
+  opponentMana?: { current?: number; max?: number };
+  turnNumber?: number;
+  activeSeat?: Seat;
+}
+
 export const AI_THEMES: readonly AiThemeDefinition[] = [
   { id: "dpp", name: "賴清德", label: "賴清德 — 新聞湧動", heroCardId: "TW046", partyTag: "民進黨" },
   { id: "dpp2", name: "蔡英文", label: "蔡英文 — 無限回溯", heroCardId: "TW020", partyTag: "民進黨" },

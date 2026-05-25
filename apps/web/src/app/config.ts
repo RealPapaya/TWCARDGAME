@@ -14,6 +14,6 @@ export const supabase: SupabaseClient | undefined =
       })
     : undefined;
 
-function isLocalDevHost(): boolean {
+export function isLocalDevHost(): boolean {
   return ["localhost", "127.0.0.1", "0.0.0.0", ""].includes(location.hostname);
 }

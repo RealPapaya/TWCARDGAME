@@ -4,6 +4,7 @@ import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared"
 import type {
   AiDifficulty,
   ClientCommandMessage,
+  DevTestMatchSetup,
   FriendRow,
   FriendRequestRow,
   GameCommand,
@@ -44,7 +45,7 @@ import {
   toggleSfxMute,
   type SoundCue
 } from "./app/audio.js";
-import { defaultServerUrl, forceDevAuth, supabase as configuredSupabase } from "./app/config.js";
+import { defaultServerUrl, forceDevAuth, isLocalDevHost, supabase as configuredSupabase } from "./app/config.js";
 import { setAppContext } from "./app/context.js";
 import {
   isHandCardAnimating,
@@ -111,6 +112,8 @@ function blog(label: string, data?: Record<string, unknown>): void {
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
+const devTestModeAvailable = import.meta.env.DEV && isLocalDevHost();
+let devTestPanel: typeof import("./app/dev-test.js") | undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const seats: Seat[] = ["player1", "player2"];
 const rarityLabel: Record<string, string> = {
@@ -202,8 +205,20 @@ export function startApp(): void {
   ensureDragLayer();
   installViewportGuards();
   installAudioUnlock();
+  if (devTestModeAvailable && shouldOpenDevTestFromUrl()) view.menuScreen = "test";
+  if (devTestModeAvailable) {
+    void import("./app/dev-test.js").then((module) => {
+      devTestPanel = module;
+      render();
+    });
+  }
   render();
   void initializeAccount();
+}
+
+function shouldOpenDevTestFromUrl(): boolean {
+  const params = new URLSearchParams(location.search);
+  return params.get("testMode") === "1" || params.get("devTest") === "1";
 }
 
 function render(): void {
@@ -253,6 +268,7 @@ function on(
 }
 
 function renderLanding(): string {
+  if (devTestModeAvailable && view.menuScreen === "test") return renderMenu();
   if (supabase && !view.session) return renderAuthPanel();
   return renderMenu();
 }
@@ -275,6 +291,8 @@ function renderMenu(): string {
       return renderLegacyShopScreen();
     case "ai":
       return renderAiBattleSetupScreen();
+    case "test":
+      return devTestModeAvailable ? devTestPanel?.renderDevTestPanel(Boolean(view.joining || view.room)) ?? `<section class="screen" data-screen="test"></section>` : renderMainMenu();
     case "main":
     default:
       return renderMainMenu();
@@ -345,6 +363,7 @@ function renderMainMenu(): string {
           <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
           <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
           <button class="menu-button menu-patch" id="changelog-open" data-testid="menu-patch">更新內容</button>
+          ${devTestModeAvailable && devTestPanel ? `<button class="menu-button" data-menu-screen="test">${escapeHtml(devTestPanel.menuLabel)}</button>` : ""}
         </nav>
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
@@ -2264,6 +2283,14 @@ function bindStaticActions(): void {
       navigateToScreen(target);
     });
   }
+  devTestPanel?.bindDevTestActions({
+    on,
+    jump: navigateToScreen,
+    startPve: (setup) => void startDevTestPveMatch(setup),
+    showReward: showDevTestRewardScreen,
+    getAiTheme: () => view.aiTheme,
+    getAiDifficulty: () => view.aiDifficulty
+  });
   for (const el of document.querySelectorAll<HTMLElement>("[data-battle-mode]")) {
     on(el, "click", "battle-mode", () => {
       const mode = el.dataset.battleMode as BattleMode | undefined;
@@ -2645,6 +2672,7 @@ function bindPackOpeningActions(): void {
 
 function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
+  if (target === "test" && !devTestModeAvailable) target = "main";
   view.menuScreen = target;
   view.avatarPickerOpen = false;
   view.pinnedCollectionCardId = undefined;
@@ -3481,6 +3509,99 @@ function selectedDeckJoinOptions(): { deckId?: string; deckIds?: string[] } {
   return {
     ...(view.selectedDeckId ? { deckId: view.selectedDeckId } : {}),
     ...(selectedDeck?.card_ids.length === 30 ? { deckIds: [...selectedDeck.card_ids] } : {})
+  };
+}
+
+async function startDevTestPveMatch(devTest: DevTestMatchSetup): Promise<void> {
+  if (!devTestModeAvailable || view.joining || view.room) return;
+  const unknown = [
+    ...(devTest.handCardIds ?? []),
+    ...(devTest.playerBoardCardIds ?? []),
+    ...(devTest.opponentBoardCardIds ?? [])
+  ].filter((id) => !cardCatalog.has(id));
+  if (unknown.length > 0) {
+    showAlert(`Unknown card id: ${unknown.join(", ")}`);
+    return;
+  }
+
+  view.joining = true;
+  render();
+  try {
+    const client = new Client(defaultServerUrl);
+    const room = await client.joinOrCreate(
+      "pve",
+      {
+        displayName: view.profile?.display_name ?? "Player",
+        difficulty: view.aiDifficulty,
+        theme: view.aiTheme,
+        devTest
+      },
+      GameStateSchema
+    );
+    bindRoomMessages(room);
+  } catch (error) {
+    showAlert(error instanceof Error ? error.message : "Unable to start dev test match.");
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
+function showDevTestRewardScreen(summary: RewardSummary): void {
+  if (!devTestModeAvailable) return;
+  if (view.room) {
+    showAlert("Leave the current match before opening a dev reward screen.");
+    return;
+  }
+  if (rewardFallbackTimer !== undefined) {
+    window.clearTimeout(rewardFallbackTimer);
+    rewardFallbackTimer = undefined;
+  }
+  resetRewardScreen(view);
+  resetCardPlayCues();
+  resetMinionVisualTracking();
+
+  const players = {
+    player1: devTestPublicPlayer("player1", "Player", 30, 10, 10),
+    player2: devTestPublicPlayer("player2", "Opponent", 0, 0, 0)
+  };
+  view.room = undefined;
+  view.mySeat = "player1";
+  view.hand = [];
+  view.events = [];
+  view.animationCues = [];
+  view.publicSync = {
+    status: "finished",
+    activeSeat: "player1",
+    turnNumber: 1,
+    actionSeq: 0,
+    result: { winnerSeat: summary.result === "win" ? "player1" : "player2", reason: "dev_test" },
+    players
+  };
+  view.state = {
+    status: "finished",
+    turn: { activeSeat: "player1", number: 1, startedAtMs: Date.now(), deadlineAtMs: Date.now() + 60_000, actionSeq: 0 },
+    result: { winnerSeat: summary.result === "win" ? "player1" : "player2", reason: "dev_test" },
+    player1: players.player1,
+    player2: players.player2
+  };
+  view.rewardSummary = summary;
+  startRewardAnimation(view, render);
+  render();
+}
+
+function devTestPublicPlayer(seat: Seat, displayName: string, handCount: number, manaCurrent: number, manaMax: number): PublicPlayer {
+  return {
+    userId: `dev-${seat}`,
+    displayName,
+    connected: true,
+    hero: { hp: 30, maxHp: 30 },
+    mana: { current: manaCurrent, max: manaMax },
+    handCount,
+    deckCount: 0,
+    graveyardCount: 0,
+    mulliganReady: true,
+    board: []
   };
 }
 

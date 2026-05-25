@@ -1,5 +1,5 @@
 import { CARD_CATALOG } from "@twcardgame/cards";
-import { decide, legalMoves, normalizeSeed, type BotRngState } from "@twcardgame/rules";
+import { decide, legalMoves, normalizeSeed, type BotRngState, type MatchState } from "@twcardgame/rules";
 import {
   AI_THEMES,
   AI_THEME_DECKS,
@@ -14,6 +14,7 @@ import {
 import { type Client } from "colyseus";
 import { GameRoom, type GameRoomCreateOptions } from "./GameRoom.js";
 import { defaultDeckIds, type JoinOptions, type PlayerSetup } from "./accounts.js";
+import { applyDevTestMatchSetup, isDevTestRequestAllowed } from "./devTest.js";
 import type { MatchPersistenceMetadata } from "./persistence.js";
 
 const BOT_MULLIGAN_DELAY_MS = parseInt(process.env.BOT_MULLIGAN_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "1000", 10);
@@ -58,6 +59,7 @@ export class BotRoom extends GameRoom {
   private botStepScheduled = false;
   private lastBotTurnKey?: string;
   private lastBatchAnimationMs = 0;
+  private devTestActive = false;
 
   override onCreate(options: BotRoomCreateOptions = {}): void {
     super.onCreate({ ...options, joinCode: options.joinCode, private: true });
@@ -94,6 +96,21 @@ export class BotRoom extends GameRoom {
     this.createMatch();
   }
 
+  override async onAuth(client: Client, options: JoinOptions = {}, context?: any): Promise<PlayerSetup> {
+    if (options.devTest) {
+      if (!isDevTestRequestAllowed(context)) {
+        throw new Error("Developer test mode is only available from localhost in development.");
+      }
+      return {
+        userId: `dev-${client.sessionId}`,
+        displayName: options.displayName || "Dev Tester",
+        deckIds: defaultDeckIds(),
+        devTest: options.devTest
+      };
+    }
+    return super.onAuth(client, options, context);
+  }
+
   override async onLeave(client: Client): Promise<void> {
     // PvE rooms don't bother with reconnection windows — if the human drops, dispose.
     this.seats.delete(client.sessionId);
@@ -107,6 +124,14 @@ export class BotRoom extends GameRoom {
     this.scheduleBotStep();
   }
 
+  protected override customizeInitialMatch(state: MatchState, events: GameEvent[]): void {
+    const setup = this.setup.get(this.humanSeat)?.devTest;
+    if (!setup) return;
+    this.devTestActive = true;
+    events.length = 0;
+    applyDevTestMatchSetup(state, setup);
+  }
+
   protected override afterCommandApplied(_envelope: CommandEnvelope, events: GameEvent[]): void {
     this.lastBatchAnimationMs = estimateEventAnimationMs(events);
     this.scheduleBotStep();
@@ -114,6 +139,10 @@ export class BotRoom extends GameRoom {
 
   protected override getMatchPersistenceMetadata(): MatchPersistenceMetadata {
     return { isVsAi: true, aiDifficulty: this.difficulty, aiTheme: this.theme };
+  }
+
+  protected override shouldPersistMatchSideEffects(): boolean {
+    return !this.devTestActive;
   }
 
   private buildBotSetup(): PlayerSetup {

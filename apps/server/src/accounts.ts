@@ -1,6 +1,7 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
 import { createSupabaseServerClient, getAuthenticatedUser, getOwnedDeck, listUserCollection } from "@twcardgame/db";
 import { validateDeck } from "@twcardgame/rules";
+import type { DevTestMatchSetup } from "@twcardgame/shared";
 
 export interface JoinOptions {
   userId?: string;
@@ -8,12 +9,14 @@ export interface JoinOptions {
   deckIds?: string[];
   deckId?: string;
   accessToken?: string;
+  devTest?: DevTestMatchSetup;
 }
 
 export interface PlayerSetup {
   userId: string;
   displayName: string;
   deckIds: string[];
+  devTest?: DevTestMatchSetup;
 }
 
 export interface AccountDeckStore {
