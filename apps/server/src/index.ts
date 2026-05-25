@@ -5,7 +5,8 @@ import { GameRoom } from "./GameRoom.js";
 import { logger } from "./logger.js";
 import { lookupRoomIdByJoinCode, normalizeJoinCode } from "./privateRooms.js";
 
-const port = Number(process.env.PORT ?? 2567);
+const port = Number.parseInt(process.env.PORT || "2567", 10);
+const host = process.env.HOST || "0.0.0.0";
 
 process.on("unhandledRejection", (reason) => {
   logger.error("unhandledRejection", { reason });
@@ -51,5 +52,5 @@ gameServer.onBeforeShutdown(() => {
   logger.info("server.shutdown.draining");
 });
 
-await gameServer.listen(port);
-logger.info("server.listen", { port });
+await gameServer.listen(port, host);
+logger.info("server.listen", { host, port });
