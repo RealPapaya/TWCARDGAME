@@ -1,6 +1,6 @@
 import { Client, type Room } from "@colyseus/sdk";
 import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
-import { AI_THEMES } from "@twcardgame/shared";
+import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared";
 import type {
   AiDifficulty,
   ClientCommandMessage,
@@ -757,7 +757,11 @@ function renderProfileScreen(): string {
   const avatarUrl = profile?.avatar_url || "/images/avatars/avatar1.webp";
   const stats = computeMatchStats();
   const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
-  const level = deriveLbLevel(stats.wins);
+  const level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(profile?.level ?? 1)));
+  const xp = Math.max(0, Math.floor(profile?.xp ?? 0));
+  const xpRequired = getXPRequiredForLevel(level);
+  const xpProgress = level >= MAX_LEVEL || xpRequired <= 0 ? 100 : Math.min(100, Math.round((xp / xpRequired) * 100));
+  const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
   const ownedCardCount = view.collection.reduce((sum, row) => sum + row.quantity, 0);
   const title = profile?.selected_title || "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
@@ -795,6 +799,22 @@ function renderProfileScreen(): string {
               <span>Lv. ${level}</span>
               <span>${stats.wins} 勝</span>
               <span>${winRateLabel} 勝率</span>
+            </div>
+            <div class="profile-xp" data-testid="profile-xp-bar">
+              <div class="profile-xp-top">
+                <span>經驗值</span>
+                <strong>${xpDisplay}</strong>
+              </div>
+              <div
+                class="profile-xp-track"
+                role="progressbar"
+                aria-label="經驗值"
+                aria-valuemin="0"
+                aria-valuemax="${level >= MAX_LEVEL ? 100 : xpRequired}"
+                aria-valuenow="${level >= MAX_LEVEL ? 100 : Math.min(xp, xpRequired)}"
+              >
+                <div class="profile-xp-fill" style="width: ${xpProgress}%"></div>
+              </div>
             </div>
           </div>
           ${view.avatarPickerOpen ? `
