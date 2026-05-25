@@ -810,6 +810,17 @@ input {
   text-shadow: 1px 1px 2px #000, 0 0 8px rgba(85, 255, 106, 0.65);
 }
 
+/* Cost uses inverted semantics: lower cost = discount (green), higher = tax (red) */
+.card-cost.stat-lower {
+  color: #55ff6a;
+  text-shadow: 1px 1px 2px #000, 0 0 8px rgba(85, 255, 106, 0.65);
+}
+
+.card-cost.stat-higher {
+  color: #ff4d4d;
+  text-shadow: 1px 1px 2px #000, 0 0 8px rgba(255, 77, 77, 0.65);
+}
+
 .stat-atk {
   background: linear-gradient(135deg, #f09819, #edde5d);
   clip-path: polygon(50% 0, 80% 20%, 80% 62%, 100% 62%, 100% 80%, 70% 80%, 70% 100%, 30% 100%, 30% 80%, 0 80%, 0 62%, 20% 62%, 20% 20%);
