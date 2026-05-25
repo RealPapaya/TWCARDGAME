@@ -2,10 +2,12 @@ FROM node:24-alpine AS deps
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY apps/server/package.json apps/server/package.json
+COPY apps/web/package.json apps/web/package.json
 COPY packages/cards/package.json packages/cards/package.json
 COPY packages/db/package.json packages/db/package.json
 COPY packages/rules/package.json packages/rules/package.json
 COPY packages/shared/package.json packages/shared/package.json
+COPY packages/test-utils/package.json packages/test-utils/package.json
 RUN npm ci
 
 FROM deps AS build
