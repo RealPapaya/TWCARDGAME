@@ -1679,6 +1679,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     "minion",
     minion.taunt && "taunt",
     minion.divineShield && "shielded",
+    minion.divineShield && "divine-shield",
     mine && minion.canAttack && "can-attack",
     minion.isEnraged && "enraged",
     minion.lockedTurns > 0 && "locked",
@@ -2008,7 +2009,8 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "damage" || cue.kind === "heal") {
     if (!cue.targetKey || cue.amount === undefined) return "";
     const sign = cue.kind === "damage" ? "-" : "+";
-    return `<div class="float-number ${cue.kind}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
+    const burst = cue.kind === "heal" ? renderHealBurst(cue, cueStyle) : "";
+    return `${burst}<div class="float-number ${cue.kind}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
   }
   if (cue.kind === "destroy") {
     if (!cue.targetKey) return "";
@@ -2016,6 +2018,22 @@ function renderEventCue(cue: AnimationCue): string {
     return `<div class="death-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
   }
   return `<div class="event-cue event-${cue.kind}"${cueStyle} data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
+}
+
+function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
+  if (!cue.targetKey) return "";
+  const particles = [
+    ["-24px", "-18px", "18px", "0ms"],
+    ["16px", "-22px", "24px", "80ms"],
+    ["-8px", "8px", "28px", "130ms"],
+    ["28px", "10px", "20px", "180ms"],
+    ["-30px", "20px", "26px", "240ms"],
+    ["8px", "24px", "18px", "320ms"]
+  ];
+  const spans = particles.map(([x, y, size, delay]) => (
+    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}">+</span>`
+  )).join("");
+  return `<div class="heal-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans}</div>`;
 }
 
 function cueStyleAttr(cue: AnimationCue): string {

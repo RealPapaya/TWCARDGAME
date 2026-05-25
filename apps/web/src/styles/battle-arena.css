@@ -861,6 +861,94 @@
   border-width: 2px;
 }
 
+.battle-surface .minion.taunt {
+  border-radius: 10px 10px 50% 50% / 10% 10% 20% 20%;
+  border-width: 4px;
+  border-color: #c0c0c0;
+  box-shadow: 0 0 20px rgba(192, 192, 192, 0.6), inset 0 0 15px rgba(192, 192, 192, 0.3);
+  animation: taunt-border-pulse 2s ease-in-out infinite;
+}
+
+.battle-surface .minion.taunt:not(.valid-target)::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  font-size: 32px;
+  opacity: 0;
+  transform: scale(0.5);
+  pointer-events: none;
+  z-index: 10;
+  filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.8));
+  transition: all 0.3s ease;
+  animation: taunt-shield-appear 0.8s ease-out 0.3s forwards;
+}
+
+.battle-surface .minion.taunt.can-attack {
+  box-shadow: 0 0 30px var(--neon-lime), 0 0 10px rgba(192, 192, 192, 0.4) !important;
+}
+
+.battle-surface .minion.shielded::after,
+.battle-surface .minion.divine-shield::after {
+  content: "";
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  bottom: -8px;
+  left: -8px;
+  border: 3px solid #ffff00;
+  border-radius: 16px;
+  box-shadow: 0 0 20px #ffff00, inset 0 0 10px #ffff00;
+  pointer-events: none;
+  z-index: 5;
+  animation: shield-pulse 2s ease-in-out infinite;
+}
+
+.battle-surface .minion.shielded.can-attack,
+.battle-surface .minion.divine-shield.can-attack {
+  box-shadow: 0 0 20px var(--neon-lime) !important;
+}
+
+@keyframes taunt-shield-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5) rotate(-10deg);
+    filter: drop-shadow(0 0 0 rgba(192, 192, 192, 0));
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.3) rotate(5deg);
+    filter: drop-shadow(0 0 20px rgba(255, 255, 255, 1)) drop-shadow(0 0 40px rgba(192, 192, 192, 0.8));
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: drop-shadow(0 0 8px rgba(192, 192, 192, 0.8));
+  }
+}
+
+@keyframes taunt-border-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(192, 192, 192, 0.3), 0 0 20px rgba(192, 192, 192, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 15px rgba(192, 192, 192, 0.5), 0 0 30px rgba(192, 192, 192, 0.3);
+  }
+}
+
+@keyframes shield-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+}
+
 .battle-surface .minion-art {
   height: 60px;
   flex-basis: 60px;
