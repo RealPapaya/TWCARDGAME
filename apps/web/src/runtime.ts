@@ -40,7 +40,8 @@ import {
   sfxMutedKey,
   sfxVolumeKey,
   toggleBgmMute,
-  toggleSfxMute
+  toggleSfxMute,
+  type SoundCue
 } from "./app/audio.js";
 import { defaultServerUrl, forceDevAuth, supabase as configuredSupabase } from "./app/config.js";
 import { setAppContext } from "./app/context.js";
@@ -4966,8 +4967,8 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
   maybeShowTurnAnnouncement(message);
-  enqueueEventCues(message);
-  scheduleAttackImpactAudio(message);
+  const cues = enqueueEventCues(message);
+  scheduleCueAudio(cues, message);
   playEventAudio(immediateAudioEvents(message));
   playDiscardAnimations(message, view.mySeat);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
@@ -4992,32 +4993,76 @@ function handleEvents(message: GameEvent[]): void {
   render();
 }
 
-function scheduleAttackImpactAudio(events: GameEvent[]): void {
-  for (let i = 0; i < events.length; i++) {
-    const event = events[i];
-    if (event.type !== "ATTACK") continue;
-    const nextDamage = events.slice(i + 1).find((item) => item.type === "DAMAGE");
-    const dmg = typeof nextDamage?.payload?.amount === "number" ? nextDamage.payload.amount : 0;
-    const cue = dmg >= 7 ? "attackHeavy" : "attack";
-    window.setTimeout(() => playSfx(cue), ATTACK_IMPACT_DELAY_MS);
+function immediateAudioEvents(events: GameEvent[]): GameEvent[] {
+  return events.filter((event) => event.type === "TURN_STARTED" || event.type === "COMMAND_REJECTED");
+}
+
+function scheduleCueAudio(cues: AnimationCue[], sourceEvents: GameEvent[]): void {
+  const attackDamageSeqs = attackDamageEventSeqs(sourceEvents);
+  const scheduled = new Set<string>();
+  for (const cue of cues) {
+    const sound = soundForCue(cue, sourceEvents, attackDamageSeqs);
+    if (!sound) continue;
+    const delayMs = audioDelayForCue(cue);
+    const dueBucket = Math.round(delayMs / 50) * 50;
+    const key = `${sound}:${dueBucket}`;
+    if (scheduled.has(key)) continue;
+    scheduled.add(key);
+    window.setTimeout(() => playSfx(sound), delayMs);
   }
 }
 
-function immediateAudioEvents(events: GameEvent[]): GameEvent[] {
-  const attackDamageIndexes = new Set<number>();
+function soundForCue(cue: AnimationCue, sourceEvents: GameEvent[], attackDamageSeqs: Set<number>): SoundCue | undefined {
+  if (cue.kind === "attackerMoves") return attackImpactSound(cue, sourceEvents);
+  if (cue.kind === "damage") {
+    const seq = cueEventSeq(cue);
+    return seq !== undefined && attackDamageSeqs.has(seq) ? undefined : "damage";
+  }
+  if (cue.kind === "heal") return "heal";
+  if (cue.kind === "buff") return "heal";
+  if (cue.kind === "bounce") return "reject";
+  if (cue.kind === "destroy") return "death";
+  return undefined;
+}
+
+function audioDelayForCue(cue: AnimationCue): number {
+  if (cue.kind === "attackerMoves") return ATTACK_IMPACT_DELAY_MS;
+  return Math.max(0, Math.round(cue.delayMs ?? 0));
+}
+
+function attackImpactSound(cue: AnimationCue, sourceEvents: GameEvent[]): SoundCue {
+  const seq = cueEventSeq(cue);
+  const attackIndex = sourceEvents.findIndex((event) => event.type === "ATTACK" && event.seq === seq);
+  const nextDamage = attackIndex >= 0
+    ? sourceEvents.slice(attackIndex + 1).find((event) => event.type === "DAMAGE")
+    : undefined;
+  const amount = typeof nextDamage?.payload?.amount === "number" ? nextDamage.payload.amount : 0;
+  return amount >= 7 ? "attackHeavy" : "attack";
+}
+
+function attackDamageEventSeqs(events: GameEvent[]): Set<number> {
+  const seqs = new Set<number>();
   for (let i = 0; i < events.length; i++) {
     if (events[i].type !== "ATTACK") continue;
     for (let j = i + 1; j < events.length; j++) {
       const type = events[j].type;
       if (type === "DAMAGE") {
-        attackDamageIndexes.add(j);
+        seqs.add(events[j].seq);
         continue;
       }
       if (type === "DESTROY" || type === "GAME_FINISHED") continue;
       break;
     }
   }
-  return events.filter((event, index) => event.type !== "ATTACK" && !attackDamageIndexes.has(index));
+  return seqs;
+}
+
+function cueEventSeq(cue: AnimationCue): number | undefined {
+  const separatorIndex = cue.id.indexOf("-");
+  if (separatorIndex < 0) return undefined;
+  const rawSeq = cue.id.slice(0, separatorIndex);
+  const seq = Number(rawSeq);
+  return Number.isFinite(seq) ? seq : undefined;
 }
 
 const cardPlayCueQueue: AnimationCue[] = [];
@@ -5360,7 +5405,7 @@ function consumeSuppressedPlayCue(cue: AnimationCue): boolean {
   return true;
 }
 
-function enqueueEventCues(events: GameEvent[]): void {
+function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   blog("events received", { types: events.map((e) => e.type) });
   const rawCues = events
     .map((event, index) => eventToCue(event, events, index))
@@ -5368,7 +5413,7 @@ function enqueueEventCues(events: GameEvent[]): void {
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
   const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues));
-  if (cues.length === 0) return;
+  if (cues.length === 0) return [];
   blog("events cues", {
     cues: cues.map((c) => ({ kind: c.kind, delayMs: c.delayMs, targetKey: c.targetKey, cardId: c.cardId }))
   });
@@ -5389,6 +5434,7 @@ function enqueueEventCues(events: GameEvent[]): void {
       render();
     }, lifetime + (cue.delayMs ?? 0));
   }
+  return cues;
 }
 
 function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
