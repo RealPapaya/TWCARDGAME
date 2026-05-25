@@ -1270,6 +1270,152 @@ input {
   text-shadow: 0 0 20px currentColor, 0 8px 20px #000;
 }
 
+/* --- Post-match reward overlay --- */
+
+.reward-overlay .reward-content {
+  width: min(560px, 92vw);
+  padding: 28px 36px 32px;
+  background: linear-gradient(180deg, rgba(28, 24, 16, 0.95), rgba(12, 10, 6, 0.95));
+  border: 2px solid #d9b25a;
+  border-radius: 18px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(255, 215, 100, 0.15) inset;
+  gap: 22px;
+}
+
+.reward-overlay .reward-title {
+  font-size: 92px;
+  margin: 0;
+  padding-bottom: 4px;
+  letter-spacing: 4px;
+  text-shadow: 0 0 22px currentColor, 0 6px 18px #000;
+}
+
+.reward-overlay .reward-title.win {
+  color: #ffe45d;
+}
+
+.reward-overlay .reward-title.loss {
+  color: #d8514a;
+}
+
+.reward-section {
+  width: 100%;
+  display: grid;
+  gap: 8px;
+  padding: 14px 18px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(217, 178, 90, 0.35);
+  border-radius: 12px;
+}
+
+.reward-section-label {
+  font-size: 14px;
+  color: #d9b25a;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}
+
+.reward-level-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reward-level-chip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 64px;
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f7d779, #b8862d);
+  color: #1d1305;
+  font-weight: 900;
+  font-size: 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+}
+
+.reward-xp-readout {
+  font-variant-numeric: tabular-nums;
+  color: #f6e2a2;
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.reward-xp-bar-track {
+  position: relative;
+  height: 14px;
+  width: 100%;
+  background: rgba(0, 0, 0, 0.55);
+  border: 1px solid rgba(217, 178, 90, 0.4);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.reward-xp-bar-fill {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, #ffe066, #ff9d3a);
+  box-shadow: 0 0 12px rgba(255, 192, 80, 0.65) inset;
+  transition: width 60ms linear;
+}
+
+.reward-overlay.stage-xp .reward-xp-bar-fill {
+  filter: drop-shadow(0 0 6px rgba(255, 220, 120, 0.7));
+}
+
+.reward-gold-counter {
+  font-size: 44px;
+  font-weight: 900;
+  color: #ffd766;
+  text-shadow: 0 0 14px rgba(255, 200, 80, 0.55), 0 4px 10px #000;
+  font-variant-numeric: tabular-nums;
+}
+
+.reward-overlay.stage-gold .reward-gold-counter {
+  animation: reward-gold-pulse 320ms ease-out infinite alternate;
+}
+
+@keyframes reward-gold-pulse {
+  from { transform: scale(1); }
+  to { transform: scale(1.04); }
+}
+
+.reward-source {
+  color: #c5b58c;
+  font-size: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  min-height: 18px;
+}
+
+.reward-continue {
+  min-width: 200px;
+  min-height: 48px;
+  padding: 0 28px;
+  margin-top: 6px;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  border-radius: 10px;
+  border: 2px solid #d9b25a;
+  background: linear-gradient(180deg, #f7d779, #b8862d);
+  color: #1d1305;
+  cursor: pointer;
+  transition: transform 80ms ease, filter 80ms ease;
+}
+
+.reward-continue:disabled {
+  cursor: default;
+  filter: grayscale(0.35) brightness(0.85);
+}
+
+.reward-continue:not(:disabled):hover {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
 .event-layer {
   position: absolute;
   inset: 0;

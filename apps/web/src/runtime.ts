@@ -13,6 +13,7 @@ import type {
   LeaderboardRow,
   PublicMinion,
   PublicPlayer,
+  RewardSummary,
   Seat,
   TargetRef
 } from "@twcardgame/shared";
@@ -76,9 +77,15 @@ import type {
   ShopItemRow
 } from "./app/types.js";
 import { installViewportGuards } from "./app/viewport.js";
+import {
+  renderRewardOverlay,
+  resetRewardScreen,
+  skipRewardAnimation,
+  startRewardAnimation
+} from "./app/reward-screen.js";
 
 const PROFILE_SELECT =
-  "user_id,display_name,avatar_url,gold,vouchers,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+  "user_id,display_name,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
@@ -1949,20 +1956,37 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
 
 function renderResultOverlay(status: GameStatus | ""): string {
   if (status !== "finished" && status !== "abandoned") return "";
-  const winnerSeat = view.publicSync?.result?.winnerSeat || view.state?.resultWinnerSeat || view.state?.result?.winnerSeat;
-  const reason = view.publicSync?.result?.reason || view.state?.resultReason || view.state?.result?.reason || status;
-  const won = winnerSeat && winnerSeat === view.mySeat;
-  const title = status === "abandoned" ? "Match Abandoned" : won ? "Victory" : winnerSeat ? "Defeat" : "Game Finished";
+  // The animated post-match reward screen replaces the old static overlay.
+  // If we don't yet have a RewardSummary from the server, fall back to a
+  // synthesized loss summary so the player sees DEFEAT without blocking.
+  if (!view.rewardSummary) ensureFallbackRewardSummary(status);
+  return renderRewardOverlay(view);
+}
 
-  return `
-    <section class="result-overlay" data-testid="result-overlay">
-      <div class="result-content">
-        <h2 class="result-text">${escapeHtml(title)}</h2>
-        <p>${escapeHtml(reason)}</p>
-        <button id="back-to-lobby" data-testid="back-to-lobby">Back to Lobby</button>
-      </div>
-    </section>
-  `;
+let rewardFallbackTimer: number | undefined;
+function ensureFallbackRewardSummary(status: GameStatus | ""): void {
+  if (view.rewardSummary || rewardFallbackTimer !== undefined) return;
+  // Server pushes reward_summary after persistence; give it a beat first.
+  rewardFallbackTimer = window.setTimeout(() => {
+    rewardFallbackTimer = undefined;
+    if (view.rewardSummary) return;
+    const winnerSeat = view.publicSync?.result?.winnerSeat ?? view.state?.result?.winnerSeat;
+    const won = Boolean(view.mySeat && winnerSeat === view.mySeat);
+    view.rewardSummary = {
+      result: won ? "win" : "loss",
+      mode: "pvp",
+      source: "none",
+      aiTheme: null,
+      aiDifficulty: null,
+      xp: { before: view.profile?.xp ?? 0, after: view.profile?.xp ?? 0, gained: 0 },
+      level: { before: view.profile?.level ?? 1, after: view.profile?.level ?? 1 },
+      levelUps: [],
+      gold: { before: view.profile?.gold ?? 0, after: view.profile?.gold ?? 0, gained: 0, breakdown: {} }
+    };
+    void status; // status param kept for future symmetry; currently unused.
+    startRewardAnimation(view, render);
+    render();
+  }, 800);
 }
 
 function renderEventCues(): string {
@@ -2286,7 +2310,18 @@ function bindStaticActions(): void {
       render();
     }
   });
-  on(document.querySelector<HTMLButtonElement>("#back-to-lobby"), "click", "back-to-lobby", () => void backToLobby());
+  on(document.querySelector<HTMLButtonElement>("#reward-continue"), "click", "reward-continue", () => {
+    const stage = view.rewardAnim?.stage;
+    if (stage === "done") void backToLobby();
+    else skipRewardAnimation(view, render);
+  });
+  on(document.querySelector<HTMLElement>(".reward-overlay"), "click", "reward-overlay-skip", (event) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest("#reward-continue")) return;
+    if (view.rewardAnim && view.rewardAnim.stage !== "done") {
+      skipRewardAnimation(view, render);
+    }
+  });
 
   for (const el of document.querySelectorAll<HTMLElement>("[data-select-deck]")) {
     on(el, "click", "select-deck", () => {
@@ -3656,6 +3691,11 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
 function bindRoomMessages(joined: Room): void {
   view.room = joined;
   resetMinionVisualTracking();
+  resetRewardScreen(view);
+  if (rewardFallbackTimer !== undefined) {
+    window.clearTimeout(rewardFallbackTimer);
+    rewardFallbackTimer = undefined;
+  }
   view.eventStatus = undefined;
   view.publicSync = undefined;
   view.presence.clear();
@@ -3698,6 +3738,21 @@ function bindRoomMessages(joined: Room): void {
   );
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
+  });
+  joined.onMessage("reward_summary", (message: RewardSummary) => {
+    view.rewardSummary = message;
+    // Keep local profile in sync with the server-confirmed deltas so reopening
+    // the lobby reflects the new gold/xp/level immediately.
+    if (view.profile && message.result === "win") {
+      view.profile = {
+        ...view.profile,
+        gold: message.gold.after,
+        xp: message.xp.after,
+        level: message.level.after
+      };
+    }
+    startRewardAnimation(view, render);
+    render();
   });
 }
 
@@ -4353,6 +4408,11 @@ function parseTargetAttr(el: HTMLElement | null): TargetRef | undefined {
 
 async function backToLobby(): Promise<void> {
   const room = view.room;
+  if (rewardFallbackTimer !== undefined) {
+    window.clearTimeout(rewardFallbackTimer);
+    rewardFallbackTimer = undefined;
+  }
+  resetRewardScreen(view);
   view.room = undefined;
   view.mySeat = undefined;
   view.hand = [];

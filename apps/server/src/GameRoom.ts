@@ -18,6 +18,7 @@ import {
 import { logger } from "./logger.js";
 import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
 import { createMatchResultPersistenceFromEnv, type MatchPersistenceMetadata, type MatchResultPersistence } from "./persistence.js";
+import { createMatchRewardsFromEnv, type MatchRewardDispatcher } from "./rewards.js";
 import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoinCodeForRoom } from "./privateRooms.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
@@ -41,7 +42,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   constructor(
     persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv(),
-    protected readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv()
+    protected readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv(),
+    protected readonly rewards: MatchRewardDispatcher = createMatchRewardsFromEnv()
   ) {
     super();
     this.finalizer = new MatchResultFinalizer(persistence);
@@ -285,8 +287,27 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   protected afterMatchComplete(): void {
     if (!this.match || !isMatchComplete(this.match)) return;
     this.lock();
-    void this.finalizer.persistOnce(this.match, this.getMatchPersistenceMetadata());
+    const metadata = this.getMatchPersistenceMetadata();
+    void this.finalizeAndReward(metadata);
     this.scheduleCleanup();
+  }
+
+  private async finalizeAndReward(metadata: MatchPersistenceMetadata | undefined): Promise<void> {
+    if (!this.match) return;
+    // Persist first so the match_history row exists before reward events
+    // reference it (the RPC uses match_id as source_id in user_events).
+    await this.finalizer.persistOnce(this.match, metadata);
+    try {
+      const summaries = await this.rewards.grantForMatch(this.match, metadata);
+      for (const client of this.clients) {
+        const seat = this.seats.get(client.sessionId);
+        if (!seat) continue;
+        const summary = summaries.get(seat);
+        if (summary) client.send("reward_summary", summary);
+      }
+    } catch (error) {
+      logger.warn("match.rewards.dispatch_failed", { matchId: this.match.matchId, error });
+    }
   }
 
   protected getMatchPersistenceMetadata(): MatchPersistenceMetadata | undefined {

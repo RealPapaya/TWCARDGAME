@@ -269,3 +269,4 @@ export interface GameEvent {
 }
 
 export * from "./animationTiming.js";
+export * from "./progression.js";

@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { PublicGameState, Seat } from "@twcardgame/shared";
+import type { AiDifficulty, AiTheme, PublicGameState, RewardSummary, Seat } from "@twcardgame/shared";
 
 export interface DatabaseConfig {
   url: string;
@@ -16,7 +16,8 @@ export interface MatchHistoryRow {
   result_reason: string;
   final_state: PublicGameState;
   is_vs_ai?: boolean;
-  ai_difficulty?: "easy" | "normal" | "hard" | null;
+  ai_difficulty?: AiDifficulty | null;
+  ai_theme?: AiTheme | null;
   created_at?: string;
   finished_at?: string;
 }
@@ -33,6 +34,8 @@ export interface PlayerProfileRow {
   avatar_url?: string | null;
   gold?: number;
   vouchers?: number;
+  xp?: number;
+  level?: number;
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string;
@@ -186,6 +189,36 @@ export async function persistMatchHistory(client: SupabaseClient, row: MatchHist
 export async function recordPvpWin(client: SupabaseClient, matchId: string): Promise<void> {
   const { error } = await client.rpc("record_pvp_win", { p_match_id: matchId });
   if (error) throw error;
+}
+
+export interface ApplyMatchRewardsInput {
+  userId: string;
+  matchId: string;
+  mode: "pvp" | "pve";
+  aiTheme?: AiTheme | null;
+  aiDifficulty?: AiDifficulty | null;
+  pvpXp?: number;
+}
+
+/**
+ * Server-only RPC. Computes XP/level/gold deltas for one player and persists
+ * them atomically. Returns the raw payload shaped like `RewardSummary` minus
+ * the `result` field (caller knows winner vs loser).
+ */
+export async function applyMatchRewards(
+  client: SupabaseClient,
+  input: ApplyMatchRewardsInput
+): Promise<Omit<RewardSummary, "result"> & { idempotent: boolean }> {
+  const { data, error } = await client.rpc("apply_match_rewards", {
+    p_user_id: input.userId,
+    p_match_id: input.matchId,
+    p_mode: input.mode,
+    p_ai_theme: input.aiTheme ?? null,
+    p_ai_difficulty: input.aiDifficulty ?? null,
+    p_pvp_xp: input.pvpXp ?? 0
+  });
+  if (error) throw error;
+  return data as Omit<RewardSummary, "result"> & { idempotent: boolean };
 }
 
 export async function recordDailyLogin(client: SupabaseClient): Promise<DailyLoginResult> {

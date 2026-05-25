@@ -113,7 +113,7 @@ export class BotRoom extends GameRoom {
   }
 
   protected override getMatchPersistenceMetadata(): MatchPersistenceMetadata {
-    return { isVsAi: true, aiDifficulty: this.difficulty };
+    return { isVsAi: true, aiDifficulty: this.difficulty, aiTheme: this.theme };
   }
 
   private buildBotSetup(): PlayerSetup {

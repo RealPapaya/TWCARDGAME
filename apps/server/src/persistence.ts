@@ -1,11 +1,12 @@
 import { createSupabaseServerClient, persistMatchHistory, recordPvpWin, type MatchHistoryRow } from "@twcardgame/db";
 import { toPublicState, type MatchState } from "@twcardgame/rules";
-import type { AiDifficulty } from "@twcardgame/shared";
+import type { AiDifficulty, AiTheme } from "@twcardgame/shared";
 import { logger } from "./logger.js";
 
 export interface MatchPersistenceMetadata {
   isVsAi?: boolean;
   aiDifficulty?: AiDifficulty;
+  aiTheme?: AiTheme;
 }
 
 export interface MatchResultPersistence {
@@ -70,6 +71,7 @@ export function buildMatchHistoryRow(
     final_state: toPublicState(state),
     is_vs_ai: metadata?.isVsAi ?? false,
     ai_difficulty: metadata?.aiDifficulty ?? null,
+    ai_theme: metadata?.aiTheme ?? null,
     finished_at: finishedAt.toISOString()
   };
 }

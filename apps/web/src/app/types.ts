@@ -11,6 +11,7 @@ import type {
   HandCardView,
   LeaderboardRow,
   PublicPlayer,
+  RewardSummary,
   Seat,
   ShopItemRow,
   TargetRef
@@ -106,6 +107,8 @@ export type ClientViewState = {
   };
   eventStatus?: GameStatus;
   toast?: string;
+  rewardSummary?: RewardSummary;
+  rewardAnim?: RewardAnimationState;
   joining: boolean;
   accountLoading: boolean;
   session?: Session | null;
@@ -194,6 +197,8 @@ export type ProfileRow = {
   avatar_url?: string | null;
   gold: number;
   vouchers: number;
+  xp?: number;
+  level?: number;
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string;
@@ -226,6 +231,23 @@ export type MatchHistoryRow = {
   finished_at?: string;
   player1_user_id?: string | null;
   player2_user_id?: string | null;
+};
+
+/**
+ * Drives the post-match reward animation. The overlay shell is rendered once
+ * by render(); the XP bar / gold ticker mutate via rAF (reward-screen.ts).
+ */
+export type RewardAnimationState = {
+  /** "xp" -> filling bar; "gold" -> ticker; "done" -> continue button armed. */
+  stage: "xp" | "gold" | "done";
+  /** Displayed level while the XP bar walks through level-ups. */
+  displayedLevel: number;
+  /** Displayed XP into the current level (used to render the bar). */
+  displayedXpIntoLevel: number;
+  /** Bar capacity for the displayed level. */
+  displayedXpRequired: number;
+  /** Displayed gold counter mid-tween. */
+  displayedGold: number;
 };
 
 export type PackOpeningReward =
