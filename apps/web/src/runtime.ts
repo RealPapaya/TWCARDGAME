@@ -4750,9 +4750,7 @@ async function loadAccountDataRaw(): Promise<void> {
 
 async function ensureCollection(): Promise<void> {
   if (!supabase) return;
-  const { error } = await supabase.rpc("ensure_full_seed_collection", {
-    target_version: CARD_CATALOG_VERSION
-  });
+  const { error } = await supabase.rpc("ensure_starter_collection");
   if (error) throw error;
 }
 

@@ -8,6 +8,10 @@ const serviceRoleGrantsMigration = readFileSync(new URL("../migrations/0004_phas
 const legacyShopMigration = readFileSync(new URL("../migrations/0006_legacy_shop_items.sql", import.meta.url), "utf8");
 const userDataMigration = readFileSync(new URL("../migrations/0007_user_inventory_login_quests.sql", import.meta.url), "utf8");
 const friendRequestsMigration = readFileSync(new URL("../migrations/0008_friend_requests.sql", import.meta.url), "utf8");
+const starterCollectionSecurityMigration = readFileSync(
+  new URL("../migrations/0013_starter_collection_security.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -34,10 +38,21 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("exposes authenticated Phase 4 RPCs without anonymous write grants", () => {
-    expect(phase4Migration + grantsMigration).toContain("grant execute on function public.ensure_full_seed_collection(text) to authenticated;");
     expect(phase4Migration + grantsMigration).toContain("grant execute on function public.save_user_deck(uuid, text, text, text[]) to authenticated;");
     expect(phase4Migration + grantsMigration).toContain("grant execute on function public.delete_user_deck(uuid) to authenticated;");
     expect(phase4Migration).not.toContain("to anon");
+  });
+
+  it("keeps full catalog seed restricted and exposes only starter bootstrap to authenticated users", () => {
+    expect(starterCollectionSecurityMigration).toContain(
+      "revoke execute on function public.ensure_full_seed_collection(text) from anon, authenticated;"
+    );
+    expect(starterCollectionSecurityMigration).toContain(
+      "grant execute on function public.ensure_full_seed_collection(text) to service_role;"
+    );
+    expect(starterCollectionSecurityMigration).toContain(
+      "grant execute on function public.ensure_starter_collection() to authenticated;"
+    );
   });
 
   it("grants browser table privileges required before RLS policies are evaluated", () => {

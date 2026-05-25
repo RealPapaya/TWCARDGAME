@@ -261,7 +261,8 @@ export async function publishCardCatalogSnapshot(
 ): Promise<void> {
   const { error } = await client.from("card_catalog_snapshots").upsert({
     version: snapshot.version,
-    cards: snapshot.cards
+    cards: snapshot.cards,
+    created_at: new Date().toISOString()
   });
   if (error) throw error;
 }
