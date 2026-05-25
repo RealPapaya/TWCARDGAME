@@ -267,3 +267,5 @@ export interface GameEvent {
   seat?: Seat;
   payload?: Record<string, unknown>;
 }
+
+export * from "./animationTiming.js";

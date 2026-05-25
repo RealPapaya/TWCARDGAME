@@ -232,11 +232,11 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (result.events.length > 0) this.broadcast("events", result.events);
     this.sendAllPrivateState();
     this.afterMatchComplete();
-    this.afterCommandApplied(envelope);
+    this.afterCommandApplied(envelope, result.events);
   }
 
   /** Hook for subclasses; runs after a successful command application. */
-  protected afterCommandApplied(_envelope: CommandEnvelope): void {
+  protected afterCommandApplied(_envelope: CommandEnvelope, _events: GameEvent[]): void {
     // no-op in the base PvP room.
   }
 

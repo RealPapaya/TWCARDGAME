@@ -3,10 +3,12 @@ import { decide, legalMoves, normalizeSeed, type BotRngState } from "@twcardgame
 import {
   AI_THEMES,
   AI_THEME_DECKS,
+  estimateEventAnimationMs,
   isAiTheme,
   type AiDifficulty,
   type AiTheme,
   type CommandEnvelope,
+  type GameEvent,
   type Seat
 } from "@twcardgame/shared";
 import { type Client } from "colyseus";
@@ -27,6 +29,7 @@ const BOT_END_TURN_DELAY_MS = parseInt(
   process.env.BOT_END_TURN_DELAY_MS ?? process.env.BOT_ACTION_DELAY_MS ?? process.env.BOT_THINK_DELAY_MS ?? "900",
   10
 );
+const BOT_ANIMATION_BUFFER_MS = parseInt(process.env.BOT_ANIMATION_BUFFER_MS ?? "200", 10);
 
 const ALLOWED_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"];
 
@@ -54,6 +57,7 @@ export class BotRoom extends GameRoom {
   private commandCounter = 0;
   private botStepScheduled = false;
   private lastBotTurnKey?: string;
+  private lastBatchAnimationMs = 0;
 
   override onCreate(options: BotRoomCreateOptions = {}): void {
     super.onCreate({ ...options, joinCode: options.joinCode, private: true });
@@ -103,7 +107,8 @@ export class BotRoom extends GameRoom {
     this.scheduleBotStep();
   }
 
-  protected override afterCommandApplied(_envelope: CommandEnvelope): void {
+  protected override afterCommandApplied(_envelope: CommandEnvelope, events: GameEvent[]): void {
+    this.lastBatchAnimationMs = estimateEventAnimationMs(events);
     this.scheduleBotStep();
   }
 
@@ -153,10 +158,15 @@ export class BotRoom extends GameRoom {
     const isFirstStepThisTurn = this.lastBotTurnKey !== botTurnKey;
     this.lastBotTurnKey = botTurnKey;
     this.botStepScheduled = true;
+    const baseDelay = isFirstStepThisTurn ? BOT_DRAW_DELAY_MS : BOT_PLAY_INTERVAL_MS;
+    const animationDelay = this.lastBatchAnimationMs > 0
+      ? this.lastBatchAnimationMs + BOT_ANIMATION_BUFFER_MS
+      : 0;
+    this.lastBatchAnimationMs = 0;
     this.clock.setTimeout(() => {
       this.botStepScheduled = false;
       this.runBotTurnStep();
-    }, isFirstStepThisTurn ? BOT_DRAW_DELAY_MS : BOT_PLAY_INTERVAL_MS);
+    }, Math.max(baseDelay, animationDelay));
   }
 
   private runBotMulligan(): void {
@@ -204,6 +214,10 @@ export class BotRoom extends GameRoom {
   private scheduleBotEndTurn(): void {
     if (this.botStepScheduled) return;
     this.botStepScheduled = true;
+    const animationDelay = this.lastBatchAnimationMs > 0
+      ? this.lastBatchAnimationMs + BOT_ANIMATION_BUFFER_MS
+      : 0;
+    this.lastBatchAnimationMs = 0;
     this.clock.setTimeout(() => {
       this.botStepScheduled = false;
       if (!this.match) return;
@@ -215,7 +229,7 @@ export class BotRoom extends GameRoom {
         nowMs: Date.now(),
         command: { type: "endTurn" }
       });
-    }, BOT_END_TURN_DELAY_MS);
+    }, Math.max(BOT_END_TURN_DELAY_MS, animationDelay));
   }
 
   private nextCommandId(tag: string): string {
