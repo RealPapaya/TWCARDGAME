@@ -295,6 +295,10 @@
 
 .reward-title-badge,
 .reward-voucher-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   max-width: 120px;
   padding: 10px 12px;
   border: 2px solid var(--wood-dark);

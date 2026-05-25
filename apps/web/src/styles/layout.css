@@ -1366,11 +1366,22 @@ input {
 }
 
 .reward-gold-counter {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
   font-size: 44px;
   font-weight: 900;
   color: #ffd766;
   text-shadow: 0 0 14px rgba(255, 200, 80, 0.55), 0 4px 10px #000;
   font-variant-numeric: tabular-nums;
+}
+
+.reward-gold-icon {
+  width: 46px;
+  height: 46px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0, 0, 0, 0.55));
 }
 
 .reward-overlay.stage-gold .reward-gold-counter {

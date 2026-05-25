@@ -616,7 +616,7 @@ function renderAiThemeOption(theme: (typeof AI_THEMES)[number], difficulties: { 
           <label class="sub-difficulty-btn ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}" data-dom-key="ai-theme-${escapeAttr(theme.id)}-difficulty-${opt.value}">
             <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
             <span>${opt.label}</span>
-            <span class="difficulty-reward"><img src="/images/ui/gold_coin.webp" alt="" />${opt.reward}</span>
+            <span class="difficulty-reward"><img src="/images/ui/Coin.webp" alt="" />${opt.reward}</span>
           </label>
         `).join("")}
       </div>
@@ -838,7 +838,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
             <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
             <h2 class="collection-title">${escapeHtml(title)}</h2>
             <div class="collection-header-voucher" title="持有消費券">
-              <span id="collection-vouchers"><span class="voucher-icon">券</span>${view.profile?.vouchers ?? 0}</span>
+              <span id="collection-vouchers"><span class="voucher-icon" aria-hidden="true"></span>${view.profile?.vouchers ?? 0}</span>
               ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" title="一鍵分解所有超過 2 張的多餘卡牌" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
             </div>
           </header>
@@ -1012,11 +1012,11 @@ function renderPinnedCardDetail(cardId: string): string {
               <div class="card-op-actions">
                 <button type="button" id="card-op-disenchant" class="card-op-btn disenchant" data-card-id="${escapeAttr(card.id)}" ${canDisenchant ? "" : "disabled"}>
                   <span class="card-op-label">分解</span>
-                  <span class="card-op-value"><span class="voucher-icon">券</span>${rate.disenchant}</span>
+                  <span class="card-op-value"><span class="voucher-icon" aria-hidden="true"></span>${rate.disenchant}</span>
                 </button>
                 <button type="button" id="card-op-craft" class="card-op-btn craft" data-card-id="${escapeAttr(card.id)}" ${canCraft ? "" : "disabled"}>
                   <span class="card-op-label">合成</span>
-                  <span class="card-op-value"><span class="voucher-icon">券</span>${rate.craft}</span>
+                  <span class="card-op-value"><span class="voucher-icon" aria-hidden="true"></span>${rate.craft}</span>
                 </button>
               </div>
               <p class="card-op-hint muted">${accountReady ? `持有消費券：${vouchers}` : "登入後才能分解或合成卡牌。"}</p>
@@ -3002,7 +3002,7 @@ function renderShopScreen(): string {
           <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
           <h2 class="shop-title">商店</h2>
           <div class="shop-gold-display">
-            <img class="gold-icon" src="/images/ui/gold_coin.webp" alt="金幣"
+            <img class="gold-icon" src="/images/ui/Coin.webp" alt="金幣"
               onerror="this.style.display='none'">
             <span id="shop-gold-amount">--</span>
           </div>
@@ -3048,7 +3048,7 @@ function renderShopItem(item: ShopItemRow): string {
         <div class="product-info-side">
           ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
           <div class="product-price">
-            <img class="price-coin" src="/images/ui/gold_coin.webp" alt="金幣"
+            <img class="price-coin" src="/images/ui/Coin.webp" alt="金幣"
               onerror="this.style.display='none'">
             <span>免費</span>
           </div>
@@ -3118,7 +3118,7 @@ function renderLegacyShopScreen(): string {
           <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
           <h2 class="shop-title">商店</h2>
           <div class="shop-gold-display">
-            <img class="gold-icon" src="/images/ui/gold_coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <img class="gold-icon" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
             <span id="shop-gold-amount">${gold}</span>
           </div>
         </header>
@@ -3166,7 +3166,7 @@ function renderLegacyShopItem(item: ShopItemRow): string {
         <div class="product-info-side">
           ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
           <div class="product-price">
-            <img class="price-coin" src="/images/ui/gold_coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <img class="price-coin" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
             <span>${item.price_gold}</span>
           </div>
           <button class="btn-buy" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop" ${affordable ? "" : "disabled"}>購買</button>
@@ -3276,7 +3276,7 @@ function renderRewardVisual(reward: PackOpeningReward): string {
   if (reward.type === "title") {
     return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-title-badge">#${escapeHtml(reward.name)}</span></div>`;
   }
-  return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge">券 ${reward.amount}</span></div>`;
+  return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge"><span class="voucher-icon" aria-hidden="true"></span>${reward.amount}</span></div>`;
 }
 
 function rewardName(reward: PackOpeningReward): string {

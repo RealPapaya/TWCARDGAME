@@ -76,7 +76,7 @@ export function renderRewardOverlay(view: ClientViewState): string {
 
         <div class="reward-section reward-gold-section">
           <div class="reward-section-label">金幣</div>
-          <div class="reward-gold-counter" id="reward-gold-counter">${anim.displayedGold}</div>
+          <div class="reward-gold-counter"><img class="reward-gold-icon" src="/images/ui/Coin.webp" alt="" /><span id="reward-gold-counter">${anim.displayedGold}</span></div>
           <div class="reward-source reward-gold-source" id="reward-gold-source">${escapeText(goldSourceText)}</div>
         </div>
 
