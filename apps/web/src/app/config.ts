@@ -1,6 +1,6 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || "ws://localhost:2567";
+export const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || inferColyseusUrl();
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
@@ -16,4 +16,14 @@ export const supabase: SupabaseClient | undefined =
 
 export function isLocalDevHost(): boolean {
   return ["localhost", "127.0.0.1", "0.0.0.0", ""].includes(location.hostname);
+}
+
+function inferColyseusUrl(): string {
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const hostname = formatHostnameForUrl(location.hostname || "localhost");
+  return `${protocol}//${hostname}:2567`;
+}
+
+function formatHostnameForUrl(hostname: string): string {
+  return hostname.includes(":") && !hostname.startsWith("[") ? `[${hostname}]` : hostname;
 }
