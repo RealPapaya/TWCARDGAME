@@ -16,6 +16,10 @@ const starterPackOwnedCollectionMigration = readFileSync(
   new URL("../migrations/0014_starter_pack_owned_collection.sql", import.meta.url),
   "utf8"
 );
+const playerIdStarterCollectionOnlyMigration = readFileSync(
+  new URL("../migrations/0015_player_id_and_starter_collection_only.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -48,7 +52,7 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("keeps full catalog seed restricted and exposes only starter bootstrap to authenticated users", () => {
-    const starterMigrations = starterCollectionSecurityMigration + starterPackOwnedCollectionMigration;
+    const starterMigrations = starterCollectionSecurityMigration + starterPackOwnedCollectionMigration + playerIdStarterCollectionOnlyMigration;
     expect(starterMigrations).toContain(
       "revoke execute on function public.ensure_full_seed_collection(text) from anon, authenticated;"
     );
@@ -61,11 +65,21 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("grants new players the starter pack collection instead of the full card catalog", () => {
-    expect(starterPackOwnedCollectionMigration).toContain("starter_pack_card_ids text[] := array[");
-    expect(starterPackOwnedCollectionMigration).toContain("'TW068'");
-    expect(starterPackOwnedCollectionMigration).toContain("'S026'");
-    expect(starterPackOwnedCollectionMigration).toContain("foreach cid in array starter_pack_card_ids loop");
-    expect(starterPackOwnedCollectionMigration).not.toContain("case when card->>'rarity' = 'LEGENDARY' then 1 else 2 end");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("starter_pack_card_ids text[] := array[");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("'TW068'");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("'S026'");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("foreach cid in array starter_pack_card_ids loop");
+    expect(playerIdStarterCollectionOnlyMigration).not.toContain("case when card->>'rarity' = 'LEGENDARY' then 1 else 2 end");
+  });
+
+  it("requires new players to set a display name and does not auto-create starter decks", () => {
+    expect(playerIdStarterCollectionOnlyMigration).toContain("add column if not exists display_name_set boolean not null default true");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("insert into public.profiles (user_id, display_name, display_name_set, avatar_url)");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("'Player'");
+    expect(playerIdStarterCollectionOnlyMigration).toContain("false");
+    expect(playerIdStarterCollectionOnlyMigration).not.toContain("starter_deck_ids");
+    expect(playerIdStarterCollectionOnlyMigration).not.toContain("insert into public.decks");
+    expect(playerIdStarterCollectionOnlyMigration).not.toContain("Starter Deck");
   });
 
   it("grants browser table privileges required before RLS policies are evaluated", () => {

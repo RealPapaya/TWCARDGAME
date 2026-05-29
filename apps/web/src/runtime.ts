@@ -96,7 +96,7 @@ import {
 } from "./app/reward-screen.js";
 
 const PROFILE_SELECT =
-  "user_id,display_name,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
@@ -281,6 +281,7 @@ function on(
 function renderLanding(): string {
   if (devTestModeAvailable && view.menuScreen === "test") return renderMenu();
   if (supabase && !view.session) return renderAuthPanel();
+  if (supabase && view.session && needsPlayerIdSetup()) return renderPlayerIdSetupPanel();
   return renderMenu();
 }
 
@@ -343,6 +344,27 @@ function renderAuthPanel(): string {
           }
           <button type="submit" class="auth-submit" data-auth-mode="${mode}" data-testid="${isSignup ? "auth-signup" : "auth-signin"}" ${view.accountLoading ? "disabled" : ""}>${isSignup ? "建立帳號" : "確定登入"}</button>
         </form>
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderPlayerIdSetupPanel(): string {
+  const value = view.editingDisplayName ?? "";
+  return `
+    <section class="screen auth-screen" data-screen="player-id">
+      ${renderCloudLayer()}
+      <div class="auth-container-v2">
+        <h1 class="auth-page-title">設定玩家 ID</h1>
+        <div class="auth-card parchment-card">
+          <form id="player-id-form" class="auth-form">
+            <label class="auth-label">
+              <span>玩家 ID</span>
+              <input id="player-id-input" type="text" autocomplete="nickname" maxlength="32" value="${escapeAttr(value)}" placeholder="輸入玩家 ID" required autofocus />
+            </label>
+            <button type="submit" class="auth-submit" data-testid="player-id-submit" ${view.accountLoading ? "disabled" : ""}>開始遊戲</button>
+          </form>
         </div>
       </div>
     </section>
@@ -2196,6 +2218,13 @@ function bindStaticActions(): void {
   });
   on(document.querySelector<HTMLFormElement>("#join-form"), "submit", "join-form", joinRoom);
   on(document.querySelector<HTMLFormElement>("#auth-form"), "submit", "auth-form", submitAuthForm);
+  on(document.querySelector<HTMLFormElement>("#player-id-form"), "submit", "player-id-form", (event) => void savePlayerId(event));
+  const playerIdInput = document.querySelector<HTMLInputElement>("#player-id-input");
+  if (playerIdInput) {
+    on(playerIdInput, "input", "player-id-input", () => {
+      view.editingDisplayName = playerIdInput.value;
+    });
+  }
   on(document.querySelector<HTMLButtonElement>("#auth-signin-tab"), "click", "auth-signin-tab", () => setAuthMode("signin"));
   on(document.querySelector<HTMLButtonElement>("#auth-signup-tab"), "click", "auth-signup-tab", () => setAuthMode("signup"));
   on(document.querySelector<HTMLButtonElement>("#google-sign-in"), "click", "google-sign-in", () => void signInWithGoogle());
@@ -3925,11 +3954,28 @@ async function saveProfile(event: Event): Promise<void> {
     return;
   }
   await withAccountLoading(async () => {
-    const { error } = await supabase.from("profiles").update({ display_name: name }).eq("user_id", view.session!.user.id);
+    const { error } = await supabase.from("profiles").update({ display_name: name, display_name_set: true }).eq("user_id", view.session!.user.id);
     if (error) throw error;
     showToast("個人資料已更新。");
     view.editingDisplayName = undefined;
     view.editingDisplayNameActive = false;
+    await loadAccountDataRaw();
+  });
+}
+
+async function savePlayerId(event: Event): Promise<void> {
+  event.preventDefault();
+  if (!supabase || !view.session?.user) return;
+  const name = (document.querySelector<HTMLInputElement>("#player-id-input")?.value ?? "").trim();
+  if (!name) {
+    showAlert("玩家 ID 不能為空。");
+    return;
+  }
+  await withAccountLoading(async () => {
+    const { error } = await supabase.from("profiles").update({ display_name: name, display_name_set: true }).eq("user_id", view.session!.user.id);
+    if (error) throw error;
+    view.editingDisplayName = undefined;
+    showToast("玩家 ID 已設定。");
     await loadAccountDataRaw();
   });
 }
@@ -4642,6 +4688,10 @@ function setAuthMode(mode: AuthMode): void {
   render();
 }
 
+function needsPlayerIdSetup(): boolean {
+  return view.profile?.display_name_set === false;
+}
+
 function submitAuthForm(event: Event): void {
   event.preventDefault();
   if (view.authMode === "signup") {
@@ -4674,7 +4724,11 @@ async function signUpWithPassword(): Promise<void> {
       options: { data: { display_name: email.split("@")[0] || "Player" } }
     });
     if (error) throw error;
-    showToast("帳號已建立，請確認信箱後登入。");
+    const signOutResult = await supabase.auth.signOut();
+    if (signOutResult.error) console.warn("sign out after sign-up failed", signOutResult.error);
+    view.session = undefined;
+    view.authMode = "signin";
+    showToast("帳號已建立，請確認信箱後重新登入。");
   });
 }
 
@@ -4825,16 +4879,17 @@ async function ensureProfile(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const user = view.session.user;
   const metadata = user.user_metadata ?? {};
-  const displayName =
-    (typeof metadata.display_name === "string" && metadata.display_name) ||
-    (typeof metadata.name === "string" && metadata.name) ||
-    user.email?.split("@")[0] ||
-    "Player";
-  const { error } = await supabase.from("profiles").upsert({
-    user_id: user.id,
-    display_name: displayName,
-    avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : null
-  });
+  const { error } = await supabase
+    .from("profiles")
+    .upsert(
+      {
+        user_id: user.id,
+        display_name: "Player",
+        display_name_set: false,
+        avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : "/images/avatars/avatar1.webp"
+      },
+      { onConflict: "user_id", ignoreDuplicates: true }
+    );
   if (error) throw error;
 }
 

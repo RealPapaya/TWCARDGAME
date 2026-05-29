@@ -196,6 +196,7 @@ export type ResolvedCardView = {
 export type ProfileRow = {
   user_id: string;
   display_name: string;
+  display_name_set?: boolean;
   avatar_url?: string | null;
   gold: number;
   vouchers: number;

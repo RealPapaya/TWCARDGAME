@@ -31,6 +31,7 @@ export interface AuthenticatedUser {
 export interface PlayerProfileRow {
   user_id: string;
   display_name: string;
+  display_name_set?: boolean;
   avatar_url?: string | null;
   gold?: number;
   vouchers?: number;
@@ -247,9 +248,10 @@ export async function upsertPlayerProfile(client: SupabaseClient, row: PlayerPro
     .upsert({
       user_id: row.user_id,
       display_name: row.display_name,
+      display_name_set: row.display_name_set ?? true,
       avatar_url: row.avatar_url ?? null
     })
-    .select("user_id,display_name,avatar_url,created_at,updated_at")
+    .select("user_id,display_name,display_name_set,avatar_url,created_at,updated_at")
     .single();
   if (error) throw error;
   return data as PlayerProfileRow;
@@ -368,10 +370,8 @@ export function assertDeckOwnership(deck: Pick<DeckRow, "id" | "user_id"> | null
 }
 
 /**
- * Grants the starter pack owned collection (20 types x 2 copies) and creates
- * a ready-to-play 30-card starter deck for the calling user if they don't have
- * one yet. Mirrors the legacy generateStarterCollection() from auth_manager.js.
- * Useful as a backfill for accounts created before migration 0011.
+ * Grants the starter pack owned collection (20 types x 2 copies) for the
+ * calling user. Decks are intentionally player-created.
  */
 export async function ensureStarterCollection(client: SupabaseClient): Promise<number> {
   const { data, error } = await client.rpc("ensure_starter_collection");
