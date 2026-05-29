@@ -386,8 +386,10 @@ function renderMainMenu(): string {
   const displayName = view.profile?.display_name ?? "Player";
   const avatarUrl = view.profile?.avatar_url || "/images/avatars/avatar1.webp";
   const stats = computeMatchStats();
-  const ownedCount = view.collection.filter((row) => row.quantity > 0).length;
-  const totalCatalog = CARD_CATALOG.filter((card) => card.collectible !== false).length;
+  const collectionMap = buildCollectionMap(view.collection);
+  const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
+  const ownedCount = ownedCollectionTypeCount(collectibles, collectionMap);
+  const totalCatalog = collectibles.length;
   const accountMode = Boolean(supabase);
   const level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(view.profile?.level ?? 1)));
   const xp = Math.max(0, Math.floor(view.profile?.xp ?? 0));
@@ -713,7 +715,7 @@ function renderProfileScreen(): string {
   const xpRequired = getXPRequiredForLevel(level);
   const xpProgress = level >= MAX_LEVEL || xpRequired <= 0 ? 100 : Math.min(100, Math.round((xp / xpRequired) * 100));
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
-  const ownedCardCount = view.collection.reduce((sum, row) => sum + row.quantity, 0);
+  const ownedCardCount = [...buildCollectionMap(view.collection).values()].reduce((sum, quantity) => sum + quantity, 0);
   const title = profile?.selected_title || "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
   const recent = view.matchHistory.slice(0, 10);
@@ -1035,7 +1037,7 @@ function renderPinnedCardDetail(cardId: string): string {
   const card = cardCatalog.get(cardId);
   if (!card) return "";
   const resolved = resolveCatalogCard(card, `pinned-${card.id}`);
-  const owned = view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0;
+  const owned = buildCollectionMap(view.collection).get(cardId) ?? 0;
   if (usesDbCollectionOwnership() && owned <= 0) return "";
   const vouchers = view.profile?.vouchers ?? 0;
   const rate = voucherRate(card.rarity);
@@ -4783,7 +4785,6 @@ async function loadAccountData(): Promise<void> {
         .from("card_collections")
         .select("card_id,quantity")
         .eq("user_id", userId)
-        .eq("card_catalog_version", CARD_CATALOG_VERSION)
         .order("card_id", { ascending: true }),
       supabase
         .from("match_history")
@@ -4842,7 +4843,6 @@ async function loadAccountDataRaw(): Promise<void> {
       .from("card_collections")
       .select("card_id,quantity")
       .eq("user_id", userId)
-      .eq("card_catalog_version", CARD_CATALOG_VERSION)
       .order("card_id", { ascending: true }),
     supabase
       .from("match_history")
@@ -4986,11 +4986,11 @@ async function craftCard(cardId: string): Promise<void> {
 
 function extraCopyEntries(): Array<{ cardId: string; extra: number }> {
   const entries: Array<{ cardId: string; extra: number }> = [];
-  for (const row of view.collection) {
-    const card = cardCatalog.get(row.card_id);
+  for (const [cardId, quantity] of buildCollectionMap(view.collection)) {
+    const card = cardCatalog.get(cardId);
     if (!card || card.collectible === false) continue;
-    const extra = row.quantity - DECK_COPY_LIMIT;
-    if (extra > 0) entries.push({ cardId: row.card_id, extra });
+    const extra = quantity - DECK_COPY_LIMIT;
+    if (extra > 0) entries.push({ cardId, extra });
   }
   return entries;
 }
@@ -5076,7 +5076,7 @@ function addCardToEditor(cardId: string | undefined): void {
   const counts = countCards(view.editingDeck!.card_ids);
   const limit = deckCopyLimit(card);
   const owned = usesDbCollectionOwnership() || hasCollectionRows()
-    ? (view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0)
+    ? (buildCollectionMap(view.collection).get(cardId) ?? 0)
     : limit;
   if (owned <= 0 || (counts.get(cardId) ?? 0) >= Math.min(limit, owned) || view.editingDeck!.card_ids.length >= 30) return;
   if (!canAddLegendary(card, view.editingDeck!.card_ids)) {

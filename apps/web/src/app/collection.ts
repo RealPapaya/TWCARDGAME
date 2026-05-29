@@ -9,7 +9,11 @@ export interface CollectionFilters {
 }
 
 export function buildCollectionMap(rows: readonly CollectionRow[]): Map<string, number> {
-  return new Map(rows.map((row) => [row.card_id, row.quantity]));
+  const collection = new Map<string, number>();
+  for (const row of rows) {
+    collection.set(row.card_id, (collection.get(row.card_id) ?? 0) + row.quantity);
+  }
+  return collection;
 }
 
 export function collectionQuantity(card: Pick<CardDefinition, "id">, collectionMap: Map<string, number>): number {

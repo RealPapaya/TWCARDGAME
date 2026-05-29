@@ -20,6 +20,10 @@ const playerIdStarterCollectionOnlyMigration = readFileSync(
   new URL("../migrations/0015_player_id_and_starter_collection_only.sql", import.meta.url),
   "utf8"
 );
+const cardIdOwnershipMigration = readFileSync(
+  new URL("../migrations/0016_collection_card_id_ownership.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -103,6 +107,14 @@ describe("Supabase RLS migration coverage", () => {
     expect(phase4Migration).toContain("catalog.collectible is false");
     expect(phase4Migration).toContain("case when catalog.rarity = 'LEGENDARY' then 1 else 2 end");
     expect(phase4Migration).toContain("deck.qty > coalesce(collection.quantity, 0)");
+  });
+
+  it("treats collection ownership as card-id based across catalog snapshots", () => {
+    expect(cardIdOwnershipMigration).toContain("collection_totals as (");
+    expect(cardIdOwnershipMigration).toContain("where user_id = current_user_id");
+    expect(cardIdOwnershipMigration).toContain("group by card_id");
+    expect(cardIdOwnershipMigration).toContain("left join collection_totals collection on collection.card_id = deck.card_id");
+    expect(cardIdOwnershipMigration).not.toContain("collection.card_catalog_version = p_card_catalog_version");
   });
 
   it("keeps legacy shop purchases paid and seeded with v1 product ids", () => {

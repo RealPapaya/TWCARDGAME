@@ -329,16 +329,25 @@ export async function deleteUserDeck(client: SupabaseClient, input: { userId: st
 
 export async function listUserCollection(
   client: SupabaseClient,
-  input: { userId: string; cardCatalogVersion: string }
+  input: { userId: string; cardCatalogVersion?: string }
 ): Promise<CardCollectionRow[]> {
   const { data, error } = await client
     .from("card_collections")
     .select("user_id,card_catalog_version,card_id,quantity,acquired_at")
     .eq("user_id", input.userId)
-    .eq("card_catalog_version", input.cardCatalogVersion)
     .order("card_id", { ascending: true });
   if (error) throw error;
-  return (data ?? []) as CardCollectionRow[];
+  const rows = (data ?? []) as CardCollectionRow[];
+  const byCardId = new Map<string, CardCollectionRow>();
+  for (const row of rows) {
+    const existing = byCardId.get(row.card_id);
+    if (!existing) {
+      byCardId.set(row.card_id, { ...row });
+      continue;
+    }
+    existing.quantity += row.quantity;
+  }
+  return [...byCardId.values()];
 }
 
 export async function replaceUserCollection(

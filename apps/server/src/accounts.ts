@@ -38,10 +38,6 @@ export function createAccountDeckStoreFromEnv(env: NodeJS.ProcessEnv = process.e
       if (!deckId) throw new Error("A saved deck id is required to join matchmaking.");
 
       const deck = await getOwnedDeck(client, { userId: user.id, deckId });
-      if (deck.card_catalog_version !== CARD_CATALOG_VERSION) {
-        throw new Error(`Deck ${deck.id} uses unsupported card catalog ${deck.card_catalog_version}.`);
-      }
-
       const collection = await listUserCollection(client, { userId: user.id, cardCatalogVersion: CARD_CATALOG_VERSION });
       const validation = validateDeck(
         deck.card_ids,

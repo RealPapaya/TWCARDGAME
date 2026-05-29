@@ -29,6 +29,17 @@ describe("collection helpers", () => {
     expect(ownedCollectionTypeCount(cards, collection)).toBe(1);
   });
 
+  it("aggregates duplicate card rows from different catalog snapshots", () => {
+    const collection = buildCollectionMap([
+      { card_id: "A", quantity: 1 },
+      { card_id: "A", quantity: 2 },
+      { card_id: "B", quantity: 0 }
+    ]);
+
+    expect(collectionQuantity(cards[0], collection)).toBe(3);
+    expect(collectionQuantity(cards[1], collection)).toBe(0);
+  });
+
   it("never returns unowned or uncollectible cards to the collection grid", () => {
     const collection = buildCollectionMap([
       { card_id: "A", quantity: 1 },
