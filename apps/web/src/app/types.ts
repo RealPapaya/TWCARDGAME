@@ -25,6 +25,7 @@ export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
 export type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
 export type FriendsPanel = "friends" | "recommended" | "add";
+export type AuthMode = "signin" | "signup";
 
 export type BattlecryPreviewState = {
   handInstanceId: string;
@@ -111,6 +112,7 @@ export type ClientViewState = {
   rewardAnim?: RewardAnimationState;
   joining: boolean;
   accountLoading: boolean;
+  authMode: AuthMode;
   session?: Session | null;
   profile?: ProfileRow;
   decks: DeckRow[];

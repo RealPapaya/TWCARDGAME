@@ -368,8 +368,8 @@ export function assertDeckOwnership(deck: Pick<DeckRow, "id" | "user_id"> | null
 }
 
 /**
- * Grants the starter card collection (20 types × 2 copies) and creates a
- * ready-to-play 30-card starter deck for the calling user if they don't have
+ * Grants the starter pack owned collection (20 types x 2 copies) and creates
+ * a ready-to-play 30-card starter deck for the calling user if they don't have
  * one yet. Mirrors the legacy generateStarterCollection() from auth_manager.js.
  * Useful as a backfill for accounts created before migration 0011.
  */

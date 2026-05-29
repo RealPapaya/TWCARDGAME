@@ -12,6 +12,10 @@ const starterCollectionSecurityMigration = readFileSync(
   new URL("../migrations/0013_starter_collection_security.sql", import.meta.url),
   "utf8"
 );
+const starterPackOwnedCollectionMigration = readFileSync(
+  new URL("../migrations/0014_starter_pack_owned_collection.sql", import.meta.url),
+  "utf8"
+);
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -44,15 +48,24 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("keeps full catalog seed restricted and exposes only starter bootstrap to authenticated users", () => {
-    expect(starterCollectionSecurityMigration).toContain(
+    const starterMigrations = starterCollectionSecurityMigration + starterPackOwnedCollectionMigration;
+    expect(starterMigrations).toContain(
       "revoke execute on function public.ensure_full_seed_collection(text) from anon, authenticated;"
     );
-    expect(starterCollectionSecurityMigration).toContain(
+    expect(starterMigrations).toContain(
       "grant execute on function public.ensure_full_seed_collection(text) to service_role;"
     );
-    expect(starterCollectionSecurityMigration).toContain(
+    expect(starterMigrations).toContain(
       "grant execute on function public.ensure_starter_collection() to authenticated;"
     );
+  });
+
+  it("grants new players the starter pack collection instead of the full card catalog", () => {
+    expect(starterPackOwnedCollectionMigration).toContain("starter_pack_card_ids text[] := array[");
+    expect(starterPackOwnedCollectionMigration).toContain("'TW068'");
+    expect(starterPackOwnedCollectionMigration).toContain("'S026'");
+    expect(starterPackOwnedCollectionMigration).toContain("foreach cid in array starter_pack_card_ids loop");
+    expect(starterPackOwnedCollectionMigration).not.toContain("case when card->>'rarity' = 'LEGENDARY' then 1 else 2 end");
   });
 
   it("grants browser table privileges required before RLS policies are evaluated", () => {

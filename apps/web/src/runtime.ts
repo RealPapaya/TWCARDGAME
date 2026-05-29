@@ -46,6 +46,14 @@ import {
   type SoundCue
 } from "./app/audio.js";
 import { defaultServerUrl, forceDevAuth, isLocalDevHost, supabase as configuredSupabase } from "./app/config.js";
+import {
+  buildCollectionMap,
+  collectionQuantity,
+  filterOwnedCollectionCards,
+  ownedCollectionCards,
+  ownedCollectionTypeCount,
+  compareCollectionCards as compareCollectionCardsBySort
+} from "./app/collection.js";
 import { setAppContext } from "./app/context.js";
 import {
   isHandCardAnimating,
@@ -62,6 +70,7 @@ import { PATCH_NOTES } from "./app/patch-notes.js";
 import type {
   AnimationCue,
   AnimationKind,
+  AuthMode,
   BattlecryPreviewState,
   BattleMode,
   ClientViewState,
@@ -152,6 +161,7 @@ const view: ClientViewState = {
   animationCues: [],
   joining: false,
   accountLoading: false,
+  authMode: "signin",
   session: undefined,
   decks: [],
   collection: [],
@@ -301,15 +311,17 @@ function renderMenu(): string {
 }
 
 function renderAuthPanel(): string {
+  const mode = view.authMode;
+  const isSignup = mode === "signup";
   return `
     <section class="screen auth-screen" data-screen="auth">
       ${renderCloudLayer()}
       <div class="auth-container-v2">
-        <h1 class="auth-page-title">帳號登入</h1>
+        <h1 class="auth-page-title">${isSignup ? "帳號註冊" : "帳號登入"}</h1>
         <div class="auth-card parchment-card">
           <div class="auth-tabs" aria-label="帳號操作">
-            <button type="button" class="auth-tab active" ${view.accountLoading ? "disabled" : ""}>登入</button>
-            <button type="button" id="sign-up" class="auth-tab" ${view.accountLoading ? "disabled" : ""}>註冊</button>
+            <button type="button" id="auth-signin-tab" class="auth-tab ${mode === "signin" ? "active" : ""}" ${view.accountLoading ? "disabled" : ""}>登入</button>
+            <button type="button" id="auth-signup-tab" class="auth-tab ${isSignup ? "active" : ""}" ${view.accountLoading ? "disabled" : ""}>註冊</button>
           </div>
         <form id="auth-form" class="auth-form">
           <label class="auth-label">
@@ -318,12 +330,18 @@ function renderAuthPanel(): string {
           </label>
           <label class="auth-label">
             <span>密碼</span>
-            <input id="auth-password" type="password" autocomplete="current-password" placeholder="輸入密碼" required />
+            <input id="auth-password" type="password" autocomplete="${isSignup ? "new-password" : "current-password"}" placeholder="輸入密碼" required />
           </label>
-          <button type="button" id="google-sign-in" class="google-logo-button" aria-label="使用 Google 登入" title="使用 Google 登入" ${view.accountLoading ? "disabled" : ""}>
-            <span class="google-g" aria-hidden="true">G</span>
-          </button>
-          <button type="submit" class="auth-submit" data-auth-mode="signin" data-testid="auth-signin" ${view.accountLoading ? "disabled" : ""}>確定登入</button>
+          ${isSignup
+            ? `<label class="auth-label">
+                <span>確認密碼</span>
+                <input id="auth-confirm-password" type="password" autocomplete="new-password" placeholder="再次輸入密碼" required />
+              </label>`
+            : `<button type="button" id="google-sign-in" class="google-logo-button" aria-label="使用 Google 登入" title="使用 Google 登入" ${view.accountLoading ? "disabled" : ""}>
+                <span class="google-g" aria-hidden="true">G</span>
+              </button>`
+          }
+          <button type="submit" class="auth-submit" data-auth-mode="${mode}" data-testid="${isSignup ? "auth-signup" : "auth-signin"}" ${view.accountLoading ? "disabled" : ""}>${isSignup ? "建立帳號" : "確定登入"}</button>
         </form>
         </div>
       </div>
@@ -821,12 +839,15 @@ function renderCollectionScreen(): string {
 
 function renderCollectionWorkspace(backScreen: MenuScreen, title: string): string {
   const accountMode = Boolean(supabase);
-  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  const collectionMap = buildCollectionMap(view.collection);
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
+  const ownedCards = usesDbCollectionOwnership() ? ownedCollectionCards(collectibles, collectionMap) : collectibles;
   const filtered = filterCollectionCards(collectibles, collectionMap);
-  const ownedTotal = collectibles.filter((card) => collectionQuantityFor(card, collectionMap) > 0).length;
-  const categories = uniqueCollectionCategories(collectibles);
-  const rarities = uniqueCollectionRarities(collectibles);
+  const ownedTotal = usesDbCollectionOwnership()
+    ? ownedCollectionTypeCount(collectibles, collectionMap)
+    : collectibles.filter((card) => collectionQuantityFor(card, collectionMap) > 0).length;
+  const categories = uniqueCollectionCategories(ownedCards);
+  const rarities = uniqueCollectionRarities(ownedCards);
   const deck = view.editingDeck;
   const selectedCounts = countCards(deck?.card_ids ?? []);
   const selectedTotal = deck?.card_ids.length ?? 0;
@@ -877,8 +898,8 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           </div>
           ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
           <section class="collection-card-library" aria-label="卡牌庫">
-            <label class="show-unowned-label">
-              <input type="checkbox" id="show-unowned-checkbox" ${view.collectionFilter !== "owned" ? "checked" : ""} />
+            <label class="show-unowned-label" hidden>
+              <input type="checkbox" id="show-unowned-checkbox" disabled />
               顯示未擁有的卡牌
             </label>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
@@ -916,6 +937,14 @@ function uniqueCollectionRarities(cards: readonly CardDefinition[]): string[] {
 }
 
 function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: Map<string, number>): CardDefinition[] {
+  if (usesDbCollectionOwnership()) {
+    return filterOwnedCollectionCards(cards, collectionMap, {
+      category: view.collectionCategory,
+      rarity: view.collectionRarity,
+      search: view.collectionSearch,
+      sort: view.collectionSort
+    });
+  }
   const search = view.collectionSearch.trim().toLowerCase();
   return cards
     .filter((card) => {
@@ -935,14 +964,11 @@ function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: 
 }
 
 function collectionQuantityFor(card: CardDefinition, collectionMap: Map<string, number>): number {
-  return hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
+  return usesDbCollectionOwnership() ? collectionQuantity(card, collectionMap) : hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
 }
 
 function compareCollectionCards(a: CardDefinition, b: CardDefinition): number {
-  if (view.collectionSort === "cost-desc") return b.cost - a.cost || a.name.localeCompare(b.name, "zh-Hant");
-  if (view.collectionSort === "rarity") return rarityRank(b.rarity) - rarityRank(a.rarity) || a.cost - b.cost || a.name.localeCompare(b.name, "zh-Hant");
-  if (view.collectionSort === "name") return a.name.localeCompare(b.name, "zh-Hant");
-  return a.cost - b.cost || a.name.localeCompare(b.name, "zh-Hant");
+  return compareCollectionCardsBySort(a, b, view.collectionSort);
 }
 
 function rarityRank(rarity: string): number {
@@ -954,9 +980,9 @@ function rarityRank(rarity: string): number {
 }
 
 function renderCollectionTile(card: CardDefinition, quantity: number, selectedCount: number, selectedTotal: number): string {
-  const owned = hasCollectionRows() ? quantity > 0 : true;
+  const owned = usesDbCollectionOwnership() || hasCollectionRows() ? quantity > 0 : true;
   const limit = deckCopyLimit(card);
-  const effectiveOwned = hasCollectionRows() ? quantity : limit;
+  const effectiveOwned = usesDbCollectionOwnership() || hasCollectionRows() ? quantity : limit;
   const legendaryOk = canAddLegendary(card, view.editingDeck?.card_ids ?? []);
   const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned && legendaryOk;
   const disabled = Boolean(view.editingDeck) && !canAdd;
@@ -988,6 +1014,7 @@ function renderPinnedCardDetail(cardId: string): string {
   if (!card) return "";
   const resolved = resolveCatalogCard(card, `pinned-${card.id}`);
   const owned = view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0;
+  if (usesDbCollectionOwnership() && owned <= 0) return "";
   const vouchers = view.profile?.vouchers ?? 0;
   const rate = voucherRate(card.rarity);
   const collectible = card.collectible !== false;
@@ -2168,8 +2195,9 @@ function bindStaticActions(): void {
     if (event.target === event.currentTarget) settleConfirmDialog(false);
   });
   on(document.querySelector<HTMLFormElement>("#join-form"), "submit", "join-form", joinRoom);
-  on(document.querySelector<HTMLFormElement>("#auth-form"), "submit", "auth-form", (event) => void signInWithPassword(event));
-  on(document.querySelector<HTMLButtonElement>("#sign-up"), "click", "sign-up", () => void signUpWithPassword());
+  on(document.querySelector<HTMLFormElement>("#auth-form"), "submit", "auth-form", submitAuthForm);
+  on(document.querySelector<HTMLButtonElement>("#auth-signin-tab"), "click", "auth-signin-tab", () => setAuthMode("signin"));
+  on(document.querySelector<HTMLButtonElement>("#auth-signup-tab"), "click", "auth-signup-tab", () => setAuthMode("signup"));
   on(document.querySelector<HTMLButtonElement>("#google-sign-in"), "click", "google-sign-in", () => void signInWithGoogle());
   on(document.querySelector<HTMLButtonElement>("#sign-out"), "click", "sign-out", () => void signOut());
   on(document.querySelector<HTMLButtonElement>("#refresh-account"), "click", "refresh-account", () => void loadAccountData());
@@ -2327,8 +2355,8 @@ function bindStaticActions(): void {
     on(el, "click", "pick-avatar", () => void pickAvatar(el.dataset.pickAvatar));
   }
   on(document.querySelector<HTMLInputElement>("#show-unowned-checkbox"), "change", "show-unowned-checkbox", (event) => {
-    const checked = (event.currentTarget as HTMLInputElement).checked;
-    view.collectionFilter = checked ? "all" : "owned";
+    (event.currentTarget as HTMLInputElement).checked = false;
+    view.collectionFilter = "owned";
     render();
   });
   on(document.querySelector<HTMLSelectElement>("#collection-sort-select"), "change", "collection-sort-select", (event) => {
@@ -2635,7 +2663,7 @@ function refreshCollectionDeckWorkspace(): void {
 function updateCollectionCardButtons(): void {
   const selectedCounts = countCards(view.editingDeck?.card_ids ?? []);
   const selectedTotal = view.editingDeck?.card_ids.length ?? 0;
-  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  const collectionMap = buildCollectionMap(view.collection);
   for (const el of document.querySelectorAll<HTMLButtonElement>(".collection-card[data-add-card]")) {
     const cardId = el.dataset.addCard;
     const card = cardId ? cardCatalog.get(cardId) : undefined;
@@ -2643,7 +2671,7 @@ function updateCollectionCardButtons(): void {
     const quantity = collectionMap.get(cardId) ?? 0;
     const selectedCount = selectedCounts.get(cardId) ?? 0;
     const limit = deckCopyLimit(card);
-    const effectiveOwned = hasCollectionRows() ? quantity : limit;
+    const effectiveOwned = usesDbCollectionOwnership() || hasCollectionRows() ? quantity : limit;
     const legendaryOk = canAddLegendary(card, view.editingDeck?.card_ids ?? []);
     const canAdd = Boolean(view.editingDeck) && quantity > 0 && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned && legendaryOk;
     el.disabled = !canAdd;
@@ -4608,10 +4636,25 @@ async function initializeAccount(): Promise<void> {
   render();
 }
 
-async function signInWithPassword(event: Event): Promise<void> {
+function setAuthMode(mode: AuthMode): void {
+  if (view.accountLoading || view.authMode === mode) return;
+  view.authMode = mode;
+  render();
+}
+
+function submitAuthForm(event: Event): void {
   event.preventDefault();
+  if (view.authMode === "signup") {
+    void signUpWithPassword();
+    return;
+  }
+  void signInWithPassword();
+}
+
+async function signInWithPassword(): Promise<void> {
   if (!supabase) return;
   const credentials = readAuthFields();
+  if (!credentials) return;
   await withAccountLoading(async () => {
     const { error } = await supabase.auth.signInWithPassword(credentials);
     if (error) throw error;
@@ -4621,7 +4664,9 @@ async function signInWithPassword(event: Event): Promise<void> {
 
 async function signUpWithPassword(): Promise<void> {
   if (!supabase) return;
-  const { email, password } = readAuthFields();
+  const credentials = readSignUpFields();
+  if (!credentials) return;
+  const { email, password } = credentials;
   await withAccountLoading(async () => {
     const { error } = await supabase.auth.signUp({
       email,
@@ -4943,11 +4988,11 @@ function startNewDeck(doRender = true): void {
 function autofillDeck(): void {
   if (!view.editingDeck) return;
   const ids: string[] = [];
-  const collectionMap = new Map(view.collection.map((row) => [row.card_id, row.quantity]));
+  const collectionMap = buildCollectionMap(view.collection);
   let legendaryCount = 0;
   for (const card of CARD_CATALOG) {
     if (card.collectible === false) continue;
-    const owned = hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
+    const owned = usesDbCollectionOwnership() || hasCollectionRows() ? (collectionMap.get(card.id) ?? 0) : deckCopyLimit(card);
     const copies = Math.min(deckCopyLimit(card), owned);
     for (let i = 0; i < copies && ids.length < 30; i++) {
       if (card.rarity === "LEGENDARY") {
@@ -4975,7 +5020,7 @@ function addCardToEditor(cardId: string | undefined): void {
   if (!card) return;
   const counts = countCards(view.editingDeck!.card_ids);
   const limit = deckCopyLimit(card);
-  const owned = hasCollectionRows()
+  const owned = usesDbCollectionOwnership() || hasCollectionRows()
     ? (view.collection.find((row) => row.card_id === cardId)?.quantity ?? 0)
     : limit;
   if (owned <= 0 || (counts.get(cardId) ?? 0) >= Math.min(limit, owned) || view.editingDeck!.card_ids.length >= 30) return;
@@ -5057,11 +5102,29 @@ function showToast(message: string): void {
   }, 2500);
 }
 
-function readAuthFields(): { email: string; password: string } {
+function readAuthFields(): { email: string; password: string } | undefined {
   const email = document.querySelector<HTMLInputElement>("#auth-email")?.value.trim() ?? "";
   const password = document.querySelector<HTMLInputElement>("#auth-password")?.value ?? "";
-  if (!email || !password) throw new Error("Email and password are required.");
+  if (!email || !password) {
+    showAlert("請輸入帳號與密碼。");
+    return undefined;
+  }
   return { email, password };
+}
+
+function readSignUpFields(): { email: string; password: string } | undefined {
+  const credentials = readAuthFields();
+  if (!credentials) return undefined;
+  const confirmPassword = document.querySelector<HTMLInputElement>("#auth-confirm-password")?.value ?? "";
+  if (!confirmPassword) {
+    showAlert("請再次輸入密碼。");
+    return undefined;
+  }
+  if (credentials.password !== confirmPassword) {
+    showAlert("兩次輸入的密碼不一致。");
+    return undefined;
+  }
+  return credentials;
 }
 
 function send(command: GameCommand): void {
@@ -6346,6 +6409,10 @@ function canAddLegendary(card: CardDefinition, cardIds: readonly string[]): bool
 
 function hasCollectionRows(): boolean {
   return view.collection.length > 0;
+}
+
+function usesDbCollectionOwnership(): boolean {
+  return Boolean(supabase);
 }
 
 function errorMessage(error: unknown): string {
