@@ -1148,6 +1148,66 @@ input {
   backdrop-filter: blur(2px);
 }
 
+/* Opponent disconnected — highlighted centered countdown while we wait for them. */
+.opponent-disconnect-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 78;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  animation: confirm-fade-in 200ms ease-out both;
+}
+
+.opponent-disconnect-card {
+  text-align: center;
+  padding: 28px 40px;
+  border-radius: 16px;
+  background: rgba(20, 12, 6, 0.92);
+  border: 2px solid var(--gold);
+  box-shadow: 0 0 32px rgba(255, 200, 80, 0.5), 0 10px 30px rgba(0, 0, 0, 0.6);
+  animation: opponent-disconnect-pulse 1.6s ease-in-out infinite;
+}
+
+.opponent-disconnect-title {
+  font-family: var(--font-display);
+  font-size: 30px;
+  letter-spacing: 0.08em;
+  color: var(--gold);
+  text-shadow: 0 3px 10px #000;
+}
+
+.opponent-disconnect-sub {
+  margin-top: 6px;
+  font-size: 15px;
+  opacity: 0.85;
+}
+
+.opponent-disconnect-countdown {
+  font-family: var(--font-display);
+  font-size: 72px;
+  line-height: 1.05;
+  margin: 10px 0 6px;
+  color: #fff;
+  text-shadow: 0 0 18px rgba(255, 200, 80, 0.8), 0 4px 12px #000;
+}
+
+.opponent-disconnect-hint {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+@keyframes opponent-disconnect-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 24px rgba(255, 200, 80, 0.35), 0 10px 30px rgba(0, 0, 0, 0.6);
+  }
+  50% {
+    box-shadow: 0 0 40px rgba(255, 200, 80, 0.7), 0 10px 30px rgba(0, 0, 0, 0.6);
+  }
+}
+
 .mulligan-content {
   display: grid;
   justify-items: center;

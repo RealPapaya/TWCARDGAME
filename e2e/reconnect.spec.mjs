@@ -7,12 +7,15 @@
  *
  * For Scenario 3 (timeout), start the server with:
  *   RECONNECT_WINDOW_MS=5000 npm run dev:server
- * The test waits 7 seconds; with the default 60 s window it would wait 62 s.
+ * The test waits ~7 seconds; with the default 30 s window it would wait ~32 s.
  *
  * Scenarios:
  *   1. Disconnect detected — P1 sees connected=false in public state after P2 closes
  *   2. Reconnect restores state — P2 rejoins, receives hand and active turn info
  *   3. Timeout → game over — P1 sees GAME_FINISHED after reconnect window expires
+ *   4. Cumulative budget — the reconnect window is a one-time per-seat allowance;
+ *      a second disconnect resumes from the remaining budget, it does not reset.
+ *      Run this one against the DEFAULT 30 s window (no RECONNECT_WINDOW_MS override).
  */
 
 import { chromium } from "playwright";
@@ -106,6 +109,15 @@ async function getConnectedStatus(page, side) {
     if (!st) return null;
     var player = st.players && st.players.get ? st.players.get(s) : (st.players && st.players[s]) || st[s];
     return player ? player.connected : null;
+  }, side);
+}
+
+async function getReconnectUntilMs(page, side) {
+  return page.evaluate((s) => {
+    var st = window.__gameState;
+    if (!st) return null;
+    var player = st.players && st.players.get ? st.players.get(s) : (st.players && st.players[s]) || st[s];
+    return player ? player.reconnectUntilMs : null;
   }, side);
 }
 
@@ -243,6 +255,76 @@ async function getConnectedStatus(page, side) {
     }
 
     await browser3.close();
+  }
+
+  // ══════════════════════════════════════════════════════════════
+  // SCENARIO 4: Cumulative reconnect budget (run with DEFAULT 30 s window)
+  // Disconnect, reconnect after a few seconds, disconnect again, then verify the
+  // remaining budget the second time is clearly less than a fresh 30 s — proving
+  // the window is a one-time allowance and not reset on each disconnect.
+  // ══════════════════════════════════════════════════════════════
+  log("S4", "Starting cumulative-budget scenario (server must use DEFAULT 30s window)");
+  {
+    var browser4 = await chromium.launch({ headless: false, slowMo: 150 });
+    var ctx4a = await browser4.newContext();
+    var ctx4b = await browser4.newContext();
+    var r1 = await ctx4a.newPage();
+    var r2 = await ctx4b.newPage();
+    r1.on("pageerror", (e) => console.error("[R1]", e.message));
+    r2.on("pageerror", (e) => console.error("[R2]", e.message));
+    await injectEventAccumulator(r1);
+    await injectEventAccumulator(r2);
+
+    try {
+      await Promise.all([joinAndMulligan(r1, "Erin"), joinAndMulligan(r2, "Frank")]);
+      await Promise.all([waitForTurnStarted(r1, "R1"), waitForTurnStarted(r2, "R2")]);
+
+      var r2Seat = await r2.evaluate(() => {
+        var t = (document.querySelector(".topbar p") || {}).textContent || "";
+        var m = t.match(/(player\d)/);
+        return m ? m[1] : "";
+      });
+      var token4 = await getReconnectToken(r2);
+      if (!token4) {
+        fail("S4 setup", new Error("reconnectionToken not available"));
+      } else {
+        // First disconnect, stay away ~6 s, then reconnect (spends ~6 s of budget).
+        var GAP_MS = 6000;
+        log("S4", "First disconnect of R2...");
+        await r2.close();
+        await r1.waitForTimeout(GAP_MS);
+
+        var r2b = await ctx4b.newPage();
+        r2b.on("pageerror", (e) => console.error("[R2b]", e.message));
+        await injectEventAccumulator(r2b);
+        await r2b.goto(devAuthUrl("&reconnect=" + encodeURIComponent(token4)));
+        await r2b.waitForSelector("#join-form");
+        if (SERVER_URL) await r2b.fill("#server-url", SERVER_URL);
+        await r2b.click("#join-form button");
+        await r2b.waitForTimeout(2500);
+
+        // Second disconnect — read remaining budget from R1's view of R2.
+        var token4b = await getReconnectToken(r2b);
+        log("S4", "Second disconnect of R2...");
+        await r2b.close();
+        await r1.waitForTimeout(2000);
+
+        var untilMs = await getReconnectUntilMs(r1, r2Seat);
+        var remaining = (typeof untilMs === "number" && untilMs > 0) ? untilMs - Date.now() : null;
+        log("S4", "remaining budget on 2nd disconnect ≈ " + remaining + "ms");
+        // A fresh window would be ~30 s; cumulative should leave well under ~26 s.
+        if (remaining !== null && remaining < 26000) {
+          pass("Scenario 4: second disconnect resumes from remaining budget (cumulative)");
+        } else {
+          fail("Scenario 4: budget appears reset (remaining=" + remaining + "ms, token4b=" + Boolean(token4b) + ")");
+        }
+      }
+    } catch (err) {
+      fail("S4 unexpected", err);
+      console.error(err);
+    }
+
+    await browser4.close();
   }
 
   // ─── results ────────────────────────────────────────────────────────────

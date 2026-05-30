@@ -112,12 +112,24 @@ export class BotRoom extends GameRoom {
   }
 
   override async onLeave(client: Client): Promise<void> {
-    // PvE rooms don't bother with reconnection windows — if the human drops, dispose.
-    this.seats.delete(client.sessionId);
-    if (this.match && this.match.status !== "finished" && this.match.status !== "abandoned") {
-      this.finalizer.finish(this.match, { reason: "abandoned" });
+    // Dev-test rooms are throwaway: don't keep them alive for reconnection.
+    if (this.devTestActive) {
+      this.seats.delete(client.sessionId);
+      if (this.match && this.match.status !== "finished" && this.match.status !== "abandoned") {
+        this.finalizer.finish(this.match, { reason: "abandoned" });
+      }
+      await this.disconnect();
+      return;
     }
-    await this.disconnect();
+    // Otherwise reuse the base reconnection window (cumulative budget). On timeout
+    // the base finalizes with the opponent as winner — here that's the bot, so an
+    // abandoned single-player match is recorded as a loss for the human.
+    await super.onLeave(client);
+  }
+
+  protected override afterReconnect(_seat: Seat): void {
+    // Resume the bot's pacing loop in case it was the bot's turn when the human dropped.
+    this.scheduleBotStep();
   }
 
   protected override afterMatchCreated(): void {
@@ -168,6 +180,9 @@ export class BotRoom extends GameRoom {
     if (this.botStepScheduled) return;
     if (!this.match) return;
     if (this.match.status === "finished" || this.match.status === "abandoned") return;
+    // Don't let the bot play on while the human is disconnected — wait for them to
+    // return (or for the reconnect window to expire and finalize the match).
+    if (!this.match.players[this.humanSeat].connected) return;
 
     if (this.match.status === "mulligan") {
       const botPlayer = this.match.players[this.botSeat];

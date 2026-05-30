@@ -23,8 +23,18 @@ import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoi
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
 const TURN_TIME_LIMIT_MS = 60_000;
-const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "60000", 10);
+const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "30000", 10);
 const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "10000", 10);
+
+/**
+ * The reconnect window is a single, cumulative budget per seat for the whole
+ * match — not a fresh allowance on every disconnect. If a player drops, returns
+ * with 20s left, then drops again, they only get those 20s. `usedMs` is how long
+ * the player was disconnected during the just-finished gap.
+ */
+export function nextReconnectBudgetMs(prevBudgetMs: number, usedMs: number): number {
+  return Math.max(0, prevBudgetMs - Math.max(0, usedMs));
+}
 
 export interface GameRoomCreateOptions {
   joinCode?: string;
@@ -36,6 +46,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   protected match?: MatchState;
   protected seats = new Map<string, Seat>();
   protected setup = new Map<Seat, PlayerSetup>();
+  // Remaining reconnect allowance per seat for the whole match (see
+  // nextReconnectBudgetMs). Lives on the room — a connection-layer concern, not
+  // gameplay — so the rules engine stays pure.
+  private reconnectBudgetMs = new Map<Seat, number>();
   private cleanupScheduled = false;
   protected readonly finalizer: MatchResultFinalizer;
   private registeredJoinCode?: string;
@@ -104,31 +118,52 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     }
     if (isMatchComplete(this.match)) return;
 
+    const budget = this.reconnectBudgetMs.get(seat) ?? RECONNECT_WINDOW_MS;
+    if (budget <= 0) {
+      this.finishDisconnectTimeout(seat);
+      return;
+    }
+
     this.match.players[seat].connected = false;
-    this.match.players[seat].reconnectUntilMs = Date.now() + RECONNECT_WINDOW_MS;
+    this.match.players[seat].reconnectUntilMs = Date.now() + budget;
     this.syncPublicState();
     this.broadcast("presence", { seat, connected: false, reconnectUntilMs: this.match.players[seat].reconnectUntilMs });
 
+    const disconnectAt = Date.now();
     try {
-      const reconnecting = await this.allowReconnection(client, RECONNECT_WINDOW_MS / 1000);
+      const reconnecting = await this.allowReconnection(client, budget / 1000);
       const reconnectSeat = seat;
       this.seats.set(reconnecting.sessionId, reconnectSeat);
+      // Spend the time spent disconnected from this seat's one-time budget.
+      this.reconnectBudgetMs.set(reconnectSeat, nextReconnectBudgetMs(budget, Date.now() - disconnectAt));
       if (this.match) {
         this.match.players[reconnectSeat].connected = true;
         this.match.players[reconnectSeat].reconnectUntilMs = undefined;
         this.syncPublicState();
         this.broadcast("presence", { seat: reconnectSeat, connected: true });
+        // Re-send the seat so a hard-refreshed client re-learns its perspective.
+        reconnecting.send("seat", { seat: reconnectSeat });
         this.sendPrivateState(reconnecting);
+        this.afterReconnect(reconnectSeat);
       }
     } catch {
-      if (!this.match || isMatchComplete(this.match)) return;
-      logger.info("match.disconnect_timeout", { roomId: this.roomId, matchId: this.match.matchId, seat });
-      const events = this.finalizer.finish(this.match, { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" }, seat);
-      this.syncPublicState();
-      this.broadcastPublicSync();
-      if (events.length > 0) this.broadcast("events", events);
-      this.afterMatchComplete();
+      this.finishDisconnectTimeout(seat);
     }
+  }
+
+  private finishDisconnectTimeout(seat: Seat): void {
+    if (!this.match || isMatchComplete(this.match)) return;
+    logger.info("match.disconnect_timeout", { roomId: this.roomId, matchId: this.match.matchId, seat });
+    const events = this.finalizer.finish(this.match, { winnerSeat: seat === "player1" ? "player2" : "player1", reason: "disconnect_timeout" }, seat);
+    this.syncPublicState();
+    this.broadcastPublicSync();
+    if (events.length > 0) this.broadcast("events", events);
+    this.afterMatchComplete();
+  }
+
+  /** Hook for subclasses; runs after a client successfully reconnects to its seat. */
+  protected afterReconnect(_seat: Seat): void {
+    // no-op in the base PvP room.
   }
 
   async onDispose(): Promise<void> {
@@ -361,5 +396,8 @@ function seedFromRoomId(roomId: string): number {
 }
 
 function requiresActionSeq(commandType: ClientCommandMessage["command"]["type"]): boolean {
-  return commandType !== "submitMulligan" && commandType !== "reconnect";
+  // Concede finalizes the match deterministically and may be sent off-turn (and
+  // by a just-reconnected client that doesn't know the current actionSeq), so it
+  // is not gated by sequence freshness.
+  return commandType !== "submitMulligan" && commandType !== "reconnect" && commandType !== "concede";
 }

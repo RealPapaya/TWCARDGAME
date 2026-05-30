@@ -127,6 +127,7 @@ export type ClientViewState = {
   menuScreen: MenuScreen;
   matchmaking?: MatchmakingState;
   matchmakingTimer?: number;
+  opponentDisconnectTimer?: number;
   collectionFilter: CollectionFilter;
   collectionSort: CollectionSort;
   collectionCategory: string;

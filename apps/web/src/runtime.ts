@@ -66,6 +66,14 @@ import { cssEscape } from "./app/dom.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
+import {
+  clearActiveMatch,
+  isActiveMatchFresh,
+  readActiveMatch,
+  rememberActiveMatch,
+  touchActiveMatch,
+  type ActiveMatchRecord
+} from "./app/activeMatch.js";
 import { PATCH_NOTES } from "./app/patch-notes.js";
 import type {
   AnimationCue,
@@ -247,7 +255,14 @@ export function startApp(): void {
     });
   }
   render();
-  void initializeAccount();
+  // Best-effort: stamp the active-match record at the moment of unload so the
+  // startup resume prompt can judge whether the server room is still alive.
+  window.addEventListener("pagehide", () => {
+    if (view.room) touchActiveMatch();
+  });
+  void initializeAccount().finally(() => {
+    void maybePromptResumeMatch();
+  });
 }
 
 function shouldOpenDevTestFromUrl(): boolean {
@@ -1397,6 +1412,7 @@ function renderGame(status: GameStatus | ""): string {
       ${renderEventCues()}
       ${renderTurnAnnouncementOverlay()}
       ${renderMulliganOverlay(status)}
+      ${renderOpponentDisconnectOverlay(status)}
       ${renderResultOverlay(status)}
       ${view.settingsOpen ? renderSettingsModal() : ""}
       ${view.battleDeckOpen ? renderBattleDeckModal() : ""}
@@ -3731,7 +3747,7 @@ async function startDevTestPveMatch(devTest: DevTestMatchSetup): Promise<void> {
       },
       GameStateSchema
     );
-    bindRoomMessages(room);
+    bindRoomMessages(room, { persist: false });
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Unable to start dev test match.");
   } finally {
@@ -3903,7 +3919,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
   }
 }
 
-function bindRoomMessages(joined: Room): void {
+function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?: string } = {}): void {
   view.room = joined;
   resetMinionVisualTracking();
   resetRewardScreen(view);
@@ -3914,10 +3930,15 @@ function bindRoomMessages(joined: Room): void {
   view.eventStatus = undefined;
   view.publicSync = undefined;
   view.presence.clear();
+  stopOpponentDisconnectTick();
   view.rejectedHandIds.clear();
   view.turnAnnouncement = undefined;
   lastTurnAnnouncementKey = undefined;
   (window as any).__room = joined;
+
+  if (options.persist !== false) {
+    persistActiveMatch(joined, options.serverUrl ?? defaultServerUrl);
+  }
 
   joined.onStateChange((nextState: any) => {
     if (!activateRoomStateWhenReady(nextState)) return;
@@ -3927,12 +3948,11 @@ function bindRoomMessages(joined: Room): void {
     view.mySeat = message.seat;
     render();
   });
-  joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
-    handleHandSync(message.cards);
+  joined.onMessage("hand", (message: { seat?: Seat; cards: HandCardView[] }) => {
+    handleHandMessage(message);
   });
   joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
-    view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
-    render();
+    handlePresenceMessage(message);
   });
   joined.onMessage(
     "publicSync",
@@ -3968,6 +3988,177 @@ function bindRoomMessages(joined: Room): void {
     startRewardAnimation(view, render);
     render();
   });
+}
+
+function handleHandMessage(message: { seat?: Seat; cards: HandCardView[] }): void {
+  // A reconnected client gets its hand before any "seat" message; re-learn the
+  // seat from it so the board renders from the correct perspective.
+  if (message.seat && !view.mySeat) view.mySeat = message.seat;
+  handleHandSync(message.cards);
+}
+
+function handlePresenceMessage(message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }): void {
+  view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
+  refreshOpponentDisconnectTick();
+  render();
+}
+
+function isOpponentDisconnected(): boolean {
+  const me = view.mySeat;
+  if (!me || !view.room) return false;
+  const presence = view.presence.get(otherSeat(me));
+  return Boolean(presence && presence.connected === false);
+}
+
+function refreshOpponentDisconnectTick(): void {
+  if (isOpponentDisconnected()) startOpponentDisconnectTick();
+  else stopOpponentDisconnectTick();
+}
+
+function startOpponentDisconnectTick(): void {
+  if (view.opponentDisconnectTimer !== undefined) return;
+  view.opponentDisconnectTimer = window.setInterval(() => {
+    if (!isOpponentDisconnected()) {
+      stopOpponentDisconnectTick();
+      return;
+    }
+    render();
+  }, 1000);
+}
+
+function stopOpponentDisconnectTick(): void {
+  if (view.opponentDisconnectTimer !== undefined) {
+    window.clearInterval(view.opponentDisconnectTimer);
+    view.opponentDisconnectTimer = undefined;
+  }
+}
+
+function persistActiveMatch(joined: Room, serverUrl: string): void {
+  const token = (joined as any).reconnectionToken as string | undefined;
+  if (!token) return;
+  const mode = joined.name === "pvp" ? "pvp" : "pve";
+  rememberActiveMatch({ token, serverUrl, matchId: joined.roomId, mode });
+  startActiveMatchHeartbeat();
+}
+
+let activeMatchHeartbeat: number | undefined;
+
+function startActiveMatchHeartbeat(): void {
+  if (activeMatchHeartbeat !== undefined) return;
+  // Keep the stored record's timestamp fresh while the match is live so a hard
+  // refresh leaves a savedAtMs close to the real disconnect time.
+  activeMatchHeartbeat = window.setInterval(() => {
+    if (!view.room) {
+      stopActiveMatchHeartbeat();
+      return;
+    }
+    touchActiveMatch();
+  }, 10_000);
+}
+
+function stopActiveMatchHeartbeat(): void {
+  if (activeMatchHeartbeat !== undefined) {
+    window.clearInterval(activeMatchHeartbeat);
+    activeMatchHeartbeat = undefined;
+  }
+}
+
+function forgetActiveMatch(): void {
+  clearActiveMatch();
+  stopActiveMatchHeartbeat();
+  stopOpponentDisconnectTick();
+}
+
+/**
+ * On returning to the main screen, offer to reconnect to a match that was left
+ * mid-game (tab close / F5). Declining is a loss; the win rate counts it.
+ */
+async function maybePromptResumeMatch(): Promise<void> {
+  if (view.room || view.joining) return;
+  const rec = readActiveMatch();
+  if (!rec) return;
+  // PvP reconnection needs an authenticated session; if there's none we can't
+  // rejoin — the server's disconnect timeout already records the loss.
+  if (rec.mode === "pvp" && supabase && !view.session) {
+    forgetActiveMatch();
+    return;
+  }
+  if (!isActiveMatchFresh(rec)) {
+    // The room is almost certainly gone and the server has already finalized the
+    // match as a loss; just refresh stats silently.
+    forgetActiveMatch();
+    if (supabase && view.session) await loadAccountData();
+    return;
+  }
+  const resume = await themedConfirm({
+    title: "尚未結束的對戰",
+    message: "你仍有一場對戰尚未結束。要重新連線回到對戰嗎？選擇「否」將判定為落敗。",
+    confirmLabel: "重新連線",
+    cancelLabel: "否，放棄對戰"
+  });
+  if (resume) await resumeMatch(rec);
+  else await declineMatch(rec);
+}
+
+async function resumeMatch(rec: ActiveMatchRecord): Promise<void> {
+  view.joining = true;
+  render();
+  try {
+    const client = new Client(rec.serverUrl);
+    const joined: Room = await (client as any).reconnect(rec.token, GameStateSchema);
+    bindRoomMessages(joined, { serverUrl: rec.serverUrl });
+  } catch {
+    // Window expired or room closed — the loss is already recorded server-side.
+    forgetActiveMatch();
+    showAlert("這場對戰已經結束。");
+    if (supabase && view.session) await loadAccountData();
+  } finally {
+    view.joining = false;
+    render();
+  }
+}
+
+async function declineMatch(rec: ActiveMatchRecord): Promise<void> {
+  // Reconnect just long enough to concede so the match resolves at once (and a
+  // waiting PvP opponent is freed). If the room is gone, the server's disconnect
+  // timeout has already recorded the loss.
+  try {
+    const client = new Client(rec.serverUrl);
+    const joined: Room = await (client as any).reconnect(rec.token, GameStateSchema);
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    const message: ClientCommandMessage = {
+      commandId: `decline-${createClientId()}`,
+      expectedActionSeq: 0,
+      command: { type: "concede" }
+    };
+    joined.send("command", message);
+    await new Promise((resolve) => window.setTimeout(resolve, 200));
+    await joined.leave(true);
+  } catch {
+    // Already finalized server-side; nothing to do.
+  }
+  forgetActiveMatch();
+  if (supabase && view.session) await loadAccountData();
+}
+
+function renderOpponentDisconnectOverlay(status: GameStatus | ""): string {
+  if (!view.room || status === "finished" || status === "abandoned") return "";
+  const me = view.mySeat;
+  if (!me) return "";
+  const presence = view.presence.get(otherSeat(me));
+  if (!presence || presence.connected !== false) return "";
+  const remainingMs = presence.reconnectUntilMs ? presence.reconnectUntilMs - Date.now() : 0;
+  const seconds = Math.max(0, Math.ceil(remainingMs / 1000));
+  return `
+    <section class="opponent-disconnect-overlay" data-testid="opponent-disconnect-overlay" role="status" aria-live="polite">
+      <div class="opponent-disconnect-card">
+        <div class="opponent-disconnect-title">對手已斷線</div>
+        <div class="opponent-disconnect-sub">等待對手重新連線…</div>
+        <div class="opponent-disconnect-countdown" data-testid="opponent-disconnect-countdown">${seconds}</div>
+        <div class="opponent-disconnect-hint">倒數結束後對手未回來，將判定你獲勝</div>
+      </div>
+    </section>
+  `;
 }
 
 function isMatchStateReady(state: any): boolean {
@@ -4748,6 +4939,7 @@ async function backToLobby(): Promise<void> {
   view.matchmaking = undefined;
   view.privateJoinCode = undefined;
   stopMatchmakingTick();
+  forgetActiveMatch();
   view.menuScreen = "main";
   if (room) {
     try {
@@ -4785,48 +4977,7 @@ async function joinRoom(event: Event): Promise<void> {
       ? await (client as any).reconnect(reconnectToken, GameStateSchema)
       : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
 
-    view.room = joined;
-    resetMinionVisualTracking();
-    view.eventStatus = undefined;
-    view.publicSync = undefined;
-    view.presence.clear();
-    view.rejectedHandIds.clear();
-    (window as any).__room = joined;
-
-    joined.onStateChange((nextState: any) => {
-      if (!activateRoomStateWhenReady(nextState)) return;
-    });
-    activateRoomStateWhenReady(joined.state);
-    joined.onMessage("seat", (message: { seat: Seat }) => {
-      view.mySeat = message.seat;
-      render();
-    });
-    joined.onMessage("hand", (message: { cards: HandCardView[] }) => {
-      handleHandSync(message.cards);
-    });
-    joined.onMessage("presence", (message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }) => {
-      view.presence.set(message.seat, { connected: message.connected, reconnectUntilMs: message.reconnectUntilMs });
-      render();
-    });
-    joined.onMessage(
-      "publicSync",
-      (message: {
-        status?: GameStatus;
-        activeSeat?: Seat;
-        turnNumber?: number;
-        actionSeq?: number;
-        result?: any;
-        players?: Partial<Record<Seat, PublicPlayer>>;
-      }) => {
-      applyPublicSync(message);
-      }
-    );
-    joined.onMessage("events", (message: GameEvent[]) => {
-      handleEvents(message);
-    });
-    joined.onMessage("error", (message: { message?: string }) => {
-      showAlert(message?.message ?? "Room error.");
-    });
+    bindRoomMessages(joined, { serverUrl });
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Unable to join room.");
     view.matchmaking = undefined;
@@ -5461,6 +5612,8 @@ function handleEvents(message: GameEvent[]): void {
   }
   if (message.some((item) => item.type === "GAME_FINISHED")) {
     view.eventStatus = "finished";
+    // Match is over — no point offering a resume after a later refresh.
+    forgetActiveMatch();
   } else if (message.some((item) => item.type === "TURN_STARTED")) {
     view.eventStatus = "in_progress";
   }
