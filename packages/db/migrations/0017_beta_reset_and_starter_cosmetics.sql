@@ -1,27 +1,35 @@
--- Beta reset controls and blank initial profile cosmetics.
+-- Beta reset controls and starter profile cosmetics.
 
 alter table public.profiles
-  alter column owned_avatars set default array[]::text[],
-  alter column owned_titles set default array[]::text[],
-  alter column selected_title drop not null,
-  alter column selected_title set default null,
-  alter column avatar_url set default null;
+  alter column owned_avatars set default array['avatar1']::text[],
+  alter column owned_titles set default array['beginner']::text[],
+  alter column selected_title set default 'beginner',
+  alter column avatar_url set default '/images/avatars/avatar1.webp';
 
 update public.profiles
-set avatar_url = null
-where avatar_url = '/images/avatars/avatar1.webp';
+set avatar_url = coalesce(avatar_url, '/images/avatars/avatar1.webp'),
+    selected_title = coalesce(selected_title, 'beginner'),
+    owned_avatars = case
+      when 'avatar1' = any(coalesce(owned_avatars, array[]::text[])) then coalesce(owned_avatars, array[]::text[])
+      else array_prepend('avatar1', coalesce(owned_avatars, array[]::text[]))
+    end,
+    owned_titles = case
+      when 'beginner' = any(coalesce(owned_titles, array[]::text[])) then coalesce(owned_titles, array[]::text[])
+      else array_prepend('beginner', coalesce(owned_titles, array[]::text[]))
+    end;
 
-update public.profiles
-set selected_title = null
-where selected_title = 'beginner';
+alter table public.profiles
+  alter column selected_title set not null;
 
-update public.profiles
-set owned_avatars = array_remove(coalesce(owned_avatars, array[]::text[]), 'avatar1'),
-    owned_titles = array_remove(coalesce(owned_titles, array[]::text[]), 'beginner');
+insert into public.user_cosmetics (user_id, kind, cosmetic_id, source)
+select p.user_id, 'avatar', 'avatar1', 'starter_default'
+from public.profiles p
+on conflict do nothing;
 
-delete from public.user_cosmetics
-where (kind = 'avatar' and cosmetic_id = 'avatar1' and source in ('new_user_default', 'default_avatar'))
-   or (kind = 'title' and cosmetic_id = 'beginner' and source in ('new_user_default', 'default_title'));
+insert into public.user_cosmetics (user_id, kind, cosmetic_id, source)
+select p.user_id, 'title', 'beginner', 'starter_default'
+from public.profiles p
+on conflict do nothing;
 
 create or replace function public.grant_user_cosmetic(
   p_user_id uuid,
@@ -105,12 +113,18 @@ begin
     new.id,
     'Player',
     false,
-    null,
-    array[]::text[],
-    array[]::text[],
-    null
+    coalesce(new.raw_user_meta_data->>'avatar_url', '/images/avatars/avatar1.webp'),
+    array['avatar1']::text[],
+    array['beginner']::text[],
+    'beginner'
   )
   on conflict (user_id) do nothing;
+
+  insert into public.user_cosmetics (user_id, kind, cosmetic_id, source)
+  values
+    (new.id, 'avatar', 'avatar1', 'starter_default'),
+    (new.id, 'title', 'beginner', 'starter_default')
+  on conflict do nothing;
 
   select version into latest_catalog_version
   from public.card_catalog_snapshots
@@ -147,7 +161,7 @@ as $$
 declare
   deleted_auth_users integer := 0;
 begin
-  delete from auth.users;
+  delete from auth.users where true;
   get diagnostics deleted_auth_users = row_count;
 
   truncate table

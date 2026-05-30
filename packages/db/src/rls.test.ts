@@ -24,7 +24,7 @@ const cardIdOwnershipMigration = readFileSync(
   new URL("../migrations/0016_collection_card_id_ownership.sql", import.meta.url),
   "utf8"
 );
-const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_and_blank_cosmetics.sql", import.meta.url), "utf8");
+const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_and_starter_cosmetics.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -83,10 +83,12 @@ describe("Supabase RLS migration coverage", () => {
     expect(betaResetMigration).toContain("insert into public.profiles (user_id, display_name, display_name_set, avatar_url, owned_avatars, owned_titles, selected_title)");
     expect(betaResetMigration).toContain("'Player'");
     expect(betaResetMigration).toContain("false");
-    expect(betaResetMigration).toContain("array[]::text[]");
-    expect(betaResetMigration).toContain("selected_title set default null");
-    expect(betaResetMigration).not.toContain("(new.id, 'avatar', 'avatar1', 'new_user_default')");
-    expect(betaResetMigration).not.toContain("(new.id, 'title', 'beginner', 'new_user_default')");
+    expect(betaResetMigration).toContain("coalesce(new.raw_user_meta_data->>'avatar_url', '/images/avatars/avatar1.webp')");
+    expect(betaResetMigration).toContain("array['avatar1']::text[]");
+    expect(betaResetMigration).toContain("array['beginner']::text[]");
+    expect(betaResetMigration).toContain("alter column selected_title set default 'beginner'");
+    expect(betaResetMigration).toContain("(new.id, 'avatar', 'avatar1', 'starter_default')");
+    expect(betaResetMigration).toContain("(new.id, 'title', 'beginner', 'starter_default')");
     expect(latestNewUserMigration).not.toContain("starter_deck_ids");
     expect(latestNewUserMigration).not.toContain("insert into public.decks");
     expect(latestNewUserMigration).not.toContain("Starter Deck");

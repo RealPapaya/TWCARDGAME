@@ -98,6 +98,15 @@ import {
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
 const DEFAULT_AVATAR_URL = "/images/avatars/ai_default.webp";
+const FALLBACK_PROFILE_AVATAR_URL = "/images/avatars/avatar1.webp";
+const TITLE_LABELS: Record<string, string> = {
+  beginner: "菜鳥",
+  salary_thief: "薪水小偷",
+  monument_smoker: "古蹟菸客",
+  busy_worker: "忙碌社畜",
+  wehavemusic: "我們有音樂",
+  heartbroken_dog: "傷心狗狗"
+};
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
@@ -397,7 +406,7 @@ function renderMainMenu(): string {
   const xpRequired = getXPRequiredForLevel(level);
   const xpFraction = level >= MAX_LEVEL || xpRequired <= 0 ? 1 : Math.min(1, xp / xpRequired);
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
-  const playerTitle = view.profile?.selected_title ? `#${view.profile.selected_title}` : "未設定稱號";
+  const playerTitle = view.profile?.selected_title ? `#${titleLabel(view.profile.selected_title)}` : "未設定稱號";
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
@@ -717,9 +726,12 @@ function renderProfileScreen(): string {
   const xpProgress = level >= MAX_LEVEL || xpRequired <= 0 ? 100 : Math.min(100, Math.round((xp / xpRequired) * 100));
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
   const ownedCardCount = [...buildCollectionMap(view.collection).values()].reduce((sum, quantity) => sum + quantity, 0);
-  const title = profile?.selected_title || "未設定稱號";
+  const title = profile?.selected_title ? `#${titleLabel(profile.selected_title)}` : "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
   const ownedAvatars = avatars.filter((slug) => profile?.owned_avatars?.includes(slug));
+  const ownedTitles = profile?.owned_titles ?? [];
+  const googleAvatarUrl = googleProfileAvatarUrl();
+  const showGoogleAvatar = Boolean(googleAvatarUrl);
   const recent = view.matchHistory.slice(0, 10);
   const editing = view.editingDisplayNameActive ?? false;
   return `
@@ -749,7 +761,10 @@ function renderProfileScreen(): string {
                 }
               </div>
             </form>
-            <div class="profile-title-badge">${escapeHtml(title)}</div>
+            <div class="profile-title-row">
+              <div class="profile-title-badge">${escapeHtml(title)}</div>
+              ${ownedTitles.length > 1 ? `<button type="button" id="open-title-picker" class="ghost-button">更換稱號</button>` : ""}
+            </div>
             <div class="profile-ribbon">
               <span>Lv. ${level}</span>
               <span>${stats.wins} 勝</span>
@@ -774,9 +789,22 @@ function renderProfileScreen(): string {
           </div>
           ${view.avatarPickerOpen ? `
           <div class="avatar-picker" data-testid="avatar-picker">
+            ${showGoogleAvatar ? `
+              <button type="button" data-pick-google-avatar="1" class="avatar-option ${profile?.avatar_url === googleAvatarUrl ? "selected" : ""}" title="Google 頭像">
+                <img src="${escapeAttr(googleAvatarUrl!)}" alt="Google 頭像" />
+              </button>
+            ` : ""}
             ${ownedAvatars.length === 0 ? `<p class="muted">尚未擁有頭像。</p>` : ownedAvatars.map((slug) => `
               <button type="button" data-pick-avatar="${slug}" class="avatar-option ${profile?.avatar_url?.includes(slug) ? "selected" : ""}">
                 <img src="/images/avatars/${slug}.webp" alt="${slug}" />
+              </button>
+            `).join("")}
+          </div>` : ""}
+          ${view.titlePickerOpen ? `
+          <div class="title-picker" data-testid="title-picker">
+            ${ownedTitles.length === 0 ? `<p class="muted">尚未擁有稱號。</p>` : ownedTitles.map((id) => `
+              <button type="button" data-pick-title="${escapeAttr(id)}" class="title-option ${profile?.selected_title === id ? "selected" : ""}">
+                #${escapeHtml(titleLabel(id))}
               </button>
             `).join("")}
           </div>` : ""}
@@ -2388,10 +2416,22 @@ function bindStaticActions(): void {
   on(document.querySelector<HTMLFormElement>("#profile-form"), "submit", "profile-form", (event) => void saveProfile(event));
   on(document.querySelector<HTMLButtonElement>("#open-avatar-picker"), "click", "open-avatar-picker", () => {
     view.avatarPickerOpen = !view.avatarPickerOpen;
+    if (view.avatarPickerOpen) view.titlePickerOpen = false;
     render();
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-avatar]")) {
     on(el, "click", "pick-avatar", () => void pickAvatar(el.dataset.pickAvatar));
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-pick-google-avatar]")) {
+    on(el, "click", "pick-google-avatar", () => void pickGoogleAvatar());
+  }
+  on(document.querySelector<HTMLButtonElement>("#open-title-picker"), "click", "open-title-picker", () => {
+    view.titlePickerOpen = !view.titlePickerOpen;
+    if (view.titlePickerOpen) view.avatarPickerOpen = false;
+    render();
+  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-pick-title]")) {
+    on(el, "click", "pick-title", () => void pickTitle(el.dataset.pickTitle));
   }
   on(document.querySelector<HTMLInputElement>("#show-unowned-checkbox"), "change", "show-unowned-checkbox", (event) => {
     (event.currentTarget as HTMLInputElement).checked = false;
@@ -2759,6 +2799,7 @@ function navigateToScreen(target: MenuScreen): void {
   if (target === "test" && !devTestModeAvailable) target = "main";
   view.menuScreen = target;
   view.avatarPickerOpen = false;
+  view.titlePickerOpen = false;
   view.pinnedCollectionCardId = undefined;
   if (target !== "profile") { view.editingDisplayName = undefined; view.editingDisplayNameActive = false; }
   if (target === "friends") void loadFriends();
@@ -3520,6 +3561,16 @@ function updateShopGoldDisplay(result: PurchaseShopResult | null): void {
   if (goldEl && typeof gold === "number") goldEl.textContent = String(gold);
 }
 
+function titleLabel(id: string): string {
+  return TITLE_LABELS[id] ?? id;
+}
+
+function googleProfileAvatarUrl(): string | undefined {
+  const metadata = view.session?.user.user_metadata ?? {};
+  const avatarUrl = metadata.avatar_url;
+  return typeof avatarUrl === "string" && avatarUrl.trim() ? avatarUrl : undefined;
+}
+
 function mountPackOpeningOverlay(): void {
   const html = renderLegacyShopPackOverlay();
   if (!html) return;
@@ -3998,6 +4049,30 @@ async function pickAvatar(slug: string | undefined): Promise<void> {
     if (error) throw error;
     showToast("頭像已更新。");
     view.avatarPickerOpen = false;
+    await loadAccountDataRaw();
+  });
+}
+
+async function pickGoogleAvatar(): Promise<void> {
+  if (!supabase || !view.session?.user) return;
+  const avatarUrl = googleProfileAvatarUrl();
+  if (!avatarUrl) return;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", view.session!.user.id);
+    if (error) throw error;
+    showToast("頭像已更新。");
+    view.avatarPickerOpen = false;
+    await loadAccountDataRaw();
+  });
+}
+
+async function pickTitle(id: string | undefined): Promise<void> {
+  if (!supabase || !view.session?.user || !id) return;
+  await withAccountLoading(async () => {
+    const { error } = await supabase.rpc("select_user_cosmetic", { p_kind: "title", p_cosmetic_id: id });
+    if (error) throw error;
+    showToast("稱號已更新。");
+    view.titlePickerOpen = false;
     await loadAccountDataRaw();
   });
 }
@@ -4922,6 +4997,7 @@ async function ensureCollection(): Promise<void> {
 async function ensureProfile(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const user = view.session.user;
+  const avatarUrl = googleProfileAvatarUrl() ?? FALLBACK_PROFILE_AVATAR_URL;
   const { error } = await supabase
     .from("profiles")
     .upsert(
@@ -4929,10 +5005,10 @@ async function ensureProfile(): Promise<void> {
         user_id: user.id,
         display_name: "Player",
         display_name_set: false,
-        avatar_url: null,
-        owned_avatars: [],
-        owned_titles: [],
-        selected_title: null
+        avatar_url: avatarUrl,
+        owned_avatars: ["avatar1"],
+        owned_titles: ["beginner"],
+        selected_title: "beginner"
       },
       { onConflict: "user_id", ignoreDuplicates: true }
     );

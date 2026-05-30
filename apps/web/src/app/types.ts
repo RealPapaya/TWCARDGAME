@@ -144,6 +144,7 @@ export type ClientViewState = {
   };
   coverPickerOpen?: boolean;
   avatarPickerOpen?: boolean;
+  titlePickerOpen?: boolean;
   editingDisplayName?: string;
   editingDisplayNameActive?: boolean;
   friends: FriendRow[];
