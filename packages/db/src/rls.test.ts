@@ -24,6 +24,7 @@ const cardIdOwnershipMigration = readFileSync(
   new URL("../migrations/0016_collection_card_id_ownership.sql", import.meta.url),
   "utf8"
 );
+const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_and_blank_cosmetics.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -77,13 +78,28 @@ describe("Supabase RLS migration coverage", () => {
   });
 
   it("requires new players to set a display name and does not auto-create starter decks", () => {
+    const latestNewUserMigration = playerIdStarterCollectionOnlyMigration + betaResetMigration;
     expect(playerIdStarterCollectionOnlyMigration).toContain("add column if not exists display_name_set boolean not null default true");
-    expect(playerIdStarterCollectionOnlyMigration).toContain("insert into public.profiles (user_id, display_name, display_name_set, avatar_url)");
-    expect(playerIdStarterCollectionOnlyMigration).toContain("'Player'");
-    expect(playerIdStarterCollectionOnlyMigration).toContain("false");
-    expect(playerIdStarterCollectionOnlyMigration).not.toContain("starter_deck_ids");
-    expect(playerIdStarterCollectionOnlyMigration).not.toContain("insert into public.decks");
-    expect(playerIdStarterCollectionOnlyMigration).not.toContain("Starter Deck");
+    expect(betaResetMigration).toContain("insert into public.profiles (user_id, display_name, display_name_set, avatar_url, owned_avatars, owned_titles, selected_title)");
+    expect(betaResetMigration).toContain("'Player'");
+    expect(betaResetMigration).toContain("false");
+    expect(betaResetMigration).toContain("array[]::text[]");
+    expect(betaResetMigration).toContain("selected_title set default null");
+    expect(betaResetMigration).not.toContain("(new.id, 'avatar', 'avatar1', 'new_user_default')");
+    expect(betaResetMigration).not.toContain("(new.id, 'title', 'beginner', 'new_user_default')");
+    expect(latestNewUserMigration).not.toContain("starter_deck_ids");
+    expect(latestNewUserMigration).not.toContain("insert into public.decks");
+    expect(latestNewUserMigration).not.toContain("Starter Deck");
+  });
+
+  it("keeps beta DB reset service-role only", () => {
+    expect(betaResetMigration).toContain("create or replace function public.beta_reset_database()");
+    expect(betaResetMigration).toContain("delete from auth.users");
+    expect(betaResetMigration).toContain("truncate table");
+    expect(betaResetMigration).toContain("revoke all on function public.beta_reset_database() from public;");
+    expect(betaResetMigration).toContain("grant execute on function public.beta_reset_database() to service_role;");
+    expect(betaResetMigration).not.toContain("grant execute on function public.beta_reset_database() to authenticated;");
+    expect(betaResetMigration).not.toContain("grant execute on function public.beta_reset_database() to anon;");
   });
 
   it("grants browser table privileges required before RLS policies are evaluated", () => {

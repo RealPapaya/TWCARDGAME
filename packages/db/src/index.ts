@@ -39,7 +39,7 @@ export interface PlayerProfileRow {
   level?: number;
   owned_avatars?: string[];
   owned_titles?: string[];
-  selected_title?: string;
+  selected_title?: string | null;
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;
@@ -137,6 +137,12 @@ export interface DailyLoginResult {
   recorded: boolean;
 }
 
+export interface BetaDatabaseResetResult {
+  deletedAuthUsers: number;
+  truncatedTables: string[];
+  preservedTables: string[];
+}
+
 export interface CardCatalogSnapshotRow {
   version: string;
   cards: unknown;
@@ -228,6 +234,12 @@ export async function recordDailyLogin(client: SupabaseClient): Promise<DailyLog
   const [row] = (data ?? []) as DailyLoginResult[];
   if (!row) throw new Error("Daily login RPC returned no row.");
   return row;
+}
+
+export async function resetBetaDatabase(client: SupabaseClient): Promise<BetaDatabaseResetResult> {
+  const { data, error } = await client.rpc("beta_reset_database");
+  if (error) throw error;
+  return data as BetaDatabaseResetResult;
 }
 
 export async function getAuthenticatedUser(client: SupabaseClient, accessToken: string): Promise<AuthenticatedUser> {

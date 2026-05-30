@@ -204,7 +204,7 @@ export type ProfileRow = {
   level?: number;
   owned_avatars?: string[];
   owned_titles?: string[];
-  selected_title?: string;
+  selected_title?: string | null;
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;

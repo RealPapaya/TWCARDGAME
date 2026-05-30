@@ -45,7 +45,7 @@ import {
   toggleSfxMute,
   type SoundCue
 } from "./app/audio.js";
-import { defaultServerUrl, forceDevAuth, isLocalDevHost, supabase as configuredSupabase } from "./app/config.js";
+import { betaDbResetEnabled, defaultServerUrl, forceDevAuth, isLocalDevHost, serverHttpUrl, supabase as configuredSupabase } from "./app/config.js";
 import {
   buildCollectionMap,
   collectionQuantity,
@@ -97,6 +97,7 @@ import {
 
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+const DEFAULT_AVATAR_URL = "/images/avatars/ai_default.webp";
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
@@ -384,7 +385,7 @@ function renderCloudLayer(): string {
 
 function renderMainMenu(): string {
   const displayName = view.profile?.display_name ?? "Player";
-  const avatarUrl = view.profile?.avatar_url || "/images/avatars/avatar1.webp";
+  const avatarUrl = view.profile?.avatar_url || DEFAULT_AVATAR_URL;
   const stats = computeMatchStats();
   const collectionMap = buildCollectionMap(view.collection);
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
@@ -396,7 +397,7 @@ function renderMainMenu(): string {
   const xpRequired = getXPRequiredForLevel(level);
   const xpFraction = level >= MAX_LEVEL || xpRequired <= 0 ? 1 : Math.min(1, xp / xpRequired);
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
-  const playerTitle = "#菜鳥";
+  const playerTitle = view.profile?.selected_title ? `#${view.profile.selected_title}` : "未設定稱號";
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
@@ -425,7 +426,7 @@ function renderMainMenu(): string {
       </nav>
       <div class="main-menu-bottom">
         <aside class="player-info-card" data-testid="player-chip">
-          <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+          <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
           <div class="player-info-text">
             <strong>${escapeHtml(displayName)}</strong>
             <span class="player-title-text">${escapeHtml(playerTitle)}</span>
@@ -707,7 +708,7 @@ function renderProfileScreen(): string {
   }
   const profile = view.profile;
   const displayName = view.editingDisplayName ?? profile?.display_name ?? "玩家";
-  const avatarUrl = profile?.avatar_url || "/images/avatars/avatar1.webp";
+  const avatarUrl = profile?.avatar_url || DEFAULT_AVATAR_URL;
   const stats = computeMatchStats();
   const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
   const level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(profile?.level ?? 1)));
@@ -718,6 +719,7 @@ function renderProfileScreen(): string {
   const ownedCardCount = [...buildCollectionMap(view.collection).values()].reduce((sum, quantity) => sum + quantity, 0);
   const title = profile?.selected_title || "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
+  const ownedAvatars = avatars.filter((slug) => profile?.owned_avatars?.includes(slug));
   const recent = view.matchHistory.slice(0, 10);
   const editing = view.editingDisplayNameActive ?? false;
   return `
@@ -730,7 +732,7 @@ function renderProfileScreen(): string {
       <div class="parchment-card profile-panel" data-testid="profile-panel">
         <div class="profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
-            <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+            <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
             <button id="open-avatar-picker" class="ghost-button">更換頭像</button>
           </div>
           <div class="profile-identity">
@@ -772,7 +774,7 @@ function renderProfileScreen(): string {
           </div>
           ${view.avatarPickerOpen ? `
           <div class="avatar-picker" data-testid="avatar-picker">
-            ${avatars.map((slug) => `
+            ${ownedAvatars.length === 0 ? `<p class="muted">尚未擁有頭像。</p>` : ownedAvatars.map((slug) => `
               <button type="button" data-pick-avatar="${slug}" class="avatar-option ${profile?.avatar_url?.includes(slug) ? "selected" : ""}">
                 <img src="/images/avatars/${slug}.webp" alt="${slug}" />
               </button>
@@ -851,6 +853,12 @@ function renderSettingsModal(): string {
         ${accountMode ? `
         <div class="settings-divider"></div>
         <button id="settings-sign-out" class="settings-signout-btn danger" data-testid="settings-sign-out">登出</button>
+        ` : ""}
+        ${betaDbResetEnabled ? `
+        <div class="settings-divider"></div>
+        <h4 class="settings-section-title">測試版資料</h4>
+        <p class="settings-danger-note">清除帳號、個人資料、收藏、牌組、好友與對戰紀錄。卡牌目錄與商店設定會保留。</p>
+        <button id="settings-beta-reset-db" class="settings-signout-btn danger" data-testid="settings-beta-reset-db" ${view.accountLoading ? "disabled" : ""}>一鍵清除 DB 資料</button>
         ` : ""}
       </div>
     </div>
@@ -2610,6 +2618,7 @@ function bindStaticActions(): void {
     });
   }
   on(document.querySelector<HTMLButtonElement>("#settings-sign-out"), "click", "settings-sign-out", () => void signOut());
+  on(document.querySelector<HTMLButtonElement>("#settings-beta-reset-db"), "click", "settings-beta-reset-db", () => void resetBetaDatabaseFromSettings());
   on(document.querySelector<HTMLButtonElement>("#settings-bgm-mute"), "click", "settings-bgm-mute", toggleBgmMute);
   on(document.querySelector<HTMLButtonElement>("#settings-sfx-mute"), "click", "settings-sfx-mute", toggleSfxMute);
   on(document.querySelector<HTMLInputElement>("#settings-bgm-volume"), "input", "settings-bgm-volume", (e) => {
@@ -2859,10 +2868,10 @@ function renderFriendsPanel(panel: FriendsPanel, friends: FriendRow[], incoming:
 }
 
 function renderFriendRow(friend: FriendRow): string {
-  const avatar = friend.avatar_url || "/images/avatars/avatar1.webp";
+  const avatar = friend.avatar_url || DEFAULT_AVATAR_URL;
   return `
     <li class="friend-row" data-testid="friend-row">
-      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
       <div class="friend-meta">
         <strong>${escapeHtml(friend.display_name)}</strong>
         <span class="muted">Wins ${friend.wins_count}</span>
@@ -2890,10 +2899,10 @@ function renderOutgoingFriendRequestRow(request: FriendRequestRow): string {
 }
 
 function renderFriendRequestRow(request: FriendRequestRow, actions: string): string {
-  const avatar = request.avatar_url || "/images/avatars/avatar1.webp";
+  const avatar = request.avatar_url || DEFAULT_AVATAR_URL;
   return `
     <li class="friend-row" data-testid="friend-request-row">
-      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <img class="friend-avatar" src="${escapeAttr(avatar)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
       <div class="friend-meta">
         <strong>${escapeHtml(request.display_name)}</strong>
         <span class="muted">Wins ${request.wins_count}</span>
@@ -2924,7 +2933,7 @@ function deriveLbLevel(wins: number): number {
 function renderPublicPlayerProfileModal(): string {
   const player = view.publicPlayerProfile;
   if (!player) return "";
-  const avatarUrl = player.avatarUrl || "/images/avatars/avatar1.webp";
+  const avatarUrl = player.avatarUrl || DEFAULT_AVATAR_URL;
   const level = deriveLbLevel(player.winsCount);
   const rankText = player.rank ? `#${player.rank}` : "—";
   return `
@@ -2932,11 +2941,11 @@ function renderPublicPlayerProfileModal(): string {
       <div class="parchment-card public-profile-card">
         <button id="close-public-profile" class="public-profile-close" title="關閉">×</button>
         <div class="public-profile-hero">
-          <img class="public-profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+          <img class="public-profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
           <div class="public-profile-info">
             <span class="public-profile-source">${escapeHtml(player.source)}</span>
             <h3>${escapeHtml(player.displayName)}</h3>
-            <div class="public-profile-title">#菜鳥</div>
+            <div class="public-profile-title">未設定稱號</div>
           </div>
         </div>
         <div class="public-profile-stats">
@@ -3001,16 +3010,16 @@ function openPublicPlayerProfile(userId: string): void {
 function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, sortBy: "wins" | "level"): string {
   const rankClass = displayRank <= 3 ? ` lb-card-rank-${displayRank}` : "";
   const rankBadge = displayRank === 1 ? "🥇" : displayRank === 2 ? "🥈" : displayRank === 3 ? "🥉" : `#${displayRank}`;
-  const avatarUrl = row.avatar_url || "/images/avatars/avatar1.webp";
+  const avatarUrl = row.avatar_url || DEFAULT_AVATAR_URL;
   const level = deriveLbLevel(row.wins_count);
   const statLabel = sortBy === "level" ? `Lv. ${level}` : `${row.wins_count} 勝`;
   return `
     <div class="lb-player-card${rankClass}">
       <div class="lb-rank-badge">${rankBadge}</div>
-      <img class="lb-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='/images/avatars/avatar1.webp'" />
+      <img class="lb-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
       <div class="lb-player-info">
         <div class="lb-player-name">${escapeHtml(row.display_name)}</div>
-        <div class="lb-player-title">#菜鳥</div>
+        <div class="lb-player-title">未設定稱號</div>
       </div>
       <div class="lb-stat-pill">${escapeHtml(statLabel)}</div>
       <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}" title="查看個人頁面">查看</button>
@@ -3984,13 +3993,48 @@ async function savePlayerId(event: Event): Promise<void> {
 
 async function pickAvatar(slug: string | undefined): Promise<void> {
   if (!supabase || !view.session?.user || !slug) return;
-  const avatarUrl = `/images/avatars/${slug}.webp`;
   await withAccountLoading(async () => {
-    const { error } = await supabase.from("profiles").update({ avatar_url: avatarUrl }).eq("user_id", view.session!.user.id);
+    const { error } = await supabase.rpc("select_user_cosmetic", { p_kind: "avatar", p_cosmetic_id: slug });
     if (error) throw error;
     showToast("頭像已更新。");
     view.avatarPickerOpen = false;
     await loadAccountDataRaw();
+  });
+}
+
+async function resetBetaDatabaseFromSettings(): Promise<void> {
+  if (!betaDbResetEnabled || view.accountLoading) return;
+  const ok = await themedConfirm({
+    title: "清除測試版 DB",
+    message: "這會刪除所有測試帳號與玩家資料，且無法復原。",
+    confirmLabel: "清除 DB",
+    danger: true
+  });
+  if (!ok) return;
+  const token = window.prompt("請輸入重置 token");
+  if (!token) return;
+
+  await withAccountLoading(async () => {
+    const response = await fetch(`${serverHttpUrl()}/admin/beta-reset-db`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-reset-token": token
+      },
+      body: JSON.stringify({ token })
+    });
+    const payload = (await response.json().catch(() => undefined)) as { ok?: boolean; error?: string } | undefined;
+    if (!response.ok || payload?.ok === false) throw new Error(payload?.error ?? "DB reset failed.");
+
+    await supabase?.auth.signOut().catch((error) => console.warn("sign out after beta DB reset failed", error));
+    view.session = null;
+    view.profile = undefined;
+    view.decks = [];
+    view.collection = [];
+    view.matchHistory = [];
+    view.selectedDeckId = undefined;
+    view.settingsOpen = false;
+    showToast("DB 資料已清除，請重新登入。");
   });
 }
 
@@ -4878,7 +4922,6 @@ async function ensureCollection(): Promise<void> {
 async function ensureProfile(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const user = view.session.user;
-  const metadata = user.user_metadata ?? {};
   const { error } = await supabase
     .from("profiles")
     .upsert(
@@ -4886,7 +4929,10 @@ async function ensureProfile(): Promise<void> {
         user_id: user.id,
         display_name: "Player",
         display_name_set: false,
-        avatar_url: typeof metadata.avatar_url === "string" ? metadata.avatar_url : "/images/avatars/avatar1.webp"
+        avatar_url: null,
+        owned_avatars: [],
+        owned_titles: [],
+        selected_title: null
       },
       { onConflict: "user_id", ignoreDuplicates: true }
     );
