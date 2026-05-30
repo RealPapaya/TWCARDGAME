@@ -162,6 +162,19 @@ const AI_DIFFICULTY_REWARDS: Record<AiDifficulty, number> = {
   hard: 300
 };
 
+function createClientId(): string {
+  const cryptoApi = globalThis.crypto;
+  if (typeof cryptoApi?.randomUUID === "function") return cryptoApi.randomUUID();
+  if (typeof cryptoApi?.getRandomValues === "function") {
+    const bytes = cryptoApi.getRandomValues(new Uint8Array(16));
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    const hex = Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0"));
+    return `${hex.slice(0, 4).join("")}-${hex.slice(4, 6).join("")}-${hex.slice(6, 8).join("")}-${hex.slice(8, 10).join("")}-${hex.slice(10, 16).join("")}`;
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
 const view: ClientViewState = {
   hand: [],
   presence: new Map(),
@@ -744,8 +757,10 @@ function renderProfileScreen(): string {
       <div class="parchment-card profile-panel" data-testid="profile-panel">
         <div class="profile-header" data-testid="profile-header">
           <div class="profile-avatar-block">
-            <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
-            <button id="open-avatar-picker" class="ghost-button">更換頭像</button>
+            <button id="open-avatar-picker" class="profile-avatar-btn" aria-label="更換頭像">
+              <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
+              <span class="profile-avatar-edit-overlay" aria-hidden="true">✏️</span>
+            </button>
           </div>
           <div class="profile-identity">
             <form id="profile-form" class="profile-form">
@@ -762,8 +777,13 @@ function renderProfileScreen(): string {
               </div>
             </form>
             <div class="profile-title-row">
-              <div class="profile-title-badge">${escapeHtml(title)}</div>
-              ${ownedTitles.length > 1 ? `<button type="button" id="open-title-picker" class="ghost-button">更換稱號</button>` : ""}
+              ${ownedTitles.length > 0
+                ? `<button type="button" id="open-title-picker" class="profile-title-badge profile-title-btn" aria-label="更換稱號">
+                     ${escapeHtml(title)}
+                     <span class="profile-title-edit-overlay" aria-hidden="true">✏️</span>
+                   </button>`
+                : `<div class="profile-title-badge">${escapeHtml(title)}</div>`
+              }
             </div>
             <div class="profile-ribbon">
               <span>Lv. ${level}</span>
@@ -787,27 +807,6 @@ function renderProfileScreen(): string {
               </div>
             </div>
           </div>
-          ${view.avatarPickerOpen ? `
-          <div class="avatar-picker" data-testid="avatar-picker">
-            ${showGoogleAvatar ? `
-              <button type="button" data-pick-google-avatar="1" class="avatar-option ${profile?.avatar_url === googleAvatarUrl ? "selected" : ""}" title="Google 頭像">
-                <img src="${escapeAttr(googleAvatarUrl!)}" alt="Google 頭像" />
-              </button>
-            ` : ""}
-            ${ownedAvatars.length === 0 ? `<p class="muted">尚未擁有頭像。</p>` : ownedAvatars.map((slug) => `
-              <button type="button" data-pick-avatar="${slug}" class="avatar-option ${profile?.avatar_url?.includes(slug) ? "selected" : ""}">
-                <img src="/images/avatars/${slug}.webp" alt="${slug}" />
-              </button>
-            `).join("")}
-          </div>` : ""}
-          ${view.titlePickerOpen ? `
-          <div class="title-picker" data-testid="title-picker">
-            ${ownedTitles.length === 0 ? `<p class="muted">尚未擁有稱號。</p>` : ownedTitles.map((id) => `
-              <button type="button" data-pick-title="${escapeAttr(id)}" class="title-option ${profile?.selected_title === id ? "selected" : ""}">
-                #${escapeHtml(titleLabel(id))}
-              </button>
-            `).join("")}
-          </div>` : ""}
         </div>
 
         <div class="profile-section profile-section--wallet">
@@ -847,6 +846,43 @@ function renderProfileScreen(): string {
           </div>
         </div>
       </div>
+      ${view.avatarPickerOpen ? `
+      <div class="picker-backdrop" id="avatar-picker-backdrop" role="dialog" aria-modal="true" aria-label="選擇頭像">
+        <div class="picker-modal parchment-card">
+          <header class="settings-modal-header">
+            <h3>選擇頭像</h3>
+            <button id="avatar-picker-close" class="settings-close-btn" title="關閉">✕</button>
+          </header>
+          <div class="avatar-picker" data-testid="avatar-picker">
+            ${showGoogleAvatar ? `
+              <button type="button" data-pick-google-avatar="1" class="avatar-option ${profile?.avatar_url === googleAvatarUrl ? "selected" : ""}" title="Google 頭像">
+                <img src="${escapeAttr(googleAvatarUrl!)}" alt="Google 頭像" />
+              </button>
+            ` : ""}
+            ${ownedAvatars.length === 0 ? `<p class="muted">尚未擁有頭像。</p>` : ownedAvatars.map((slug) => `
+              <button type="button" data-pick-avatar="${slug}" class="avatar-option ${profile?.avatar_url?.includes(slug) ? "selected" : ""}">
+                <img src="/images/avatars/${slug}.webp" alt="${slug}" />
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>` : ""}
+      ${view.titlePickerOpen ? `
+      <div class="picker-backdrop" id="title-picker-backdrop" role="dialog" aria-modal="true" aria-label="選擇稱號">
+        <div class="picker-modal parchment-card">
+          <header class="settings-modal-header">
+            <h3>選擇稱號</h3>
+            <button id="title-picker-close" class="settings-close-btn" title="關閉">✕</button>
+          </header>
+          <div class="title-picker" data-testid="title-picker">
+            ${ownedTitles.length === 0 ? `<p class="muted">尚未擁有稱號。</p>` : ownedTitles.map((id) => `
+              <button type="button" data-pick-title="${escapeAttr(id)}" class="title-option ${profile?.selected_title === id ? "selected" : ""}">
+                #${escapeHtml(titleLabel(id))}
+              </button>
+            `).join("")}
+          </div>
+        </div>
+      </div>` : ""}
     </section>
   `;
 }
@@ -2419,6 +2455,13 @@ function bindStaticActions(): void {
     if (view.avatarPickerOpen) view.titlePickerOpen = false;
     render();
   });
+  on(document.querySelector<HTMLButtonElement>("#avatar-picker-close"), "click", "avatar-picker-close", () => {
+    view.avatarPickerOpen = false;
+    render();
+  });
+  on(document.querySelector<HTMLElement>("#avatar-picker-backdrop"), "click", "avatar-picker-backdrop", (event) => {
+    if (event.target === event.currentTarget) { view.avatarPickerOpen = false; render(); }
+  });
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-avatar]")) {
     on(el, "click", "pick-avatar", () => void pickAvatar(el.dataset.pickAvatar));
   }
@@ -2429,6 +2472,13 @@ function bindStaticActions(): void {
     view.titlePickerOpen = !view.titlePickerOpen;
     if (view.titlePickerOpen) view.avatarPickerOpen = false;
     render();
+  });
+  on(document.querySelector<HTMLButtonElement>("#title-picker-close"), "click", "title-picker-close", () => {
+    view.titlePickerOpen = false;
+    render();
+  });
+  on(document.querySelector<HTMLElement>("#title-picker-backdrop"), "click", "title-picker-backdrop", (event) => {
+    if (event.target === event.currentTarget) { view.titlePickerOpen = false; render(); }
   });
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-title]")) {
     on(el, "click", "pick-title", () => void pickTitle(el.dataset.pickTitle));
@@ -3867,16 +3917,12 @@ function bindRoomMessages(joined: Room): void {
   view.rejectedHandIds.clear();
   view.turnAnnouncement = undefined;
   lastTurnAnnouncementKey = undefined;
-  view.matchmaking = undefined;
-  stopMatchmakingTick();
   (window as any).__room = joined;
 
   joined.onStateChange((nextState: any) => {
-    view.state = nextState;
-    publishDebugState();
-    pruneSelections();
-    render();
+    if (!activateRoomStateWhenReady(nextState)) return;
   });
+  activateRoomStateWhenReady(joined.state);
   joined.onMessage("seat", (message: { seat: Seat }) => {
     view.mySeat = message.seat;
     render();
@@ -3922,6 +3968,28 @@ function bindRoomMessages(joined: Room): void {
     startRewardAnimation(view, render);
     render();
   });
+}
+
+function isMatchStateReady(state: any): boolean {
+  return typeof state?.matchId === "string" && state.matchId.length > 0;
+}
+
+function activateRoomStateWhenReady(nextState: any): boolean {
+  if (view.matchmaking && !isMatchStateReady(nextState)) {
+    render();
+    return false;
+  }
+  if (view.matchmaking) {
+    view.matchmaking = undefined;
+    stopMatchmakingTick();
+  }
+  if (nextState) {
+    view.state = nextState;
+    publishDebugState();
+    pruneSelections();
+  }
+  render();
+  return true;
 }
 
 async function startMatchmaking(): Promise<void> {
@@ -4723,16 +4791,12 @@ async function joinRoom(event: Event): Promise<void> {
     view.publicSync = undefined;
     view.presence.clear();
     view.rejectedHandIds.clear();
-    view.matchmaking = undefined;
-    stopMatchmakingTick();
     (window as any).__room = joined;
 
     joined.onStateChange((nextState: any) => {
-      view.state = nextState;
-      publishDebugState();
-      pruneSelections();
-      render();
+      if (!activateRoomStateWhenReady(nextState)) return;
     });
+    activateRoomStateWhenReady(joined.state);
     joined.onMessage("seat", (message: { seat: Seat }) => {
       view.mySeat = message.seat;
       render();
@@ -5309,7 +5373,7 @@ function send(command: GameCommand): void {
   if (isBattleActionCommand(command) && isBattleActionLocked()) return;
   const expectedActionSeq = view.publicSync?.actionSeq ?? view.state?.turn?.actionSeq ?? 0;
   const message: ClientCommandMessage = {
-    commandId: `${view.mySeat ?? "client"}-${crypto.randomUUID()}`,
+    commandId: `${view.mySeat ?? "client"}-${createClientId()}`,
     expectedActionSeq,
     command
   };
@@ -5353,7 +5417,7 @@ function maybeShowTurnAnnouncement(events: GameEvent[]): void {
 }
 
 function showTurnAnnouncement(text: string, seat: Seat): void {
-  const id = crypto.randomUUID();
+  const id = createClientId();
   view.turnAnnouncement = {
     id,
     text,
@@ -6076,7 +6140,7 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): Ani
   const target = typeof payload.target === "string" ? payload.target : undefined;
   const amount = typeof payload.amount === "number" ? payload.amount : undefined;
   const cardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
-  const id = `${event.seq}-${event.type}-${crypto.randomUUID()}`;
+  const id = `${event.seq}-${event.type}-${createClientId()}`;
   if (event.type === "CARD_PLAYED") {
     const playedCardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
     return {

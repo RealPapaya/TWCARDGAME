@@ -14,7 +14,28 @@ export const sfxVolumeKey = "twcardgame.sfxVolume";
 export const bgmMutedKey = "twcardgame.bgmMuted";
 export const sfxMutedKey = "twcardgame.sfxMuted";
 
-const bgmTrack = new Audio("/audio/bgm/Earthbound Ember.mp3");
+const BGM_TRACKS = [
+  "/audio/bgm/Earthbound Ember.mp3",
+  "/audio/bgm/Battle 1.mp3",
+  "/audio/bgm/Battle 2.mp3",
+  "/audio/bgm/Battle 3.mp3",
+];
+
+let currentTrackIndex = Math.floor(Math.random() * BGM_TRACKS.length);
+let bgmTrack = new Audio(BGM_TRACKS[currentTrackIndex]);
+
+function pickNextTrack(): void {
+  let next: number;
+  do {
+    next = Math.floor(Math.random() * BGM_TRACKS.length);
+  } while (next === currentTrackIndex && BGM_TRACKS.length > 1);
+  currentTrackIndex = next;
+  bgmTrack.src = BGM_TRACKS[currentTrackIndex];
+  const view = audioView;
+  if (view) bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  void bgmTrack.play().catch(() => {});
+}
+
 const sfxPaths: Record<SoundCue, string> = {
   cardPlay: "/audio/sfx/LowCostMionion.mp3",
   cardPlayHeavy: "/audio/sfx/HighCostMionion.mp3",
@@ -40,9 +61,9 @@ export function configureAudio(view: AudioViewState, render: () => void): void {
 
 export function installAudioUnlock(): void {
   const view = requireAudioView();
-  bgmTrack.loop = true;
   bgmTrack.preload = "auto";
   bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  bgmTrack.addEventListener("ended", pickNextTrack);
   const unlock = () => {
     audioUnlocked = true;
     ensureBgm();
