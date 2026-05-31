@@ -1157,6 +1157,7 @@ function renderPinnedCardDetail(cardId: string): string {
             ${renderCardFace(resolved, "mulligan")}
           </div>
           <div class="card-op-side">
+            ${renderKeywordGlossary(card.id, "right")}
             <p class="card-op-count">擁有數量：<strong>${owned}</strong></p>
             ${collectible ? `
               <div class="card-op-actions">
@@ -1434,8 +1435,9 @@ function renderGame(status: GameStatus | ""): string {
 }
 
 function renderBattleHistoryPanel(): string {
+  const emptyClass = view.battleLog.length === 0 ? " battle-log-panel--empty" : "";
   return `
-    <section id="match-history-panel" class="battle-log-panel" data-testid="event-log">
+    <section id="match-history-panel" class="battle-log-panel${emptyClass}" data-testid="event-log">
       <div class="battle-log-list">
         ${view.battleLog.slice(-BATTLE_LOG_VISIBLE).map(renderBattleLogEntry).join("")}
       </div>
@@ -2189,7 +2191,8 @@ function renderHoverTooltip(): string {
   const anchor = shell ? localAnchorFromViewport(shell, view.hoverAnchor) : view.hoverAnchor;
   const margin = 16;
   const gap = 24;
-  const tooltipWidth = 224;
+  const cardWidth = 224;
+  const glossaryWidth = 216;
   const tooltipHeight = 322;
   const viewportWidth = shell?.offsetWidth || window.innerWidth;
   const viewportHeight = shell?.offsetHeight || window.innerHeight;
@@ -2197,7 +2200,12 @@ function renderHoverTooltip(): string {
   const anchorRight = anchor.x + anchor.width / 2;
   const roomOnRight = viewportWidth - anchorRight - gap - margin;
   const roomOnLeft = anchorLeft - gap - margin;
-  const preferRight = roomOnRight >= tooltipWidth || roomOnRight >= roomOnLeft;
+  const preferRight = roomOnRight >= cardWidth || roomOnRight >= roomOnLeft;
+  // Glossary panel sits opposite the card so the combined block grows away from the
+  // viewport edge; include its width in the clamp so nothing spills off-screen.
+  const glossarySide: "left" | "right" = preferRight ? "right" : "left";
+  const glossary = renderKeywordGlossary(view.hoveredCardId, glossarySide);
+  const tooltipWidth = glossary ? cardWidth + glossaryWidth : cardWidth;
   let left = preferRight ? anchorRight + gap : anchorLeft - tooltipWidth - gap;
   left = Math.max(margin, Math.min(left, viewportWidth - tooltipWidth - margin));
   if (left < anchorRight && left + tooltipWidth > anchorLeft) {
@@ -2207,11 +2215,13 @@ function renderHoverTooltip(): string {
   }
   let top = anchor.y - tooltipHeight / 2;
   top = Math.max(margin, Math.min(top, viewportHeight - tooltipHeight - margin));
-  return `
-    <div class="hover-tooltip" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
+  const card = `
       <div class="card rarity-${resolved.rarity.toLowerCase()}">
         ${renderCardFace(resolved)}
-      </div>
+      </div>`;
+  return `
+    <div class="hover-tooltip${glossary ? " has-glossary" : ""}" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
+      ${glossarySide === "left" && glossary ? glossary + card : card + glossary}
     </div>
   `;
 }
@@ -2398,7 +2408,9 @@ function renderLogTooltip(entry: BattleLogEntry): string {
 
 function renderBattleLogEntry(entry: BattleLogEntry): string {
   const side = entry.seat ? (entry.seat === view.mySeat ? "log-mine" : "log-enemy") : "";
-  const badge = entry.badge ? `<span class="log-badge log-badge-${entry.badge}" aria-hidden="true">${logIcon(entry.badge)}</span>` : "";
+  // The summon badge is a plain "+" glyph rather than the sparkle SVG (cleaner at tile size).
+  const badgeContent = entry.badge === "sparkle" ? "+" : entry.badge ? logIcon(entry.badge) : "";
+  const badge = entry.badge ? `<span class="log-badge log-badge-${entry.badge}" aria-hidden="true">${badgeContent}</span>` : "";
   const deathOverlay = entry.kind === "death" ? `<span class="log-death-overlay" aria-hidden="true">${logIcon("skull")}</span>` : "";
   return `
     <div class="log-entry log-${entry.kind} ${side}" data-dom-key="log-${entry.seq}" data-testid="log-entry">
@@ -5821,6 +5833,40 @@ function logTargetRef(target: string): BattleLogCardRef {
 
 /** Display name (Traditional Chinese) for a granted keyword code. */
 const KEYWORD_LABEL: Record<string, string> = { taunt: "嘲諷", charge: "衝鋒" };
+
+/**
+ * Generic, player-facing explanation for each card keyword — what the mechanic *does*,
+ * independent of the card's own `description`. Order here is the display order.
+ */
+const KEYWORD_GLOSSARY: { has: (k: NonNullable<CardDefinition["keywords"]>) => boolean; label: string; text: string }[] = [
+  { has: (k) => Boolean(k.battlecry), label: "戰吼", text: "當此隨從從手牌打出、放置在場上時會發動這個效果。" },
+  { has: (k) => Boolean(k.taunt || k.baseTaunt), label: "嘲諷", text: "敵方必須先攻擊有嘲諷的隨從，才能攻擊其他目標。" },
+  { has: (k) => Boolean(k.divineShield), label: "光盾", text: "第一次受到傷害時會免除該次傷害，之後光盾消失。" },
+  { has: (k) => Boolean(k.charge), label: "衝鋒", text: "此隨從進場的當回合就能攻擊，不需等待。" },
+  { has: (k) => Boolean(k.deathrattle), label: "遺志", text: "當此隨從死亡、離開場上時會發動這個效果。" },
+  { has: (k) => Boolean(k.ongoing), label: "持續效果", text: "只要此隨從在場上，這個效果就會持續生效。" },
+  { has: (k) => Boolean(k.enrage), label: "激怒", text: "當此隨從受到傷害（生命未滿）時會獲得額外效果。" },
+  { has: (k) => Boolean(k.triggered), label: "觸發", text: "符合特定條件時會自動發動的效果。" },
+  { has: (k) => Boolean(k.quest), label: "任務", text: "達成指定條件後完成任務並獲得獎勵。" }
+];
+
+/**
+ * Side panel listing the generic explanation for each keyword the card has. Returns "" when the
+ * card is unknown or has none of the glossary keywords, so callers can omit the panel entirely.
+ */
+function renderKeywordGlossary(cardId: string | undefined, side: "left" | "right"): string {
+  const keywords = cardId ? cardCatalog.get(cardId)?.keywords : undefined;
+  if (!keywords) return "";
+  const rows = KEYWORD_GLOSSARY.filter((entry) => entry.has(keywords));
+  if (rows.length === 0) return "";
+  const items = rows
+    .map(
+      (entry) =>
+        `<li class="keyword-glossary-item"><span class="keyword-glossary-label">${escapeHtml(entry.label)}</span><span class="keyword-glossary-text">${escapeHtml(entry.text)}</span></li>`
+    )
+    .join("");
+  return `<aside class="keyword-glossary keyword-glossary-${side}"><ul>${items}</ul></aside>`;
+}
 
 /** A BUFF payload that locks a minion's attack is shown as a silence, not a stat buff. */
 function isSilencePayload(payload: Record<string, unknown>): boolean {

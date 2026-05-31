@@ -311,6 +311,33 @@
   opacity: 1;
 }
 
+/* When the hovered card has keywords, the card + glossary sit side by side and the
+   whole block is still scaled 1.75x by `.hover-tooltip`, so sizes here are pre-scale. */
+.hover-tooltip.has-glossary {
+  width: auto;
+  height: 184px;
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+}
+
+.hover-tooltip .keyword-glossary {
+  width: 122px;
+  max-height: 184px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.hover-tooltip .keyword-glossary-label {
+  font-size: 8px;
+  padding: 1px 5px;
+}
+
+.hover-tooltip .keyword-glossary-text {
+  font-size: 7.5px;
+  line-height: 1.32;
+}
+
 .confirm-overlay {
   position: fixed;
   inset: 0;

@@ -955,6 +955,49 @@
   font-size: 8px;
 }
 
+/* Generic keyword glossary panel shown beside an enlarged card (board hover + collection enlarge). */
+.keyword-glossary {
+  box-sizing: border-box;
+  padding: 8px 9px;
+  border-radius: 10px;
+  border: 1px solid rgba(32, 214, 242, 0.32);
+  background: linear-gradient(180deg, rgba(16, 18, 24, 0.96), rgba(8, 9, 12, 0.96));
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
+  text-align: left;
+}
+
+.keyword-glossary ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.keyword-glossary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.keyword-glossary-label {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(32, 214, 242, 0.32);
+  color: #d1fbff;
+  font-family: var(--font-display);
+  font-weight: 900;
+  line-height: 1.08;
+}
+
+.keyword-glossary-text {
+  color: rgba(255, 255, 255, 0.88);
+  font-family: var(--font-display);
+  font-weight: 700;
+}
+
 .battle-surface .minion .minion-stats {
   left: 5px;
   right: 5px;
@@ -1338,6 +1381,14 @@
   pointer-events: auto;
 }
 
+/* Before any battle-log entry exists, hide the panel chrome so no empty box shows. */
+.battle-log-panel--empty {
+  background: none;
+  border: 0;
+  box-shadow: none;
+  pointer-events: none;
+}
+
 /* Hidden machine-readable event mirror for the e2e oracle / debugging. */
 .event-log-raw {
   display: none;
@@ -1424,6 +1475,13 @@
 .log-badge svg {
   width: 13px;
   height: 13px;
+  color: var(--wood-dark, #5d2e17);
+}
+
+/* Summon badge: a plain "+" glyph instead of an inline SVG. */
+.log-badge-sparkle {
+  font-size: 15px;
+  font-weight: 900;
   color: var(--wood-dark, #5d2e17);
 }
 
@@ -1566,10 +1624,10 @@
 }
 
 .log-tooltip-label {
-  max-width: 240px;
   font-size: 13px;
   font-weight: 700;
   line-height: 1.35;
+  white-space: nowrap;
 }
 
 .battle-player-info {

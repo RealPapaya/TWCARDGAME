@@ -376,6 +376,16 @@
   opacity: 1;
 }
 
+/* Align the card name's vertical centre with the cost badge: occupy a header band that
+   starts at the card's top edge and leave left room so the name clears the cost badge. */
+.collection-card .card-title {
+  align-self: stretch;
+  width: auto;
+  min-height: 28px;
+  margin: 0 0 4px;
+  padding: 0 6px 0 30px;
+}
+
 .card-count-badge {
   position: absolute;
   top: 4px;
@@ -473,6 +483,20 @@
   width: 52px;
   height: 52px;
   font-size: 24px;
+}
+
+/* Keyword glossary inside the enlarge modal's side column (not scaled, so normal sizes). */
+.card-op-side .keyword-glossary {
+  width: 100%;
+}
+
+.card-op-side .keyword-glossary-label {
+  font-size: 13px;
+}
+
+.card-op-side .keyword-glossary-text {
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 /* Card detail / disenchant-craft modal */
