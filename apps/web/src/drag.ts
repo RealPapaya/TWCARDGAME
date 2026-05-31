@@ -411,7 +411,7 @@ export interface BattlecryTargetingOptions {
   /** A legal target was clicked. */
   onCommit: (targetEl: HTMLElement) => void;
   /** A unit was clicked, but it is not a legal target — keep aiming. */
-  onInvalid: () => void;
+  onInvalid: (targetEl: HTMLElement) => void;
   /** Empty space / non-unit clicked, or Escape — abort and refund. */
   onCancel: () => void;
 }
@@ -519,7 +519,7 @@ function onTargetingClick(event: MouseEvent): void {
   if (unit && state.isEligibleTarget(unit)) {
     state.onCommit(unit);
   } else if (unit) {
-    state.onInvalid(); // a unit, but not a legal target — stay in targeting
+    state.onInvalid(unit); // a unit, but not a legal target — stay in targeting
   } else {
     endBattlecryTargeting();
     state.onCancel();

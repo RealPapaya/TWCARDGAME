@@ -4389,6 +4389,11 @@ function bindSelectionActions(): void {
     on(el, "click", "attacker-select", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       event.stopImmediatePropagation();
+      const reason = attackerError(findMinion(el.dataset.attackerId ?? ""));
+      if (reason) {
+        showBattleToast(reason);
+        return;
+      }
       view.selectedAttackerId = el.dataset.attackerId;
       view.selectedHandId = undefined;
       view.selectedTarget = undefined;
@@ -4408,27 +4413,42 @@ function bindSelectionActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
-      const target = JSON.parse(el.dataset.target!) as TargetRef;
-      if (!isTargetHighlighted(target)) return;
-      if (view.selectedAttackerId && isLegalAttackTarget(target)) {
+      const target = parseTargetAttr(el);
+      if (!target) return;
+      if (view.selectedAttackerId) {
+        const reason = attackTargetError(target);
+        if (reason) {
+          showBattleToast(reason);
+          return;
+        }
         send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target });
         view.selectedAttackerId = undefined;
         view.selectedHandId = undefined;
         view.selectedTarget = undefined;
-      } else {
-        const card = selectedHandCard();
-        if (card && isLegalCardTarget(target)) {
-          send({ type: "playCard", handInstanceId: card.instanceId, target });
-          view.selectedAttackerId = undefined;
-          view.selectedHandId = undefined;
-          view.selectedTarget = undefined;
-        } else if (confirmSelectedTarget(target)) {
-          view.selectedAttackerId = undefined;
-          view.selectedHandId = undefined;
-          view.selectedTarget = undefined;
-        } else {
-          view.selectedTarget = target;
+        render();
+        return;
+      }
+      const card = selectedHandCard();
+      if (card && cardNeedsTarget(card.cardId)) {
+        const reason = cardTargetError(target);
+        if (reason) {
+          showBattleToast(reason);
+          return;
         }
+        send({ type: "playCard", handInstanceId: card.instanceId, target });
+        view.selectedAttackerId = undefined;
+        view.selectedHandId = undefined;
+        view.selectedTarget = undefined;
+        render();
+        return;
+      }
+      if (!isTargetHighlighted(target)) return;
+      if (confirmSelectedTarget(target)) {
+        view.selectedAttackerId = undefined;
+        view.selectedHandId = undefined;
+        view.selectedTarget = undefined;
+      } else {
+        view.selectedTarget = target;
       }
       render();
     });
@@ -4536,6 +4556,34 @@ function suppressNextClick(): void {
   window.setTimeout(() => document.removeEventListener("click", handler, true), 500);
 }
 
+/**
+ * The source can't be dragged (e.g. not enough mana, a minion that can't attack
+ * yet). Rather than silently swallowing the gesture, wait for a real drag
+ * attempt — a press alone could just be an inspect/select — then surface the
+ * reason as a battle toast. A simple tap never crosses the threshold, so it
+ * won't spam the hint.
+ */
+function attachRejectedDrag(event: PointerEvent, reason: string): void {
+  if (event.pointerType === "mouse" && event.button !== 0) return;
+  const startX = event.clientX;
+  const startY = event.clientY;
+  const pointerId = event.pointerId;
+  const cleanup = () => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", cleanup);
+    window.removeEventListener("pointercancel", cleanup);
+  };
+  const onMove = (moveEvent: PointerEvent) => {
+    if (moveEvent.pointerId !== pointerId) return;
+    if (Math.hypot(moveEvent.clientX - startX, moveEvent.clientY - startY) < DRAG_THRESHOLD_PX) return;
+    cleanup();
+    showBattleToast(reason);
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", cleanup);
+  window.addEventListener("pointercancel", cleanup);
+}
+
 function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
   if (isBattleActionLocked() || view.pendingBattlecry) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
@@ -4543,7 +4591,10 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   if (!handId) return;
   const card = view.hand.find((item) => item.instanceId === handId);
   if (!card) return;
-  if (!canAfford(card.cost)) return;
+  if (!canAfford(card.cost)) {
+    attachRejectedDrag(event, cardPlayError(card) ?? "現在無法使用這張牌。");
+    return;
+  }
   const cardDef = cardCatalog.get(card.cardId);
   const isMinion = (cardDef?.type ?? card.type) === "MINION";
   // Targeted-battlecry cards are played in two stages (LEGACY v1 parity): the
@@ -4699,7 +4750,7 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
         return Boolean(target && isLegalCardTarget(target));
       },
       onCommit: (el) => commitBattlecry(el),
-      onInvalid: () => showToast("這不是有效的目標！"),
+      onInvalid: (el) => showBattleToast(cardTargetError(parseTargetAttr(el)) ?? "這不是有效的目標！"),
       onCancel: () => cancelBattlecry()
     });
   });
@@ -4834,7 +4885,10 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
   const attackerId = sourceEl.dataset.attackerId;
   if (!attackerId) return;
   const minion = findMinion(attackerId);
-  if (!minion?.canAttack) return;
+  if (!minion?.canAttack) {
+    attachRejectedDrag(event, attackerError(minion) ?? "這名隨從現在不能攻擊。");
+    return;
+  }
   const startX = event.clientX;
   const startY = event.clientY;
   const pointerId = event.pointerId;
@@ -4936,6 +4990,10 @@ async function backToLobby(): Promise<void> {
   resetCardPlayCues();
   view.eventStatus = undefined;
   view.toast = undefined;
+  if (battleToastTimer !== undefined) {
+    clearTimeout(battleToastTimer);
+    battleToastTimer = undefined;
+  }
   view.matchmaking = undefined;
   view.privateJoinCode = undefined;
   stopMatchmakingTick();
@@ -5476,6 +5534,7 @@ function showAlert(message: string, title = "提示"): void {
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
+let battleToastTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingWelcomeToast = false;
 function showToast(message: string): void {
   let el = document.getElementById("medieval-toast");
@@ -5492,6 +5551,17 @@ function showToast(message: string): void {
     el!.classList.remove("show");
     toastTimer = undefined;
   }, 2500);
+}
+
+function showBattleToast(message: string): void {
+  view.toast = message;
+  if (battleToastTimer !== undefined) clearTimeout(battleToastTimer);
+  battleToastTimer = setTimeout(() => {
+    view.toast = undefined;
+    battleToastTimer = undefined;
+    render();
+  }, 2200);
+  render();
 }
 
 function readAuthFields(): { email: string; password: string } | undefined {
@@ -5604,11 +5674,7 @@ function handleEvents(message: GameEvent[]): void {
       view.rejectedHandIds.add(view.pendingBattlecry.handInstanceId);
       clearPendingBattlecry();
     }
-    view.toast = String(rejection.payload?.reason ?? "Command rejected.");
-    window.setTimeout(() => {
-      view.toast = undefined;
-      render();
-    }, 2200);
+    showBattleToast(String(rejection.payload?.reason ?? "動作被拒絕。"));
   }
   if (message.some((item) => item.type === "GAME_FINISHED")) {
     view.eventStatus = "finished";
@@ -6320,7 +6386,7 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): Ani
   if (event.type === "BOUNCE") return { id, kind: "bounce", text: "Bounce", seat: event.seat, targetKey: target, cardId };
   if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
   if (event.type === "TURN_STARTED") return undefined;
-  if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "Command rejected"), seat: event.seat };
+  if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "動作被拒絕。"), seat: event.seat };
   return undefined;
 }
 
@@ -6484,13 +6550,42 @@ function selectedHandCard(): HandCardView | undefined {
 }
 
 function isLegalAttackTarget(target: TargetRef): boolean {
-  if (!view.mySeat || !view.selectedAttackerId || target.side === view.mySeat) return false;
+  return !attackTargetError(target);
+}
+
+function attackTargetError(target: TargetRef | undefined): string | undefined {
+  if (!target) return "請選擇攻擊目標。";
+  if (!view.mySeat || !view.selectedAttackerId) return "請先選擇要攻擊的隨從。";
   const attacker = Array.from(readPlayer(view.mySeat)?.board ?? []).find((minion) => minion.instanceId === view.selectedAttackerId);
-  if (!attacker?.canAttack) return false;
+  const attackerReason = attackerError(attacker);
+  if (attackerReason) return attackerReason;
   const enemy = otherSeat(view.mySeat);
+  if (target.side !== enemy) return "只能攻擊敵方目標。";
+  if (target.type === "MINION" && !targetMinionExists(target)) return "找不到目標隨從。";
   const enemyTaunts = Array.from(readPlayer(enemy)?.board ?? []).filter((minion) => minion.taunt);
-  if (enemyTaunts.length === 0) return target.side === enemy;
-  return target.side === enemy && target.type === "MINION" && enemyTaunts.some((minion) => minion.instanceId === target.instanceId);
+  if (enemyTaunts.length > 0 && !(target.type === "MINION" && enemyTaunts.some((minion) => minion.instanceId === target.instanceId))) {
+    return "請先攻擊具有嘲諷的敵方隨從。";
+  }
+  return undefined;
+}
+
+/** Why a minion of mine cannot attack right now, or undefined if it can. */
+function attackerError(attacker: PublicMinion | undefined): string | undefined {
+  if (!attacker) return "找不到攻擊者。";
+  if (readActiveSeat() !== view.mySeat) return "還沒輪到你的回合。";
+  if (attacker.lockedTurns > 0) return "這名隨從被鎖定，不能攻擊。";
+  if (attacker.attack <= 0) return "這名隨從沒有攻擊力，無法攻擊。";
+  if (attacker.sleeping) return "這名隨從剛上場，本回合還不能攻擊。";
+  if (!attacker.canAttack) return "這名隨從本回合已經攻擊過了。";
+  return undefined;
+}
+
+/** Why a card in my hand cannot be played right now, or undefined if it can. */
+function cardPlayError(card: HandCardView): string | undefined {
+  if (readActiveSeat() !== view.mySeat) return "還沒輪到你的回合。";
+  const player = view.mySeat ? readPlayer(view.mySeat) : undefined;
+  if (player && player.mana.current < card.cost) return "魔力不足，無法使用這張牌。";
+  return undefined;
 }
 
 /** The card currently choosing a battlecry target — selected in hand, or mid two-stage play. */
@@ -6500,13 +6595,33 @@ function targetingCardId(): string | undefined {
 }
 
 function isLegalCardTarget(target: TargetRef): boolean {
+  return !cardTargetError(target);
+}
+
+function cardTargetError(target: TargetRef | undefined): string | undefined {
   const cardId = targetingCardId();
-  if (!cardId || !view.mySeat) return false;
+  if (!cardId || !view.mySeat) return "請先選擇要指定目標的卡牌。";
   const rule = cardCatalog.get(cardId)?.keywords?.battlecry?.target;
-  if (!rule) return false;
+  if (!rule) return "這張牌不需要指定目標。";
+  if (!target) return "這張牌需要選擇目標。";
   const expectedSides = targetRuleSides(rule.side);
   const expectedTypes = targetRuleTypes(rule.type);
-  return Boolean(target.side && expectedSides.includes(target.side) && expectedTypes.includes(target.type));
+  if (!expectedTypes.includes(target.type)) {
+    if (rule.type === "MINION") return "這個目標不是隨從。";
+    if (rule.type === "HERO") return "這個目標不是英雄。";
+    return "這個目標類型不正確。";
+  }
+  if (!target.side || !expectedSides.includes(target.side)) {
+    if (rule.side === "FRIENDLY") return "這個目標不是友軍。";
+    if (rule.side === "ENEMY") return "這個目標不是敵軍。";
+    return "這個目標陣營不正確。";
+  }
+  if (target.type === "MINION" && !targetMinionExists(target)) return "找不到目標隨從。";
+  return undefined;
+}
+
+function targetMinionExists(target: TargetRef): boolean {
+  return Boolean(target.side && target.instanceId && Array.from(readPlayer(target.side)?.board ?? []).some((minion) => minion.instanceId === target.instanceId));
 }
 
 /** True if at least one unit on the field satisfies the card's battlecry target rule. */

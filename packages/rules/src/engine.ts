@@ -107,7 +107,7 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   }
 
   if (next.status === "finished" || next.status === "abandoned") {
-    reject(next, events, envelope.seat, "Match is already complete.");
+    reject(next, events, envelope.seat, "對局已經結束。");
     return { state: next, events };
   }
 
@@ -124,12 +124,12 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   }
 
   if (next.status !== "in_progress") {
-    reject(next, events, envelope.seat, "Match has not started.");
+    reject(next, events, envelope.seat, "對局尚未開始。");
     return { state: next, events };
   }
 
   if (next.turn.activeSeat !== envelope.seat) {
-    reject(next, events, envelope.seat, "It is not your turn.");
+    reject(next, events, envelope.seat, "還不是你的回合。");
     return { state: next, events };
   }
 
@@ -171,7 +171,7 @@ function submitMulligan(
   catalog: Map<string, CardDefinition>
 ): void {
   if (state.status !== "mulligan") {
-    reject(state, events, seat, "Mulligan phase is over.");
+    reject(state, events, seat, "換牌階段已結束。");
     return;
   }
 
@@ -194,15 +194,15 @@ function submitMulligan(
 
 function validatePlayTarget(state: MatchState, seat: Seat, battlecry: EffectDefinition, target: TargetRef | undefined): string | null {
   const rule = battlecry.target;
-  if (!rule || rule.type === "ALL") return null;
-  if (!target) return "This card requires a target.";
-  if (rule.type === "MINION" && target.type !== "MINION") return "Must target a minion.";
-  if (rule.type === "HERO" && target.type !== "HERO") return "Must target a hero.";
+  if (!rule) return null;
+  if (!target) return "這張牌需要選擇目標。";
+  if (rule.type === "MINION" && target.type !== "MINION") return "這個目標不是隨從。";
+  if (rule.type === "HERO" && target.type !== "HERO") return "這個目標不是英雄。";
   const expectedSide = rule.side === "ENEMY" ? opponentOf(seat) : rule.side === "FRIENDLY" ? seat : null;
-  if (expectedSide && target.side !== expectedSide) return rule.side === "ENEMY" ? "Must target an enemy." : "Must target a friendly.";
+  if (expectedSide && target.side !== expectedSide) return rule.side === "ENEMY" ? "這個目標不是敵軍。" : "這個目標不是友軍。";
   if (target.type === "MINION") {
-    if (!target.side || !target.instanceId) return "Invalid minion target.";
-    if (!state.players[target.side]?.board.some((m) => m.instanceId === target.instanceId)) return "Target minion is not on the board.";
+    if (!target.side || !state.players[target.side] || !target.instanceId) return "這個隨從目標無效。";
+    if (!state.players[target.side].board.some((m) => m.instanceId === target.instanceId)) return "找不到目標隨從。";
   }
   return null;
 }
@@ -219,21 +219,21 @@ function playCard(
   const player = state.players[seat];
   const found = findCardInHand(player, handInstanceId);
   if (!found) {
-    reject(state, events, seat, "Card is not in hand.");
+    reject(state, events, seat, "這張牌不在手牌中。");
     return;
   }
   const { card, index } = found;
   const actualCost = getCardActualCost(state, seat, card);
   if (player.mana.current < actualCost) {
-    reject(state, events, seat, "Not enough mana.");
+    reject(state, events, seat, "魔力不足。");
     return;
   }
   if (card.type === "MINION" && player.board.length >= 7) {
-    reject(state, events, seat, "Board is full.");
+    reject(state, events, seat, "場上已滿，無法再召喚隨從。");
     return;
   }
   if (card.keywords.battlecry?.type === "DISCARD_RANDOM" && player.hand.length <= (card.keywords.battlecry.value ?? 1)) {
-    reject(state, events, seat, "Not enough other cards to discard.");
+    reject(state, events, seat, "沒有足夠的其他手牌可棄置。");
     return;
   }
   if (card.keywords.battlecry) {
@@ -277,30 +277,34 @@ function attack(
   const enemy = state.players[opponentOf(seat)];
   const found = findMinion(player, attackerInstanceId);
   if (!found) {
-    reject(state, events, seat, "Attacker is not on board.");
+    reject(state, events, seat, "找不到攻擊者。");
     return;
   }
   const attacker = found.minion;
   if (attacker.sleeping || !attacker.canAttack) {
-    reject(state, events, seat, "Attacker cannot attack.");
+    reject(state, events, seat, "這名隨從本回合不能攻擊。");
     return;
   }
   if (attacker.lockedTurns > 0) {
-    reject(state, events, seat, "Attacker is locked.");
+    reject(state, events, seat, "這名隨從被鎖定，不能攻擊。");
     return;
   }
   if (attacker.attack <= 0) {
-    reject(state, events, seat, "Attacker has no attack.");
+    reject(state, events, seat, "這名隨從沒有攻擊力。");
+    return;
+  }
+  const ref = getTargetUnit(state, seat, target);
+  if (!ref) {
+    reject(state, events, seat, target?.type === "MINION" ? "找不到目標隨從。" : "無效的攻擊目標。");
+    return;
+  }
+  if (ref.owner.seat !== enemy.seat) {
+    reject(state, events, seat, "只能攻擊敵方目標。");
     return;
   }
   const taunts = enemy.board.filter((minion) => minion.keywords.taunt);
   if (taunts.length > 0 && !(target?.type === "MINION" && taunts.some((minion) => minion.instanceId === target.instanceId))) {
-    reject(state, events, seat, "Taunt minions must be attacked first.");
-    return;
-  }
-  const ref = getTargetUnit(state, seat, target);
-  if (!ref || ref.owner.seat !== enemy.seat) {
-    reject(state, events, seat, "Invalid attack target.");
+    reject(state, events, seat, "請先攻擊具有嘲諷的敵方隨從。");
     return;
   }
 

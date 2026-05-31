@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { createRuntimeCard, effectHandlers, nextInstanceId, reduce, toHandView, toPublicState, validateDeck } from "./index.js";
 import { createInitialMatch } from "./engine.js";
 import type { MatchState } from "./types.js";
-import { opponentOf, type Seat } from "@twcardgame/shared";
+import { opponentOf, type GameEvent, type Seat } from "@twcardgame/shared";
 
 describe("rules architecture", () => {
   it("has handlers for every current battlecry effect", () => {
@@ -265,6 +265,10 @@ function targetLegalityMatch() {
   return { state, catalog };
 }
 
+function rejectionReason(events: GameEvent[]): string | undefined {
+  return events.find((event) => event.type === "COMMAND_REJECTED")?.payload?.reason as string | undefined;
+}
+
 describe("target legality", () => {
   it("rejects a targeted battlecry played without a target", () => {
     const { state, catalog } = targetLegalityMatch();
@@ -276,7 +280,7 @@ describe("target legality", () => {
       { commandId: "tl1", seat: state.turn.activeSeat, nowMs: 2000, command: { type: "playCard", handInstanceId: state.players[state.turn.activeSeat].hand[0].instanceId } },
       catalog
     );
-    expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
+    expect(rejectionReason(result.events)).toBe("這張牌需要選擇目標。");
   });
 
   it("rejects a MINION-targeting battlecry aimed at a hero", () => {
@@ -291,7 +295,7 @@ describe("target legality", () => {
       { commandId: "tl2", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: state.players[seat].hand[0].instanceId, target: { type: "HERO", side: enemy } } },
       catalog
     );
-    expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
+    expect(rejectionReason(result.events)).toBe("這個目標不是隨從。");
   });
 
   it("rejects a FRIENDLY-targeting battlecry aimed at an enemy minion", () => {
@@ -311,7 +315,7 @@ describe("target legality", () => {
       { commandId: "tl3", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: state.players[seat].hand[0].instanceId, target: { type: "MINION", side: enemy, instanceId: enemyBoard.instanceId } } },
       catalog
     );
-    expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
+    expect(rejectionReason(result.events)).toBe("這個目標不是友軍。");
   });
 
   it("rejects a battlecry targeting a minion that is not on the board", () => {
@@ -326,7 +330,7 @@ describe("target legality", () => {
       { commandId: "tl4", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: state.players[seat].hand[0].instanceId, target: { type: "MINION", side: enemy, instanceId: "ghost_minion" } } },
       catalog
     );
-    expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
+    expect(rejectionReason(result.events)).toBe("找不到目標隨從。");
   });
 
   it("accepts a valid enemy-minion target", () => {
@@ -363,7 +367,7 @@ describe("target legality", () => {
       { commandId: "tl6", seat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "my_attacker", target: { type: "HERO", side: enemy } } },
       catalog
     );
-    expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
+    expect(rejectionReason(result.events)).toBe("請先攻擊具有嘲諷的敵方隨從。");
 
     // Attack the taunt minion → accepted
     const result2 = reduce(
@@ -372,5 +376,21 @@ describe("target legality", () => {
       catalog
     );
     expect(result2.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(false);
+  });
+
+  it("attack: rejects friendly targets with a specific message", () => {
+    const { state, catalog } = targetLegalityMatch();
+    const seat = state.turn.activeSeat;
+    const attacker = { instanceId: "my_attacker", cardId: "TL_F0", ownerSeat: seat as Seat, name: "A", category: "test", cost: 1, type: "MINION" as const, rarity: "COMMON" as const, attack: 2, baseAttack: 2, health: 2, currentHealth: 2, keywords: {}, sleeping: false, canAttack: true, isEnraged: false, lockedTurns: 0, auraAttack: 0, auraHealth: 0, auraTaunt: false, tempBuffs: [] };
+    const friendly = { instanceId: "friendly_m1", cardId: "TL_F1", ownerSeat: seat as Seat, name: "F", category: "test", cost: 2, type: "MINION" as const, rarity: "COMMON" as const, attack: 1, baseAttack: 1, health: 3, currentHealth: 3, keywords: {}, sleeping: false, canAttack: true, isEnraged: false, lockedTurns: 0, auraAttack: 0, auraHealth: 0, auraTaunt: false, tempBuffs: [] };
+    state.players[seat].board = [attacker, friendly];
+
+    const result = reduce(
+      state,
+      { commandId: "tl8", seat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "my_attacker", target: { type: "MINION", side: seat, instanceId: "friendly_m1" } } },
+      catalog
+    );
+
+    expect(rejectionReason(result.events)).toBe("只能攻擊敵方目標。");
   });
 });

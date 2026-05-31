@@ -237,24 +237,24 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   private handleCommand(client: Client, message: ClientCommandMessage): void {
     if (!this.match) {
-      client.send("error", { message: "Match is not ready." });
+      client.send("error", { message: "對局尚未準備完成。" });
       return;
     }
     const seat = this.seats.get(client.sessionId);
     if (!seat) {
-      client.send("error", { message: "No seat assigned." });
+      client.send("error", { message: "尚未分配玩家座位。" });
       return;
     }
     logger.info("server.handleCommand", { seat, command: message?.command });
     if (!message || typeof message.commandId !== "string" || !message.command) {
-      this.rejectCommand(seat, "Invalid command message.");
+      this.rejectCommand(seat, "動作資料無效。");
       return;
     }
     if (this.match.private.processedCommandIds.includes(message.commandId)) {
       return;
     }
     if (requiresActionSeq(message.command.type) && message.expectedActionSeq !== this.match.turn.actionSeq) {
-      this.rejectCommand(seat, "Command sequence is stale.");
+      this.rejectCommand(seat, "動作已過期，請依照最新局面操作。");
       return;
     }
     const envelope: CommandEnvelope = {
