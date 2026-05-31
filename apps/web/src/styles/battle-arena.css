@@ -1126,6 +1126,18 @@
   box-shadow: 0 0 15px rgba(255, 238, 0, 0.4);
 }
 
+/* No moves left this turn — keep the yellow button but glow green behind it,
+   matching the playable-card halo. drop-shadow (not box-shadow) is used so the
+   glow follows the clip-path shape instead of being clipped away. */
+.battle-surface .end-turn-btn.can-end {
+  animation: end-turn-ready-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes end-turn-ready-pulse {
+  0%, 100% { filter: drop-shadow(0 0 7px var(--neon-lime)); }
+  50% { filter: drop-shadow(0 0 18px var(--neon-lime)); }
+}
+
 .battle-surface .turn-stack,
 .battle-surface #turn-indicator,
 .legacy-hidden-actions {
@@ -1475,13 +1487,6 @@
 .log-badge svg {
   width: 13px;
   height: 13px;
-  color: var(--wood-dark, #5d2e17);
-}
-
-/* Summon badge: a plain "+" glyph instead of an inline SVG. */
-.log-badge-sparkle {
-  font-size: 15px;
-  font-weight: 900;
   color: var(--wood-dark, #5d2e17);
 }
 

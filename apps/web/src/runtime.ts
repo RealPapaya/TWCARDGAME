@@ -1919,7 +1919,9 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
         <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
         </div>
-        <button id="end-turn" class="end-turn-btn" ${view.room && isMyTurn && !battleLocked ? "" : "disabled"} data-testid="end-turn">結束回合</button>
+        <span class="end-turn-wrap${isMyTurn && !battleLocked && !hasAnyLegalAction() ? " can-end" : ""}">
+          <button id="end-turn" class="end-turn-btn" ${view.room && isMyTurn && !battleLocked ? "" : "disabled"} data-testid="end-turn">結束回合</button>
+        </span>
         <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
           <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
         </div>
@@ -2408,9 +2410,10 @@ function renderLogTooltip(entry: BattleLogEntry): string {
 
 function renderBattleLogEntry(entry: BattleLogEntry): string {
   const side = entry.seat ? (entry.seat === view.mySeat ? "log-mine" : "log-enemy") : "";
-  // The summon badge is a plain "+" glyph rather than the sparkle SVG (cleaner at tile size).
-  const badgeContent = entry.badge === "sparkle" ? "+" : entry.badge ? logIcon(entry.badge) : "";
-  const badge = entry.badge ? `<span class="log-badge log-badge-${entry.badge}" aria-hidden="true">${badgeContent}</span>` : "";
+  // The summon entry shows no corner badge at all (no SVG, no glyph).
+  const badge = entry.badge && entry.badge !== "sparkle"
+    ? `<span class="log-badge log-badge-${entry.badge}" aria-hidden="true">${logIcon(entry.badge)}</span>`
+    : "";
   const deathOverlay = entry.kind === "death" ? `<span class="log-death-overlay" aria-hidden="true">${logIcon("skull")}</span>` : "";
   return `
     <div class="log-entry log-${entry.kind} ${side}" data-dom-key="log-${entry.seq}" data-testid="log-entry">
@@ -2475,8 +2478,19 @@ function bindStaticActions(): void {
     if (!view.selectedAttackerId || !view.selectedTarget) return;
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
-  on(document.querySelector<HTMLButtonElement>("#end-turn"), "click", "end-turn", () => {
+  on(document.querySelector<HTMLButtonElement>("#end-turn"), "click", "end-turn", (event) => {
     if (isBattleActionLocked() || view.pendingBattlecry) return;
+    const btn = event.currentTarget as HTMLButtonElement | null;
+    // Drive the flip via WAAPI: a re-render patches the class attribute (see
+    // dom-patch.ts) and would otherwise strip a CSS animation class mid-flight.
+    btn?.animate?.(
+      [
+        { transform: "perspective(420px) rotateY(0deg)" },
+        { transform: "perspective(420px) rotateY(90deg)", offset: 0.5 },
+        { transform: "perspective(420px) rotateY(0deg)" }
+      ],
+      { duration: 420, easing: "ease-in-out" }
+    );
     send({ type: "endTurn" });
   });
   on(document.querySelector<HTMLButtonElement>("#battle-settings-toggle"), "click", "battle-settings-toggle", () => {
@@ -7257,6 +7271,28 @@ function canAfford(cost: number): boolean {
 function cardNeedsTarget(cardId: string): boolean {
   const effect = cardCatalog.get(cardId)?.keywords?.battlecry;
   return Boolean(effect?.target);
+}
+
+/**
+ * True if the player still has a move other than ending the turn — i.e. an
+ * affordable card to play (with board room for minions) or a minion that can
+ * still attack. Mirrors `legalMoves` loosely; used only as a UX hint so it
+ * errs optimistic (a card whose battlecry has no valid target still counts).
+ */
+function hasAnyLegalAction(): boolean {
+  if (!view.mySeat || readActiveSeat() !== view.mySeat || isBattleActionLocked()) return false;
+  const player = readPlayer(view.mySeat);
+  if (!player) return false;
+  const boardSize = Array.from(player.board ?? []).length;
+  for (const card of view.hand) {
+    if (player.mana.current < card.cost) continue;
+    if (card.type === "MINION" && boardSize >= 7) continue;
+    return true;
+  }
+  for (const minion of Array.from(player.board ?? [])) {
+    if (!attackerError(minion)) return true;
+  }
+  return false;
 }
 
 function inferDefaultTarget(cardId: string | undefined): TargetRef | undefined {
