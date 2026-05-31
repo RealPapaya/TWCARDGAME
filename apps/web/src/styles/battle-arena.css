@@ -1127,15 +1127,21 @@
 }
 
 /* No moves left this turn — keep the yellow button but glow green behind it,
-   matching the playable-card halo. drop-shadow (not box-shadow) is used so the
-   glow follows the clip-path shape instead of being clipped away. */
-.battle-surface .end-turn-btn.can-end {
+   matching the playable-card halo. The glow lives on the (unclipped) wrapper and
+   uses drop-shadow so it traces the clipped button shape; putting it on the
+   button itself would be cut off, since clip-path is applied after filter. */
+.end-turn-wrap {
+  display: inline-flex;
+  line-height: 0;
+}
+
+.end-turn-wrap.can-end {
   animation: end-turn-ready-pulse 1.4s ease-in-out infinite;
 }
 
 @keyframes end-turn-ready-pulse {
-  0%, 100% { filter: drop-shadow(0 0 7px var(--neon-lime)); }
-  50% { filter: drop-shadow(0 0 18px var(--neon-lime)); }
+  0%, 100% { filter: drop-shadow(0 0 6px var(--neon-lime)) drop-shadow(0 0 10px var(--neon-lime)); }
+  50% { filter: drop-shadow(0 0 14px var(--neon-lime)) drop-shadow(0 0 22px var(--neon-lime)); }
 }
 
 .battle-surface .turn-stack,
