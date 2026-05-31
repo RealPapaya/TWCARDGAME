@@ -80,6 +80,9 @@ import type {
   AnimationKind,
   AuthMode,
   BattlecryPreviewState,
+  BattleLogBadge,
+  BattleLogCardRef,
+  BattleLogEntry,
   BattleMode,
   ClientViewState,
   CollectionFilter,
@@ -144,6 +147,14 @@ const devTestModeAvailable = import.meta.env.DEV && isLocalDevHost();
 let devTestPanel: typeof import("./app/dev-test.js") | undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const seats: Seat[] = ["player1", "player2"];
+/**
+ * Remembers each minion's card identity by `instanceId` for the battle log. Populated when a minion
+ * is summoned so `ATTACK` / `DAMAGE` / `DESTROY` events (which reference an `instanceId` that may
+ * already have left the board) can still resolve a display name and art. Cleared per match.
+ */
+const battleLogMinions = new Map<string, { cardId: string; name: string }>();
+/** How many of the most recent battle-log entries the panel shows at once (newest at the bottom). */
+const BATTLE_LOG_VISIBLE = 10;
 const rarityLabel: Record<string, string> = {
   COMMON: "普通", RARE: "精良", EPIC: "史詩", LEGENDARY: "傳說"
 };
@@ -189,6 +200,7 @@ const view: ClientViewState = {
   rejectedHandIds: new Set(),
   mulliganSelection: new Set(),
   events: [],
+  battleLog: [],
   animationCues: [],
   joining: false,
   accountLoading: false,
@@ -1423,13 +1435,12 @@ function renderGame(status: GameStatus | ""): string {
 
 function renderBattleHistoryPanel(): string {
   return `
-    <section id="match-history-panel" class="log battle-history-panel" data-testid="event-log" data-preserve-scroll>
-      <div class="history-tab" aria-hidden="true">▤</div>
-      <div class="history-content">
-        <div class="history-header">戰鬥紀錄</div>
-        <div id="history-list">
-          ${view.events.map(renderEventLine).join("")}
-        </div>
+    <section id="match-history-panel" class="battle-log-panel" data-testid="event-log">
+      <div class="battle-log-list">
+        ${view.battleLog.slice(-BATTLE_LOG_VISIBLE).map(renderBattleLogEntry).join("")}
+      </div>
+      <div id="history-list" class="event-log-raw" aria-hidden="true">
+        ${view.events.map(renderEventLine).join("")}
       </div>
     </section>
   `;
@@ -2291,9 +2302,114 @@ function renderConfirmDialog(): string {
   `;
 }
 
+/**
+ * Hidden machine-readable event line (`TYPE#seq {payload}`) kept for the e2e oracle and quick
+ * debugging — the visible battle log is rendered from `view.battleLog` instead.
+ */
 function renderEventLine(event: GameEvent): string {
   const payload = event.payload ? ` ${JSON.stringify(event.payload)}` : "";
   return `<p>${escapeHtml(`${event.type}#${event.seq ?? "?"}${payload}`)}</p>`;
+}
+
+/**
+ * Inline SVG icons for the battle log — clean single-color glyphs that inherit `currentColor`
+ * (so a badge stays dark-on-gold, a placeholder stays parchment) and are sized purely by CSS.
+ */
+const BATTLE_LOG_SVG: Record<string, string> = {
+  // Crossed swords — attack.
+  sword: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M2.5 3 7 3l9 9-2.5 2.5-9-9L2.5 3Zm19 0L17 3l-4 4 2.5 2.5L21.5 7 21.5 3ZM5 16l3 3-2 2H3v-3l2-2Zm14 0 2 2v3h-3l-2-2 3-3Z"/></svg>`,
+  // Starburst — direct damage.
+  burst: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 1.5l2 5 5-2-2 5 5 2-5 2 2 5-5-2-2 5-2-5-5 2 2-5-5-2 5-2-2-5 5 2 2-5z"/></svg>`,
+  // Heart — heal.
+  heart: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`,
+  // Upward arrow — stat buff.
+  arrow: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 4l7 7h-4v9h-6v-9H5l7-7z"/></svg>`,
+  // Four-point sparkle — summon.
+  sparkle: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2c.4 3.6 1.4 4.6 5 5-3.6.4-4.6 1.4-5 5-.4-3.6-1.4-4.6-5-5 3.6-.4 4.6-1.4 5-5z"/></svg>`,
+  // Skull — death.
+  skull: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2C7.6 2 4 5.6 4 10c0 2.4 1.1 4.6 2.8 6V19c0 .6.4 1 1 1H9v-2h2v2h2v-2h2v2h1.2c.6 0 1-.4 1-1v-3c1.7-1.4 2.8-3.6 2.8-6 0-4.4-3.6-8-8-8zM9 13a1.9 1.9 0 110-3.8A1.9 1.9 0 019 13zm6 0a1.9 1.9 0 110-3.8A1.9 1.9 0 0115 13z"/></svg>`,
+  // Muted speaker — silence / lock.
+  silence: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 9v6h4l5 4V5L7 9H3z"/><path d="M15.5 9.5l5 5M20.5 9.5l-5 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>`,
+  // Arrow into a holder — bounce (return to hand).
+  bounce: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 3v8m0 0l-3.2-3.2M12 11l3.2-3.2" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><rect x="4" y="14" width="16" height="6" rx="1.5"/></svg>`,
+  // Shield — hero placeholder (no card art).
+  shield: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l8 3v6c0 5-3.4 8.5-8 10-4.6-1.5-8-5-8-10V5l8-3z"/></svg>`,
+  // Five-point star — unknown-card placeholder.
+  star: `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l2.9 6.3L22 9.2l-5 4.6L18.2 21 12 17.3 5.8 21 7 13.8l-5-4.6 7.1-.9L12 2z"/></svg>`
+};
+
+/** The inline SVG markup for a named battle-log icon. */
+function logIcon(name: keyof typeof BATTLE_LOG_SVG): string {
+  return BATTLE_LOG_SVG[name] ?? "";
+}
+
+/** Card art block for a log card ref, at `tile` (strip) or `big` (tooltip) size. */
+function renderLogCardArt(ref: BattleLogCardRef, size: "tile" | "big"): string {
+  const cls = size === "big" ? "log-card-art log-card-art-big" : "log-card-art";
+  if (ref.thumb) return `<span class="${cls}" style="background-image:url('${escapeAttr(ref.thumb)}')" aria-hidden="true"></span>`;
+  if (ref.hero) return `<span class="${cls} log-card-hero" aria-hidden="true">${logIcon("shield")}</span>`;
+  return `<span class="${cls} log-card-empty" aria-hidden="true">${logIcon("star")}</span>`;
+}
+
+/** The rich card tooltip revealed on hover: actor art, an optional action flow to one or many targets, and a label. */
+function renderLogTooltip(entry: BattleLogEntry): string {
+  const signedAmount =
+    entry.amount === undefined ? "" : `${entry.kind === "heal" ? "+" : "-"}${entry.amount}`;
+  const icon = logIcon(entry.badge ?? "sword");
+  let flow = "";
+  if (entry.buffTargets?.length) {
+    // Buff / silence: actor → icon → every affected target with its own stat-change badge.
+    const targets = entry.buffTargets
+      .map(
+        (t) => `
+          <span class="log-flow-target">
+            ${renderLogCardArt(t.ref, "big")}
+            <span class="log-amount log-amount-buff">${escapeHtml(t.detail)}</span>
+          </span>`
+      )
+      .join("");
+    flow = `
+        <span class="log-flow-icon" aria-hidden="true">${icon}</span>
+        <span class="log-flow-targets">${targets}</span>`;
+  } else if (entry.flowTo) {
+    flow = `
+        <span class="log-flow-icon" aria-hidden="true">${icon}</span>
+        <span class="log-flow-target">
+          ${renderLogCardArt(entry.flowTo, "big")}
+          ${signedAmount ? `<span class="log-amount log-amount-${entry.kind}">${escapeHtml(signedAmount)}</span>` : ""}
+        </span>`;
+  }
+  const hasFlow = Boolean(entry.buffTargets?.length || entry.flowTo);
+  return `
+    <div class="log-tooltip" role="tooltip">
+      <div class="log-tooltip-flow log-tooltip-flow-${entry.kind}">
+        <span class="log-flow-source">
+          ${renderLogCardArt(entry.tile, "big")}
+          ${entry.kind === "death" ? `<span class="log-death-mark" aria-hidden="true">${logIcon("skull")}</span>` : ""}
+          ${!hasFlow && signedAmount ? `<span class="log-amount log-amount-${entry.kind}">${escapeHtml(signedAmount)}</span>` : ""}
+          ${!hasFlow && entry.detail ? `<span class="log-amount log-amount-buff">${escapeHtml(entry.detail)}</span>` : ""}
+        </span>
+        ${flow}
+      </div>
+      <div class="log-tooltip-label">${escapeHtml(entry.label)}</div>
+    </div>
+  `;
+}
+
+function renderBattleLogEntry(entry: BattleLogEntry): string {
+  const side = entry.seat ? (entry.seat === view.mySeat ? "log-mine" : "log-enemy") : "";
+  const badge = entry.badge ? `<span class="log-badge log-badge-${entry.badge}" aria-hidden="true">${logIcon(entry.badge)}</span>` : "";
+  const deathOverlay = entry.kind === "death" ? `<span class="log-death-overlay" aria-hidden="true">${logIcon("skull")}</span>` : "";
+  return `
+    <div class="log-entry log-${entry.kind} ${side}" data-dom-key="log-${entry.seq}" data-testid="log-entry">
+      <span class="log-tile">
+        ${renderLogCardArt(entry.tile, "tile")}
+        ${badge}
+        ${deathOverlay}
+      </span>
+      ${renderLogTooltip(entry)}
+    </div>
+  `;
 }
 
 function renderEmptySlots(): string {
@@ -3778,6 +3894,7 @@ function showDevTestRewardScreen(summary: RewardSummary): void {
   view.mySeat = "player1";
   view.hand = [];
   view.events = [];
+  resetBattleLog();
   view.animationCues = [];
   view.publicSync = {
     status: "finished",
@@ -4985,6 +5102,7 @@ async function backToLobby(): Promise<void> {
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
   view.events = [];
+  resetBattleLog();
   view.animationCues = [];
   resetMinionVisualTracking();
   resetCardPlayCues();
@@ -5658,8 +5776,234 @@ function showTurnAnnouncement(text: string, seat: Seat): void {
   }, TURN_ANNOUNCEMENT_LOCK_MS);
 }
 
+function resetBattleLog(): void {
+  view.battleLog = [];
+  battleLogMinions.clear();
+}
+
+/** Resolved art URL for a card id, or undefined if unknown. */
+function cardArt(cardId: string | undefined): string | undefined {
+  const image = cardId ? cardCatalog.get(cardId)?.image : undefined;
+  return image ? assetUrl(image) : undefined;
+}
+
+/** Display name of a seat's hero (its owner), falling back to a relative label. */
+function battleLogHeroName(seat: Seat | undefined): string {
+  if (!seat) return "Hero";
+  return readPlayer(seat)?.displayName || (seat === view.mySeat ? "You" : "Opponent");
+}
+
+/** Resolve a minion `instanceId` to a name + card id, using the live board then the summon cache. */
+function battleLogUnit(instanceId: string): { name: string; cardId?: string } {
+  const minion = findMinion(instanceId);
+  if (minion) return { name: cardName(minion.cardId) ?? minion.cardId, cardId: minion.cardId };
+  const cached = battleLogMinions.get(instanceId);
+  if (cached) return { name: cached.name, cardId: cached.cardId };
+  return { name: "a minion" };
+}
+
+/** A card ref for the log from a card id (used for the actor of summons / plays / spell damage). */
+function logCardRef(cardId: string | undefined, fallback = "A minion"): BattleLogCardRef {
+  return { name: cardName(cardId) ?? fallback, thumb: cardArt(cardId) };
+}
+
+/** A card ref for a minion instance id. */
+function logUnitRef(instanceId: string): BattleLogCardRef {
+  const unit = battleLogUnit(instanceId);
+  return { name: unit.name, thumb: cardArt(unit.cardId) };
+}
+
+/** A card ref for a damage/heal/buff target string (`instanceId` or `"{seat}:hero"`). */
+function logTargetRef(target: string): BattleLogCardRef {
+  if (target.endsWith(":hero")) return { name: battleLogHeroName(target.split(":")[0] as Seat), hero: true };
+  return logUnitRef(target);
+}
+
+/** Display name (Traditional Chinese) for a granted keyword code. */
+const KEYWORD_LABEL: Record<string, string> = { taunt: "嘲諷", charge: "衝鋒" };
+
+/** A BUFF payload that locks a minion's attack is shown as a silence, not a stat buff. */
+function isSilencePayload(payload: Record<string, unknown>): boolean {
+  return typeof payload.lockedTurns === "number";
+}
+
+/** Concise stat-change text for a BUFF payload (e.g. "+2/+2", "光盾"). */
+function buffDetail(payload: Record<string, unknown>): string {
+  if (payload.shield === true) return "光盾";
+  if (typeof payload.keyword === "string") return KEYWORD_LABEL[payload.keyword] ?? payload.keyword;
+  if (typeof payload.lockedTurns === "number") return `鎖定 ${payload.lockedTurns} 回合`;
+  if (typeof payload.setAttack === "number") return `攻擊力 → ${payload.setAttack}`;
+  const value = typeof payload.value === "number" ? payload.value : 0;
+  if (payload.stat === "ALL") return `+${value}/+${value}`;
+  if (payload.stat === "HEALTH") return `+0/+${value}`;
+  return `+${value}/+0`;
+}
+
+interface BattleLogContext {
+  /** DAMAGE seqs already consumed by a preceding attack (folded into its tooltip). */
+  claimedDamage: Set<number>;
+  /** Attack seq → damage dealt to its target. */
+  attackTargetDamage: Map<number, number>;
+  /** Most recently played card id seen so far in the batch — the actor for spell/effect damage. */
+  lastPlayedCardId?: string;
+}
+
+/** Turn a single GameEvent into a battle-log entry, or undefined to skip it (curated subset). */
+function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEntry | undefined {
+  const payload = event.payload ?? {};
+  const cardId = typeof payload.cardId === "string" ? payload.cardId : undefined;
+  const target = typeof payload.target === "string" ? payload.target : undefined;
+  const amount = typeof payload.amount === "number" ? payload.amount : undefined;
+  const base = { seq: event.seq, seat: event.seat } as const;
+
+  switch (event.type) {
+    case "MINION_SUMMONED": {
+      if (target && cardId) battleLogMinions.set(target, { cardId, name: cardName(cardId) ?? cardId });
+      const tile = logCardRef(cardId);
+      return { ...base, kind: "summon", tile, badge: "sparkle", label: `${tile.name} 進場` };
+    }
+    case "CARD_PLAYED": {
+      // Minions are covered by the following MINION_SUMMONED; only log spells/news here.
+      if (!cardId || cardCatalog.get(cardId)?.type !== "NEWS") return undefined;
+      const tile = logCardRef(cardId);
+      return { ...base, kind: "play", tile, label: `打出 ${tile.name}` };
+    }
+    case "ATTACK": {
+      const attackerId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
+      const tile = attackerId ? logUnitRef(attackerId) : { name: battleLogHeroName(event.seat), hero: true };
+      const ref = payload.target as TargetRef | undefined;
+      const flowTo = ref
+        ? ref.type === "HERO"
+          ? { name: battleLogHeroName(ref.side), hero: true }
+          : logUnitRef(ref.instanceId ?? "")
+        : undefined;
+      const dealt = ctx.attackTargetDamage.get(event.seq);
+      return { ...base, kind: "attack", tile, flowTo, badge: "sword", amount: dealt, label: `${tile.name} 攻擊 ${flowTo?.name ?? "目標"}` };
+    }
+    case "DAMAGE": {
+      // Damage from a combat trade is shown inside the attack entry; only direct (spell/effect) damage lands here.
+      if (!target || ctx.claimedDamage.has(event.seq)) return undefined;
+      const targetRef = logTargetRef(target);
+      const actor = ctx.lastPlayedCardId ? logCardRef(ctx.lastPlayedCardId) : undefined;
+      if (actor) {
+        return { ...base, kind: "damage", tile: actor, flowTo: targetRef, badge: "burst", amount, label: `${actor.name} 對 ${targetRef.name} 造成 ${amount ?? 0} 點傷害` };
+      }
+      return { ...base, kind: "damage", tile: targetRef, badge: "burst", amount, label: `${targetRef.name} 受到 ${amount ?? 0} 點傷害` };
+    }
+    case "DESTROY": {
+      const tile = cardId ? logCardRef(cardId) : target ? logUnitRef(target) : { name: "隨從" };
+      return { ...base, kind: "death", tile, label: `${tile.name} 陣亡` };
+    }
+    case "HEAL": {
+      if (!target) return undefined;
+      const tile = logTargetRef(target);
+      return { ...base, kind: "heal", tile, badge: "heart", amount, label: `${tile.name} 恢復 ${amount ?? 0} 點生命` };
+    }
+    case "BOUNCE": {
+      const tile = cardId ? logCardRef(cardId) : target ? logUnitRef(target) : { name: "隨從" };
+      return { ...base, kind: "bounce", tile, badge: "bounce", label: `${tile.name} 被收回手牌` };
+    }
+    // BUFF is handled by the grouping pass in appendBattleLog (multiple events → one actor entry).
+    default:
+      return undefined;
+  }
+}
+
+/** Derive battle-log entries from a fresh batch of events (oldest→newest, capped). */
+function appendBattleLog(message: GameEvent[]): void {
+  // Pre-pass: claim the DAMAGE events that belong to each attack (target hit + retaliation),
+  // so they fold into the attack entry rather than appearing as standalone damage.
+  const claimedDamage = new Set<number>();
+  const attackTargetDamage = new Map<number, number>();
+  for (let i = 0; i < message.length; i++) {
+    const event = message[i];
+    if (event.type !== "ATTACK") continue;
+    const payload = event.payload ?? {};
+    const attackerId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
+    const ref = payload.target as TargetRef | undefined;
+    const targetKey = ref ? targetKeyFor(ref) : undefined;
+    const claimNextDamageTo = (wanted: string | undefined): GameEvent | undefined => {
+      if (!wanted) return undefined;
+      for (let j = i + 1; j < message.length; j++) {
+        const d = message[j];
+        if (d.type !== "DAMAGE" || claimedDamage.has(d.seq)) continue;
+        if ((typeof d.payload?.target === "string" ? d.payload.target : undefined) === wanted) {
+          claimedDamage.add(d.seq);
+          return d;
+        }
+      }
+      return undefined;
+    };
+    const targetHit = claimNextDamageTo(targetKey);
+    if (targetHit && typeof targetHit.payload?.amount === "number") attackTargetDamage.set(event.seq, targetHit.payload.amount);
+    claimNextDamageTo(attackerId); // retaliation — claimed so it isn't shown as separate damage
+  }
+
+  const entries: BattleLogEntry[] = [];
+  let lastPlayedCardId: string | undefined;
+
+  // Consecutive BUFF events sharing one actor (the just-played card) collapse into a single
+  // entry whose strip tile is the actor and whose tooltip fans out to every affected target.
+  let pendingBuff:
+    | { kind: "buff" | "silence"; actorKey: string; tile: BattleLogCardRef; badge: BattleLogBadge; seat?: Seat; seq: number; buffTargets: { ref: BattleLogCardRef; detail: string }[] }
+    | undefined;
+  const flushBuff = (): void => {
+    if (!pendingBuff) return;
+    const names = pendingBuff.buffTargets.map((t) => t.ref.name).join("、");
+    const verb = pendingBuff.kind === "silence" ? "鎖定" : "強化";
+    entries.push({
+      seq: pendingBuff.seq,
+      seat: pendingBuff.seat,
+      kind: pendingBuff.kind,
+      tile: pendingBuff.tile,
+      badge: pendingBuff.badge,
+      buffTargets: pendingBuff.buffTargets,
+      label: `${pendingBuff.tile.name} ${verb} ${names}`
+    });
+    pendingBuff = undefined;
+  };
+
+  for (const event of message) {
+    if (event.type === "BUFF") {
+      const payload = event.payload ?? {};
+      const target = typeof payload.target === "string" ? payload.target : undefined;
+      if (!target) continue;
+      const silence = isSilencePayload(payload);
+      const kind = silence ? "silence" : "buff";
+      const badge: BattleLogBadge = silence ? "silence" : "arrow";
+      const detail = buffDetail(payload);
+      const targetRef = logTargetRef(target);
+      if (lastPlayedCardId) {
+        const actorKey = `${kind}:${lastPlayedCardId}`;
+        if (pendingBuff && pendingBuff.actorKey === actorKey) {
+          pendingBuff.buffTargets.push({ ref: targetRef, detail });
+        } else {
+          flushBuff();
+          pendingBuff = { kind, actorKey, tile: logCardRef(lastPlayedCardId), badge, seat: event.seat, seq: event.seq, buffTargets: [{ ref: targetRef, detail }] };
+        }
+      } else {
+        // No played-card actor (triggered / self-buff): the buffed minion is its own actor.
+        flushBuff();
+        entries.push({ seq: event.seq, seat: event.seat, kind, tile: targetRef, badge, detail, label: silence ? `${targetRef.name} ${detail}` : `${targetRef.name} 獲得 ${detail}` });
+      }
+      continue;
+    }
+
+    flushBuff();
+    if (event.type === "CARD_PLAYED" && typeof event.payload?.cardId === "string") {
+      lastPlayedCardId = event.payload.cardId;
+    }
+    const entry = battleLogEntryFor(event, { claimedDamage, attackTargetDamage, lastPlayedCardId });
+    if (entry) entries.push(entry);
+  }
+  flushBuff();
+  if (entries.length === 0) return;
+  view.battleLog = [...view.battleLog, ...entries].slice(-50);
+}
+
 function handleEvents(message: GameEvent[]): void {
   view.events = [...message, ...view.events].slice(0, 50);
+  appendBattleLog(message);
   maybeShowTurnAnnouncement(message);
   const handGate = scheduleHandEventGates(message);
   const cues = enqueueEventCues(message);

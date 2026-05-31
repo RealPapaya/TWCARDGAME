@@ -20,6 +20,42 @@ import type {
 export type { ShopItemRow } from "@twcardgame/shared";
 
 export type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "bounce" | "destroy" | "turn" | "reject";
+
+/** One entry in the Hearthstone-style battle log, derived from a GameEvent. */
+export type BattleLogKind = "summon" | "play" | "attack" | "damage" | "heal" | "buff" | "silence" | "bounce" | "death";
+/** Corner badge / action icon drawn on a log entry and inside its tooltip. */
+export type BattleLogBadge = "sword" | "burst" | "heart" | "arrow" | "sparkle" | "silence" | "bounce";
+
+/** A card (or hero) shown as art in a log entry's tile and rich tooltip. */
+export interface BattleLogCardRef {
+  name: string;
+  /** Resolved card art URL; absent for heroes or unknown cards. */
+  thumb?: string;
+  /** True when this references a hero rather than a card (no art available). */
+  hero?: boolean;
+}
+
+export interface BattleLogEntry {
+  /** Source event `seq` — used as the stable DOM key and to dedupe. */
+  seq: number;
+  kind: BattleLogKind;
+  /** Card shown on the strip tile and as the main card in the tooltip — the actor (for buff/silence, the card that triggered it; for heal, the target). */
+  tile: BattleLogCardRef;
+  /** Optional second card shown after the action icon in the tooltip (attack / spell-damage target). */
+  flowTo?: BattleLogCardRef;
+  /** Affected targets for a buff/silence entry, each with its own stat-change text. When present, `tile` is the ACTOR and the tooltip fans out to these targets. */
+  buffTargets?: { ref: BattleLogCardRef; detail: string }[];
+  /** Small corner badge on the tile (omitted for deaths, which use a centered overlay). */
+  badge?: BattleLogBadge;
+  /** Numeric magnitude (damage dealt / health restored), shown on the affected card. */
+  amount?: number;
+  /** Stat-change / qualifier text for buffs (e.g. "+2/+2"). */
+  detail?: string;
+  /** Full readable sentence shown in the tooltip. */
+  label: string;
+  /** Acting seat, for friendly/enemy tinting. */
+  seat?: Seat;
+}
 export type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai" | "test";
 export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
@@ -99,6 +135,7 @@ export type ClientViewState = {
   pendingBattlecry?: BattlecryPreviewState;
   acceptedBattlecry?: BattlecryPreviewState;
   events: GameEvent[];
+  battleLog: BattleLogEntry[];
   animationCues: AnimationCue[];
   turnAnnouncement?: {
     id: string;
