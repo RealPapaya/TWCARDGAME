@@ -336,6 +336,30 @@
   text-shadow: 0 2px 6px #000;
 }
 
+.battle-training-card {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: 440px;
+  padding: 18px 22px;
+  border: 3px solid rgba(244, 228, 188, 0.62);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(28, 47, 45, 0.9), rgba(25, 23, 28, 0.9));
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  color: #f4e4bc;
+  text-align: center;
+}
+
+.battle-training-card strong {
+  font-size: 24px;
+  color: #fff8d8;
+}
+
+.battle-training-card span {
+  font-size: 15px;
+  line-height: 1.45;
+}
+
 .battle-private-room {
   margin: 0;
   padding: 0;
@@ -1666,6 +1690,156 @@
   color: #6b3519;
 }
 
+.training-coach {
+  position: absolute;
+  left: 24px;
+  bottom: 118px;
+  z-index: 140;
+  width: min(520px, calc(100% - 48px));
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 4px solid #7a4a22;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 248, 224, 0.98), rgba(229, 207, 165, 0.98)),
+    #f4e4bc;
+  color: #3d2616;
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.45);
+}
+
+.training-coach-copy {
+  display: grid;
+  gap: 6px;
+}
+
+.training-coach-copy strong {
+  font-size: 20px;
+  color: #2f1b10;
+}
+
+.training-coach-copy p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.training-coach-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.training-action-lock {
+  min-width: 116px;
+  padding: 8px 12px;
+  border: 2px solid rgba(122, 74, 34, 0.46);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.38);
+  color: #5a3219;
+  font-weight: 900;
+  text-align: center;
+}
+
+.training-highlight {
+  z-index: 120;
+  outline: 3px solid rgba(255, 210, 77, 0.96);
+  outline-offset: 4px;
+  box-shadow: 0 0 0 6px rgba(83, 49, 13, 0.42), 0 0 30px rgba(255, 210, 77, 0.86) !important;
+  isolation: isolate;
+}
+
+.end-turn-wrap.training-highlight,
+.minion-stats .training-highlight {
+  position: relative;
+}
+
+.card-cost.training-highlight {
+  position: absolute;
+}
+
+.training-highlight::before,
+.training-highlight::after {
+  content: "";
+  position: absolute;
+  pointer-events: none;
+}
+
+.training-highlight::before {
+  inset: -9px;
+  z-index: 3;
+  border: 2px solid rgba(255, 244, 170, 0.72);
+  border-radius: inherit;
+  box-shadow: 0 0 14px rgba(255, 210, 77, 0.58);
+  animation: training-highlight-ring 1.6s ease-in-out infinite;
+}
+
+.training-highlight::after {
+  inset: -13px;
+  z-index: 4;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(255, 255, 255, 0.98) 0 2px, transparent 3px),
+    radial-gradient(circle at 100% 50%, rgba(255, 232, 116, 0.95) 0 2px, transparent 3px),
+    radial-gradient(circle at 50% 100%, rgba(255, 255, 255, 0.92) 0 2px, transparent 3px),
+    radial-gradient(circle at 0% 50%, rgba(255, 232, 116, 0.95) 0 2px, transparent 3px);
+  animation: training-highlight-orbit 2.8s linear infinite;
+}
+
+.minion-stats .training-highlight {
+  outline-width: 3px;
+  outline-offset: 2px;
+}
+
+.minion-stats .training-highlight::before,
+.minion-stats .training-highlight::after,
+.card-cost.training-highlight::before,
+.card-cost.training-highlight::after {
+  inset: -7px;
+}
+
+.battle-surface .mana-container.training-highlight-mana {
+  outline: 0;
+  box-shadow: none !important;
+}
+
+.battle-surface .mana-container.training-highlight-mana::before {
+  inset: 25px 34px 19px 54px;
+  border-radius: 999px;
+}
+
+.battle-surface .mana-container.training-highlight-mana::after {
+  inset: 21px 30px 15px 50px;
+  border-radius: 999px;
+}
+
+.battle-surface .mana-container.training-highlight-mana .mana-crystal.active {
+  filter: brightness(1.3) drop-shadow(0 0 10px rgba(255, 244, 170, 0.92));
+}
+
+@keyframes training-highlight-ring {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes training-highlight-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.training-active .battle-gear-btn,
+.training-active .battle-log-panel,
+.training-active .battle-player-info {
+  z-index: 60;
+}
+
 @media (max-width: 900px) {
   .battle-selection-content {
     padding: 24px 18px;
@@ -1698,6 +1872,22 @@
   .ai-battle-setup .battle-setup-container {
     padding: 28px;
     gap: 20px;
+  }
+
+  .training-coach {
+    left: 16px;
+    bottom: 88px;
+    width: calc(100% - 32px);
+    grid-template-columns: 1fr;
+    justify-items: stretch;
+  }
+
+  .training-coach-actions {
+    justify-content: stretch;
+  }
+
+  .training-coach-actions .neon-button {
+    width: 100%;
   }
 
   .preview-description {

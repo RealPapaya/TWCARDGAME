@@ -105,6 +105,23 @@ import {
   skipRewardAnimation,
   startRewardAnimation
 } from "./app/reward-screen.js";
+import {
+  SOCIAL_ROOKIE_TRAINING,
+  advanceTraining,
+  createSocialRookieTraining,
+  createTrainingRewardSummary,
+  handleTrainingCommand,
+  trainingBlocksBattle,
+  trainingCanEndTurn,
+  trainingCanSelectAttacker,
+  trainingCanSelectHand,
+  trainingHasHighlight,
+  trainingPrompt,
+  trainingPublicState,
+  type TrainingCommandResult,
+  type TrainingHighlight,
+  type TrainingSession
+} from "./app/training.js";
 
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
@@ -237,6 +254,7 @@ const view: ClientViewState = {
 };
 
 let renderScheduled = false;
+let trainingSession: TrainingSession | undefined;
 let lastRenderedHtml = "";
 let turnAnnouncementTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
@@ -548,7 +566,7 @@ function renderBattleScreen(): string {
     { value: "challenge", title: "挑戰模式", description: "挑戰五大主題魔王" },
     { value: "ai", title: "電腦模式", description: "與電腦對戰，選擇難度" },
     { value: "pvp", title: "玩家模式", description: "線上排隊配對真人玩家" },
-    { value: "training", title: "訓練場", description: "敬請期待" }
+    { value: "training", title: "訓練場", description: "固定腳本新手關卡" }
   ];
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
   const aiEntryDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
@@ -616,7 +634,13 @@ function renderBattleScreen(): string {
             </button>
           </div>
           <div class="battle-training-section">
-            <p class="battle-training-note">訓練場功能尚在製作中，敬請期待。</p>
+            <div class="battle-training-card">
+              <strong>第一關：社會新鮮人</strong>
+              <span>無牌組、無隨機性。完成後首通獲得 100 金幣。</span>
+              <button id="start-training-match" class="neon-button battle-start-btn" data-testid="start-training-match" ${view.joining || Boolean(view.room) ? "disabled" : ""}>
+                開始訓練
+              </button>
+            </div>
           </div>
           <details class="advanced-disclosure battle-advanced">
             <summary>進階設定</summary>
@@ -1413,7 +1437,7 @@ function renderGame(status: GameStatus | ""): string {
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
       <span>${escapeHtml(targetHint)}</span>
     </section>
-    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""}" data-testid="battle-surface">
+    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""} ${trainingSession ? "training-active" : ""}" data-testid="battle-surface">
       <button id="battle-settings-toggle" class="battle-gear-btn" data-testid="battle-settings" title="設定" aria-label="設定">⚙</button>
       ${renderBattleSettingsMenu()}
       ${renderBattleHistoryPanel()}
@@ -1427,6 +1451,7 @@ function renderGame(status: GameStatus | ""): string {
       ${renderMulliganOverlay(status)}
       ${renderOpponentDisconnectOverlay(status)}
       ${renderResultOverlay(status)}
+      ${renderTrainingOverlay()}
       ${view.settingsOpen ? renderSettingsModal() : ""}
       ${view.battleDeckOpen ? renderBattleDeckModal() : ""}
       ${renderConcedeModal()}
@@ -1483,7 +1508,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
       ${role === "opponent" ? renderOpponentHand(handCount) : ""}
       ${renderHero(seat, player, role)}
       <div class="status-cluster">
-        ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role)}
+        ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role, seat)}
       </div>
       <div class="${boardClasses}" data-testid="${role}-board">
         ${renderBoardContents(seat, board, role)}
@@ -1649,6 +1674,8 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   const heroClasses = classNames([
     "hero",
     role === "player" ? "player-hero" : "opponent-hero",
+    trainingHighlightClass({ type: "hero", seat }),
+    trainingHighlightClass({ type: "unit", seat }),
     isTargetHighlighted(targetRef) && "valid-target",
     sameTarget(view.selectedTarget, targetRef) && "target-selected",
     hasCue(targetKey, "damage") && "taking-damage",
@@ -1666,14 +1693,16 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   `;
 }
 
-function renderMana(current: number, max: number, role: "player" | "opponent"): string {
+function renderMana(current: number, max: number, role: "player" | "opponent", seat: Seat): string {
   const crystals = Array.from({ length: 10 }, (_, index) => {
     const crystalClass = index < current ? `mana-crystal ${role}-crystal active` : index < max ? "mana-crystal spent" : "mana-crystal locked";
     return `<span class="${crystalClass}" aria-hidden="true"></span>`;
   }).join("");
+  const highlight = trainingHighlightClass({ type: "mana", seat });
+  const highlightClass = highlight ? `${highlight} training-highlight-mana` : "";
 
   return `
-    <div class="mana-container frame-style" data-testid="${role}-mana">
+    <div class="mana-container frame-style ${highlightClass}" data-testid="${role}-mana">
       ${crystals}
       <span class="mana-text">${current}/${max}</span>
     </div>
@@ -1709,6 +1738,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   const classes = classNames([
     "card",
     `rarity-${resolved.rarity.toLowerCase()}`,
+    trainingHighlightClass({ type: "hand", instanceId: card.instanceId }),
     selected && "selected",
     mulliganSelected && "mulligan-selected",
     playable && "can-play",
@@ -1772,6 +1802,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   }
   const classes = classNames([
     "minion",
+    trainingHighlightClass({ type: "unit", seat, instanceId: minion.instanceId }),
     minion.taunt && "taunt",
     minion.divineShield && "shielded",
     minion.divineShield && "divine-shield",
@@ -1807,8 +1838,8 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
       ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
       <div class="minion-stats">
-        <span class="${attackClass}"><span>${minion.attack}</span></span>
-        <span class="${healthClass}">${minion.currentHealth}</span>
+        <span class="${attackClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "attack" })}"><span>${minion.attack}</span></span>
+        <span class="${healthClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "health" })}">${minion.currentHealth}</span>
       </div>
       <span class="sr-e2e">${minion.canAttack ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
     </button>
@@ -1856,7 +1887,7 @@ function battlecryReplacementIndex(
 }
 
 function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): string {
-  const costClass = classNames(["card-cost", valueDeltaClass(card.cost, card.baseCost)]);
+  const costClass = classNames(["card-cost", trainingHighlightClass({ type: "cardCost", instanceId: card.instanceId }), valueDeltaClass(card.cost, card.baseCost)]);
   const attackClass = classNames(["stat-atk", valueDeltaClass(card.attack, card.baseAttack)]);
   const healthClass = classNames(["stat-hp", valueDeltaClass(card.health, card.baseHealth)]);
   return `
@@ -1902,10 +1933,13 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
 function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, myPlayer?: PublicPlayer): string {
   const isMyTurn = activeSeat && activeSeat === view.mySeat;
   const battleLocked = isBattleActionLocked();
+  const localTraining = Boolean(trainingSession);
   const selectedCard = selectedHandCard();
   const selectedNeedsTarget = selectedCard ? cardNeedsTarget(selectedCard.cardId) : false;
   const canPlay = Boolean(selectedCard && canAfford(selectedCard.cost) && (!selectedNeedsTarget || view.selectedTarget));
   const canAttack = Boolean(!battleLocked && view.selectedAttackerId && view.selectedTarget && isLegalAttackTarget(view.selectedTarget));
+  const canEndTurn = Boolean(isMyTurn && !battleLocked && (localTraining ? trainingCanEndTurn(trainingSession) : view.room));
+  const endTurnHighlight = trainingHighlightClass({ type: "endTurn" });
   const primaryLabel = selectedCard ? (selectedNeedsTarget && !view.selectedTarget ? "Choose Target" : "Play Selected") : "Play Selected";
 
   return `
@@ -1919,8 +1953,8 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
         <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
         </div>
-        <span class="end-turn-wrap${isMyTurn && !battleLocked && !hasAnyLegalAction() ? " can-end" : ""}">
-          <button id="end-turn" class="end-turn-btn" ${view.room && isMyTurn && !battleLocked ? "" : "disabled"} data-testid="end-turn">結束回合</button>
+        <span class="end-turn-wrap${isMyTurn && !battleLocked && !hasAnyLegalAction() ? " can-end" : ""} ${endTurnHighlight}">
+          <button id="end-turn" class="end-turn-btn" ${canEndTurn ? "" : "disabled"} data-testid="end-turn">結束回合</button>
         </span>
         <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
           <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
@@ -2050,6 +2084,28 @@ function renderResultOverlay(status: GameStatus | ""): string {
   // synthesized loss summary so the player sees DEFEAT without blocking.
   if (!view.rewardSummary) ensureFallbackRewardSummary(status);
   return renderRewardOverlay(view);
+}
+
+function renderTrainingOverlay(): string {
+  if (!trainingSession) return "";
+  const prompt = trainingPrompt(trainingSession);
+  if (!prompt || prompt.allowedAction !== "next" || readStatus() === "finished") return "";
+  const showNext = prompt.allowedAction === "next";
+  return `
+    <section class="training-coach" data-testid="training-coach" role="dialog" aria-live="polite">
+      <div class="training-coach-copy">
+        <strong>${escapeHtml(prompt.title)}</strong>
+        <p>${escapeHtml(prompt.body)}</p>
+      </div>
+      <div class="training-coach-actions">
+        ${showNext ? `<button id="training-next" class="neon-button" type="button" data-testid="training-next">下一步</button>` : `<span class="training-action-lock">請照指示操作</span>`}
+      </div>
+    </section>
+  `;
+}
+
+function trainingHighlightClass(highlight: TrainingHighlight): string | undefined {
+  return trainingHasHighlight(trainingSession, highlight) ? "training-highlight" : undefined;
 }
 
 let rewardFallbackTimer: number | undefined;
@@ -2478,8 +2534,16 @@ function bindStaticActions(): void {
     if (!view.selectedAttackerId || !view.selectedTarget) return;
     send({ type: "attack", attackerInstanceId: view.selectedAttackerId, target: view.selectedTarget });
   });
+  on(document.querySelector<HTMLButtonElement>("#training-next"), "click", "training-next", () => {
+    if (!trainingSession) return;
+    applyTrainingResult(advanceTraining(trainingSession));
+  });
   on(document.querySelector<HTMLButtonElement>("#end-turn"), "click", "end-turn", (event) => {
-    if (isBattleActionLocked() || view.pendingBattlecry) return;
+    if (activeTurnAnnouncement() || view.pendingBattlecry) return;
+    if (trainingSession && !trainingCanEndTurn(trainingSession)) {
+      showBattleToast("這一步只能照教學指定的操作進行。");
+      return;
+    }
     const btn = event.currentTarget as HTMLButtonElement | null;
     // Drive the flip via WAAPI: a re-render patches the class attribute (see
     // dom-patch.ts) and would otherwise strip a CSS animation class mid-flight.
@@ -3825,34 +3889,121 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
 
 async function startTrainingMatch(): Promise<void> {
   if (view.joining || view.room) return;
-  if (supabase && (!view.session || !view.selectedDeckId)) {
-    showAlert("請先選擇牌組再進入訓練場。");
-    return;
+  startLocalTrainingMatch();
+  await Promise.resolve();
+}
+
+function startLocalTrainingMatch(): void {
+  if (rewardFallbackTimer !== undefined) {
+    window.clearTimeout(rewardFallbackTimer);
+    rewardFallbackTimer = undefined;
   }
-  view.joining = true;
+  resetRewardScreen(view);
+  resetCardPlayCues();
+  resetMinionVisualTracking();
+  resetBattleLog();
+  trainingSession = createSocialRookieTraining(view.profile?.display_name ?? "玩家");
+  view.room = undefined;
+  view.mySeat = "player1";
+  view.hand = [];
+  view.state = trainingPublicState(trainingSession);
+  view.publicSync = {
+    status: trainingSession.status,
+    activeSeat: trainingSession.activeSeat,
+    turnNumber: trainingSession.turnNumber,
+    actionSeq: trainingSession.actionSeq,
+    players: trainingSession.players
+  };
+  view.events = [];
+  view.animationCues = [];
+  view.eventStatus = "in_progress";
+  view.selectedHandId = undefined;
+  view.selectedAttackerId = undefined;
+  view.selectedTarget = undefined;
+  view.mulliganSelection.clear();
+  view.rejectedHandIds.clear();
+  view.menuScreen = "battle";
   render();
-  try {
-    const client = new Client(defaultServerUrl);
-    const joinOptions: Record<string, unknown> = supabase
-      ? {
-          displayName: view.profile?.display_name,
-          accessToken: view.session?.access_token,
-          ...selectedDeckJoinOptions(),
-          difficulty: "easy"
-        }
-      : {
-          displayName: view.profile?.display_name ?? "Player",
-          ...selectedDeckJoinOptions(),
-          difficulty: "easy"
-        };
-    const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
-    bindRoomMessages(room);
-  } catch (error) {
-    showAlert(error instanceof Error ? error.message : "Unable to start training match.");
-  } finally {
-    view.joining = false;
-    render();
+}
+
+function applyTrainingResult(result: TrainingCommandResult): void {
+  if (!trainingSession) return;
+  if (result.publicSync) {
+    view.state = trainingPublicState(trainingSession);
+    applyPublicSync(result.publicSync);
   }
+  if (result.events.length > 0) handleEvents(result.events);
+  if (result.hand) handleHandSync(result.hand);
+  if (result.completed) void completeTrainingReward();
+  render();
+}
+
+async function completeTrainingReward(): Promise<void> {
+  const session = trainingSession;
+  if (!session) return;
+  const optimistic = localTrainingReward(session.level.id);
+  applyTrainingRewardSummary(optimistic);
+
+  if (!supabase || !view.session?.user) return;
+  try {
+    const { data, error } = await supabase.rpc("complete_training_level", { p_level_id: session.level.id });
+    if (error) throw error;
+    const payload = normalizeTrainingRewardRpc(data, optimistic);
+    markLocalTrainingComplete(session.level.id);
+    applyTrainingRewardSummary(payload);
+  } catch (error) {
+    console.warn("training reward persistence failed", error);
+  }
+}
+
+function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: number; rewardGold: number }): void {
+  view.rewardSummary = createTrainingRewardSummary(result);
+  if (view.profile) {
+    view.profile = {
+      ...view.profile,
+      gold: result.goldAfter
+    };
+  }
+  startRewardAnimation(view, render);
+  render();
+}
+
+function localTrainingReward(levelId: string): { goldBefore: number; goldAfter: number; rewardGold: number } {
+  const goldBefore = view.profile?.gold ?? 0;
+  const alreadyCompleted = isLocalTrainingComplete(levelId);
+  const rewardGold = alreadyCompleted ? 0 : SOCIAL_ROOKIE_TRAINING.rewardGold;
+  if (!alreadyCompleted) markLocalTrainingComplete(levelId);
+  return { goldBefore, goldAfter: goldBefore + rewardGold, rewardGold };
+}
+
+function normalizeTrainingRewardRpc(
+  data: unknown,
+  fallback: { goldBefore: number; goldAfter: number; rewardGold: number }
+): { goldBefore: number; goldAfter: number; rewardGold: number } {
+  const payload = Array.isArray(data) ? data[0] : data;
+  if (!payload || typeof payload !== "object") return fallback;
+  const record = payload as Record<string, unknown>;
+  const goldBefore = numericValue(record.goldBefore, fallback.goldBefore);
+  const goldAfter = numericValue(record.goldAfter, fallback.goldAfter);
+  const rewardGold = numericValue(record.rewardGold, Math.max(0, goldAfter - goldBefore));
+  return { goldBefore, goldAfter, rewardGold };
+}
+
+function numericValue(value: unknown, fallback: number): number {
+  return typeof value === "number" && Number.isFinite(value) ? value : fallback;
+}
+
+function localTrainingCompleteKey(levelId: string): string {
+  const userId = view.session?.user?.id ?? "guest";
+  return `twcardgame.training.${userId}.${levelId}.completed`;
+}
+
+function isLocalTrainingComplete(levelId: string): boolean {
+  return window.localStorage.getItem(localTrainingCompleteKey(levelId)) === "1";
+}
+
+function markLocalTrainingComplete(levelId: string): void {
+  window.localStorage.setItem(localTrainingCompleteKey(levelId), "1");
 }
 
 function selectedDeckJoinOptions(): { deckId?: string; deckIds?: string[] } {
@@ -4063,6 +4214,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
 }
 
 function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?: string } = {}): void {
+  trainingSession = undefined;
   view.room = joined;
   resetMinionVisualTracking();
   resetRewardScreen(view);
@@ -4522,6 +4674,10 @@ function bindSelectionActions(): void {
     });
     on(el, "pointerdown", "hand-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
+      if (!trainingCanSelectHand(trainingSession, el.dataset.handId)) {
+        showBattleToast("這一步只能使用教學指定的牌。");
+        return;
+      }
       event.preventDefault();
       clearHoverTooltip();
       attachHandPointerDrag(event, el);
@@ -4532,6 +4688,10 @@ function bindSelectionActions(): void {
     on(el, "click", "attacker-select", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
       event.stopImmediatePropagation();
+      if (!trainingCanSelectAttacker(trainingSession, el.dataset.attackerId)) {
+        showBattleToast("這一步只能選教學指定的隨從。");
+        return;
+      }
       const reason = attackerError(findMinion(el.dataset.attackerId ?? ""));
       if (reason) {
         showBattleToast(reason);
@@ -4544,6 +4704,10 @@ function bindSelectionActions(): void {
     });
     on(el, "pointerdown", "attacker-drag", (event) => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
+      if (!trainingCanSelectAttacker(trainingSession, el.dataset.attackerId)) {
+        showBattleToast("這一步只能選教學指定的隨從。");
+        return;
+      }
       clearHoverTooltip();
       attachAttackerPointerDrag(event, el);
     });
@@ -4732,6 +4896,10 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   if (event.pointerType === "mouse" && event.button !== 0) return;
   const handId = sourceEl.dataset.handId;
   if (!handId) return;
+  if (!trainingCanSelectHand(trainingSession, handId)) {
+    attachRejectedDrag(event, "這一步只能使用教學指定的牌。");
+    return;
+  }
   const card = view.hand.find((item) => item.instanceId === handId);
   if (!card) return;
   if (!canAfford(card.cost)) {
@@ -5113,6 +5281,7 @@ async function backToLobby(): Promise<void> {
     rewardFallbackTimer = undefined;
   }
   resetRewardScreen(view);
+  trainingSession = undefined;
   view.room = undefined;
   view.mySeat = undefined;
   view.hand = [];
@@ -5734,6 +5903,11 @@ function readSignUpFields(): { email: string; password: string } | undefined {
 }
 
 function send(command: GameCommand): void {
+  if (trainingSession) {
+    if (isBattleActionCommand(command) && activeTurnAnnouncement()) return;
+    applyTrainingResult(handleTrainingCommand(trainingSession, command));
+    return;
+  }
   if (!view.room) return;
   if (isBattleActionCommand(command) && isBattleActionLocked()) return;
   const expectedActionSeq = view.publicSync?.actionSeq ?? view.state?.turn?.actionSeq ?? 0;
@@ -5763,7 +5937,7 @@ function activeTurnAnnouncement(): ClientViewState["turnAnnouncement"] | undefin
 }
 
 function isBattleActionLocked(): boolean {
-  return Boolean(activeTurnAnnouncement());
+  return Boolean(activeTurnAnnouncement()) || trainingBlocksBattle(trainingSession);
 }
 
 function maybeShowTurnAnnouncement(events: GameEvent[]): void {

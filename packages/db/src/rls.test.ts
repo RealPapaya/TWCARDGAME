@@ -25,6 +25,7 @@ const cardIdOwnershipMigration = readFileSync(
   "utf8"
 );
 const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_and_starter_cosmetics.sql", import.meta.url), "utf8");
+const trainingCompletionsMigration = readFileSync(new URL("../migrations/0019_training_completions.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -201,5 +202,16 @@ describe("Supabase RLS migration coverage", () => {
     expect(friendRequestsMigration).toContain("grant select on public.friend_requests to authenticated;");
     expect(friendRequestsMigration).not.toContain("grant select, insert on public.friend_requests to authenticated;");
     expect(friendRequestsMigration).toContain("grant execute on function public.list_friend_requests() to authenticated;");
+  });
+
+  it("claims scripted training rewards through an idempotent authenticated RPC", () => {
+    expect(trainingCompletionsMigration).toContain("create table if not exists public.user_training_completions");
+    expect(trainingCompletionsMigration).toContain("alter table public.user_training_completions enable row level security;");
+    expect(trainingCompletionsMigration).toContain("auth.uid() = user_id");
+    expect(trainingCompletionsMigration).toContain("on conflict (user_id, level_id) do nothing");
+    expect(trainingCompletionsMigration).toContain("set gold = gold + v_reward_gold");
+    expect(trainingCompletionsMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
+    expect(trainingCompletionsMigration).not.toContain("grant execute on function public.complete_training_level(text) to anon;");
+    expect(trainingCompletionsMigration).not.toContain("grant insert on public.user_training_completions to authenticated;");
   });
 });
