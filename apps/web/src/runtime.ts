@@ -106,9 +106,11 @@ import {
   startRewardAnimation
 } from "./app/reward-screen.js";
 import {
+  COLLISION_NEWS_TRAINING,
   SOCIAL_ROOKIE_TRAINING,
+  TRAINING_LEVELS,
   advanceTraining,
-  createSocialRookieTraining,
+  createTrainingSession,
   createTrainingRewardSummary,
   handleTrainingCommand,
   trainingBlocksBattle,
@@ -120,6 +122,7 @@ import {
   trainingPublicState,
   type TrainingCommandResult,
   type TrainingHighlight,
+  type TrainingLevelId,
   type TrainingSession
 } from "./app/training.js";
 
@@ -255,6 +258,7 @@ const view: ClientViewState = {
 
 let renderScheduled = false;
 let trainingSession: TrainingSession | undefined;
+let remoteTrainingCompletions = new Set<string>();
 let lastRenderedHtml = "";
 let turnAnnouncementTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
@@ -634,13 +638,7 @@ function renderBattleScreen(): string {
             </button>
           </div>
           <div class="battle-training-section">
-            <div class="battle-training-card">
-              <strong>第一關：社會新鮮人</strong>
-              <span>無牌組、無隨機性。完成後首通獲得 100 金幣。</span>
-              <button id="start-training-match" class="neon-button battle-start-btn" data-testid="start-training-match" ${view.joining || Boolean(view.room) ? "disabled" : ""}>
-                開始訓練
-              </button>
-            </div>
+            ${renderTrainingLevelCards()}
           </div>
           <details class="advanced-disclosure battle-advanced">
             <summary>進階設定</summary>
@@ -657,6 +655,34 @@ function renderBattleScreen(): string {
       ${renderMatchmakingOverlay()}
     </section>
   `;
+}
+
+function renderTrainingLevelCards(): string {
+  return TRAINING_LEVELS.map((level, index) => {
+    const unlocked = trainingLevelUnlocked(level.id);
+    const completed = trainingLevelCompleted(level.id);
+    const disabled = view.joining || Boolean(view.room) || !unlocked;
+    const title = `第${index + 1}關：${level.name}`;
+    const description = level.id === SOCIAL_ROOKIE_TRAINING.id
+      ? "無牌組、無隨機性。完成後首通獲得 100 金幣。"
+      : "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。完成第一關後解鎖。";
+    const status = completed ? "已完成" : unlocked ? "可開始" : "完成第一關後解鎖";
+    return `
+      <div class="battle-training-card">
+        <strong>${escapeHtml(title)}</strong>
+        <span>${escapeHtml(description)}</span>
+        <span class="battle-training-note">${escapeHtml(status)}</span>
+        <button
+          class="neon-button battle-start-btn"
+          data-start-training="${escapeAttr(level.id)}"
+          data-testid="start-training-${escapeAttr(level.id)}"
+          ${disabled ? "disabled" : ""}
+        >
+          ${completed ? "再次訓練" : "開始訓練"}
+        </button>
+      </div>
+    `;
+  }).join("");
 }
 
 function renderAiBattleSetupScreen(): string {
@@ -2668,7 +2694,13 @@ function bindStaticActions(): void {
       render();
     });
   }
-  on(document.querySelector<HTMLButtonElement>("#start-training-match"), "click", "start-training-match", () => void startTrainingMatch());
+  for (const el of document.querySelectorAll<HTMLButtonElement>("[data-start-training]")) {
+    on(el, "click", "start-training", () => {
+      const levelId = el.dataset.startTraining as TrainingLevelId | undefined;
+      if (!levelId) return;
+      void startTrainingMatch(levelId);
+    });
+  }
   on(document.querySelector<HTMLButtonElement>("#find-match"), "click", "find-match", () => void startMatchmaking());
   on(document.querySelector<HTMLButtonElement>("#matchmaking-cancel"), "click", "matchmaking-cancel", () => void cancelMatchmaking());
   on(document.querySelector<HTMLFormElement>("#profile-form"), "submit", "profile-form", (event) => void saveProfile(event));
@@ -3887,13 +3919,14 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
     .filter((reward): reward is PackOpeningReward => Boolean(reward));
 }
 
-async function startTrainingMatch(): Promise<void> {
+async function startTrainingMatch(levelId: TrainingLevelId): Promise<void> {
   if (view.joining || view.room) return;
-  startLocalTrainingMatch();
+  if (!trainingLevelUnlocked(levelId)) return;
+  startLocalTrainingMatch(levelId);
   await Promise.resolve();
 }
 
-function startLocalTrainingMatch(): void {
+function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   if (rewardFallbackTimer !== undefined) {
     window.clearTimeout(rewardFallbackTimer);
     rewardFallbackTimer = undefined;
@@ -3902,7 +3935,7 @@ function startLocalTrainingMatch(): void {
   resetCardPlayCues();
   resetMinionVisualTracking();
   resetBattleLog();
-  trainingSession = createSocialRookieTraining(view.profile?.display_name ?? "玩家");
+  trainingSession = createTrainingSession(levelId, view.profile?.display_name ?? "玩家");
   view.room = undefined;
   view.mySeat = "player1";
   view.hand = [];
@@ -3971,8 +4004,12 @@ function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: num
 function localTrainingReward(levelId: string): { goldBefore: number; goldAfter: number; rewardGold: number } {
   const goldBefore = view.profile?.gold ?? 0;
   const alreadyCompleted = isLocalTrainingComplete(levelId);
-  const rewardGold = alreadyCompleted ? 0 : SOCIAL_ROOKIE_TRAINING.rewardGold;
-  if (!alreadyCompleted) markLocalTrainingComplete(levelId);
+  const level = TRAINING_LEVELS.find((candidate) => candidate.id === levelId);
+  const rewardGold = alreadyCompleted ? 0 : level?.rewardGold ?? 0;
+  if (!alreadyCompleted) {
+    markLocalTrainingComplete(levelId);
+    remoteTrainingCompletions.add(levelId);
+  }
   return { goldBefore, goldAfter: goldBefore + rewardGold, rewardGold };
 }
 
@@ -3996,6 +4033,16 @@ function numericValue(value: unknown, fallback: number): number {
 function localTrainingCompleteKey(levelId: string): string {
   const userId = view.session?.user?.id ?? "guest";
   return `twcardgame.training.${userId}.${levelId}.completed`;
+}
+
+function trainingLevelCompleted(levelId: string): boolean {
+  return remoteTrainingCompletions.has(levelId) || isLocalTrainingComplete(levelId);
+}
+
+function trainingLevelUnlocked(levelId: TrainingLevelId): boolean {
+  if (levelId === SOCIAL_ROOKIE_TRAINING.id) return true;
+  if (levelId === COLLISION_NEWS_TRAINING.id) return trainingLevelCompleted(SOCIAL_ROOKIE_TRAINING.id);
+  return false;
 }
 
 function isLocalTrainingComplete(levelId: string): boolean {
@@ -4661,6 +4708,7 @@ async function resetBetaDatabaseFromSettings(): Promise<void> {
     view.decks = [];
     view.collection = [];
     view.matchHistory = [];
+    remoteTrainingCompletions = new Set();
     view.selectedDeckId = undefined;
     view.settingsOpen = false;
     showToast("DB 資料已清除，請重新登入。");
@@ -5380,6 +5428,7 @@ async function initializeAccount(): Promise<void> {
       view.matchHistory = [];
       view.friends = [];
       view.friendRequests = [];
+      remoteTrainingCompletions = new Set();
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
       view.menuScreen = "main";
@@ -5475,7 +5524,7 @@ async function loadAccountData(): Promise<void> {
     await recordDailyLoginIfAvailable();
 
     const userId = view.session!.user.id;
-    const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
+    const [profileResult, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
       supabase
         .from("profiles")
         .select(PROFILE_SELECT)
@@ -5495,18 +5544,24 @@ async function loadAccountData(): Promise<void> {
         .from("match_history")
         .select("id,winner_seat,result_reason,created_at,finished_at,player1_user_id,player2_user_id")
         .order("finished_at", { ascending: false })
-        .limit(20)
+        .limit(20),
+      supabase
+        .from("user_training_completions")
+        .select("level_id")
+        .eq("user_id", userId)
     ]);
 
     if (profileResult.error) throw profileResult.error;
     if (decksResult.error) throw decksResult.error;
     if (collectionResult.error) throw collectionResult.error;
     if (historyResult.error) throw historyResult.error;
+    if (trainingResult.error) throw trainingResult.error;
 
     view.profile = profileResult.data as ProfileRow;
     view.decks = (decksResult.data ?? []) as DeckRow[];
     view.collection = (collectionResult.data ?? []) as CollectionRow[];
     view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+    syncRemoteTrainingCompletions(trainingResult.data);
     if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
       view.selectedDeckId = view.decks[0]?.id;
     }
@@ -5533,7 +5588,7 @@ async function syncCollection(): Promise<void> {
 async function loadAccountDataRaw(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const userId = view.session.user.id;
-  const [profileResult, decksResult, collectionResult, historyResult] = await Promise.all([
+  const [profileResult, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
     supabase
       .from("profiles")
       .select(PROFILE_SELECT)
@@ -5553,18 +5608,24 @@ async function loadAccountDataRaw(): Promise<void> {
       .from("match_history")
       .select("id,winner_seat,result_reason,created_at,finished_at")
       .order("finished_at", { ascending: false })
-      .limit(20)
+      .limit(20),
+    supabase
+      .from("user_training_completions")
+      .select("level_id")
+      .eq("user_id", userId)
   ]);
 
   if (profileResult.error) throw profileResult.error;
   if (decksResult.error) throw decksResult.error;
   if (collectionResult.error) throw collectionResult.error;
   if (historyResult.error) throw historyResult.error;
+  if (trainingResult.error) throw trainingResult.error;
 
   view.profile = profileResult.data as ProfileRow;
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
   view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+  syncRemoteTrainingCompletions(trainingResult.data);
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;
   }
@@ -5572,6 +5633,20 @@ async function loadAccountDataRaw(): Promise<void> {
     const editingDeck = view.decks.find((deck) => deck.id === view.editingDeck?.id);
     view.editingDeck = editingDeck ? { ...editingDeck, card_ids: [...editingDeck.card_ids] } : undefined;
   }
+}
+
+function syncRemoteTrainingCompletions(rows: unknown): void {
+  const next = new Set<string>();
+  if (Array.isArray(rows)) {
+    for (const row of rows) {
+      const levelId = row && typeof row === "object" ? (row as Record<string, unknown>).level_id : undefined;
+      if (typeof levelId === "string") {
+        next.add(levelId);
+        markLocalTrainingComplete(levelId);
+      }
+    }
+  }
+  remoteTrainingCompletions = next;
 }
 
 async function ensureCollection(): Promise<void> {

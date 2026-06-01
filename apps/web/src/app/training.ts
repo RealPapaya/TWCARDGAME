@@ -18,6 +18,18 @@ export const SOCIAL_ROOKIE_TRAINING = {
   heroHealth: 10
 } as const;
 
+export const COLLISION_NEWS_TRAINING = {
+  id: "collision_news",
+  name: "拜碼頭",
+  rewardGold: 100,
+  heroHealth: 10
+} as const;
+
+export const TRAINING_LEVELS = [SOCIAL_ROOKIE_TRAINING, COLLISION_NEWS_TRAINING] as const;
+
+export type TrainingLevel = (typeof TRAINING_LEVELS)[number];
+export type TrainingLevelId = TrainingLevel["id"];
+
 const PLAYER: Seat = "player1";
 const OPPONENT: Seat = "player2";
 const ROOKIE_CARD_ID = "TW001";
@@ -25,6 +37,15 @@ const ROOKIE_HAND_ID = "training-hand-rookie";
 const ROOKIE_MINION_ID = "training-minion-rookie";
 const FINAL_CARD_ID = "S002";
 const FINAL_HAND_ID = "training-hand-final-damage";
+const COLLISION_FRIENDLY_CARD_ID = "TW045";
+const COLLISION_ENEMY_CARD_ID = "TW076";
+const COLLISION_FRIENDLY_MINION_ID = "training-minion-collision-friendly";
+const COLLISION_ENEMY_MINION_ID = "training-minion-collision-threat";
+const VACCINE_CARD_ID = "S011";
+const VACCINE_HAND_ID_1 = "training-hand-vaccine-1";
+const VACCINE_HAND_ID_2 = "training-hand-vaccine-2";
+const EGG_CARD_ID = "S006";
+const EGG_HAND_ID = "training-hand-egg";
 
 export type TrainingStepId =
   | "welcome"
@@ -44,9 +65,28 @@ export type TrainingStepId =
   | "victory_condition"
   | "final_strike_intro"
   | "final_strike"
+  | "collision_intro"
+  | "collision_attack"
+  | "collision_result"
+  | "vaccine_intro"
+  | "vaccine_one"
+  | "vaccine_cap_intro"
+  | "vaccine_two"
+  | "egg_intro"
+  | "egg_finish"
   | "completed";
 
-export type TrainingAllowedAction = "next" | "play_rookie" | "end_turn" | "attack_hero" | "final_strike" | "none";
+export type TrainingAllowedAction =
+  | "next"
+  | "play_rookie"
+  | "end_turn"
+  | "attack_hero"
+  | "final_strike"
+  | "attack_threat"
+  | "vaccine_one"
+  | "vaccine_two"
+  | "egg_finish"
+  | "none";
 
 export type TrainingHighlight =
   | { type: "hand"; instanceId: string }
@@ -82,7 +122,7 @@ export type TrainingPublicSync = {
 };
 
 export interface TrainingSession {
-  level: typeof SOCIAL_ROOKIE_TRAINING;
+  level: TrainingLevel;
   step: TrainingStepId;
   status: GameStatus;
   activeSeat: Seat;
@@ -92,6 +132,11 @@ export interface TrainingSession {
   players: PublicGameState["players"];
   hand: HandCardView[];
   result?: PublicGameState["result"];
+}
+
+export function createTrainingSession(levelId: TrainingLevelId, playerName = "玩家"): TrainingSession {
+  if (levelId === COLLISION_NEWS_TRAINING.id) return createCollisionNewsTraining(playerName);
+  return createSocialRookieTraining(playerName);
 }
 
 export function createSocialRookieTraining(playerName = "玩家"): TrainingSession {
@@ -108,6 +153,30 @@ export function createSocialRookieTraining(playerName = "玩家"): TrainingSessi
       player2: createPlayer(OPPONENT, "訓練教官", 0, 0, 0)
     },
     hand: []
+  };
+}
+
+export function createCollisionNewsTraining(playerName = "玩家"): TrainingSession {
+  const player = createPlayer(PLAYER, playerName, 3, 4, 4, COLLISION_NEWS_TRAINING.heroHealth);
+  const opponent = createPlayer(OPPONENT, "訓練教官", 0, 0, 0, COLLISION_NEWS_TRAINING.heroHealth);
+  player.hero = { hp: 3, maxHp: COLLISION_NEWS_TRAINING.heroHealth };
+  opponent.hero = { hp: 3, maxHp: COLLISION_NEWS_TRAINING.heroHealth };
+  player.board = [minion(COLLISION_FRIENDLY_MINION_ID, COLLISION_FRIENDLY_CARD_ID, PLAYER, 4, 5, { canAttack: true })];
+  opponent.board = [minion(COLLISION_ENEMY_MINION_ID, COLLISION_ENEMY_CARD_ID, OPPONENT, 3, 4, { canAttack: true })];
+  return {
+    level: COLLISION_NEWS_TRAINING,
+    step: "collision_intro",
+    status: "in_progress",
+    activeSeat: PLAYER,
+    turnNumber: 1,
+    actionSeq: 0,
+    seq: 1,
+    players: { player1: player, player2: opponent },
+    hand: [
+      handCard(VACCINE_HAND_ID_1, VACCINE_CARD_ID, 0, "NEWS"),
+      handCard(VACCINE_HAND_ID_2, VACCINE_CARD_ID, 0, "NEWS"),
+      handCard(EGG_HAND_ID, EGG_CARD_ID, 2, "NEWS")
+    ]
   };
 }
 
@@ -239,6 +308,78 @@ export function trainingPrompt(session: TrainingSession): TrainingPrompt | undef
         allowedAction: "final_strike",
         highlights: [{ type: "hand", instanceId: FINAL_HAND_ID }, { type: "hero", seat: OPPONENT }]
       };
+    case "collision_intro":
+      return {
+        title: session.level.name,
+        body: "你的英雄只剩 3 點生命，敵方隨從有 3 點攻擊。若不先處理它，下回合英雄就會被擊倒。",
+        allowedAction: "next",
+        highlights: [{ type: "hero", seat: PLAYER }, { type: "unit", seat: OPPONENT, instanceId: COLLISION_ENEMY_MINION_ID }]
+      };
+    case "collision_attack":
+      return {
+        title: "先解除危機",
+        body: "選我方發亮的隨從，攻擊敵方隨從。這一步不能打英雄，必須先移除會致命的威脅。",
+        allowedAction: "attack_threat",
+        highlights: [
+          { type: "unit", seat: PLAYER, instanceId: COLLISION_FRIENDLY_MINION_ID },
+          { type: "unit", seat: OPPONENT, instanceId: COLLISION_ENEMY_MINION_ID }
+        ]
+      };
+    case "collision_result":
+      return {
+        title: "卡牌碰撞",
+        body: "隨從互相攻擊時，雙方都會扣血：我方用 4 攻擊打敵方，敵方也用 3 攻擊反擊我方。敵方生命歸零離場，我方受傷留下來。",
+        allowedAction: "next",
+        highlights: [
+          { type: "unit", seat: PLAYER, instanceId: COLLISION_FRIENDLY_MINION_ID },
+          { type: "minionStat", instanceId: COLLISION_FRIENDLY_MINION_ID, stat: "health" }
+        ]
+      };
+    case "vaccine_intro":
+      return {
+        title: "新聞牌：回復",
+        body: "新聞牌會打出一次效果，不會像隨從一樣留在場上。高端疫苗可以回復隨從生命；這張目標是民進黨政治人物，所以會回復 2 點。",
+        allowedAction: "next",
+        highlights: [{ type: "hand", instanceId: VACCINE_HAND_ID_1 }, { type: "unit", seat: PLAYER, instanceId: COLLISION_FRIENDLY_MINION_ID }]
+      };
+    case "vaccine_one":
+      return {
+        title: "使用高端疫苗",
+        body: "把第一張高端疫苗用在受傷的我方隨從上。",
+        allowedAction: "vaccine_one",
+        highlights: [{ type: "hand", instanceId: VACCINE_HAND_ID_1 }, { type: "unit", seat: PLAYER, instanceId: COLLISION_FRIENDLY_MINION_ID }]
+      };
+    case "vaccine_cap_intro":
+      return {
+        title: "生命上限",
+        body: "回復生命不能超過生命上限。這名隨從最多是 5 點生命；再補 2 點也只會到 5，不會變成 6。",
+        allowedAction: "next",
+        highlights: [
+          { type: "hand", instanceId: VACCINE_HAND_ID_2 },
+          { type: "minionStat", instanceId: COLLISION_FRIENDLY_MINION_ID, stat: "health" }
+        ]
+      };
+    case "vaccine_two":
+      return {
+        title: "再次回復",
+        body: "再用第二張高端疫苗，觀察生命只會補到上限。",
+        allowedAction: "vaccine_two",
+        highlights: [{ type: "hand", instanceId: VACCINE_HAND_ID_2 }, { type: "unit", seat: PLAYER, instanceId: COLLISION_FRIENDLY_MINION_ID }]
+      };
+    case "egg_intro":
+      return {
+        title: "新聞牌：傷害",
+        body: "砸雞蛋是傷害型新聞牌，可以對敵方單位造成 3 點傷害。敵方英雄剩 3 點生命，正好可以完成最後一擊。",
+        allowedAction: "next",
+        highlights: [{ type: "hand", instanceId: EGG_HAND_ID }, { type: "hero", seat: OPPONENT }]
+      };
+    case "egg_finish":
+      return {
+        title: "使用砸雞蛋",
+        body: "把砸雞蛋打到敵方英雄，完成第二關。",
+        allowedAction: "egg_finish",
+        highlights: [{ type: "hand", instanceId: EGG_HAND_ID }, { type: "hero", seat: OPPONENT }]
+      };
     case "completed":
       return undefined;
   }
@@ -258,12 +399,18 @@ export function trainingCanSelectHand(session: TrainingSession | undefined, hand
   const action = trainingPrompt(session)?.allowedAction;
   if (action === "play_rookie") return handInstanceId === ROOKIE_HAND_ID;
   if (action === "final_strike") return handInstanceId === FINAL_HAND_ID;
+  if (action === "vaccine_one") return handInstanceId === VACCINE_HAND_ID_1;
+  if (action === "vaccine_two") return handInstanceId === VACCINE_HAND_ID_2;
+  if (action === "egg_finish") return handInstanceId === EGG_HAND_ID;
   return false;
 }
 
 export function trainingCanSelectAttacker(session: TrainingSession | undefined, attackerInstanceId: string | undefined): boolean {
   if (!session || !attackerInstanceId) return true;
-  return trainingPrompt(session)?.allowedAction === "attack_hero" && attackerInstanceId === ROOKIE_MINION_ID;
+  const action = trainingPrompt(session)?.allowedAction;
+  if (action === "attack_hero") return attackerInstanceId === ROOKIE_MINION_ID;
+  if (action === "attack_threat") return attackerInstanceId === COLLISION_FRIENDLY_MINION_ID;
+  return false;
 }
 
 export function trainingCanEndTurn(session: TrainingSession | undefined): boolean {
@@ -314,6 +461,21 @@ export function advanceTraining(session: TrainingSession): TrainingCommandResult
     case "final_strike_intro":
       session.step = "final_strike";
       return update(session);
+    case "collision_intro":
+      session.step = "collision_attack";
+      return update(session);
+    case "collision_result":
+      session.step = "vaccine_intro";
+      return update(session);
+    case "vaccine_intro":
+      session.step = "vaccine_one";
+      return update(session);
+    case "vaccine_cap_intro":
+      session.step = "vaccine_two";
+      return update(session);
+    case "egg_intro":
+      session.step = "egg_finish";
+      return update(session);
     default:
       return reject(session, "請照教學指示操作。");
   }
@@ -337,6 +499,38 @@ export function handleTrainingCommand(session: TrainingSession, command: GameCom
   }
   if (command.type === "playCard" && action === "final_strike" && command.handInstanceId === FINAL_HAND_ID) {
     return finalStrike(session);
+  }
+  if (
+    command.type === "attack" &&
+    action === "attack_threat" &&
+    command.attackerInstanceId === COLLISION_FRIENDLY_MINION_ID &&
+    isCollisionThreat(command.target)
+  ) {
+    return attackCollisionThreat(session);
+  }
+  if (
+    command.type === "playCard" &&
+    action === "vaccine_one" &&
+    command.handInstanceId === VACCINE_HAND_ID_1 &&
+    isCollisionFriendly(command.target)
+  ) {
+    return playVaccine(session, VACCINE_HAND_ID_1, "vaccine_cap_intro");
+  }
+  if (
+    command.type === "playCard" &&
+    action === "vaccine_two" &&
+    command.handInstanceId === VACCINE_HAND_ID_2 &&
+    isCollisionFriendly(command.target)
+  ) {
+    return playVaccine(session, VACCINE_HAND_ID_2, "egg_intro");
+  }
+  if (
+    command.type === "playCard" &&
+    action === "egg_finish" &&
+    command.handInstanceId === EGG_HAND_ID &&
+    isOpponentHero(command.target)
+  ) {
+    return eggFinish(session);
   }
   return reject(session, "這一步只能照教學指定的操作進行。");
 }
@@ -481,6 +675,85 @@ function finalStrike(session: TrainingSession): TrainingCommandResult {
   };
 }
 
+function attackCollisionThreat(session: TrainingSession): TrainingCommandResult {
+  const player = session.players[PLAYER];
+  const opponent = session.players[OPPONENT];
+  const attacker = player.board.find((item) => item.instanceId === COLLISION_FRIENDLY_MINION_ID);
+  const defender = opponent.board.find((item) => item.instanceId === COLLISION_ENEMY_MINION_ID);
+  if (!attacker || !defender) return reject(session, "找不到教學指定的碰撞目標。");
+  const attackerDamage = attacker.attack;
+  const defenderDamage = defender.attack;
+  const nextAttacker = { ...attacker, currentHealth: attacker.currentHealth - defenderDamage, canAttack: false };
+  const nextDefender = { ...defender, currentHealth: defender.currentHealth - attackerDamage };
+  session.players[PLAYER] = {
+    ...player,
+    board: player.board.map((item) => item.instanceId === COLLISION_FRIENDLY_MINION_ID ? nextAttacker : item)
+  };
+  session.players[OPPONENT] = {
+    ...opponent,
+    graveyardCount: opponent.graveyardCount + (nextDefender.currentHealth <= 0 ? 1 : 0),
+    board: opponent.board
+      .map((item) => item.instanceId === COLLISION_ENEMY_MINION_ID ? nextDefender : item)
+      .filter((item) => item.currentHealth > 0)
+  };
+  session.step = "collision_result";
+  session.actionSeq += 1;
+  return update(session, [
+    event(session, "ATTACK", PLAYER, { attackerInstanceId: COLLISION_FRIENDLY_MINION_ID, target: { type: "MINION", side: OPPONENT, instanceId: COLLISION_ENEMY_MINION_ID } }),
+    event(session, "DAMAGE", OPPONENT, { target: COLLISION_ENEMY_MINION_ID, amount: attackerDamage }),
+    event(session, "DAMAGE", PLAYER, { target: COLLISION_FRIENDLY_MINION_ID, amount: defenderDamage }),
+    event(session, "DESTROY", OPPONENT, { target: COLLISION_ENEMY_MINION_ID, cardId: COLLISION_ENEMY_CARD_ID })
+  ]);
+}
+
+function playVaccine(session: TrainingSession, handInstanceId: string, nextStep: TrainingStepId): TrainingCommandResult {
+  const player = session.players[PLAYER];
+  const healedBoard = player.board.map((item) => {
+    if (item.instanceId !== COLLISION_FRIENDLY_MINION_ID) return item;
+    return { ...item, currentHealth: Math.min(item.health, item.currentHealth + 2) };
+  });
+  const before = player.board.find((item) => item.instanceId === COLLISION_FRIENDLY_MINION_ID)?.currentHealth ?? 0;
+  const after = healedBoard.find((item) => item.instanceId === COLLISION_FRIENDLY_MINION_ID)?.currentHealth ?? before;
+  session.hand = session.hand.filter((card) => card.instanceId !== handInstanceId);
+  session.players[PLAYER] = {
+    ...player,
+    board: healedBoard,
+    handCount: session.hand.length
+  };
+  session.step = nextStep;
+  session.actionSeq += 1;
+  return update(session, [
+    event(session, "CARD_PLAYED", PLAYER, { handInstanceId, cardId: VACCINE_CARD_ID }),
+    event(session, "HEAL", PLAYER, { target: COLLISION_FRIENDLY_MINION_ID, amount: after - before })
+  ]);
+}
+
+function eggFinish(session: TrainingSession): TrainingCommandResult {
+  const opponent = session.players[OPPONENT];
+  session.hand = session.hand.filter((card) => card.instanceId !== EGG_HAND_ID);
+  session.players[PLAYER] = {
+    ...session.players[PLAYER],
+    handCount: session.hand.length,
+    mana: { ...session.players[PLAYER].mana, current: Math.max(0, session.players[PLAYER].mana.current - 2) }
+  };
+  session.players[OPPONENT] = {
+    ...opponent,
+    hero: { ...opponent.hero, hp: 0 }
+  };
+  session.status = "finished";
+  session.result = { winnerSeat: PLAYER, reason: "hero_destroyed" };
+  session.step = "completed";
+  session.actionSeq += 1;
+  return {
+    ...update(session, [
+      event(session, "CARD_PLAYED", PLAYER, { handInstanceId: EGG_HAND_ID, cardId: EGG_CARD_ID }),
+      event(session, "DAMAGE", PLAYER, { target: `${OPPONENT}:hero`, amount: 3 }),
+      event(session, "GAME_FINISHED", PLAYER, { winnerSeat: PLAYER, reason: "hero_destroyed" })
+    ]),
+    completed: true
+  };
+}
+
 function update(session: TrainingSession, events: GameEvent[] = []): TrainingCommandResult {
   return {
     publicSync: trainingPublicSync(session),
@@ -500,12 +773,12 @@ function event(session: TrainingSession, type: GameEvent["type"], seat: Seat, pa
   return { seq: session.seq++, type, seat, payload };
 }
 
-function createPlayer(seat: Seat, displayName: string, handCount: number, manaCurrent: number, manaMax: number): PublicPlayer {
+function createPlayer(seat: Seat, displayName: string, handCount: number, manaCurrent: number, manaMax: number, heroHealth = SOCIAL_ROOKIE_TRAINING.heroHealth): PublicPlayer {
   return {
     userId: `training-${seat}`,
     displayName,
     connected: true,
-    hero: { hp: SOCIAL_ROOKIE_TRAINING.heroHealth, maxHp: SOCIAL_ROOKIE_TRAINING.heroHealth },
+    hero: { hp: heroHealth, maxHp: heroHealth },
     mana: { current: manaCurrent, max: manaMax },
     handCount,
     deckCount: 0,
@@ -553,8 +826,16 @@ function minion(
   };
 }
 
-function isOpponentHero(target: TargetRef): boolean {
-  return target.type === "HERO" && target.side === OPPONENT;
+function isOpponentHero(target: TargetRef | undefined): boolean {
+  return target?.type === "HERO" && target.side === OPPONENT;
+}
+
+function isCollisionThreat(target: TargetRef): boolean {
+  return target.type === "MINION" && target.side === OPPONENT && target.instanceId === COLLISION_ENEMY_MINION_ID;
+}
+
+function isCollisionFriendly(target: TargetRef | undefined): boolean {
+  return target?.type === "MINION" && target.side === PLAYER && target.instanceId === COLLISION_FRIENDLY_MINION_ID;
 }
 
 function clonePlayers(players: PublicGameState["players"]): PublicGameState["players"] {

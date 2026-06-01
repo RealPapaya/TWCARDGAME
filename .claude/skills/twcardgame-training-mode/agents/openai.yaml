@@ -1,0 +1,4 @@
+interface:
+  display_name: "TWCARDGAME Training Mode"
+  short_description: "Guides social rookie training UX changes"
+  default_prompt: "Use $twcardgame-training-mode to update the training mode flow and highlight behavior."
