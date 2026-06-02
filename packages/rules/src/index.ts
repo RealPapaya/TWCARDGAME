@@ -6,3 +6,5 @@ export * from "./rng.js";
 export * from "./state.js";
 export * from "./legalMoves.js";
 export * from "./bot.js";
+export * from "./phases.js";
+export { environmentCostDelta, applyEnvironmentTick } from "./effects/environment.js";

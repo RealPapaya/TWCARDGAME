@@ -541,6 +541,7 @@ export function trainingPublicState(session: TrainingSession): PublicGameState {
     schemaVersion: 1,
     cardCatalogVersion: "training",
     status: session.status,
+    phase: "NORMAL_PLAY",
     turn: {
       activeSeat: session.activeSeat,
       number: session.turnNumber,

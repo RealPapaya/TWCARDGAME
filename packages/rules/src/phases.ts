@@ -1,0 +1,417 @@
+import {
+  AMPLIFICATION_TIERS,
+  SEATS,
+  type AiPartyTag,
+  type AmplificationOption,
+  type GameEvent,
+  type Phase,
+  type Seat,
+  type VoteEvent,
+  type VoteWeights
+} from "@twcardgame/shared";
+import {
+  AMPLIFICATION_DB,
+  filterAmplification,
+  VOTE_EVENT_DB,
+  type AmplificationDbEntry,
+  type CardDefinition,
+  type EnvironmentDescriptor,
+  type VoteEventDbEntry
+} from "@twcardgame/cards";
+import { resolveEffect, resolvePostAction } from "./effects.js";
+import { applyEnvironmentTick } from "./effects/environment.js";
+import { nextInt } from "./rng.js";
+import { addEvent } from "./state.js";
+import { turnTimeLimitForPlayer } from "./timing.js";
+import type { MatchState, SpecialPhaseState } from "./types.js";
+
+// --- Trigger configuration -------------------------------------------------
+
+/** Turns that open the deck-based amplification phase. */
+export const AMPLIFICATION_TURNS: readonly number[] = [6, 14];
+/** Turn that opens the inverse-HP referendum phase. */
+export const VOTING_TURN = 20;
+/** Independent countdown for both special phases (max 30s). */
+export const SPECIAL_PHASE_TIME_LIMIT_MS = 30_000;
+
+/** The three political-figure faction categories, in fixed tie-break order. */
+export const FACTION_CATEGORIES: readonly string[] = ["民進黨政治人物", "國民黨政治人物", "民眾黨政治人物"];
+
+const PARTY_BY_CATEGORY: Record<string, AiPartyTag> = {
+  民進黨政治人物: "民進黨",
+  國民黨政治人物: "國民黨",
+  民眾黨政治人物: "民眾黨"
+};
+
+/** Maps a just-started turn number to the special phase it triggers, if any. */
+export function phaseTriggerForTurn(turnNumber: number): Exclude<Phase, "NORMAL_PLAY"> | undefined {
+  if (turnNumber === VOTING_TURN) return "VOTING_PHASE";
+  if (AMPLIFICATION_TURNS.includes(turnNumber)) return "AMPLIFICATION_PHASE";
+  return undefined;
+}
+
+// --- Deck analyzer ----------------------------------------------------------
+
+export interface FactionComposition {
+  dominantCategory?: string;
+  dominantParty?: AiPartyTag;
+  count: number;
+  total: number;
+}
+
+/**
+ * Finds the player's dominant political faction from their registered deck
+ * histogram. Considers only the three `…政治人物` categories; ties break by the
+ * fixed {@link FACTION_CATEGORIES} order (deterministic, no RNG). A deck with no
+ * faction cards yields `dominantCategory: undefined` → neutral fallback pool.
+ */
+export function dominantFaction(counts: Record<string, number>): FactionComposition {
+  let dominantCategory: string | undefined;
+  let best = 0;
+  let total = 0;
+  for (const category of FACTION_CATEGORIES) {
+    const count = counts[category] ?? 0;
+    total += count;
+    if (count > best) {
+      best = count;
+      dominantCategory = category;
+    }
+  }
+  return {
+    dominantCategory,
+    dominantParty: dominantCategory ? PARTY_BY_CATEGORY[dominantCategory] : undefined,
+    count: best,
+    total
+  };
+}
+
+// --- Inverse-HP weighted roulette ------------------------------------------
+
+/**
+ * Integer roulette weights for the referendum: a seat's weight is the OPPONENT's
+ * HP, so the lower-HP/underdog player is favored ("弱勢族群加成"). Both at 0 → even.
+ */
+export function voteWeightsInt(hpPlayer1: number, hpPlayer2: number): Record<Seat, number> {
+  const player1 = Math.max(0, hpPlayer2);
+  const player2 = Math.max(0, hpPlayer1);
+  if (player1 + player2 === 0) return { player1: 1, player2: 1 };
+  return { player1, player2 };
+}
+
+/** Picks the winning seat from integer weights, threading the seeded RNG. */
+export function weightedPickSeat(rngState: number, weights: Record<Seat, number>): { seat: Seat; rngState: number } {
+  const total = weights.player1 + weights.player2;
+  const roll = nextInt(rngState, total);
+  return { seat: roll.value < weights.player1 ? "player1" : "player2", rngState: roll.state };
+}
+
+/** Converts integer roulette weights into display win percentages summing to ~100. */
+export function voteWeightsDisplay(weights: Record<Seat, number>): VoteWeights {
+  const total = weights.player1 + weights.player2;
+  if (total === 0) return { player1: 50, player2: 50 };
+  return {
+    player1: Math.round((weights.player1 / total) * 100),
+    player2: Math.round((weights.player2 / total) * 100)
+  };
+}
+
+// --- Tier-probability sampling ---------------------------------------------
+
+/** Picks an index proportional to integer weights, threading the seeded RNG. */
+export function weightedIndex(rngState: number, weights: readonly number[]): { value: number; state: number } {
+  const total = weights.reduce((sum, w) => sum + Math.max(0, w), 0);
+  if (total <= 0) return { value: 0, state: rngState };
+  const roll = nextInt(rngState, total);
+  let acc = 0;
+  for (let i = 0; i < weights.length; i++) {
+    acc += Math.max(0, weights[i]);
+    if (roll.value < acc) return { value: i, state: roll.state };
+  }
+  return { value: weights.length - 1, state: roll.state };
+}
+
+/**
+ * Builds the three tier-graded amplification options for a player: one per tier
+ * (加減賺 / 吃紅 / 卯死). Falls back to topping up from the remaining pool if a tier
+ * has no entries. Deterministic for a given seed.
+ */
+export function sampleAmplificationOptions(
+  rngState: number,
+  pool: readonly AmplificationDbEntry[],
+  count = 3
+): { options: AmplificationOption[]; rngState: number } {
+  let state = rngState;
+  const options: AmplificationOption[] = [];
+  for (const tier of AMPLIFICATION_TIERS) {
+    if (options.length >= count) break;
+    const candidates = pool.filter((entry) => entry.tier === tier);
+    if (candidates.length === 0) continue;
+    const pick = nextInt(state, candidates.length);
+    state = pick.state;
+    options.push(toOption(candidates[pick.value]));
+  }
+  if (options.length < count) {
+    const used = new Set(options.map((o) => o.id));
+    for (const entry of pool) {
+      if (options.length >= count) break;
+      if (!used.has(entry.id)) options.push(toOption(entry));
+    }
+  }
+  return { options, rngState: state };
+}
+
+function toOption(entry: AmplificationDbEntry): AmplificationOption {
+  return { id: entry.id, tier: entry.tier, name: entry.name, description: entry.description };
+}
+
+/** Draws `count` unique vote events weighted by their tier weight. Deterministic per seed. */
+export function sampleVoteEvents(
+  rngState: number,
+  db: readonly VoteEventDbEntry[],
+  count = 3
+): { events: VoteEvent[]; rngState: number } {
+  let state = rngState;
+  const remaining = [...db];
+  const events: VoteEvent[] = [];
+  for (let i = 0; i < count && remaining.length > 0; i++) {
+    const pick = weightedIndex(state, remaining.map((entry) => entry.tierWeight));
+    state = pick.state;
+    const entry = remaining.splice(pick.value, 1)[0];
+    events.push({ id: entry.id, name: entry.name, options: [...entry.options] as [string, string, string] });
+  }
+  return { events, rngState: state };
+}
+
+// --- State machine: enter / resolve ----------------------------------------
+
+/**
+ * Switches the match into a special phase, builds its transient state, draws its
+ * options/events (threading the seeded RNG) and emits `PHASE_STARTED`. Called at
+ * the end of `startTurn`; the turn's draw/mana/clock have already happened, so the
+ * interrupted turn simply resumes once the phase resolves (never re-runs startTurn).
+ */
+export function enterSpecialPhase(
+  state: MatchState,
+  phase: Exclude<Phase, "NORMAL_PLAY">,
+  nowMs: number,
+  events: GameEvent[]
+): void {
+  const resumeSeat = state.turn.activeSeat;
+  state.phase = phase;
+  const sp: SpecialPhaseState = {
+    phase,
+    phaseDeadlineAtMs: nowMs + SPECIAL_PHASE_TIME_LIMIT_MS,
+    resumeSeat,
+    resumeTurnNumber: state.turn.number
+  };
+
+  if (phase === "AMPLIFICATION_PHASE") {
+    sp.amplificationOptions = { player1: [], player2: [] };
+    sp.amplificationChoice = {};
+    for (const seat of SEATS) {
+      const dom = dominantFaction(state.players[seat].registeredCategoryCounts);
+      const pool = filterAmplification(AMPLIFICATION_DB, dom.dominantCategory);
+      const sampled = sampleAmplificationOptions(state.private.rngState, pool.length > 0 ? pool : AMPLIFICATION_DB);
+      state.private.rngState = sampled.rngState;
+      sp.amplificationOptions[seat] = sampled.options;
+    }
+  } else {
+    const drawn = sampleVoteEvents(state.private.rngState, VOTE_EVENT_DB);
+    state.private.rngState = drawn.rngState;
+    sp.voteEvents = drawn.events;
+    sp.voteChoice = {};
+    sp.voteWeightsInt = voteWeightsInt(state.players.player1.hero.hp, state.players.player2.hero.hp);
+  }
+
+  state.specialPhase = sp;
+  addEvent(state, events, "PHASE_STARTED", { phase, phaseDeadlineAtMs: sp.phaseDeadlineAtMs }, resumeSeat);
+}
+
+/** Records (or force-defaults) a seat's amplification choice and resolves once both are in. */
+export function handleSelectAmplification(
+  state: MatchState,
+  seat: Seat,
+  optionId: string,
+  serverTimeout: boolean,
+  nowMs: number,
+  events: GameEvent[]
+): void {
+  const sp = state.specialPhase;
+  if (!sp || sp.phase !== "AMPLIFICATION_PHASE") {
+    rejectPhase(state, events, seat, "現在不是增幅選擇階段。");
+    return;
+  }
+
+  if (serverTimeout) {
+    for (const target of SEATS) {
+      if (sp.amplificationChoice?.[target] === undefined) {
+        const fallback = defaultAmplification(sp.amplificationOptions?.[target] ?? []);
+        if (fallback) recordAmplification(state, sp, target, fallback.id, fallback.tier, events);
+      }
+    }
+    resolveAmplificationPhase(state, nowMs, events);
+    return;
+  }
+
+  if (sp.amplificationChoice?.[seat] !== undefined) return;
+  const chosen = (sp.amplificationOptions?.[seat] ?? []).find((option) => option.id === optionId);
+  if (!chosen) {
+    rejectPhase(state, events, seat, "無效的增幅選項。");
+    return;
+  }
+  recordAmplification(state, sp, seat, chosen.id, chosen.tier, events);
+  if (SEATS.every((s) => sp.amplificationChoice?.[s] !== undefined)) resolveAmplificationPhase(state, nowMs, events);
+}
+
+function recordAmplification(
+  state: MatchState,
+  sp: SpecialPhaseState,
+  seat: Seat,
+  optionId: string,
+  tier: string,
+  events: GameEvent[]
+): void {
+  sp.amplificationChoice = { ...sp.amplificationChoice, [seat]: optionId };
+  addEvent(state, events, "AMPLIFICATION_SELECTED", { optionId, tier }, seat);
+}
+
+function defaultAmplification(options: readonly AmplificationOption[]): AmplificationOption | undefined {
+  return options.find((option) => option.tier === "加減賺") ?? options[0];
+}
+
+function resolveAmplificationPhase(state: MatchState, nowMs: number, events: GameEvent[]): void {
+  const sp = state.specialPhase;
+  if (!sp) return;
+  for (const seat of SEATS) {
+    const choiceId = sp.amplificationChoice?.[seat];
+    const option = sp.amplificationOptions?.[seat]?.find((o) => o.id === choiceId);
+    if (!option) continue;
+    state.players[seat].amplification = { id: option.id, tier: option.tier, name: option.name };
+    // Bind the modifier; passive effects are consulted by the cost/stat readers,
+    // one-shot effects are authored to resolve here once real DB content exists.
+    state.players[seat].amplificationEffect = AMPLIFICATION_DB.find((e) => e.id === option.id)?.effect;
+  }
+  endSpecialPhase(state, nowMs, "AMPLIFICATION_PHASE", events);
+}
+
+/**
+ * Returns to NORMAL_PLAY and refreshes the interrupted turn's clock from `nowMs`,
+ * so the resumed player gets a full turn timer instead of inheriting the deadline
+ * that was set when the (now-elapsed) special phase opened.
+ */
+function endSpecialPhase(state: MatchState, nowMs: number, phase: string, events: GameEvent[]): void {
+  state.phase = "NORMAL_PLAY";
+  state.specialPhase = undefined;
+  const resumeSeat = state.turn.activeSeat;
+  state.turn.startedAtMs = nowMs;
+  state.turn.deadlineAtMs = nowMs + turnTimeLimitForPlayer(state.players[resumeSeat], state.private.turnTimeLimitMs);
+  addEvent(state, events, "PHASE_ENDED", { phase });
+}
+
+/** Records (or force-defaults) a seat's referendum vote and resolves once both are in. */
+export function handleSubmitVote(
+  state: MatchState,
+  seat: Seat,
+  optionIndex: 0 | 1 | 2,
+  serverTimeout: boolean,
+  nowMs: number,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  const sp = state.specialPhase;
+  if (!sp || sp.phase !== "VOTING_PHASE") {
+    rejectPhase(state, events, seat, "現在不是公投階段。");
+    return;
+  }
+
+  if (serverTimeout) {
+    for (const target of SEATS) {
+      if (sp.voteChoice?.[target] === undefined) recordVote(state, sp, target, 0, events);
+    }
+    resolveVotingPhase(state, nowMs, events, catalog);
+    return;
+  }
+
+  if (sp.voteChoice?.[seat] !== undefined) return;
+  const eventCount = sp.voteEvents?.length ?? 0;
+  if (optionIndex < 0 || optionIndex >= eventCount) {
+    rejectPhase(state, events, seat, "無效的公投選項。");
+    return;
+  }
+  recordVote(state, sp, seat, optionIndex, events);
+  if (SEATS.every((s) => sp.voteChoice?.[s] !== undefined)) resolveVotingPhase(state, nowMs, events, catalog);
+}
+
+function recordVote(
+  state: MatchState,
+  sp: SpecialPhaseState,
+  seat: Seat,
+  optionIndex: 0 | 1 | 2,
+  events: GameEvent[]
+): void {
+  sp.voteChoice = { ...sp.voteChoice, [seat]: optionIndex };
+  addEvent(state, events, "VOTE_CAST", { optionIndex }, seat);
+}
+
+function resolveVotingPhase(
+  state: MatchState,
+  nowMs: number,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  const sp = state.specialPhase;
+  if (!sp || !sp.voteEvents || !sp.voteWeightsInt) return;
+
+  const pick = weightedPickSeat(state.private.rngState, sp.voteWeightsInt);
+  state.private.rngState = pick.rngState;
+  const winningSeat = pick.seat;
+  const winningIndex = sp.voteChoice?.[winningSeat] ?? 0;
+  const winningEvent = sp.voteEvents[winningIndex] ?? sp.voteEvents[0];
+  const display = voteWeightsDisplay(sp.voteWeightsInt);
+
+  const dbEntry = VOTE_EVENT_DB.find((entry) => entry.id === winningEvent.id);
+  if (dbEntry) applyVoteEventEffect(state, dbEntry.apply, winningEvent.id, winningEvent.name, winningSeat, events, catalog);
+
+  const winnerName = state.players[winningSeat].displayName;
+  const processText = `中選會公投：${winnerName}（中選率 ${display[winningSeat]}%，弱勢族群加成）勝出，通過「${winningEvent.name}」。`;
+  addEvent(
+    state,
+    events,
+    "VOTE_RESOLVED",
+    { winningSeat, eventId: winningEvent.id, eventName: winningEvent.name, weights: display, processText },
+    winningSeat
+  );
+
+  endSpecialPhase(state, nowMs, "VOTING_PHASE", events);
+}
+
+function applyVoteEventEffect(
+  state: MatchState,
+  descriptor: EnvironmentDescriptor,
+  eventId: string,
+  eventName: string,
+  activeSeat: Seat,
+  events: GameEvent[],
+  catalog: Map<string, CardDefinition>
+): void {
+  if (descriptor.mode === "IMMEDIATE") {
+    resolveEffect(descriptor.effect, { state, activeSeat, events, catalog });
+    resolvePostAction(state, events, catalog);
+    return;
+  }
+  const expiresTurn = descriptor.durationTurns ? state.turn.number + descriptor.durationTurns : undefined;
+  state.currentEnvironment = {
+    id: eventId,
+    name: eventName,
+    appliedTurn: state.turn.number,
+    expiresTurn,
+    effect: descriptor.effect
+  };
+  addEvent(state, events, "ENVIRONMENT_APPLIED", { id: eventId, name: eventName, expiresTurn });
+  applyEnvironmentTick(state, events);
+}
+
+function rejectPhase(state: MatchState, events: GameEvent[], seat: Seat, reason: string): void {
+  addEvent(state, events, "COMMAND_REJECTED", { reason }, seat);
+}
+

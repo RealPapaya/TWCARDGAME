@@ -83,7 +83,18 @@ function scoreMove(state: MatchState, seat: Seat, move: GameCommand): number {
   if (move.type === "concede") return -1_000_000;
   if (move.type === "playCard") return scorePlay(state, seat, move);
   if (move.type === "attack") return scoreAttack(state, seat, move);
+  if (move.type === "selectAmplification") return scoreAmplification(state, seat, move);
+  if (move.type === "submitVote") return 3 - move.optionIndex; // deterministic: prefer index 0
   return 0;
+}
+
+const TIER_RANK: Record<string, number> = { 加減賺: 1, 吃紅: 2, 卯死: 3 };
+
+function scoreAmplification(state: MatchState, seat: Seat, move: Extract<GameCommand, { type: "selectAmplification" }>): number {
+  // Placeholder heuristic until real amplification effects exist: prefer the
+  // stronger tier (卯死 > 吃紅 > 加減賺).
+  const option = state.specialPhase?.amplificationOptions?.[seat]?.find((o) => o.id === move.optionId);
+  return option ? TIER_RANK[option.tier] ?? 0 : 0;
 }
 
 function endTurnScore(state: MatchState, seat: Seat): number {

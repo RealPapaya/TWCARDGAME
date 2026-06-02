@@ -3,6 +3,7 @@ import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcard
 import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared";
 import type {
   AiDifficulty,
+  AmplificationOption,
   ClientCommandMessage,
   DevTestMatchSetup,
   FriendRow,
@@ -12,6 +13,7 @@ import type {
   GameStatus,
   HandCardView,
   LeaderboardRow,
+  Phase,
   PublicMinion,
   PublicPlayer,
   RewardSummary,
@@ -1479,6 +1481,8 @@ function renderGame(status: GameStatus | ""): string {
       ${renderEventCues()}
       ${renderTurnAnnouncementOverlay()}
       ${renderMulliganOverlay(status)}
+      ${renderAmplificationOverlay()}
+      ${renderVotingOverlay()}
       ${renderOpponentDisconnectOverlay(status)}
       ${renderResultOverlay(status)}
       ${renderTrainingOverlay()}
@@ -1719,8 +1723,17 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
       <span class="hero-hp">${hp}/${maxHp}</span>
       <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
       <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
+      ${renderAmplificationBadge(player)}
     </button>
   `;
+}
+
+/** Small badge beside the hero showing the amplification this player bound (turn 6/14). */
+function renderAmplificationBadge(player: PublicPlayer | undefined): string {
+  const amp = player?.amplification;
+  if (!amp?.name) return "";
+  const tierClass = AMP_TIER_CLASS[amp.tier] ?? "amp-tier-low";
+  return `<span class="hero-amp-badge ${tierClass}" title="${escapeAttr(`${amp.tier}・${amp.name}`)}">${escapeHtml(amp.name)}</span>`;
 }
 
 function renderMana(current: number, max: number, role: "player" | "opponent", seat: Seat): string {
@@ -2105,6 +2118,105 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
       ${renderCardFace(resolved, "mulligan")}
       ${selected ? `<span class="mulligan-replace-tag">替換</span>` : ""}
       <span class="sr-e2e">Cost ${card.cost} ${card.type}</span>
+    </button>
+  `;
+}
+
+const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 吃紅: "amp-tier-mid", 卯死: "amp-tier-high" };
+
+function renderPhaseCountdown(label: string): string {
+  const seconds = phaseCountdownSeconds();
+  if (seconds === undefined) return "";
+  return `
+    <div class="turn-countdown-badge phase ${seconds <= 5 ? "urgent" : ""}" data-testid="phase-countdown" role="status" aria-live="polite">
+      <span class="turn-countdown-label">${escapeHtml(label)}</span>
+      <span class="turn-countdown-value">${seconds}</span>
+    </div>
+  `;
+}
+
+/** Turn 6/14 deck-amplification chooser — presented mulligan-style with three highlighted picks. */
+function renderAmplificationOverlay(): string {
+  if (readPhase() !== "AMPLIFICATION_PHASE" || !view.room) return "";
+  const options = view.amplificationOptions ?? [];
+  const mySeat = view.mySeat;
+  const sp = view.state?.specialPhase;
+  // Use the per-phase "selected" flag, not the persistent bound amplification —
+  // the latter stays set from turn 6 and would wrongly hide the turn-14 options.
+  const submitted = Boolean(sp && mySeat && (mySeat === "player1" ? sp.ampSelectedP1 : sp.ampSelectedP2)) || options.length === 0;
+  return `
+    <section id="amplification-modal" class="mulligan-overlay amp-overlay ${submitted ? "submitted" : ""}" data-testid="amplification-overlay">
+      <div class="mulligan-content amp-content">
+        <h2>政黨增幅</h2>
+        <p>${submitted ? "已選擇，等待對手…" : "依你的牌組陣營，選擇一項增幅"}</p>
+        ${renderPhaseCountdown("增幅倒數")}
+        <div class="mulligan-card-area amp-card-area">
+          ${options.map((option) => renderAmplificationOption(option, submitted)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderAmplificationOption(option: AmplificationOption, disabled: boolean): string {
+  const tierClass = AMP_TIER_CLASS[option.tier] ?? "amp-tier-low";
+  return `
+    <button
+      class="card mulligan-card amp-option ${tierClass}"
+      data-amp-id="${escapeAttr(option.id)}"
+      data-dom-key="amp-${escapeAttr(option.id)}"
+      ${disabled ? "disabled" : ""}
+    >
+      <span class="amp-tier-badge">${escapeHtml(option.tier)}</span>
+      <span class="amp-option-name">${escapeHtml(option.name)}</span>
+      <span class="amp-option-desc">${escapeHtml(option.description)}</span>
+    </button>
+  `;
+}
+
+/** Turn 20 inverse-HP referendum ballot — three highlighted events, mulligan-style. */
+function renderVotingOverlay(): string {
+  if (readPhase() !== "VOTING_PHASE" || !view.room) return "";
+  const sp = view.state?.specialPhase;
+  const events: Array<{ id: string; name: string; options: string[] }> = sp
+    ? Array.from(sp.voteEvents ?? []).map((event: any) => ({
+        id: event.id,
+        name: event.name,
+        options: [event.option0, event.option1, event.option2]
+      }))
+    : [];
+  const mySeat = view.mySeat;
+  const submitted = Boolean(
+    sp && mySeat && (mySeat === "player1" ? sp.voteSubmittedP1 : sp.voteSubmittedP2)
+  );
+  const myWeight = sp ? (mySeat === "player1" ? sp.voteWeightP1 : sp.voteWeightP2) : 0;
+  return `
+    <section id="voting-modal" class="mulligan-overlay vote-overlay ${submitted ? "submitted" : ""}" data-testid="voting-overlay">
+      <div class="mulligan-content vote-content">
+        <h2>中選會公投</h2>
+        <p>
+          ${submitted ? "已投票，等待開票…" : "投下你支持的公投案"}
+          <span class="vote-weight-tag">你的中選率 ${myWeight}%（弱勢族群加成）</span>
+        </p>
+        ${renderPhaseCountdown("公投倒數")}
+        <div class="mulligan-card-area vote-card-area">
+          ${events.map((event, index) => renderVoteOption(event, index, submitted)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderVoteOption(event: { id: string; name: string; options: string[] }, index: number, disabled: boolean): string {
+  return `
+    <button
+      class="card mulligan-card vote-option"
+      data-vote-index="${index}"
+      data-dom-key="vote-${escapeAttr(event.id)}"
+      ${disabled ? "disabled" : ""}
+    >
+      <span class="vote-option-name">${escapeHtml(event.name)}</span>
+      <span class="vote-option-desc">${escapeHtml(event.options[0] ?? "")}</span>
     </button>
   `;
 }
@@ -4306,10 +4418,12 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
     "publicSync",
     (message: {
       status?: GameStatus;
+      phase?: Phase;
       activeSeat?: Seat;
       turnNumber?: number;
       turnStartedAtMs?: number;
       turnDeadlineAtMs?: number;
+      phaseDeadlineAtMs?: number;
       actionSeq?: number;
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
@@ -4317,6 +4431,10 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
       applyPublicSync(message);
     }
   );
+  joined.onMessage("amplificationOptions", (message: { options: AmplificationOption[] }) => {
+    view.amplificationOptions = message.options ?? [];
+    render();
+  });
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
   });
@@ -4824,6 +4942,20 @@ function bindSelectionActions(): void {
       if (view.mulliganSelection.has(id)) view.mulliganSelection.delete(id);
       else view.mulliganSelection.add(id);
       render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-amp-id]")) {
+    on(el, "click", "select-amplification", () => {
+      const optionId = el.dataset.ampId;
+      if (!optionId) return;
+      send({ type: "selectAmplification", optionId });
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-vote-index]")) {
+    on(el, "click", "submit-vote", () => {
+      const optionIndex = Number(el.dataset.voteIndex);
+      if (!Number.isInteger(optionIndex)) return;
+      send({ type: "submitVote", optionIndex: optionIndex as 0 | 1 | 2 });
     });
   }
 }
@@ -6020,7 +6152,8 @@ function activeTurnAnnouncement(): ClientViewState["turnAnnouncement"] | undefin
 }
 
 function isBattleActionLocked(): boolean {
-  return Boolean(activeTurnAnnouncement()) || trainingBlocksBattle(trainingSession);
+  // Regular play/attack/endTurn are suspended while a special phase is open.
+  return readPhase() !== "NORMAL_PLAY" || Boolean(activeTurnAnnouncement()) || trainingBlocksBattle(trainingSession);
 }
 
 function maybeShowTurnAnnouncement(events: GameEvent[]): void {
@@ -6220,6 +6353,10 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
       const tile = cardId ? logCardRef(cardId) : target ? logUnitRef(target) : { name: "隨從" };
       return { ...base, kind: "bounce", tile, badge: "bounce", label: `${tile.name} 被收回手牌` };
     }
+    case "VOTE_RESOLVED": {
+      const processText = typeof payload.processText === "string" ? payload.processText : "公投結果出爐";
+      return { ...base, kind: "play", tile: { name: "公投" }, badge: "sparkle", label: processText };
+    }
     // BUFF is handled by the grouping pass in appendBattleLog (multiple events → one actor entry).
     default:
       return undefined;
@@ -6343,6 +6480,11 @@ function handleEvents(message: GameEvent[]): void {
     forgetActiveMatch();
   } else if (message.some((item) => item.type === "TURN_STARTED")) {
     view.eventStatus = "in_progress";
+  }
+  // Drop stale amplification options when a special phase closes so the next
+  // phase's fresh private offer can't be shadowed by the previous turn's options.
+  if (message.some((item) => item.type === "PHASE_ENDED")) {
+    view.amplificationOptions = undefined;
   }
   render();
 }
@@ -7159,6 +7301,24 @@ function readTurnNumber(): number {
   return view.publicSync?.turnNumber ?? view.state?.turn?.number ?? 0;
 }
 
+function readPhase(): Phase {
+  return (view.publicSync?.phase as Phase | undefined) ?? (view.state?.phase as Phase | undefined) ?? "NORMAL_PLAY";
+}
+
+function readPhaseDeadlineAtMs(): number {
+  return view.publicSync?.phaseDeadlineAtMs ?? view.state?.specialPhase?.phaseDeadlineAtMs ?? 0;
+}
+
+/** Live seconds left in the current special phase (PvP only); undefined when none. */
+function phaseCountdownSeconds(): number | undefined {
+  if (!isTimedPlayerMatch()) return undefined;
+  const deadlineAtMs = readPhaseDeadlineAtMs();
+  if (!deadlineAtMs) return undefined;
+  const remainingMs = deadlineAtMs - Date.now();
+  if (remainingMs < -500) return undefined;
+  return Math.max(0, Math.ceil(remainingMs / 1000));
+}
+
 function readTurnStartedAtMs(): number {
   return view.publicSync?.turnStartedAtMs ?? view.state?.turn?.startedAtMs ?? 0;
 }
@@ -7195,15 +7355,24 @@ function renderTurnCountdown(kind: "turn" | "mulligan"): string {
 }
 
 function syncTurnCountdownTick(status: GameStatus | ""): void {
-  const deadlineAtMs = readTurnDeadlineAtMs();
-  const inTimedMatch = Boolean(isTimedPlayerMatch() && view.state && (status === "mulligan" || status === "in_progress") && deadlineAtMs > 0);
+  // During a special phase the turn clock is frozen; tick on the phase deadline
+  // instead and reveal the whole ~30s window (vs. the last 10s for turns).
+  const inSpecialPhase = isTimedPlayerMatch() && readPhase() !== "NORMAL_PLAY";
+  const deadlineAtMs = inSpecialPhase ? readPhaseDeadlineAtMs() : readTurnDeadlineAtMs();
+  const showWindowMs = inSpecialPhase ? 31_000 : 10_000;
+  const inTimedMatch = Boolean(
+    isTimedPlayerMatch() &&
+      view.state &&
+      deadlineAtMs > 0 &&
+      (inSpecialPhase || status === "mulligan" || status === "in_progress")
+  );
   if (!inTimedMatch) {
     stopTurnCountdownTick();
     return;
   }
 
   const remainingMs = deadlineAtMs - Date.now();
-  if (remainingMs <= 10_000 && remainingMs >= -500) {
+  if (remainingMs <= showWindowMs && remainingMs >= -500) {
     if (turnCountdownWakeTimer !== undefined) {
       window.clearTimeout(turnCountdownWakeTimer);
       turnCountdownWakeTimer = undefined;
@@ -7219,14 +7388,14 @@ function syncTurnCountdownTick(status: GameStatus | ""): void {
     window.clearInterval(turnCountdownTimer);
     turnCountdownTimer = undefined;
   }
-  if (remainingMs > 10_000 && turnCountdownWakeDeadlineAtMs !== deadlineAtMs) {
+  if (remainingMs > showWindowMs && turnCountdownWakeDeadlineAtMs !== deadlineAtMs) {
     if (turnCountdownWakeTimer !== undefined) window.clearTimeout(turnCountdownWakeTimer);
     turnCountdownWakeDeadlineAtMs = deadlineAtMs;
     turnCountdownWakeTimer = window.setTimeout(() => {
       turnCountdownWakeTimer = undefined;
       turnCountdownWakeDeadlineAtMs = undefined;
       render();
-    }, Math.max(0, remainingMs - 10_000));
+    }, Math.max(0, remainingMs - showWindowMs));
   }
 }
 

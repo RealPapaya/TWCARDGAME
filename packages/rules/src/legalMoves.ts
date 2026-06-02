@@ -11,6 +11,10 @@ import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
 export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   if (state.status === "mulligan") return legalMulliganMoves(state, seat);
   if (state.status !== "in_progress") return [];
+  // Special phases interleave with `in_progress` and let both seats act, so they
+  // are checked before the active-seat guard.
+  if (state.phase === "AMPLIFICATION_PHASE") return legalAmplificationMoves(state, seat);
+  if (state.phase === "VOTING_PHASE") return legalVoteMoves(state, seat);
   if (state.turn.activeSeat !== seat) return [];
   if (state.pendingPrompt && state.pendingPrompt.seat !== seat) return [];
 
@@ -18,6 +22,28 @@ export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   for (const cmd of legalPlays(state, seat)) moves.push(cmd);
   for (const cmd of legalAttacks(state, seat)) moves.push(cmd);
   moves.push({ type: "endTurn" });
+  return moves;
+}
+
+function legalAmplificationMoves(state: MatchState, seat: Seat): GameCommand[] {
+  const sp = state.specialPhase;
+  if (!sp || sp.phase !== "AMPLIFICATION_PHASE") return [];
+  if (sp.amplificationChoice?.[seat] !== undefined) return [];
+  return (sp.amplificationOptions?.[seat] ?? []).map((option) => ({
+    type: "selectAmplification" as const,
+    optionId: option.id
+  }));
+}
+
+function legalVoteMoves(state: MatchState, seat: Seat): GameCommand[] {
+  const sp = state.specialPhase;
+  if (!sp || sp.phase !== "VOTING_PHASE") return [];
+  if (sp.voteChoice?.[seat] !== undefined) return [];
+  const eventCount = sp.voteEvents?.length ?? 0;
+  const moves: GameCommand[] = [];
+  for (let index = 0; index < eventCount && index < 3; index++) {
+    moves.push({ type: "submitVote", optionIndex: index as 0 | 1 | 2 });
+  }
   return moves;
 }
 

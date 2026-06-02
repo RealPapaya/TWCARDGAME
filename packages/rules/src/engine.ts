@@ -11,6 +11,12 @@ import {
   resolvePostAction,
   startTurn
 } from "./effects.js";
+import {
+  enterSpecialPhase,
+  handleSelectAmplification,
+  handleSubmitVote,
+  phaseTriggerForTurn
+} from "./phases.js";
 import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
   activePlayer,
@@ -45,6 +51,7 @@ export function createInitialMatch(input: CreateMatchInput): RulesResult {
     schemaVersion: SCHEMA_VERSION,
     cardCatalogVersion: input.cardCatalogVersion,
     status: "mulligan",
+    phase: "NORMAL_PLAY",
     turn: {
       activeSeat: "player1",
       number: 0,
@@ -75,6 +82,9 @@ export function createInitialMatch(input: CreateMatchInput): RulesResult {
     player.deck = setup.deckIds.map((cardId) => {
       const def = catalog.get(cardId);
       if (!def) throw new Error(`Unknown card ${cardId}`);
+      // Tally the registered deck's category histogram before the shuffle — this
+      // is the deck analyzer's input and is stable for the whole match.
+      player.registeredCategoryCounts[def.category] = (player.registeredCategoryCounts[def.category] ?? 0) + 1;
       return createRuntimeCard(def, setup.seat, nextInstanceId(state, "card"));
     });
     state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
@@ -131,6 +141,24 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
     return { state: next, events };
   }
 
+  // Special-phase routing: while a phase is open both seats may submit their
+  // phase command simultaneously, and all regular play/attack/endTurn is rejected.
+  if (next.phase !== "NORMAL_PLAY") {
+    if (envelope.command.type === "selectAmplification") {
+      handleSelectAmplification(next, envelope.seat, envelope.command.optionId, envelope.serverTimeout === true, envelope.nowMs, events);
+    } else if (envelope.command.type === "submitVote") {
+      handleSubmitVote(next, envelope.seat, envelope.command.optionIndex, envelope.serverTimeout === true, envelope.nowMs, events, catalog);
+    } else {
+      reject(next, events, envelope.seat, "特殊階段進行中，暫停一般動作。");
+    }
+    return { state: next, events };
+  }
+
+  if (envelope.command.type === "selectAmplification" || envelope.command.type === "submitVote") {
+    reject(next, events, envelope.seat, "現在不是特殊階段。");
+    return { state: next, events };
+  }
+
   if (next.turn.activeSeat !== envelope.seat) {
     reject(next, events, envelope.seat, "還不是你的回合。");
     return { state: next, events };
@@ -178,7 +206,8 @@ function createPlayer(setup: PlayerSetup): PlayerState {
     graveyard: [],
     board: [],
     mulliganReady: false,
-    shortTurnPenalty: false
+    shortTurnPenalty: false,
+    registeredCategoryCounts: {}
   };
 }
 
@@ -345,6 +374,12 @@ function endTurn(state: MatchState, nowMs: number, events: GameEvent[], catalog:
   if (state.status === "finished") return;
   state.turn.activeSeat = opponentPlayer(state).seat;
   startTurn(state, nowMs, events);
+  // After the new turn is fully set up (draw/mana/clock done), open a special
+  // phase if this turn triggers one. The interrupted turn resumes on resolution.
+  const trigger = phaseTriggerForTurn(state.turn.number);
+  if (trigger && state.phase === "NORMAL_PLAY" && state.specialPhase?.resumeTurnNumber !== state.turn.number) {
+    enterSpecialPhase(state, trigger, nowMs, events);
+  }
 }
 
 function reject(state: MatchState, events: GameEvent[], seat: Seat, reason: string): void {

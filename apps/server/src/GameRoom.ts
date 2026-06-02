@@ -312,17 +312,25 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   private broadcastPublicSync(): void {
     if (!this.match) return;
     const publicState = toPublicState(this.match);
-    const deadlineSync = this.usesActionDeadlines()
+    const inSpecialPhase = this.match.phase !== "NORMAL_PLAY";
+    // The turn countdown is frozen while a special phase is open; surface the
+    // phase deadline instead so the client can run the phase countdown.
+    const deadlineSync = this.usesActionDeadlines() && !inSpecialPhase
       ? {
           turnStartedAtMs: this.match.turn.startedAtMs,
           turnDeadlineAtMs: this.match.turn.deadlineAtMs
         }
       : {};
+    const phaseSync = inSpecialPhase && this.match.specialPhase
+      ? { phaseDeadlineAtMs: this.match.specialPhase.phaseDeadlineAtMs }
+      : {};
     this.broadcast("publicSync", {
       status: this.match.status,
+      phase: this.match.phase,
       activeSeat: this.match.turn.activeSeat,
       turnNumber: this.match.turn.number,
       ...deadlineSync,
+      ...phaseSync,
       actionSeq: this.match.turn.actionSeq,
       result: this.match.result,
       players: publicState.players
@@ -338,6 +346,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     const seat = this.seats.get(client.sessionId);
     if (!seat) return;
     client.send("hand", { seat, cards: toHandView(this.match, seat) });
+    // Amplification options are private per-seat: deliver only this seat's three.
+    if (this.match.phase === "AMPLIFICATION_PHASE" && this.match.specialPhase?.amplificationOptions) {
+      client.send("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] });
+    }
   }
 
   private rejectCommand(seat: Seat, reason: string): void {
@@ -416,6 +428,19 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.clearActionDeadline();
     if (!this.usesActionDeadlines()) return;
     if (!this.match || isMatchComplete(this.match)) return;
+
+    // Special phases (amplification/voting) run their own 30s deadline instead of
+    // the turn clock; on timeout the rules engine fills defaults for both seats.
+    if (this.match.phase !== "NORMAL_PLAY" && this.match.specialPhase) {
+      const phaseExpected = { phase: this.match.phase, deadlineAtMs: this.match.specialPhase.phaseDeadlineAtMs };
+      const phaseDelayMs = Math.max(0, phaseExpected.deadlineAtMs - Date.now());
+      this.actionDeadlineTimer = this.clock.setTimeout(() => {
+        this.actionDeadlineTimer = undefined;
+        this.handlePhaseDeadline(phaseExpected);
+      }, phaseDelayMs);
+      return;
+    }
+
     if (this.match.status !== "mulligan" && this.match.status !== "in_progress") return;
 
     const expected = {
@@ -429,6 +454,27 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       this.actionDeadlineTimer = undefined;
       this.handleActionDeadline(expected);
     }, delayMs);
+  }
+
+  private handlePhaseDeadline(expected: { phase: string; deadlineAtMs: number }): void {
+    if (!this.match || isMatchComplete(this.match)) return;
+    if (this.match.phase !== expected.phase || this.match.specialPhase?.phaseDeadlineAtMs !== expected.deadlineAtMs) {
+      this.scheduleActionDeadline();
+      return;
+    }
+    if (Date.now() < expected.deadlineAtMs) {
+      this.scheduleActionDeadline();
+      return;
+    }
+    // A single server-timeout command resolves the whole phase: the rules engine
+    // fills tier-1 / index-0 defaults for every seat that hasn't chosen.
+    const seat = this.match.turn.activeSeat;
+    if (this.match.phase === "AMPLIFICATION_PHASE") {
+      this.applyServerCommand(seat, "amp-timeout", { type: "selectAmplification", optionId: "" }, { serverTimeout: true });
+    } else if (this.match.phase === "VOTING_PHASE") {
+      this.applyServerCommand(seat, "vote-timeout", { type: "submitVote", optionIndex: 0 }, { serverTimeout: true });
+    }
+    this.scheduleActionDeadline();
   }
 
   private clearActionDeadline(): void {
@@ -491,6 +537,13 @@ function seedFromRoomId(roomId: string): number {
 function requiresActionSeq(commandType: ClientCommandMessage["command"]["type"]): boolean {
   // Concede finalizes the match deterministically and may be sent off-turn (and
   // by a just-reconnected client that doesn't know the current actionSeq), so it
-  // is not gated by sequence freshness.
-  return commandType !== "submitMulligan" && commandType !== "reconnect" && commandType !== "concede";
+  // is not gated by sequence freshness. Special-phase commands are phase-scoped
+  // (both seats act simultaneously), not turn-scoped, so they skip the gate too.
+  return (
+    commandType !== "submitMulligan" &&
+    commandType !== "reconnect" &&
+    commandType !== "concede" &&
+    commandType !== "selectAmplification" &&
+    commandType !== "submitVote"
+  );
 }

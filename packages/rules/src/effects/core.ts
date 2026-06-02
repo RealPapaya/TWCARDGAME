@@ -12,6 +12,7 @@ import {
 } from "../state.js";
 import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
+import { applyEnvironmentTick } from "./environment.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
   ADD_CARD_TO_HAND: addCardToHand,
@@ -101,6 +102,9 @@ export function startTurn(state: MatchState, nowMs: number, events: EffectContex
     minion.sleeping = false;
     minion.canAttack = minion.lockedTurns <= 0;
   }
+  // Expire / re-apply any global referendum environment (e.g. 大停電 silence) at
+  // the start of every turn, after minions wake so silence re-locks them.
+  applyEnvironmentTick(state, events);
   updateAuras(state, events);
   addEvent(state, events, "TURN_STARTED", { turn: state.turn.number, activeSeat: state.turn.activeSeat }, state.turn.activeSeat);
 }

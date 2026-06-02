@@ -199,6 +199,19 @@ export class BotRoom extends GameRoom {
       return;
     }
 
+    // Special phases (amplification/voting) let either seat act, so the bot must
+    // make its choice regardless of whose turn was interrupted — otherwise PvE
+    // would hang waiting for a vote the bot never casts.
+    if (this.match.phase !== "NORMAL_PLAY") {
+      if (legalMoves(this.match, this.botSeat).length === 0) return; // bot already chose
+      this.botStepScheduled = true;
+      this.clock.setTimeout(() => {
+        this.botStepScheduled = false;
+        this.runBotPhaseStep();
+      }, BOT_PLAY_INTERVAL_MS);
+      return;
+    }
+
     if (this.match.turn.activeSeat !== this.botSeat) return;
     if (this.match.pendingPrompt && this.match.pendingPrompt.seat !== this.botSeat) return;
 
@@ -253,6 +266,20 @@ export class BotRoom extends GameRoom {
 
     this.applyEnvelope({
       commandId: this.nextCommandId("act"),
+      seat: this.botSeat,
+      nowMs: Date.now(),
+      command: move
+    });
+  }
+
+  private runBotPhaseStep(): void {
+    if (!this.match || this.match.phase === "NORMAL_PLAY") return;
+    const moves = legalMoves(this.match, this.botSeat);
+    if (moves.length === 0) return;
+    const move = decide(this.match, this.botSeat, this.difficulty, this.botRng, CARD_CATALOG, Date.now());
+    if (!move) return;
+    this.applyEnvelope({
+      commandId: this.nextCommandId("phase"),
       seat: this.botSeat,
       nowMs: Date.now(),
       command: move

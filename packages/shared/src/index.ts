@@ -174,6 +174,66 @@ export interface PublicMinion {
   temporaryUntilTurn?: number;
 }
 
+// --- Special phases: turn 6/14 deck amplification & turn 20 inverse-HP voting ---
+
+/**
+ * Global battle phase, orthogonal to {@link GameStatus}. While the phase is not
+ * `NORMAL_PLAY`, regular play/attack/endTurn commands and the turn countdown are
+ * suspended; the only legal commands are the matching phase command.
+ */
+export type Phase = "NORMAL_PLAY" | "AMPLIFICATION_PHASE" | "VOTING_PHASE";
+
+/** Amplification strength tiers, weakest → strongest. */
+export type AmplificationTier = "加減賺" | "吃紅" | "卯死";
+
+export const AMPLIFICATION_TIERS: readonly AmplificationTier[] = ["加減賺", "吃紅", "卯死"] as const;
+
+/** One of the three upgrade choices privately offered to a player. */
+export interface AmplificationOption {
+  id: string;
+  tier: AmplificationTier;
+  name: string;
+  description: string;
+}
+
+/** The amplification a player committed to; shown beside their hero avatar. */
+export interface AmplificationSelection {
+  id: string;
+  tier: AmplificationTier;
+  name: string;
+}
+
+/** A drawn referendum event with three voteable option labels (index 0/1/2). */
+export interface VoteEvent {
+  id: string;
+  name: string;
+  options: [string, string, string];
+}
+
+/** Per-seat win probability for the inverse-HP roulette (display %, "弱勢族群加成"). */
+export interface VoteWeights {
+  player1: number;
+  player2: number;
+}
+
+/**
+ * Public, synced view of the active special phase. Amplification *options* are
+ * NOT here — they are private per-seat (see {@link AmplificationOffer}); only
+ * the per-seat "has selected" flag and the resolved selection are public.
+ */
+export interface SpecialPhaseView {
+  phaseDeadlineAtMs: number;
+  amplificationSelected?: Record<Seat, boolean>;
+  voteEvents?: VoteEvent[];
+  voteWeights?: VoteWeights;
+  voteSubmitted?: Record<Seat, boolean>;
+}
+
+/** Private direct message delivering a seat's tailored amplification options. */
+export interface AmplificationOffer {
+  options: AmplificationOption[];
+}
+
 export interface PublicPlayer {
   userId: string;
   displayName: string;
@@ -186,6 +246,7 @@ export interface PublicPlayer {
   graveyardCount: number;
   mulliganReady: boolean;
   board: PublicMinion[];
+  amplification?: AmplificationSelection;
 }
 
 export interface TurnState {
@@ -214,9 +275,11 @@ export interface PublicGameState {
   schemaVersion: number;
   cardCatalogVersion: string;
   status: GameStatus;
+  phase: Phase;
   turn: TurnState;
   players: Record<Seat, PublicPlayer>;
   pendingPrompt?: PendingPrompt;
+  specialPhase?: SpecialPhaseView;
   result?: MatchResult;
 }
 
@@ -235,7 +298,9 @@ export type GameCommand =
   | { type: "attack"; attackerInstanceId: string; target: TargetRef }
   | { type: "endTurn" }
   | { type: "concede" }
-  | { type: "reconnect"; matchId: string };
+  | { type: "reconnect"; matchId: string }
+  | { type: "selectAmplification"; optionId: string }
+  | { type: "submitVote"; optionIndex: 0 | 1 | 2 };
 
 export interface ClientCommandMessage {
   commandId: string;
@@ -272,7 +337,14 @@ export type GameEventType =
   | "DEATHRATTLE"
   | "QUEST_COMPLETED"
   | "GAME_FINISHED"
-  | "COMMAND_REJECTED";
+  | "COMMAND_REJECTED"
+  | "PHASE_STARTED"
+  | "PHASE_ENDED"
+  | "AMPLIFICATION_SELECTED"
+  | "VOTE_CAST"
+  | "VOTE_RESOLVED"
+  | "ENVIRONMENT_APPLIED"
+  | "ENVIRONMENT_EXPIRED";
 
 export interface GameEvent {
   seq: number;

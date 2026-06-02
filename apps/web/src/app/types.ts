@@ -4,17 +4,21 @@ import type { DragLineKind } from "../drag.js";
 import type {
   AiDifficulty,
   AiTheme,
+  AmplificationOption,
   FriendRequestRow,
   FriendRow,
   GameEvent,
   GameStatus,
   HandCardView,
   LeaderboardRow,
+  Phase,
   PublicPlayer,
   RewardSummary,
   Seat,
   ShopItemRow,
-  TargetRef
+  TargetRef,
+  VoteEvent,
+  VoteWeights
 } from "@twcardgame/shared";
 
 export type { ShopItemRow } from "@twcardgame/shared";
@@ -110,14 +114,18 @@ export type ClientViewState = {
   state?: any;
   publicSync?: {
     status?: GameStatus;
+    phase?: Phase;
     activeSeat?: Seat;
     turnNumber?: number;
     turnStartedAtMs?: number;
     turnDeadlineAtMs?: number;
+    phaseDeadlineAtMs?: number;
     actionSeq?: number;
     result?: any;
     players?: Partial<Record<Seat, PublicPlayer>>;
   };
+  /** This seat's privately-delivered amplification options (turn 6/14). */
+  amplificationOptions?: AmplificationOption[];
   presence: Map<Seat, { connected: boolean; reconnectUntilMs?: number }>;
   rejectedHandIds: Set<string>;
   selectedHandId?: string;

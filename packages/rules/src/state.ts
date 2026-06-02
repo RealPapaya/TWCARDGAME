@@ -1,6 +1,15 @@
 import type { CardDefinition } from "@twcardgame/cards";
-import { opponentOf, type GameEvent, type HandCardView, type PublicGameState, type Seat, type TargetRef } from "@twcardgame/shared";
+import {
+  opponentOf,
+  type GameEvent,
+  type HandCardView,
+  type PublicGameState,
+  type Seat,
+  type SpecialPhaseView,
+  type TargetRef
+} from "@twcardgame/shared";
 import { createRuntimeCard } from "./deck.js";
+import { environmentCostDelta } from "./effects/environment.js";
 import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "./types.js";
 
 export function cloneState(state: MatchState): MatchState {
@@ -38,13 +47,54 @@ export function toPublicState(state: MatchState): PublicGameState {
     schemaVersion: state.schemaVersion,
     cardCatalogVersion: state.cardCatalogVersion,
     status: state.status,
+    phase: state.phase,
     turn: structuredClone(state.turn),
     players: {
       player1: toPublicPlayer(state.players.player1),
       player2: toPublicPlayer(state.players.player2)
     },
     pendingPrompt: state.pendingPrompt ? structuredClone(state.pendingPrompt) : undefined,
+    specialPhase: toSpecialPhaseView(state),
     result: state.result ? structuredClone(state.result) : undefined
+  };
+}
+
+/**
+ * Public projection of the active special phase. Deliberately omits each seat's
+ * amplification options (those are private, delivered per-seat) and the raw
+ * integer roulette weights / individual votes; only "selected"/"submitted"
+ * flags, the shared vote events, and the display win % are exposed.
+ */
+export function toSpecialPhaseView(state: MatchState): SpecialPhaseView | undefined {
+  const sp = state.specialPhase;
+  if (!sp) return undefined;
+  if (sp.phase === "AMPLIFICATION_PHASE") {
+    return {
+      phaseDeadlineAtMs: sp.phaseDeadlineAtMs,
+      amplificationSelected: {
+        player1: sp.amplificationChoice?.player1 !== undefined,
+        player2: sp.amplificationChoice?.player2 !== undefined
+      }
+    };
+  }
+  return {
+    phaseDeadlineAtMs: sp.phaseDeadlineAtMs,
+    voteEvents: sp.voteEvents ? structuredClone(sp.voteEvents) : undefined,
+    voteWeights: sp.voteWeightsInt ? displayWeights(sp.voteWeightsInt) : undefined,
+    voteSubmitted: {
+      player1: sp.voteChoice?.player1 !== undefined,
+      player2: sp.voteChoice?.player2 !== undefined
+    }
+  };
+}
+
+/** Display win percentages from integer roulette weights (kept local to avoid a phases.ts import cycle). */
+function displayWeights(weights: Record<Seat, number>): { player1: number; player2: number } {
+  const total = weights.player1 + weights.player2;
+  if (total === 0) return { player1: 50, player2: 50 };
+  return {
+    player1: Math.round((weights.player1 / total) * 100),
+    player2: Math.round((weights.player2 / total) * 100)
   };
 }
 
@@ -60,7 +110,8 @@ export function toPublicPlayer(player: PlayerState) {
     deckCount: player.deck.length,
     graveyardCount: player.graveyard.length,
     mulliganReady: player.mulliganReady,
-    board: player.board.map(toPublicMinion)
+    board: player.board.map(toPublicMinion),
+    amplification: player.amplification ? structuredClone(player.amplification) : undefined
   };
 }
 
@@ -106,6 +157,10 @@ export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCa
       }
     }
   }
+  // Global environment cost penalty (e.g. 油電雙漲). Applied on top of any
+  // reduction and hard-capped at 10 so drawn cards inherit it automatically.
+  const envDelta = environmentCostDelta(state);
+  if (envDelta > 0) cost = Math.min(10, cost + envDelta);
   return Math.max(0, cost);
 }
 

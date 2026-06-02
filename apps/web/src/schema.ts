@@ -84,6 +84,9 @@ class PublicPlayerSchema extends Schema {
   graveyardCount = 0;
   mulliganReady = false;
   board = new ArraySchema<PublicMinionSchema>();
+  amplificationId = "";
+  amplificationName = "";
+  amplificationTier = "";
 }
 defineTypes(PublicPlayerSchema, {
   userId: "string",
@@ -97,6 +100,45 @@ defineTypes(PublicPlayerSchema, {
   graveyardCount: "number",
   mulliganReady: "boolean",
   board: [PublicMinionSchema],
+  amplificationId: "string",
+  amplificationName: "string",
+  amplificationTier: "string",
+});
+
+class VoteEventSchema extends Schema {
+  id = "";
+  name = "";
+  option0 = "";
+  option1 = "";
+  option2 = "";
+}
+defineTypes(VoteEventSchema, {
+  id: "string",
+  name: "string",
+  option0: "string",
+  option1: "string",
+  option2: "string",
+});
+
+class SpecialPhaseSchema extends Schema {
+  phaseDeadlineAtMs = 0;
+  ampSelectedP1 = false;
+  ampSelectedP2 = false;
+  voteSubmittedP1 = false;
+  voteSubmittedP2 = false;
+  voteWeightP1 = 0;
+  voteWeightP2 = 0;
+  voteEvents = new ArraySchema<VoteEventSchema>();
+}
+defineTypes(SpecialPhaseSchema, {
+  phaseDeadlineAtMs: "number",
+  ampSelectedP1: "boolean",
+  ampSelectedP2: "boolean",
+  voteSubmittedP1: "boolean",
+  voteSubmittedP2: "boolean",
+  voteWeightP1: "number",
+  voteWeightP2: "number",
+  voteEvents: [VoteEventSchema],
 });
 
 export class GameStateSchema extends Schema {
@@ -104,12 +146,14 @@ export class GameStateSchema extends Schema {
   schemaVersion = 1;
   cardCatalogVersion = "";
   status = "mulligan";
+  phase = "NORMAL_PLAY";
   turn = new TurnSchema();
   player1 = new PublicPlayerSchema();
   player2 = new PublicPlayerSchema();
   pendingPromptId = "";
   pendingPromptSeat = "";
   pendingPromptKind = "";
+  specialPhase = new SpecialPhaseSchema();
   resultWinnerSeat = "";
   resultReason = "";
 }
@@ -118,12 +162,14 @@ defineTypes(GameStateSchema, {
   schemaVersion: "number",
   cardCatalogVersion: "string",
   status: "string",
+  phase: "string",
   turn: TurnSchema,
   player1: PublicPlayerSchema,
   player2: PublicPlayerSchema,
   pendingPromptId: "string",
   pendingPromptSeat: "string",
   pendingPromptKind: "string",
+  specialPhase: SpecialPhaseSchema,
   resultWinnerSeat: "string",
   resultReason: "string",
 });
