@@ -261,6 +261,9 @@ let trainingSession: TrainingSession | undefined;
 let remoteTrainingCompletions = new Set<string>();
 let lastRenderedHtml = "";
 let turnAnnouncementTimer: number | undefined;
+let turnCountdownTimer: number | undefined;
+let turnCountdownWakeTimer: number | undefined;
+let turnCountdownWakeDeadlineAtMs: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
@@ -337,6 +340,7 @@ function renderNow(): void {
     restoreRenderSnapshot(snapshot);
   }
   applyPostRenderEffects();
+  syncTurnCountdownTick(status);
   ensureBgm();
 }
 
@@ -1975,6 +1979,7 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
         <span id="indicator-opp" class="turn-light ${activeSeat === otherSeat(view.mySeat ?? "player1") ? "active" : ""}">Opponent</span>
         <span id="indicator-player" class="turn-light ${isMyTurn ? "active" : ""}">${isMyTurn ? "Your Turn" : "Waiting"}</span>
       </div>
+      ${renderTurnCountdown("turn")}
       <div class="end-turn-group">
         <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
@@ -2073,6 +2078,7 @@ function renderMulliganOverlay(status: GameStatus | ""): string {
       <div class="mulligan-content">
         <h2>起手的手牌</h2>
         <p>${ready ? "等待對手完成換牌..." : "保留或更換卡牌"}</p>
+        ${renderTurnCountdown("mulligan")}
         <div class="mulligan-card-area">
           ${view.hand.map((card) => renderMulliganCard(card, ready)).join("")}
         </div>
@@ -4302,6 +4308,8 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
       status?: GameStatus;
       activeSeat?: Seat;
       turnNumber?: number;
+      turnStartedAtMs?: number;
+      turnDeadlineAtMs?: number;
       actionSeq?: number;
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
@@ -7149,6 +7157,89 @@ function readActiveSeat(): Seat | "" {
 
 function readTurnNumber(): number {
   return view.publicSync?.turnNumber ?? view.state?.turn?.number ?? 0;
+}
+
+function readTurnStartedAtMs(): number {
+  return view.publicSync?.turnStartedAtMs ?? view.state?.turn?.startedAtMs ?? 0;
+}
+
+function readTurnDeadlineAtMs(): number {
+  if (!isTimedPlayerMatch()) return 0;
+  return view.publicSync?.turnDeadlineAtMs ?? view.state?.turn?.deadlineAtMs ?? 0;
+}
+
+function isTimedPlayerMatch(): boolean {
+  return view.room?.name === "pvp";
+}
+
+function visibleCountdownSeconds(): number | undefined {
+  if (!isTimedPlayerMatch()) return undefined;
+  const deadlineAtMs = readTurnDeadlineAtMs();
+  if (!deadlineAtMs || readTurnStartedAtMs() <= 0) return undefined;
+  const remainingMs = deadlineAtMs - Date.now();
+  if (remainingMs > 10_000 || remainingMs < -500) return undefined;
+  return Math.max(0, Math.ceil(remainingMs / 1000));
+}
+
+function renderTurnCountdown(kind: "turn" | "mulligan"): string {
+  const seconds = visibleCountdownSeconds();
+  if (seconds === undefined) return "";
+  const activeSeat = readActiveSeat();
+  const label = kind === "mulligan" ? "換牌倒數" : activeSeat === view.mySeat ? "你的回合" : "對手回合";
+  return `
+    <div class="turn-countdown-badge ${kind} ${seconds <= 3 ? "urgent" : ""}" data-testid="${kind}-countdown" role="status" aria-live="polite">
+      <span class="turn-countdown-label">${escapeHtml(label)}</span>
+      <span class="turn-countdown-value">${seconds}</span>
+    </div>
+  `;
+}
+
+function syncTurnCountdownTick(status: GameStatus | ""): void {
+  const deadlineAtMs = readTurnDeadlineAtMs();
+  const inTimedMatch = Boolean(isTimedPlayerMatch() && view.state && (status === "mulligan" || status === "in_progress") && deadlineAtMs > 0);
+  if (!inTimedMatch) {
+    stopTurnCountdownTick();
+    return;
+  }
+
+  const remainingMs = deadlineAtMs - Date.now();
+  if (remainingMs <= 10_000 && remainingMs >= -500) {
+    if (turnCountdownWakeTimer !== undefined) {
+      window.clearTimeout(turnCountdownWakeTimer);
+      turnCountdownWakeTimer = undefined;
+      turnCountdownWakeDeadlineAtMs = undefined;
+    }
+    if (turnCountdownTimer === undefined) {
+      turnCountdownTimer = window.setInterval(render, 250);
+    }
+    return;
+  }
+
+  if (turnCountdownTimer !== undefined) {
+    window.clearInterval(turnCountdownTimer);
+    turnCountdownTimer = undefined;
+  }
+  if (remainingMs > 10_000 && turnCountdownWakeDeadlineAtMs !== deadlineAtMs) {
+    if (turnCountdownWakeTimer !== undefined) window.clearTimeout(turnCountdownWakeTimer);
+    turnCountdownWakeDeadlineAtMs = deadlineAtMs;
+    turnCountdownWakeTimer = window.setTimeout(() => {
+      turnCountdownWakeTimer = undefined;
+      turnCountdownWakeDeadlineAtMs = undefined;
+      render();
+    }, Math.max(0, remainingMs - 10_000));
+  }
+}
+
+function stopTurnCountdownTick(): void {
+  if (turnCountdownTimer !== undefined) {
+    window.clearInterval(turnCountdownTimer);
+    turnCountdownTimer = undefined;
+  }
+  if (turnCountdownWakeTimer !== undefined) {
+    window.clearTimeout(turnCountdownWakeTimer);
+    turnCountdownWakeTimer = undefined;
+  }
+  turnCountdownWakeDeadlineAtMs = undefined;
 }
 
 function hasBothPlayers(): boolean {

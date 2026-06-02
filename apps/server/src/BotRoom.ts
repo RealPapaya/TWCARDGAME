@@ -157,6 +157,10 @@ export class BotRoom extends GameRoom {
     return !this.devTestActive;
   }
 
+  protected override usesActionDeadlines(): boolean {
+    return false;
+  }
+
   private buildBotSetup(): PlayerSetup {
     const themeDeck = this.theme ? AI_THEME_DECKS[this.theme] : undefined;
     return {

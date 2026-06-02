@@ -112,6 +112,8 @@ export type ClientViewState = {
     status?: GameStatus;
     activeSeat?: Seat;
     turnNumber?: number;
+    turnStartedAtMs?: number;
+    turnDeadlineAtMs?: number;
     actionSeq?: number;
     result?: any;
     players?: Partial<Record<Seat, PublicPlayer>>;

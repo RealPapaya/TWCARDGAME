@@ -81,6 +81,7 @@ export interface PlayerState {
   graveyard: RuntimeCard[];
   board: RuntimeMinion[];
   mulliganReady: boolean;
+  shortTurnPenalty: boolean;
 }
 
 export interface PrivateMatchState {
@@ -90,6 +91,8 @@ export interface PrivateMatchState {
   processedCommandIds: string[];
   actionLog: CommandEnvelope[];
   eventLog: GameEvent[];
+  turnActionTaken: boolean;
+  turnTimeLimitMs: number;
 }
 
 export interface MatchState {
@@ -118,6 +121,7 @@ export interface CreateMatchInput {
   players: [PlayerSetup, PlayerSetup];
   seed: number;
   nowMs: number;
+  mulliganTimeLimitMs?: number;
   turnTimeLimitMs?: number;
   catalog: readonly CardDefinition[];
 }

@@ -1,6 +1,8 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
 import {
   createInitialMatch,
+  DEFAULT_MULLIGAN_TIME_LIMIT_MS,
+  DEFAULT_TURN_TIME_LIMIT_MS,
   reduce,
   toHandView,
   toPublicState,
@@ -22,7 +24,6 @@ import { createMatchRewardsFromEnv, type MatchRewardDispatcher } from "./rewards
 import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoinCodeForRoom } from "./privateRooms.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
-const TURN_TIME_LIMIT_MS = 60_000;
 const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "30000", 10);
 const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "10000", 10);
 
@@ -34,6 +35,15 @@ const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "1
  */
 export function nextReconnectBudgetMs(prevBudgetMs: number, usedMs: number): number {
   return Math.max(0, prevBudgetMs - Math.max(0, usedMs));
+}
+
+export function pendingMulliganSeats(match: MatchState): Seat[] {
+  if (match.status !== "mulligan") return [];
+  return (["player1", "player2"] as Seat[]).filter((seat) => !match.players[seat].mulliganReady);
+}
+
+export function shouldApplyTimeoutPenalty(match: MatchState): boolean {
+  return match.status === "in_progress" && !match.private.turnActionTaken;
 }
 
 export interface GameRoomCreateOptions {
@@ -51,6 +61,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   // gameplay — so the rules engine stays pure.
   private reconnectBudgetMs = new Map<Seat, number>();
   private cleanupScheduled = false;
+  private actionDeadlineTimer?: { clear: () => void };
+  private serverCommandSeq = 0;
   protected readonly finalizer: MatchResultFinalizer;
   private registeredJoinCode?: string;
 
@@ -208,7 +220,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       cardCatalogVersion: CARD_CATALOG_VERSION,
       seed: seedFromRoomId(this.roomId),
       nowMs: Date.now(),
-      turnTimeLimitMs: TURN_TIME_LIMIT_MS,
+      mulliganTimeLimitMs: DEFAULT_MULLIGAN_TIME_LIMIT_MS,
+      turnTimeLimitMs: DEFAULT_TURN_TIME_LIMIT_MS,
       catalog: CARD_CATALOG,
       players: [
         { seat: "player1", userId: player1.userId, displayName: player1.displayName, deckIds: player1.deckIds },
@@ -222,6 +235,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.broadcastPublicSync();
     this.broadcast("events", created.events);
     this.sendAllPrivateState();
+    this.scheduleActionDeadline();
     this.afterMatchCreated();
   }
 
@@ -281,6 +295,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (result.events.length > 0) this.broadcast("events", result.events);
     this.sendAllPrivateState();
     this.afterMatchComplete();
+    this.scheduleActionDeadline();
     this.afterCommandApplied(envelope, result.events);
   }
 
@@ -297,10 +312,17 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   private broadcastPublicSync(): void {
     if (!this.match) return;
     const publicState = toPublicState(this.match);
+    const deadlineSync = this.usesActionDeadlines()
+      ? {
+          turnStartedAtMs: this.match.turn.startedAtMs,
+          turnDeadlineAtMs: this.match.turn.deadlineAtMs
+        }
+      : {};
     this.broadcast("publicSync", {
       status: this.match.status,
       activeSeat: this.match.turn.activeSeat,
       turnNumber: this.match.turn.number,
+      ...deadlineSync,
       actionSeq: this.match.turn.actionSeq,
       result: this.match.result,
       players: publicState.players
@@ -333,6 +355,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
 
   protected afterMatchComplete(): void {
     if (!this.match || !isMatchComplete(this.match)) return;
+    this.clearActionDeadline();
     this.lock();
     if (!this.shouldPersistMatchSideEffects()) {
       this.scheduleCleanup();
@@ -369,6 +392,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     return undefined;
   }
 
+  protected usesActionDeadlines(): boolean {
+    return true;
+  }
+
   protected scheduleCleanup(): void {
     if (this.cleanupScheduled) return;
     this.cleanupScheduled = true;
@@ -383,6 +410,72 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     this.clock.setTimeout(() => {
       void this.disconnect();
     }, Math.max(0, MATCH_CLEANUP_DELAY_MS));
+  }
+
+  private scheduleActionDeadline(): void {
+    this.clearActionDeadline();
+    if (!this.usesActionDeadlines()) return;
+    if (!this.match || isMatchComplete(this.match)) return;
+    if (this.match.status !== "mulligan" && this.match.status !== "in_progress") return;
+
+    const expected = {
+      status: this.match.status,
+      turnNumber: this.match.turn.number,
+      actionSeq: this.match.turn.actionSeq,
+      deadlineAtMs: this.match.turn.deadlineAtMs
+    };
+    const delayMs = Math.max(0, expected.deadlineAtMs - Date.now());
+    this.actionDeadlineTimer = this.clock.setTimeout(() => {
+      this.actionDeadlineTimer = undefined;
+      this.handleActionDeadline(expected);
+    }, delayMs);
+  }
+
+  private clearActionDeadline(): void {
+    this.actionDeadlineTimer?.clear();
+    this.actionDeadlineTimer = undefined;
+  }
+
+  private handleActionDeadline(expected: { status: string; turnNumber: number; actionSeq: number; deadlineAtMs: number }): void {
+    if (!this.match || isMatchComplete(this.match)) return;
+    if (
+      this.match.status !== expected.status ||
+      this.match.turn.number !== expected.turnNumber ||
+      this.match.turn.actionSeq !== expected.actionSeq ||
+      this.match.turn.deadlineAtMs !== expected.deadlineAtMs
+    ) {
+      this.scheduleActionDeadline();
+      return;
+    }
+
+    if (Date.now() < expected.deadlineAtMs) {
+      this.scheduleActionDeadline();
+      return;
+    }
+
+    if (this.match.status === "mulligan") {
+      for (const seat of pendingMulliganSeats(this.match)) {
+        this.applyServerCommand(seat, "mulligan-timeout", { type: "submitMulligan", replaceHandInstanceIds: [] });
+      }
+      this.scheduleActionDeadline();
+      return;
+    }
+
+    if (this.match.status === "in_progress") {
+      const timedOutSeat = this.match.turn.activeSeat;
+      this.applyServerCommand(timedOutSeat, "turn-timeout", { type: "endTurn" }, { serverTimeout: true });
+      this.scheduleActionDeadline();
+    }
+  }
+
+  private applyServerCommand(seat: Seat, tag: string, command: CommandEnvelope["command"], opts: { serverTimeout?: boolean } = {}): void {
+    this.applyEnvelope({
+      commandId: `server-${this.roomId}-${tag}-${++this.serverCommandSeq}`,
+      seat,
+      nowMs: Date.now(),
+      command,
+      serverTimeout: opts.serverTimeout
+    });
   }
 }
 

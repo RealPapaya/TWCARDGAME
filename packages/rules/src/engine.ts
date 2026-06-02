@@ -26,10 +26,11 @@ import {
   toHandView,
   toPublicState
 } from "./state.js";
+import { DEFAULT_MULLIGAN_TIME_LIMIT_MS, DEFAULT_TURN_TIME_LIMIT_MS, SHORT_TURN_TIME_LIMIT_MS } from "./timing.js";
 import type { CreateMatchInput, MatchState, PlayerSetup, PlayerState, RulesResult } from "./types.js";
 
 export const SCHEMA_VERSION = 1;
-export const DEFAULT_TURN_TIME_LIMIT_MS = 60_000;
+export { DEFAULT_MULLIGAN_TIME_LIMIT_MS, DEFAULT_TURN_TIME_LIMIT_MS, SHORT_TURN_TIME_LIMIT_MS };
 
 export function createInitialMatch(input: CreateMatchInput): RulesResult {
   const catalog = new Map(input.catalog.map((card) => [card.id, card]));
@@ -48,7 +49,7 @@ export function createInitialMatch(input: CreateMatchInput): RulesResult {
       activeSeat: "player1",
       number: 0,
       startedAtMs: input.nowMs,
-      deadlineAtMs: input.nowMs + (input.turnTimeLimitMs ?? DEFAULT_TURN_TIME_LIMIT_MS),
+      deadlineAtMs: input.nowMs + (input.mulliganTimeLimitMs ?? DEFAULT_MULLIGAN_TIME_LIMIT_MS),
       actionSeq: 0
     },
     players: {
@@ -61,7 +62,9 @@ export function createInitialMatch(input: CreateMatchInput): RulesResult {
       nextEventSeq: 1,
       processedCommandIds: [],
       actionLog: [],
-      eventLog: []
+      eventLog: [],
+      turnActionTaken: false,
+      turnTimeLimitMs: input.turnTimeLimitMs ?? DEFAULT_TURN_TIME_LIMIT_MS
     }
   };
 
@@ -133,12 +136,28 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
     return { state: next, events };
   }
 
+  const rejectedBefore = events.filter((event) => event.type === "COMMAND_REJECTED").length;
+  const turnBefore = next.turn.number;
+  const activeSeatBefore = next.turn.activeSeat;
+  const serverTimeoutEndTurn = envelope.serverTimeout === true && envelope.command.type === "endTurn";
+
   if (envelope.command.type === "playCard") {
     playCard(next, envelope.seat, envelope.command.handInstanceId, envelope.command.target, envelope.command.boardIndex, events, catalog);
   } else if (envelope.command.type === "attack") {
     attack(next, envelope.seat, envelope.command.attackerInstanceId, envelope.command.target, events, catalog);
   } else if (envelope.command.type === "endTurn") {
+    if (serverTimeoutEndTurn && !next.private.turnActionTaken) {
+      next.players[envelope.seat].shortTurnPenalty = true;
+    }
     endTurn(next, envelope.nowMs, events, catalog);
+  }
+
+  const rejectedAfter = events.filter((event) => event.type === "COMMAND_REJECTED").length;
+  if (!serverTimeoutEndTurn && rejectedAfter === rejectedBefore) {
+    next.players[envelope.seat].shortTurnPenalty = false;
+    if (turnBefore === next.turn.number && activeSeatBefore === next.turn.activeSeat) {
+      next.private.turnActionTaken = true;
+    }
   }
 
   return { state: next, events };
@@ -158,7 +177,8 @@ function createPlayer(setup: PlayerSetup): PlayerState {
     deck: [],
     graveyard: [],
     board: [],
-    mulliganReady: false
+    mulliganReady: false,
+    shortTurnPenalty: false
   };
 }
 

@@ -1,6 +1,17 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
 import { describe, expect, it } from "vitest";
-import { createRuntimeCard, effectHandlers, nextInstanceId, reduce, toHandView, toPublicState, validateDeck } from "./index.js";
+import {
+  createRuntimeCard,
+  DEFAULT_MULLIGAN_TIME_LIMIT_MS,
+  DEFAULT_TURN_TIME_LIMIT_MS,
+  effectHandlers,
+  nextInstanceId,
+  reduce,
+  SHORT_TURN_TIME_LIMIT_MS,
+  toHandView,
+  toPublicState,
+  validateDeck
+} from "./index.js";
 import { createInitialMatch } from "./engine.js";
 import type { MatchState } from "./types.js";
 import { opponentOf, type GameEvent, type Seat } from "@twcardgame/shared";
@@ -64,6 +75,29 @@ describe("rules architecture", () => {
     expect(toHandView(state, "player1")).toHaveLength(3);
   });
 
+  it("uses a 30s mulligan clock and a 50s default turn clock", () => {
+    const created = createSeededMatch(2026).state;
+    expect(created.turn.deadlineAtMs - created.turn.startedAtMs).toBe(DEFAULT_MULLIGAN_TIME_LIMIT_MS);
+
+    const started = startMatch(2026);
+    expect(started.turn.deadlineAtMs - started.turn.startedAtMs).toBe(DEFAULT_TURN_TIME_LIMIT_MS);
+  });
+
+  it("uses a 10s turn clock for a player with an unresolved timeout penalty", () => {
+    const state = startMatch(2027);
+    const nextSeat = opponentOf(state.turn.activeSeat);
+    state.players[nextSeat].shortTurnPenalty = true;
+
+    const result = reduce(
+      state,
+      { commandId: "start-short-turn", seat: state.turn.activeSeat, nowMs: 3000, command: { type: "endTurn" } },
+      CARD_CATALOG
+    );
+
+    expect(result.state.turn.activeSeat).toBe(nextSeat);
+    expect(result.state.turn.deadlineAtMs - result.state.turn.startedAtMs).toBe(SHORT_TURN_TIME_LIMIT_MS);
+  });
+
   it("replays the same command log deterministically with the same seed", () => {
     const a = startMatch(42);
     const b = startMatch(42);
@@ -104,7 +138,61 @@ describe("rules architecture", () => {
 
     expect(result.state.players.player2.hero.hp).toBe(27);
     expect(result.state.players.player1.hand).toHaveLength(0);
+    expect(result.state.private.turnActionTaken).toBe(true);
     expect(result.events.some((event) => event.type === "DAMAGE")).toBe(true);
+  });
+
+  it("clears a timeout penalty on any valid player action", () => {
+    const state = startMatch(79);
+    const activeSeat = state.turn.activeSeat;
+    state.players[activeSeat].shortTurnPenalty = true;
+
+    const result = reduce(
+      state,
+      { commandId: "valid-action-clears-penalty", seat: activeSeat, nowMs: 2000, command: { type: "endTurn" } },
+      CARD_CATALOG
+    );
+
+    expect(result.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(false);
+    expect(result.state.players[activeSeat].shortTurnPenalty).toBe(false);
+  });
+
+  it("does not clear a timeout penalty or mark action taken for rejected commands", () => {
+    const state = startMatch(80);
+    const activeSeat = state.turn.activeSeat;
+    state.players[activeSeat].shortTurnPenalty = true;
+
+    const result = reduce(
+      state,
+      { commandId: "invalid-action-keeps-penalty", seat: activeSeat, nowMs: 2000, command: { type: "playCard", handInstanceId: "missing-card" } },
+      CARD_CATALOG
+    );
+
+    expect(result.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
+    expect(result.state.players[activeSeat].shortTurnPenalty).toBe(true);
+    expect(result.state.private.turnActionTaken).toBe(false);
+  });
+
+  it("records server timeout penalties through the command envelope", () => {
+    const state = startMatch(81);
+    const timedOutSeat = state.turn.activeSeat;
+
+    const timedOut = reduce(
+      state,
+      { commandId: "server-timeout-test", seat: timedOutSeat, nowMs: 2000, command: { type: "endTurn" }, serverTimeout: true },
+      CARD_CATALOG
+    ).state;
+
+    expect(timedOut.players[timedOutSeat].shortTurnPenalty).toBe(true);
+
+    const returned = reduce(
+      timedOut,
+      { commandId: "return-to-penalized-seat", seat: timedOut.turn.activeSeat, nowMs: 3000, command: { type: "endTurn" } },
+      CARD_CATALOG
+    ).state;
+
+    expect(returned.turn.activeSeat).toBe(timedOutSeat);
+    expect(returned.turn.deadlineAtMs - returned.turn.startedAtMs).toBe(SHORT_TURN_TIME_LIMIT_MS);
   });
 
   it("ignores duplicate command ids without mutating state or emitting events", () => {

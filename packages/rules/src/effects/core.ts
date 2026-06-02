@@ -10,6 +10,7 @@ import {
   getTargetUnit,
   removeMinion
 } from "../state.js";
+import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
@@ -86,12 +87,13 @@ export function resolvePostAction(state: MatchState, events: EffectContext["even
 }
 
 export function startTurn(state: MatchState, nowMs: number, events: EffectContext["events"]): void {
-  const turnTimeLimitMs = Math.max(1, state.turn.deadlineAtMs - state.turn.startedAtMs);
   const player = activePlayer(state);
+  const turnTimeLimitMs = turnTimeLimitForPlayer(player, state.private.turnTimeLimitMs);
   state.status = "in_progress";
   state.turn.number += 1;
   state.turn.startedAtMs = nowMs;
   state.turn.deadlineAtMs = nowMs + turnTimeLimitMs;
+  state.private.turnActionTaken = false;
   if (player.mana.max < 10) player.mana.max += 1;
   player.mana.current = player.mana.max;
   drawCards(state, player, 1, events);

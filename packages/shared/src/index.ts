@@ -248,6 +248,7 @@ export interface CommandEnvelope {
   seat: Seat;
   nowMs: number;
   command: GameCommand;
+  serverTimeout?: boolean;
 }
 
 export type GameEventType =
