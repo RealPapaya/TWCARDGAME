@@ -193,6 +193,7 @@ describe("voting phase (turn 20)", () => {
 
   it("resolves a winning event, logs the process text, and returns to normal play", () => {
     let state = advanceToTurn(startMatch(22), 20);
+    const ballot = state.specialPhase?.voteEvents ?? [];
     state = reduce(state, env("v1", "player1", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG).state;
     const result = reduce(state, env("v2", "player2", { type: "submitVote", optionIndex: 1 }), CARD_CATALOG);
     expect(result.state.phase).toBe("NORMAL_PLAY");
@@ -200,6 +201,18 @@ describe("voting phase (turn 20)", () => {
     const resolved = result.events.find((e) => e.type === "VOTE_RESOLVED");
     expect(resolved).toBeDefined();
     expect(typeof resolved?.payload?.processText).toBe("string");
+
+    // The payload carries each seat's ballot pick so the client can animate the
+    // roulette flipping between the two voted cards before landing on the winner.
+    const choices = resolved?.payload?.choices as
+      | Record<"player1" | "player2", { optionIndex: number; eventId: string; eventName: string }>
+      | undefined;
+    expect(choices?.player1?.optionIndex).toBe(0);
+    expect(choices?.player2?.optionIndex).toBe(1);
+    expect(choices?.player1?.eventId).toBe(ballot[0]?.id);
+    expect(choices?.player2?.eventId).toBe(ballot[1]?.id);
+    const winningSeat = resolved?.payload?.winningSeat as "player1" | "player2";
+    expect(choices?.[winningSeat]?.eventId).toBe(resolved?.payload?.eventId);
   });
 
   it("is deterministic: same seed + votes → same winning event", () => {

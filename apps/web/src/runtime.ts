@@ -64,6 +64,7 @@ import {
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
+import { playVoteRoulette, resetVoteRoulette, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
@@ -6486,7 +6487,30 @@ function handleEvents(message: GameEvent[]): void {
   if (message.some((item) => item.type === "PHASE_ENDED")) {
     view.amplificationOptions = undefined;
   }
+  const voteResolved = message.find((item) => item.type === "VOTE_RESOLVED");
+  if (voteResolved) startVoteRouletteFromEvent(voteResolved);
   render();
+}
+
+/** Kicks off the turn-20 referendum roulette from a `VOTE_RESOLVED` event. */
+function startVoteRouletteFromEvent(event: GameEvent): void {
+  const payload = event.payload ?? {};
+  const choices = payload.choices as
+    | { player1?: VoteRouletteChoice; player2?: VoteRouletteChoice }
+    | undefined;
+  const winnerSeat = payload.winningSeat;
+  const winnerEventId = typeof payload.eventId === "string" ? payload.eventId : undefined;
+  const winnerEventName = typeof payload.eventName === "string" ? payload.eventName : "";
+  if (!choices?.player1 || !choices?.player2) return;
+  if (winnerSeat !== "player1" && winnerSeat !== "player2") return;
+  if (!winnerEventId) return;
+  void playVoteRoulette({
+    choices: { player1: choices.player1, player2: choices.player2 },
+    winnerSeat,
+    winnerEventId,
+    winnerEventName,
+    mySeat: view.mySeat
+  });
 }
 
 function scheduleHandEventGates(events: GameEvent[]): { discardDelayMs: number } {
@@ -6959,6 +6983,7 @@ function resetCardPlayCues(): void {
   document.getElementById("card-play-overlay")?.replaceChildren();
   resetMinionVisualTracking();
   resetDrawTracking();
+  resetVoteRoulette();
 }
 
 function enqueueCardPlayCue(cue: AnimationCue): void {

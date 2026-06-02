@@ -25,6 +25,14 @@ import { addEvent } from "./state.js";
 import { turnTimeLimitForPlayer } from "./timing.js";
 import type { MatchState, SpecialPhaseState } from "./types.js";
 
+/** One seat's referendum pick, carried on the `VOTE_RESOLVED` event payload. */
+export interface VoteResolvedChoice {
+  seat: Seat;
+  optionIndex: number;
+  eventId: string;
+  eventName: string;
+}
+
 // --- Trigger configuration -------------------------------------------------
 
 /** Turns that open the deck-based amplification phase. */
@@ -362,12 +370,25 @@ function resolveVotingPhase(
   const sp = state.specialPhase;
   if (!sp || !sp.voteEvents || !sp.voteWeightsInt) return;
 
+  const voteEvents = sp.voteEvents;
   const pick = weightedPickSeat(state.private.rngState, sp.voteWeightsInt);
   state.private.rngState = pick.rngState;
   const winningSeat = pick.seat;
   const winningIndex = sp.voteChoice?.[winningSeat] ?? 0;
-  const winningEvent = sp.voteEvents[winningIndex] ?? sp.voteEvents[0];
+  const winningEvent = voteEvents[winningIndex] ?? voteEvents[0];
   const display = voteWeightsDisplay(sp.voteWeightsInt);
+
+  // Each seat's ballot pick, so the client can run the inverse-HP "roulette"
+  // animation that flips between the two voted cards before landing on the winner.
+  const ballotChoice = (seat: Seat): VoteResolvedChoice => {
+    const optionIndex = sp.voteChoice?.[seat] ?? 0;
+    const event = voteEvents[optionIndex] ?? voteEvents[0];
+    return { seat, optionIndex, eventId: event.id, eventName: event.name };
+  };
+  const choices: Record<Seat, VoteResolvedChoice> = {
+    player1: ballotChoice("player1"),
+    player2: ballotChoice("player2")
+  };
 
   const dbEntry = VOTE_EVENT_DB.find((entry) => entry.id === winningEvent.id);
   if (dbEntry) applyVoteEventEffect(state, dbEntry.apply, winningEvent.id, winningEvent.name, winningSeat, events, catalog);
@@ -378,7 +399,7 @@ function resolveVotingPhase(
     state,
     events,
     "VOTE_RESOLVED",
-    { winningSeat, eventId: winningEvent.id, eventName: winningEvent.name, weights: display, processText },
+    { winningSeat, eventId: winningEvent.id, eventName: winningEvent.name, weights: display, choices, processText },
     winningSeat
   );
 
