@@ -96,6 +96,25 @@ describe("estimateEventAnimationMs", () => {
     );
   });
 
+  it("standalone DEATHRATTLE waits out the soul plume", () => {
+    expect(estimateEventAnimationMs([ev("DEATHRATTLE")])).toBe(C.STANDALONE_DEATHRATTLE_MS);
+  });
+
+  it("combat kill with DEATHRATTLE extends past the lunge to cover the plume", () => {
+    const tail = estimateEventAnimationMs([
+      ev("ATTACK"),
+      ev("DAMAGE"),
+      ev("DESTROY"),
+      ev("DEATHRATTLE")
+    ]);
+    expect(tail).toBe(C.ATTACK_LUNGE_MS + C.DEATHRATTLE_EFFECT_MS);
+  });
+
+  it("battlecry-triggered DEATHRATTLE waits past the play effect point", () => {
+    const tail = estimateEventAnimationMs([ev("CARD_PLAYED"), ev("DESTROY"), ev("DEATHRATTLE")]);
+    expect(tail).toBe(C.CARD_PLAY_EFFECT_DELAY_MS + C.DEATHRATTLE_EFFECT_MS);
+  });
+
   it("is deterministic across repeated calls", () => {
     const events: GameEvent[] = [
       ev("CARD_PLAYED"),

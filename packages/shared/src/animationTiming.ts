@@ -19,7 +19,11 @@ export const ANIMATION_COSTS = {
   POST_ATTACK_STATE_SYNC_LAG_MS: 120,
   STANDALONE_EFFECT_MS: 1150,
   STANDALONE_BOUNCE_MS: 900,
-  STANDALONE_DESTROY_MS: 700
+  STANDALONE_DESTROY_MS: 700,
+  // 遺志 soul plume (applyDeathrattlePlume in runtime.ts runs ~1200ms). The bot
+  // must wait this out, or it acts over the opponent's deathrattle animation.
+  DEATHRATTLE_EFFECT_MS: 1200,
+  STANDALONE_DEATHRATTLE_MS: 1350
 } as const;
 
 const C = ANIMATION_COSTS;
@@ -101,6 +105,20 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
           tail = C.ATTACK_LUNGE_MS + C.DESTROY_EFFECT_SYNC_LAG_MS;
         } else {
           tail = C.STANDALONE_DESTROY_MS + C.DESTROY_EFFECT_SYNC_LAG_MS;
+        }
+        if (tail > total) total = tail;
+        break;
+      }
+      case "DEATHRATTLE": {
+        // The plume starts when its destroy/play/attack delay clears, then
+        // runs DEATHRATTLE_EFFECT_MS. Mirror the BOUNCE/DESTROY shape.
+        let tail: number;
+        if (currentPostPlayDelay > 0) {
+          tail = currentPostPlayDelay + C.DEATHRATTLE_EFFECT_MS;
+        } else if (inAttack) {
+          tail = C.ATTACK_LUNGE_MS + C.DEATHRATTLE_EFFECT_MS;
+        } else {
+          tail = C.STANDALONE_DEATHRATTLE_MS;
         }
         if (tail > total) total = tail;
         break;

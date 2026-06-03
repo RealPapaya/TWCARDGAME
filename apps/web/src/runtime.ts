@@ -66,6 +66,7 @@ import {
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
 import { playVoteRoulette, resetVoteRoulette, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
+import { classifyBatchScopes, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
@@ -270,6 +271,10 @@ let turnCountdownWakeDeadlineAtMs: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
+const appliedDeathrattles = new Set<string>();
+// Last-seen on-screen rect per unit instanceId, so a deathrattle (遺志) plume can
+// anchor on a minion whose DOM has already been removed by its DESTROY (R4).
+const recentUnitRects = new Map<string, { rect: DOMRect; atMs: number }>();
 const summonPreviewedTargets = new Set<string>();
 const loggedSummonPreviewSlots = new Set<string>();
 const loggedSkippedSummonAnimations = new Set<string>();
@@ -1545,7 +1550,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
       <div class="status-cluster">
         ${renderMana(player?.mana?.current ?? 0, player?.mana?.max ?? 0, role, seat)}
       </div>
-      <div class="${boardClasses}" data-testid="${role}-board">
+      <div class="${boardClasses}" data-testid="${role}-board" data-target-key="board:${seat}">
         ${renderBoardContents(seat, board, role)}
       </div>
       ${role === "player" ? renderPlayerHand() : ""}
@@ -1669,9 +1674,11 @@ function renderSummonPreview(cue: AnimationCue): string {
     "minion",
     "summon-preview",
     !cue.suppressBoardAnimation && "summoning",
-    hasCue(targetKey, "damage") && "taking-damage",
+    (hasCue(targetKey, "damage") || hasCue(targetKey, "effectStrike")) && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "shieldPop") && "shield-popping",
+    hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "destroy") && "being-destroyed"
   ]);
@@ -1713,7 +1720,7 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
     trainingHighlightClass({ type: "unit", seat }),
     isTargetHighlighted(targetRef) && "valid-target",
     sameTarget(view.selectedTarget, targetRef) && "target-selected",
-    hasCue(targetKey, "damage") && "taking-damage",
+    (hasCue(targetKey, "damage") || hasCue(targetKey, "effectStrike")) && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal"
   ]);
 
@@ -1856,9 +1863,11 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     attackLunge && "lunging",
     selectedMinionClass(minion.instanceId, target),
     isTargetHighlighted(target) && "valid-target",
-    hasCue(targetKey, "damage") && "taking-damage",
+    (hasCue(targetKey, "damage") || hasCue(targetKey, "effectStrike")) && "taking-damage",
     hasCue(targetKey, "heal") && "receiving-heal",
     hasCue(targetKey, "buff") && "receiving-buff",
+    hasCue(targetKey, "shieldPop") && "shield-popping",
+    hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "summon") && !skipSummonAnimation && "summoning",
     hasCue(targetKey, "destroy") && "being-destroyed"
@@ -2316,22 +2325,54 @@ function renderEventCue(cue: AnimationCue): string {
     return "";
   }
   if (cue.kind === "buff") {
+    if (!cue.targetKey) return "";
+    const sparks = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 7);
+    return `<div class="buff-burst${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="buff-burst">${sparks}</div>`;
+  }
+  if (cue.kind === "shieldPop") {
+    if (!cue.targetKey) return "";
+    const shards = particleSpread(cue.id, 7);
+    return `<div class="shield-shatter"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="shield-shatter"><span class="shield-shatter-ring"></span>${shards}</div>`;
+  }
+  if (cue.kind === "lock") {
+    if (!cue.targetKey) return "";
+    const shards = particleSpread(cue.id, 6);
+    return `<div class="lock-clamp"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="lock-clamp"><span class="lock-clamp-ring"></span>${shards}</div>`;
+  }
+  if (cue.kind === "deathrattle") {
+    // Rendered imperatively by applyDeathrattlePlume — the dead minion's DOM is
+    // already gone after DESTROY, so we anchor off its captured rect (see R4).
     return "";
+  }
+  if (cue.kind === "aoeSweep") {
+    if (!cue.targetKey) return "";
+    const variant = cue.variant ?? "damage";
+    return `<div class="aoe-sweep aoe-sweep-${variant}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="aoe-sweep"><span class="aoe-sweep-wave"></span><span class="aoe-sweep-glow"></span></div>`;
   }
   if (cue.kind === "bounce") {
     if (!cue.targetKey) return "";
     return `<div class="bounce-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="bounce-burst"><span></span><span></span><span></span></div>`;
   }
-  if (cue.kind === "damage" || cue.kind === "heal") {
-    if (!cue.targetKey || cue.amount === undefined) return "";
-    const sign = cue.kind === "damage" ? "-" : "+";
-    const burst = cue.kind === "heal" ? renderHealBurst(cue, cueStyle) : "";
-    return `${burst}<div class="float-number ${cue.kind}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`;
+  if (cue.kind === "damage" || cue.kind === "heal" || cue.kind === "effectStrike") {
+    if (!cue.targetKey) return "";
+    const isHeal = cue.kind === "heal";
+    const sign = isHeal ? "+" : "-";
+    // The readable -N / +N stays (it is data, not decoration); the particles
+    // wrap it. Combat "damage" keeps just the number + the taking-damage shake.
+    const number = cue.amount !== undefined
+      ? `<div class="float-number ${isHeal ? "heal" : "damage"}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`
+      : "";
+    // Every damage gets an impact burst: combat damage a red spark, effect /
+    // spell damage the magenta strike. Heal keeps its green motes.
+    const burst = isHeal
+      ? renderHealBurst(cue, cueStyle)
+      : renderEffectStrike(cue, cueStyle, cue.kind === "effectStrike" ? "effect" : "combat");
+    return `${burst}${number}`;
   }
   if (cue.kind === "destroy") {
     if (!cue.targetKey) return "";
     const particles = particleSpread(cue.id);
-    return `<div class="death-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst">${particles}</div>`;
+    return `<div class="death-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst"><i class="death-burst-ring"></i>${particles}</div>`;
   }
   return `<div class="event-cue event-${cue.kind}"${cueStyle} data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
 }
@@ -2346,10 +2387,22 @@ function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
     ["-30px", "20px", "26px", "240ms"],
     ["8px", "24px", "18px", "320ms"]
   ];
-  const spans = particles.map(([x, y, size, delay]) => (
-    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}">+</span>`
+  // 全場治療由 aoeSweep 主導，單體粒子數調少。粒子改用 CSS 圓點，移除 "+" 文字字形。
+  const shown = cue.scope === "aoe" ? particles.slice(0, 3) : particles;
+  const spans = shown.map(([x, y, size, delay]) => (
+    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}"></span>`
   )).join("");
   return `<div class="heal-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans}</div>`;
+}
+
+/**
+ * Damage impact: a core flash plus radial shards. `tone` "effect" = magenta
+ * spell strike (非普通攻擊); "combat" = red spark for a basic attack hit.
+ */
+function renderEffectStrike(cue: AnimationCue, cueStyle: string, tone: "effect" | "combat" = "effect"): string {
+  if (!cue.targetKey) return "";
+  const shards = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 9);
+  return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="effect-strike"><span class="effect-strike-core"></span>${shards}</div>`;
 }
 
 function cueStyleAttr(cue: AnimationCue): string {
@@ -2362,14 +2415,14 @@ function cueStyleAttr(cue: AnimationCue): string {
   return styles.length > 0 ? ` style="${styles.join(";")}"` : "";
 }
 
-function particleSpread(seed: string): string {
+function particleSpread(seed: string, count = 8): string {
   let hash = 2166136261 >>> 0;
   for (let i = 0; i < seed.length; i++) {
     hash ^= seed.charCodeAt(i);
     hash = Math.imul(hash, 16777619) >>> 0;
   }
   const spans: string[] = [];
-  for (let i = 0; i < 8; i++) {
+  for (let i = 0; i < count; i++) {
     hash = Math.imul(hash ^ (i + 1), 2654435761) >>> 0;
     const angle = ((hash >>> 0) % 360) * (Math.PI / 180);
     const distance = 40 + ((hash >>> 8) % 30);
@@ -7039,9 +7092,16 @@ function consumeSuppressedPlayCue(cue: AnimationCue): boolean {
 
 function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   blog("events received", { types: events.map((e) => e.type) });
+  // Single vs whole-board (全場) is a presentation concern, so it is decided
+  // here from the batch — the rules engine stays pure and carries no aoe flag.
+  const { combatDamageSeqs, aoeSeqs, aoeClusters } = classifyBatchScopes(events);
   const rawCues = events
-    .map((event, index) => eventToCue(event, events, index))
+    .map((event, index) => eventToCue(event, events, index, combatDamageSeqs))
     .filter((cue): cue is AnimationCue => Boolean(cue));
+  for (const cue of rawCues) {
+    if (cue.seq !== undefined && aoeSeqs.has(cue.seq)) cue.scope = "aoe";
+  }
+  insertAoeSweepCues(rawCues, aoeClusters);
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
   const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues));
@@ -7049,7 +7109,11 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   blog("events cues", {
     cues: cues.map((c) => ({ kind: c.kind, delayMs: c.delayMs, targetKey: c.targetKey, cardId: c.cardId }))
   });
-  view.animationCues = [...cues, ...view.animationCues].slice(0, 12);
+  // An AOE batch can spawn many short-lived per-target cues plus a sweep, so
+  // lift the retained-cue cap when a sweep is present (R1) instead of silently
+  // dropping the oldest cues.
+  const cueCap = cues.some((cue) => cue.kind === "aoeSweep") ? 28 : 12;
+  view.animationCues = [...cues, ...view.animationCues].slice(0, cueCap);
   for (const cue of cues) {
     if (cue.kind === "play") enqueueCardPlayCue(cue);
     if ((cue.delayMs ?? 0) > 0) window.setTimeout(render, cue.delayMs);
@@ -7057,6 +7121,11 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
       cue.kind === "play" ? 1350
       : cue.kind === "attackerMoves" ? ATTACK_LUNGE_MS
       : cue.kind === "damage" || cue.kind === "heal" ? 1150
+      : cue.kind === "effectStrike" ? 1150
+      : cue.kind === "deathrattle" ? 1150
+      : cue.kind === "aoeSweep" ? 1100
+      : cue.kind === "lock" ? 900
+      : cue.kind === "shieldPop" ? 700
       : cue.kind === "bounce" ? 900
       : cue.kind === "destroy" ? 700
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
@@ -7067,6 +7136,39 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     }, lifetime + (cue.delayMs ?? 0));
   }
   return cues;
+}
+
+/** Builds the single board-wide overlay cue for one AOE cluster. */
+function buildAoeSweepCue(cluster: AoeCluster): AnimationCue {
+  const seat = cluster.seat;
+  const seatSide: "player" | "opponent" = seat && seat === view.mySeat ? "player" : "opponent";
+  return {
+    id: `aoe-${cluster.variant}-${createClientId()}`,
+    kind: "aoeSweep",
+    text: "",
+    seat,
+    scope: "aoe",
+    variant: cluster.variant,
+    seatSide,
+    // Anchored to the affected seat's board element (player1 / player2),
+    // which renders top or bottom depending on the local viewpoint → mirrors.
+    targetKey: seat ? `board:${seat}` : undefined
+  };
+}
+
+/**
+ * Splices each cluster's sweep cue just before its first member so the post-play
+ * / post-attack delay pass (which walks forward from the play/attack cue) gives
+ * the sweep the same delay as its members, and so it renders behind them.
+ */
+function insertAoeSweepCues(cues: AnimationCue[], clusters: AoeCluster[]): void {
+  for (const cluster of clusters) {
+    const members = new Set(cluster.memberSeqs);
+    const firstIndex = cues.findIndex((cue) => cue.seq !== undefined && members.has(cue.seq));
+    const sweep = buildAoeSweepCue(cluster);
+    if (firstIndex < 0) cues.push(sweep);
+    else cues.splice(firstIndex, 0, sweep);
+  }
 }
 
 function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
@@ -7145,7 +7247,12 @@ function isPostPlayEffectCue(cue: AnimationCue): boolean {
     || cue.kind === "buff"
     || cue.kind === "bounce"
     || cue.kind === "destroy"
-    || cue.kind === "summon";
+    || cue.kind === "summon"
+    || cue.kind === "effectStrike"
+    || cue.kind === "deathrattle"
+    || cue.kind === "shieldPop"
+    || cue.kind === "lock"
+    || cue.kind === "aoeSweep";
 }
 
 function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
@@ -7179,10 +7286,19 @@ function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
 }
 
 function isPostAttackEffectCue(cue: AnimationCue): boolean {
-  return cue.kind === "damage" || cue.kind === "heal" || cue.kind === "buff" || cue.kind === "bounce" || cue.kind === "destroy";
+  return cue.kind === "damage"
+    || cue.kind === "heal"
+    || cue.kind === "buff"
+    || cue.kind === "bounce"
+    || cue.kind === "destroy"
+    || cue.kind === "effectStrike"
+    || cue.kind === "deathrattle"
+    || cue.kind === "shieldPop"
+    || cue.kind === "lock"
+    || cue.kind === "aoeSweep";
 }
 
-function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): AnimationCue | undefined {
+function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, combatDamageSeqs?: Set<number>): AnimationCue | undefined {
   const payload = event.payload ?? {};
   const target = typeof payload.target === "string" ? payload.target : undefined;
   const amount = typeof payload.amount === "number" ? payload.amount : undefined;
@@ -7208,11 +7324,26 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1): Ani
     const targetKey = targetRef ? targetKeyFor(targetRef) : undefined;
     return { id, kind: "attackerMoves", text: "", seat: event.seat, attackerInstanceId, targetKey };
   }
-  if (event.type === "DAMAGE") return { id, kind: "damage", text: amount ? `-${amount}` : "Damage", seat: event.seat, targetKey: target, amount };
-  if (event.type === "HEAL") return { id, kind: "heal", text: amount ? `+${amount}` : "Heal", seat: event.seat, targetKey: target, amount };
-  if (event.type === "BUFF" || event.type === "SHIELD_POPPED") return { id, kind: "buff", text: "Buff", seat: event.seat, targetKey: target };
-  if (event.type === "BOUNCE") return { id, kind: "bounce", text: "Bounce", seat: event.seat, targetKey: target, cardId };
-  if (event.type === "DESTROY") return { id, kind: "destroy", text: "Destroyed", seat: event.seat, targetKey: target, cardId };
+  // DAMAGE / HEAL / BUFF / SHIELD_POPPED / BOUNCE / DESTROY / DEATHRATTLE all
+  // map through the shared cue-kind table. The batch-level `combatDamageSeqs`
+  // decides whether a DAMAGE is a basic combat hit ("damage") or a spell strike
+  // ("effectStrike"); the AOE scope is tagged later in enqueueEventCues.
+  const effectKind = mapEventToCueKind(event, combatDamageSeqs ? combatDamageSeqs.has(event.seq) : true);
+  if (effectKind) {
+    const effectTargetKey = event.type === "DEATHRATTLE"
+      ? (typeof payload.source === "string" ? payload.source : undefined)
+      : target;
+    const text =
+      effectKind === "damage" || effectKind === "effectStrike" ? (amount ? `-${amount}` : "Damage")
+      : effectKind === "heal" ? (amount ? `+${amount}` : "Heal")
+      : effectKind === "shieldPop" ? "Shield"
+      : effectKind === "lock" ? "Locked"
+      : effectKind === "bounce" ? "Bounce"
+      : effectKind === "destroy" ? "Destroyed"
+      : effectKind === "deathrattle" ? "Deathrattle"
+      : "Buff";
+    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, cardId, amount, seq: event.seq };
+  }
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "動作被拒絕。"), seat: event.seat };
   return undefined;
@@ -7686,6 +7817,7 @@ function applyDeathShatter(cue: AnimationCue): void {
   appliedDeathShatters.add(cue.id);
 
   const rect = minionEl.getBoundingClientRect();
+  recentUnitRects.set(cue.targetKey, { rect, atMs: performance.now() });
   const artEl = minionEl.querySelector<HTMLElement>(".minion-art");
   const bgImg = artEl ? artEl.style.backgroundImage : null;
 
@@ -7725,6 +7857,40 @@ function applyDeathShatter(cue: AnimationCue): void {
   }, 800);
 }
 
+// Spawns the 遺志 soul plume imperatively at the dead minion's slot. The unit
+// may already be gone from the DOM (DESTROY ran first), so fall back to the
+// rect captured by applyDeathShatter (R4).
+function applyDeathrattlePlume(cue: AnimationCue): void {
+  if (cue.kind !== "deathrattle" || !cue.targetKey || appliedDeathrattles.has(cue.id)) return;
+  const liveEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
+  const recent = recentUnitRects.get(cue.targetKey);
+  const rect = liveEl?.getBoundingClientRect()
+    ?? (recent && performance.now() - recent.atMs < 2000 ? recent.rect : undefined);
+  if (!rect || rect.width === 0) return;
+  appliedDeathrattles.add(cue.id);
+
+  const container = document.createElement("div");
+  container.className = "deathrattle-plume-layer";
+  container.style.cssText = `position:fixed;left:${rect.left + rect.width / 2}px;top:${rect.top + rect.height / 2}px;width:0;height:0;pointer-events:none;z-index:2100;overflow:visible;`;
+  document.body.appendChild(container);
+
+  for (let i = 0; i < 9; i++) {
+    const wisp = document.createElement("span");
+    wisp.className = "deathrattle-wisp";
+    const spread = (i / 8 - 0.5) * rect.width * 0.8;
+    const rise = 50 + Math.random() * 60;
+    wisp.style.setProperty("--dx", `${Math.round(spread + (Math.random() - 0.5) * 18)}px`);
+    wisp.style.setProperty("--dy", `${-Math.round(rise)}px`);
+    wisp.style.setProperty("--size", `${10 + Math.round(Math.random() * 12)}px`);
+    wisp.style.animationDelay = `${i * 40}ms`;
+    container.appendChild(wisp);
+  }
+  window.setTimeout(() => {
+    container.remove();
+    appliedDeathrattles.delete(cue.id);
+  }, 1200);
+}
+
 function applyPostRenderEffects(): void {
   const eventLayer = document.querySelector<HTMLElement>(".event-layer");
   for (const cue of view.animationCues) {
@@ -7733,6 +7899,9 @@ function applyPostRenderEffects(): void {
     }
     if (cue.kind === "destroy" && cue.targetKey && cueIsReady(cue)) {
       applyDeathShatter(cue);
+    }
+    if (cue.kind === "deathrattle" && cue.targetKey && cueIsReady(cue)) {
+      applyDeathrattlePlume(cue);
     }
   }
   if (eventLayer) {
@@ -7743,6 +7912,19 @@ function applyPostRenderEffects(): void {
       const target = document.querySelector<HTMLElement>(selector);
       if (!target) continue;
       const r = target.getBoundingClientRect();
+      // A board-wide AOE sweep covers the whole board rect (top-left + size),
+      // not a single point. The board element that this seat rendered into is
+      // top or bottom depending on the local viewpoint, so the sweep mirrors.
+      if (anchorKey.startsWith("board:")) {
+        const topLeft = localPointFromViewport(eventLayer, r.left, r.top);
+        const bottomRight = localPointFromViewport(eventLayer, r.right, r.bottom);
+        node.style.left = `${topLeft.x}px`;
+        node.style.top = `${topLeft.y}px`;
+        node.style.width = `${Math.max(0, bottomRight.x - topLeft.x)}px`;
+        node.style.height = `${Math.max(0, bottomRight.y - topLeft.y)}px`;
+        node.dataset.anchored = "true";
+        continue;
+      }
       const { x, y } = localPointFromViewport(eventLayer, r.left + r.width / 2, r.top + r.height / 2);
       const cueId = node.dataset.cueId;
       const cue = cueId ? view.animationCues.find((item) => item.id === cueId) : undefined;
@@ -7782,16 +7964,25 @@ function findMinion(instanceId: string): PublicMinion | undefined {
   return undefined;
 }
 
+// Vector (SVG) badge icons — replace the former 🔒 / ⏳ / 💀 emoji so the
+// battlefield carries no emoji. `currentColor` lets each badge tint the icon.
+const BADGE_ICON_LOCK =
+  `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M12 2a5 5 0 0 0-5 5v3H6a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2h-1V7a5 5 0 0 0-5-5zm-3 8V7a3 3 0 0 1 6 0v3z"/></svg>`;
+const BADGE_ICON_QUEST =
+  `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M6 2h12a1 1 0 0 1 0 2h-1v3l-4 5 4 5v3h1a1 1 0 0 1 0 2H6a1 1 0 0 1 0-2h1v-3l4-5-4-5V4H6a1 1 0 0 1 0-2z"/></svg>`;
+const BADGE_ICON_DEATH =
+  `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M12 2C7 2 3 5.6 3 10c0 2.6 1.4 4.9 3.5 6.3V19a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2.7C20.6 14.9 22 12.6 22 10c0-4.4-4-8-9-8zM8.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>`;
+
 function renderCountdownBadges(minion: PublicMinion): string {
   let html = "";
   if (minion.lockedTurns > 0) {
-    html += `<div class="countdown-badge lock-countdown">🔒 ${minion.lockedTurns}</div>`;
+    html += `<div class="countdown-badge lock-countdown">${BADGE_ICON_LOCK}<span>${minion.lockedTurns}</span></div>`;
   }
   if (minion.questTurns !== undefined && minion.questTurns >= 0) {
-    html += `<div class="countdown-badge quest-countdown">⏳ ${minion.questTurns}</div>`;
+    html += `<div class="countdown-badge quest-countdown">${BADGE_ICON_QUEST}<span>${minion.questTurns}</span></div>`;
   }
   if (minion.deathTimer !== undefined && minion.deathTimer >= 0) {
-    html += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">💀 ${minion.deathTimer}</div>`;
+    html += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">${BADGE_ICON_DEATH}<span>${minion.deathTimer}</span></div>`;
   }
   return html;
 }

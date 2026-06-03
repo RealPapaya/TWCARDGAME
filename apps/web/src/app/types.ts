@@ -23,7 +23,30 @@ import type {
 
 export type { ShopItemRow } from "@twcardgame/shared";
 
-export type AnimationKind = "play" | "summon" | "attack" | "attackerMoves" | "damage" | "heal" | "buff" | "bounce" | "destroy" | "turn" | "reject";
+export type AnimationKind =
+  | "play"
+  | "summon"
+  | "attack"
+  | "attackerMoves"
+  | "damage"
+  | "heal"
+  | "buff"
+  | "bounce"
+  | "destroy"
+  | "turn"
+  | "reject"
+  // particle-effect kinds (single-target unless cue.scope === "aoe")
+  | "effectStrike" // spell / effect damage impact, distinct from a combat lunge
+  | "deathrattle" // 遺志 — soul plume rising from a dead minion's slot
+  | "shieldPop" // divine shield breaking (split out of "buff")
+  | "lock" // silence / lock (split out of "buff")
+  | "aoeSweep"; // one board-wide overlay drawn per AOE cluster
+
+/** Whether an effect hit a single target or swept the whole board (全場). */
+export type AnimationScope = "single" | "aoe";
+
+/** Flavour of a board-wide `aoeSweep` overlay, by originating effect family. */
+export type AnimationSweepVariant = "damage" | "heal" | "buff" | "destroy" | "lock" | "bounce";
 
 /** One entry in the Hearthstone-style battle log, derived from a GameEvent. */
 export type BattleLogKind = "summon" | "play" | "attack" | "damage" | "heal" | "buff" | "silence" | "bounce" | "death";
@@ -105,6 +128,14 @@ export type AnimationCue = {
   suppressBoardAnimation?: boolean;
   anchorX?: number;
   anchorY?: number;
+  /** Source GameEvent.seq — lets the batch scope pass tag/dedupe this cue. */
+  seq?: number;
+  /** "aoe" when this cue is one member of a whole-board cluster (全場特效). */
+  scope?: AnimationScope;
+  /** Which board an `aoeSweep` overlay covers, relative to the local player. */
+  seatSide?: "player" | "opponent";
+  /** Flavour of an `aoeSweep` overlay. */
+  variant?: AnimationSweepVariant;
 };
 
 export type ClientViewState = {

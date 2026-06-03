@@ -985,6 +985,28 @@ input {
   animation: bounce-return-pulse 0.72s ease-out;
 }
 
+/* Divine-shield breaking — quick icy flash on the unit (pairs with .shield-shatter). */
+.minion.shield-popping {
+  animation: shield-pop-flash 0.5s ease-out;
+}
+
+@keyframes shield-pop-flash {
+  0% { box-shadow: 0 0 0 rgba(140, 210, 255, 0); }
+  35% { box-shadow: 0 0 26px rgba(140, 210, 255, 0.95); filter: brightness(1.4); }
+  100% { box-shadow: 0 0 0 rgba(140, 210, 255, 0); }
+}
+
+/* Silence/lock onset — desaturating dip (the persistent .locked keeps grayscale). */
+.minion.locked-fx {
+  animation: lock-onset 0.6s ease-out;
+}
+
+@keyframes lock-onset {
+  0% { filter: grayscale(0%) brightness(1); }
+  40% { filter: grayscale(100%) brightness(0.6); }
+  100% { filter: grayscale(100%) brightness(1); }
+}
+
 .minion.being-destroyed {
   animation: death-fade 0.78s ease-out;
 }
@@ -2555,6 +2577,11 @@ input {
     animation: none;
   }
 
+  .minion.shield-popping,
+  .minion.locked-fx {
+    animation: none;
+  }
+
   .turn-announcement-overlay.active,
   .turn-announcement-text {
     animation: none;
@@ -2601,5 +2628,11 @@ input {
 
 .minion .countdown-badge + .countdown-badge {
   top: 35px;
+}
+
+/* Vector badge icons (replace former 🔒 / ⏳ / 💀 emoji). */
+.countdown-badge .badge-icon {
+  display: block;
+  flex-shrink: 0;
 }
 

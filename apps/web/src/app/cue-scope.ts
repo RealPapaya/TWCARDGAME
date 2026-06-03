@@ -1,0 +1,177 @@
+import type { GameEvent, Seat } from "@twcardgame/shared";
+import type { AnimationKind, AnimationSweepVariant } from "./types.js";
+
+/**
+ * Pure, DOM-free classification of one `events` batch (= one server command)
+ * into single-target vs whole-board (全場 / AOE) effects.
+ *
+ * The rules engine emits AOE as N separate single-target events of the same
+ * type in one batch (e.g. DAMAGE_ALL_ENEMY_MINIONS → one DAMAGE per minion).
+ * AOE is a *presentation* concern, so detection lives here in the web client —
+ * `packages/rules` stays pure and carries no aoe flag.
+ *
+ * Basic combat damage (ATTACK → DAMAGE [→ retaliation DAMAGE]) must NEVER be
+ * treated as effect damage or clustered as AOE; the attacker's lunge already
+ * carries the attack, so combat damage keeps the plain `damage` cue.
+ */
+
+/** A whole-board effect: ≥2 distinct targets share one effect family in a batch. */
+export type AoeCluster = {
+  /** Cue kind for the synthetic board-wide overlay. Always "aoeSweep". */
+  kind: Extract<AnimationKind, "aoeSweep">;
+  variant: AnimationSweepVariant;
+  /** Owner seat of the affected units — picks which board the sweep covers. */
+  seat?: Seat;
+  /** seqs of the per-target events that belong to this cluster. */
+  memberSeqs: number[];
+};
+
+export type BatchScopeResult = {
+  /** seqs of DAMAGE events that are basic combat (never effectStrike/AOE). */
+  combatDamageSeqs: Set<number>;
+  /** seqs of every event that is a member of some AOE cluster. */
+  aoeSeqs: Set<number>;
+  aoeClusters: AoeCluster[];
+};
+
+/** Effect families that can sweep the board. Order fixes sweep stacking. */
+type Family = "damage" | "heal" | "bounce" | "buff" | "lock" | "destroy";
+
+function eventTargetKey(event: GameEvent): string | undefined {
+  const payload = event.payload ?? {};
+  // DEATHRATTLE carries `source`; everything else carries `target`.
+  const key = event.type === "DEATHRATTLE" ? payload.source : payload.target;
+  return typeof key === "string" ? key : undefined;
+}
+
+/**
+ * Family an event clusters under, or undefined if it never sweeps.
+ * Combat DAMAGE (its seq in `combatDamageSeqs`) is excluded from "damage".
+ */
+function familyOf(event: GameEvent, combatDamageSeqs: Set<number>): Family | undefined {
+  switch (event.type) {
+    case "DAMAGE":
+      return combatDamageSeqs.has(event.seq) ? undefined : "damage";
+    case "HEAL":
+      return "heal";
+    case "BOUNCE":
+      return "bounce";
+    case "DESTROY":
+      return "destroy";
+    case "BUFF":
+      return typeof (event.payload ?? {}).lockedTurns === "number" ? "lock" : "buff";
+    default:
+      // SHIELD_POPPED, DEATHRATTLE, MINION_SUMMONED, … never sweep.
+      return undefined;
+  }
+}
+
+const FAMILY_TO_VARIANT: Record<Family, AnimationSweepVariant> = {
+  damage: "damage",
+  heal: "heal",
+  bounce: "bounce",
+  buff: "buff",
+  lock: "lock",
+  destroy: "destroy"
+};
+
+const FAMILY_ORDER: Family[] = ["damage", "heal", "bounce", "buff", "lock", "destroy"];
+
+/**
+ * Marks every DAMAGE that belongs to basic combat as non-effect. A single
+ * ATTACK resolves to at most two hits — the defender and the attacker's
+ * retaliation — each of which is either a DAMAGE or a divine-shield pop. We
+ * bound the window to those two slots so a later effect (which can only happen
+ * in a *different* command/batch) is never swallowed as combat.
+ */
+export function findCombatDamageSeqs(events: GameEvent[]): Set<number> {
+  const combat = new Set<number>();
+  let combatHitsLeft = 0;
+  for (const event of events) {
+    if (event.type === "ATTACK") {
+      combatHitsLeft = 2;
+      continue;
+    }
+    if (combatHitsLeft > 0 && (event.type === "DAMAGE" || event.type === "SHIELD_POPPED")) {
+      if (event.type === "DAMAGE") combat.add(event.seq);
+      combatHitsLeft -= 1;
+      continue;
+    }
+    combatHitsLeft = 0;
+  }
+  return combat;
+}
+
+export function classifyBatchScopes(events: GameEvent[]): BatchScopeResult {
+  const combatDamageSeqs = findCombatDamageSeqs(events);
+
+  // Bucket by (family, owner seat): a both-board AOE (e.g. destroy-all) sweeps
+  // each side separately, so the opponent's board and ours both get an overlay.
+  type Bucket = { family: Family; seqs: number[]; targets: Set<string>; seat?: Seat };
+  const buckets = new Map<string, Bucket>();
+  for (const event of events) {
+    const family = familyOf(event, combatDamageSeqs);
+    if (!family) continue;
+    const target = eventTargetKey(event);
+    if (!target) continue;
+    const key = `${family}:${event.seat ?? "?"}`;
+    let bucket = buckets.get(key);
+    if (!bucket) {
+      bucket = { family, seqs: [], targets: new Set<string>(), seat: event.seat };
+      buckets.set(key, bucket);
+    }
+    bucket.seqs.push(event.seq);
+    bucket.targets.add(target);
+  }
+
+  // A "damage" sweep already conveys the wipe; the DESTROY events it triggers
+  // would otherwise paint a redundant second sweep, so suppress destroy then.
+  const hasDamageCluster = [...buckets.values()].some(
+    (bucket) => bucket.family === "damage" && bucket.targets.size >= 2
+  );
+
+  const aoeSeqs = new Set<number>();
+  const aoeClusters: AoeCluster[] = [];
+  const ordered = [...buckets.values()].sort(
+    (a, b) => FAMILY_ORDER.indexOf(a.family) - FAMILY_ORDER.indexOf(b.family)
+  );
+  for (const bucket of ordered) {
+    if (bucket.targets.size < 2) continue;
+    if (bucket.family === "destroy" && hasDamageCluster) continue;
+    for (const seq of bucket.seqs) aoeSeqs.add(seq);
+    aoeClusters.push({
+      kind: "aoeSweep",
+      variant: FAMILY_TO_VARIANT[bucket.family],
+      seat: bucket.seat,
+      memberSeqs: [...bucket.seqs]
+    });
+  }
+
+  return { combatDamageSeqs, aoeSeqs, aoeClusters };
+}
+
+/**
+ * Final cue kind for an effect event. `isCombatDamage` (from
+ * `classifyBatchScopes`) decides whether DAMAGE is a combat hit or a spell
+ * strike. Returns undefined for events that produce no transient cue.
+ */
+export function mapEventToCueKind(event: GameEvent, isCombatDamage: boolean): AnimationKind | undefined {
+  switch (event.type) {
+    case "DAMAGE":
+      return isCombatDamage ? "damage" : "effectStrike";
+    case "HEAL":
+      return "heal";
+    case "SHIELD_POPPED":
+      return "shieldPop";
+    case "BUFF":
+      return typeof (event.payload ?? {}).lockedTurns === "number" ? "lock" : "buff";
+    case "BOUNCE":
+      return "bounce";
+    case "DESTROY":
+      return "destroy";
+    case "DEATHRATTLE":
+      return "deathrattle";
+    default:
+      return undefined;
+  }
+}
