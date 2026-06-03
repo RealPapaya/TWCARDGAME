@@ -68,9 +68,11 @@ export interface BattleLogEntry {
   kind: BattleLogKind;
   /** Card shown on the strip tile and as the main card in the tooltip — the actor (for buff/silence, the card that triggered it; for heal, the target). */
   tile: BattleLogCardRef;
-  /** Optional second card shown after the action icon in the tooltip (attack / spell-damage target). */
+  /** Optional second card shown after the action icon in the tooltip (attack / single-target effect target). */
   flowTo?: BattleLogCardRef;
-  /** Affected targets for a buff/silence entry, each with its own stat-change text. When present, `tile` is the ACTOR and the tooltip fans out to these targets. */
+  /** Affected targets for a grouped effect. When present, `tile` is the actor and the tooltip fans out to these targets. */
+  flowTargets?: { ref: BattleLogCardRef; detail?: string; amount?: number }[];
+  /** Deprecated alias kept for older buff/silence callers. Prefer `flowTargets`. */
   buffTargets?: { ref: BattleLogCardRef; detail: string }[];
   /** Small corner badge on the tile (omitted for deaths, which use a centered overlay). */
   badge?: BattleLogBadge;
@@ -120,6 +122,8 @@ export type AnimationCue = {
   text: string;
   seat?: Seat;
   targetKey?: string;
+  /** For a flying effect (e.g. battlecry knife): the caster unit's key to fly FROM. */
+  sourceKey?: string;
   cardId?: string;
   attackerInstanceId?: string;
   amount?: number;

@@ -38,7 +38,14 @@
       "Bash(xargs ls -lh)",
       "Bash(rg -n \"leaderboard\\\\|排行\\\\|榜\" LEGACY --include=\"*.js\" --include=\"*.html\" --include=\"*.css\" -l)",
       "Bash(Get-ChildItem -Path \"D:\\\\Google AI\\\\TWCARDGAME\" -Directory)",
-      "Bash(Select-Object Name)"
+      "Bash(Select-Object Name)",
+      "Bash(powershell -Command \"Select-String -Path 'packages/cards/src/catalog.generated.ts' -Pattern '小草|謝長廷|大學生' | Select-Object LineNumber, Line -First 20\")",
+      "Bash(powershell -Command \"Select-String -Path 'apps/web/src/styles/battle-fx.css' -Pattern 'effect-strike' | Select-Object LineNumber, Line\")",
+      "PowerShell(npm run *)",
+      "Bash(curl -s -o /dev/null -w \"frame-1: %{http_code} %{content_type}\\\\n\" http://localhost:5173/images/fx/attack-frame-1.webp)",
+      "Bash(curl -s -o /dev/null -w \"frame-2: %{http_code}\\\\n\" http://localhost:5173/images/fx/attack-frame-2.webp)",
+      "Bash(curl -s -o /dev/null -w \"root:    %{http_code}\\\\n\" http://localhost:5173/)",
+      "PowerShell(node verify-attack-sprite.mjs 2>&1 | Select-Object -Last 5)"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -2402,7 +2402,11 @@ function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
 function renderEffectStrike(cue: AnimationCue, cueStyle: string, tone: "effect" | "combat" = "effect"): string {
   if (!cue.targetKey) return "";
   const shards = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 9);
-  return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="effect-strike"><span class="effect-strike-core"></span>${shards}</div>`;
+  // 只有戰吼傷害(tone "effect" 且有施放方)才飛刀:雙影格(Attack1 / Attack1-2)交替,
+  // 從施放方飛向目標。普通攻擊(combat)與無來源的效果傷害不畫刀。
+  const sprite = tone === "effect" && cue.sourceKey ? `<i class="attack-sprite" aria-hidden="true"></i>` : "";
+  const sourceAttr = sprite && cue.sourceKey ? ` data-source-key="${escapeAttr(cue.sourceKey)}"` : "";
+  return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}"${sourceAttr} data-testid="effect-strike">${sprite}<span class="effect-strike-core"></span>${shards}</div>`;
 }
 
 function cueStyleAttr(cue: AnimationCue): string {
@@ -2623,15 +2627,21 @@ function renderLogTooltip(entry: BattleLogEntry): string {
     entry.amount === undefined ? "" : `${entry.kind === "heal" ? "+" : "-"}${entry.amount}`;
   const icon = logIcon(entry.badge ?? "sword");
   let flow = "";
-  if (entry.buffTargets?.length) {
-    // Buff / silence: actor → icon → every affected target with its own stat-change badge.
-    const targets = entry.buffTargets
+  const flowTargets = entry.flowTargets ?? entry.buffTargets;
+  if (flowTargets?.length) {
+    const targets = flowTargets
       .map(
-        (t) => `
-          <span class="log-flow-target">
-            ${renderLogCardArt(t.ref, "big")}
-            <span class="log-amount log-amount-buff">${escapeHtml(t.detail)}</span>
-          </span>`
+        (t) => {
+          const targetAmount =
+            "amount" in t && t.amount !== undefined ? `${entry.kind === "heal" ? "+" : "-"}${t.amount}` : "";
+          const targetDetail = t.detail ?? targetAmount;
+          const amountClass = t.detail ? "buff" : entry.kind;
+          return `
+            <span class="log-flow-target">
+              ${renderLogCardArt(t.ref, "big")}
+              ${targetDetail ? `<span class="log-amount log-amount-${amountClass}">${escapeHtml(targetDetail)}</span>` : ""}
+            </span>`;
+        }
       )
       .join("");
     flow = `
@@ -2645,7 +2655,7 @@ function renderLogTooltip(entry: BattleLogEntry): string {
           ${signedAmount ? `<span class="log-amount log-amount-${entry.kind}">${escapeHtml(signedAmount)}</span>` : ""}
         </span>`;
   }
-  const hasFlow = Boolean(entry.buffTargets?.length || entry.flowTo);
+  const hasFlow = Boolean(flowTargets?.length || entry.flowTo);
   return `
     <div class="log-tooltip" role="tooltip">
       <div class="log-tooltip-flow log-tooltip-flow-${entry.kind}">
@@ -6450,25 +6460,73 @@ function appendBattleLog(message: GameEvent[]): void {
   const entries: BattleLogEntry[] = [];
   let lastPlayedCardId: string | undefined;
 
-  // Consecutive BUFF events sharing one actor (the just-played card) collapse into a single
-  // entry whose strip tile is the actor and whose tooltip fans out to every affected target.
-  let pendingBuff:
-    | { kind: "buff" | "silence"; actorKey: string; tile: BattleLogCardRef; badge: BattleLogBadge; seat?: Seat; seq: number; buffTargets: { ref: BattleLogCardRef; detail: string }[] }
-    | undefined;
-  const flushBuff = (): void => {
-    if (!pendingBuff) return;
-    const names = pendingBuff.buffTargets.map((t) => t.ref.name).join("、");
-    const verb = pendingBuff.kind === "silence" ? "鎖定" : "強化";
+  // Consecutive effect events sharing one actor (the just-played card) collapse into
+  // a single entry whose strip tile is the actor and whose tooltip fans out to every target.
+  type GroupedLogKind = "damage" | "heal" | "buff" | "silence" | "bounce";
+  type PendingEffect = {
+    kind: GroupedLogKind;
+    actorKey: string;
+    tile: BattleLogCardRef;
+    badge: BattleLogBadge;
+    seat?: Seat;
+    seq: number;
+    flowTargets: { ref: BattleLogCardRef; detail?: string; amount?: number }[];
+    singleFallback?: BattleLogEntry;
+  };
+  let pendingEffect: PendingEffect | undefined;
+  const groupedEffectVerb = (kind: GroupedLogKind): string => {
+    if (kind === "damage") return "造成傷害";
+    if (kind === "heal") return "治療";
+    if (kind === "silence") return "鎖定";
+    if (kind === "bounce") return "收回";
+    return "強化";
+  };
+  const flushEffect = (): void => {
+    if (!pendingEffect) return;
+    if (pendingEffect.flowTargets.length === 1 && pendingEffect.singleFallback) {
+      entries.push(pendingEffect.singleFallback);
+      pendingEffect = undefined;
+      return;
+    }
+    const names = pendingEffect.flowTargets.map((t) => t.ref.name).join("、");
     entries.push({
-      seq: pendingBuff.seq,
-      seat: pendingBuff.seat,
-      kind: pendingBuff.kind,
-      tile: pendingBuff.tile,
-      badge: pendingBuff.badge,
-      buffTargets: pendingBuff.buffTargets,
-      label: `${pendingBuff.tile.name} ${verb} ${names}`
+      seq: pendingEffect.seq,
+      seat: pendingEffect.seat,
+      kind: pendingEffect.kind,
+      tile: pendingEffect.tile,
+      badge: pendingEffect.badge,
+      flowTargets: pendingEffect.flowTargets,
+      label: `${pendingEffect.tile.name} ${groupedEffectVerb(pendingEffect.kind)} ${names}`
     });
-    pendingBuff = undefined;
+    pendingEffect = undefined;
+  };
+  const pushEffectTarget = (
+    kind: GroupedLogKind,
+    event: GameEvent,
+    target: { ref: BattleLogCardRef; detail?: string; amount?: number },
+    badge: BattleLogBadge,
+    singleFallback?: BattleLogEntry
+  ): void => {
+    if (!lastPlayedCardId) {
+      flushEffect();
+      if (singleFallback) entries.push(singleFallback);
+      return;
+    }
+    const actorKey = `${kind}:${lastPlayedCardId}`;
+    if (!pendingEffect || pendingEffect.actorKey !== actorKey) {
+      flushEffect();
+      pendingEffect = {
+        kind,
+        actorKey,
+        tile: logCardRef(lastPlayedCardId),
+        badge,
+        seat: event.seat,
+        seq: event.seq,
+        flowTargets: [],
+        singleFallback
+      };
+    }
+    pendingEffect.flowTargets.push(target);
   };
 
   for (const event of message) {
@@ -6482,29 +6540,39 @@ function appendBattleLog(message: GameEvent[]): void {
       const detail = buffDetail(payload);
       const targetRef = logTargetRef(target);
       if (lastPlayedCardId) {
-        const actorKey = `${kind}:${lastPlayedCardId}`;
-        if (pendingBuff && pendingBuff.actorKey === actorKey) {
-          pendingBuff.buffTargets.push({ ref: targetRef, detail });
-        } else {
-          flushBuff();
-          pendingBuff = { kind, actorKey, tile: logCardRef(lastPlayedCardId), badge, seat: event.seat, seq: event.seq, buffTargets: [{ ref: targetRef, detail }] };
-        }
+        pushEffectTarget(kind, event, { ref: targetRef, detail }, badge);
       } else {
         // No played-card actor (triggered / self-buff): the buffed minion is its own actor.
-        flushBuff();
+        flushEffect();
         entries.push({ seq: event.seq, seat: event.seat, kind, tile: targetRef, badge, detail, label: silence ? `${targetRef.name} ${detail}` : `${targetRef.name} 獲得 ${detail}` });
       }
       continue;
     }
 
-    flushBuff();
     if (event.type === "CARD_PLAYED" && typeof event.payload?.cardId === "string") {
+      flushEffect();
       lastPlayedCardId = event.payload.cardId;
+      const entry = battleLogEntryFor(event, { claimedDamage, attackTargetDamage, lastPlayedCardId });
+      if (entry) entries.push(entry);
+      continue;
     }
+
     const entry = battleLogEntryFor(event, { claimedDamage, attackTargetDamage, lastPlayedCardId });
+    const payload = event.payload ?? {};
+    const target = typeof payload.target === "string" ? payload.target : undefined;
+    const amount = typeof payload.amount === "number" ? payload.amount : undefined;
+    if (entry && target && lastPlayedCardId && (event.type === "DAMAGE" || event.type === "HEAL" || event.type === "BOUNCE")) {
+      const kind = event.type === "DAMAGE" ? "damage" : event.type === "HEAL" ? "heal" : "bounce";
+      const badge: BattleLogBadge = kind === "damage" ? "burst" : kind === "heal" ? "heart" : "bounce";
+      const targetRef = event.type === "BOUNCE" && typeof payload.cardId === "string" ? logCardRef(payload.cardId) : logTargetRef(target);
+      pushEffectTarget(kind, event, { ref: targetRef, amount }, badge, entry);
+      continue;
+    }
+
+    flushEffect();
     if (entry) entries.push(entry);
   }
-  flushBuff();
+  flushEffect();
   if (entries.length === 0) return;
   view.battleLog = [...view.battleLog, ...entries].slice(-50);
 }
@@ -7342,10 +7410,42 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
       : effectKind === "destroy" ? "Destroyed"
       : effectKind === "deathrattle" ? "Deathrattle"
       : "Buff";
-    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, cardId, amount, seq: event.seq };
+    // Battlecry damage flies a knife from the caster minion (summoned earlier in
+    // this same batch) to the target. Spells / triggered damage have no such
+    // source → sourceKey stays undefined and no knife is drawn.
+    const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
+    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq };
   }
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "動作被拒絕。"), seat: event.seat };
+  return undefined;
+}
+
+/**
+ * The caster a battlecry's damage should fly FROM: the minion summoned by the
+ * card play that owns this effect. A play batch runs
+ * CARD_PLAYED → MINION_SUMMONED → DAMAGE…; note a DAMAGE event carries the
+ * *target* owner's seat (it's emitted from the victim), so we must NOT match on
+ * the damage seat. Instead find the nearest preceding CARD_PLAYED and the minion
+ * it summoned (same seat + cardId). A spell (CARD_PLAYED with no own summon) or a
+ * triggered effect (no CARD_PLAYED / an ATTACK boundary) yields no flying source.
+ */
+function findEffectSourceKey(events: GameEvent[], startIndex: number): string | undefined {
+  if (startIndex < 0) return undefined;
+  for (let i = startIndex - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type === "ATTACK") return undefined;
+    if (event.type === "CARD_PLAYED") {
+      const cardId = event.payload?.cardId;
+      for (let j = i + 1; j < startIndex; j++) {
+        const summon = events[j];
+        if (summon.type === "MINION_SUMMONED" && summon.seat === event.seat && summon.payload?.cardId === cardId) {
+          return typeof summon.payload?.target === "string" ? summon.payload.target : undefined;
+        }
+      }
+      return undefined;
+    }
+  }
   return undefined;
 }
 
@@ -7934,6 +8034,23 @@ function applyPostRenderEffects(): void {
       }
       node.style.left = `${x}px`;
       node.style.top = `${y}px`;
+      // Flying knife: point the sprite from its caster toward the target and seed
+      // the fly offset (caster − target, since the node sits at the target point).
+      const sourceKey = node.dataset.sourceKey;
+      const sprite = sourceKey ? node.querySelector<HTMLElement>(".attack-sprite") : null;
+      if (sourceKey && sprite) {
+        const sourceEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(sourceKey)}"]`);
+        if (sourceEl) {
+          const sr = sourceEl.getBoundingClientRect();
+          const src = localPointFromViewport(eventLayer, sr.left + sr.width / 2, sr.top + sr.height / 2);
+          const dx = src.x - x;
+          const dy = src.y - y;
+          const angle = Math.round(Math.atan2(-dy, -dx) * (180 / Math.PI));
+          sprite.style.setProperty("--fly-dx", `${Math.round(dx)}px`);
+          sprite.style.setProperty("--fly-dy", `${Math.round(dy)}px`);
+          sprite.style.setProperty("--fly-angle", `${angle}deg`);
+        }
+      }
       node.dataset.anchored = "true";
     }
   }

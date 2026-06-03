@@ -963,15 +963,20 @@
 }
 
 .battle-surface .minion-art {
-  height: 60px;
-  flex-basis: 60px;
+  height: 66px;
+  flex-basis: 66px;
   border-radius: 5px;
 }
 
 .battle-surface .minion .card-title {
   min-height: 20px;
-  margin-top: 4px;
+  margin-top: 5px;
   font-size: 10px;
+  line-height: 1.35;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: visible;
 }
 
 .battle-surface .keyword-row {

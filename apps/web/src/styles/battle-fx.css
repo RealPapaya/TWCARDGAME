@@ -529,6 +529,54 @@
   box-shadow: 0 0 8px rgba(255, 120, 60, 0.9);
 }
 
+/* 戰吼飛刀:Attack1 / Attack1-2 兩張不斷交替(看起來像 sprite 動畫),從施放方
+   飛向目標。只掛在 effect-strike.effect(戰吼/效果傷害)且有施放方時 —— 普通攻擊
+   (combat)不畫刀。--fly-dx/dy 是「施放方 − 目標」的位移,--fly-angle 讓刀尖朝行進方向。 */
+.attack-sprite {
+  position: absolute;
+  left: 0;
+  top: 0;
+  /* 圖是寬刀刃(~6:1),box 用寬高比 contain 才不會被縮成一條細線。比命中版小一號。 */
+  width: 132px;
+  height: 48px;
+  margin: -24px 0 0 -66px;
+  background: url("/images/fx/attack-frame-1.webp") center / contain no-repeat;
+  filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 9px rgba(255, 200, 120, 0.7));
+  opacity: 0;
+  transform-origin: center;
+  z-index: 96;
+  /* fly = 從施放方飛到目標→命中淡出;flip = 每 80ms 換一張圖,飛行途中持續交替。 */
+  animation:
+    attack-sprite-fly 0.5s cubic-bezier(0.35, 0.05, 0.4, 1) forwards,
+    attack-sprite-flip 0.16s steps(1, end) infinite;
+  animation-delay: var(--cue-delay, 0ms), var(--cue-delay, 0ms);
+}
+
+@keyframes attack-sprite-fly {
+  0% {
+    opacity: 0;
+    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) rotate(var(--fly-angle, 0deg)) scale(0.7);
+  }
+  15% { opacity: 1; }
+  70% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(1);
+  }
+  84% {
+    opacity: 1;
+    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(1.12);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(0.9);
+  }
+}
+
+@keyframes attack-sprite-flip {
+  0% { background-image: url("/images/fx/attack-frame-1.webp"); }
+  50% { background-image: url("/images/fx/attack-frame-2.webp"); }
+}
+
 /* Destroy shockwave ring — a bright burst on top of the grey death dust so a
    kill reads clearly even before the art-shatter plays. */
 .death-burst > .death-burst-ring {
@@ -775,6 +823,7 @@
   .death-burst > .death-burst-ring,
   .effect-strike-core,
   .effect-strike > span,
+  .attack-sprite,
   .deathrattle-wisp,
   .buff-burst > span,
   .shield-shatter-ring,
@@ -795,6 +844,12 @@
   .shield-shatter-ring,
   .lock-clamp-ring {
     opacity: 0.8;
+  }
+
+  /* 無動畫偏好下保留一張靜態命中圖,而不是讓它停在 opacity:0 看不見。 */
+  .attack-sprite {
+    opacity: 0.9;
+    transform: scale(1);
   }
 
   .float-number {
