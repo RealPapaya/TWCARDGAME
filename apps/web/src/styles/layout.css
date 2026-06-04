@@ -2598,6 +2598,12 @@ input {
   transition: filter 0.5s ease-out;
 }
 
+/* Keep silenced minions grayscale on hover — the generic `button:hover` brightness
+   (base.css) otherwise out-specifies `.minion.locked` and restores their colour. */
+.minion.locked:hover {
+  filter: grayscale(100%);
+}
+
 /* Countdown Badges */
 .countdown-badge {
   position: absolute;

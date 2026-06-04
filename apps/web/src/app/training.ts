@@ -1,8 +1,10 @@
 import type {
+  AmplificationOption,
   GameCommand,
   GameEvent,
   GameStatus,
   HandCardView,
+  Phase,
   PublicGameState,
   PublicMinion,
   PublicPlayer,
@@ -10,22 +12,65 @@ import type {
   Seat,
   TargetRef
 } from "@twcardgame/shared";
+import {
+  ADVANCED_KEYWORDS_TRAINING,
+  AMP_FIELD_TRAINING,
+  CARD_TYPES_TRAINING,
+  advanceScript,
+  createScriptedSession,
+  handleScriptCommand,
+  lessonScriptFor,
+  scriptCanEndTurn,
+  scriptCanSelectAttacker,
+  scriptCanSelectHand,
+  scriptPrompt,
+  type TrainingScript
+} from "./training-scripts.js";
+
+/** Structural shape shared by every training level (legacy + scripted lessons). */
+export interface TrainingLevelInfo {
+  id: string;
+  name: string;
+  rewardGold: number;
+  heroHealth: number;
+  description: string;
+}
+
+/** Special-phase snapshot the battle arena's amplification / voting overlays read. */
+export interface TrainingSpecialPhase {
+  voteEvents?: { id: string; name: string; option0: string; option1: string; option2: string }[];
+  voteWeightP1?: number;
+  voteWeightP2?: number;
+  voteSubmittedP1?: boolean;
+  voteSubmittedP2?: boolean;
+  ampSelectedP1?: boolean;
+  ampSelectedP2?: boolean;
+  phaseDeadlineAtMs?: number;
+}
 
 export const SOCIAL_ROOKIE_TRAINING = {
   id: "social_rookie",
   name: "社會新鮮人",
   rewardGold: 100,
-  heroHealth: 10
+  heroHealth: 10,
+  description: "無牌組、無隨機性的基本戰鬥教學。完成後首通獲得 100 金幣。"
 } as const;
 
 export const COLLISION_NEWS_TRAINING = {
   id: "collision_news",
   name: "拜碼頭",
   rewardGold: 100,
-  heroHealth: 10
+  heroHealth: 10,
+  description: "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。完成第一關後解鎖。"
 } as const;
 
-export const TRAINING_LEVELS = [SOCIAL_ROOKIE_TRAINING, COLLISION_NEWS_TRAINING] as const;
+export const TRAINING_LEVELS = [
+  SOCIAL_ROOKIE_TRAINING,
+  COLLISION_NEWS_TRAINING,
+  CARD_TYPES_TRAINING,
+  ADVANCED_KEYWORDS_TRAINING,
+  AMP_FIELD_TRAINING
+] as const;
 
 export type TrainingLevel = (typeof TRAINING_LEVELS)[number];
 export type TrainingLevelId = TrainingLevel["id"];
@@ -86,6 +131,10 @@ export type TrainingAllowedAction =
   | "vaccine_one"
   | "vaccine_two"
   | "egg_finish"
+  | "script_play"
+  | "script_attack"
+  | "script_amp"
+  | "script_vote"
   | "none";
 
 export type TrainingHighlight =
@@ -122,19 +171,28 @@ export type TrainingPublicSync = {
 };
 
 export interface TrainingSession {
-  level: TrainingLevel;
+  level: TrainingLevelInfo;
   step: TrainingStepId;
+  /** Set for data-driven lesson levels (第3~5關); absent for legacy levels 1-2. */
+  script?: TrainingScript;
+  stepIndex?: number;
   status: GameStatus;
   activeSeat: Seat;
   turnNumber: number;
   actionSeq: number;
   seq: number;
+  /** Special-phase signalling for scripted lessons (amplification / voting). */
+  phase?: Phase;
+  specialPhase?: TrainingSpecialPhase;
+  amplificationOptions?: AmplificationOption[];
   players: PublicGameState["players"];
   hand: HandCardView[];
   result?: PublicGameState["result"];
 }
 
 export function createTrainingSession(levelId: TrainingLevelId, playerName = "玩家"): TrainingSession {
+  const script = lessonScriptFor(levelId);
+  if (script) return createScriptedSession(script, playerName);
   if (levelId === COLLISION_NEWS_TRAINING.id) return createCollisionNewsTraining(playerName);
   return createSocialRookieTraining(playerName);
 }
@@ -181,6 +239,7 @@ export function createCollisionNewsTraining(playerName = "玩家"): TrainingSess
 }
 
 export function trainingPrompt(session: TrainingSession): TrainingPrompt | undefined {
+  if (session.script) return scriptPrompt(session);
   switch (session.step) {
     case "welcome":
       return {
@@ -396,6 +455,7 @@ export function trainingHasHighlight(session: TrainingSession | undefined, highl
 
 export function trainingCanSelectHand(session: TrainingSession | undefined, handInstanceId: string | undefined): boolean {
   if (!session || !handInstanceId) return true;
+  if (session.script) return scriptCanSelectHand(session, handInstanceId);
   const action = trainingPrompt(session)?.allowedAction;
   if (action === "play_rookie") return handInstanceId === ROOKIE_HAND_ID;
   if (action === "final_strike") return handInstanceId === FINAL_HAND_ID;
@@ -407,6 +467,7 @@ export function trainingCanSelectHand(session: TrainingSession | undefined, hand
 
 export function trainingCanSelectAttacker(session: TrainingSession | undefined, attackerInstanceId: string | undefined): boolean {
   if (!session || !attackerInstanceId) return true;
+  if (session.script) return scriptCanSelectAttacker(session, attackerInstanceId);
   const action = trainingPrompt(session)?.allowedAction;
   if (action === "attack_hero") return attackerInstanceId === ROOKIE_MINION_ID;
   if (action === "attack_threat") return attackerInstanceId === COLLISION_FRIENDLY_MINION_ID;
@@ -419,6 +480,12 @@ export function trainingCanEndTurn(session: TrainingSession | undefined): boolea
 }
 
 export function advanceTraining(session: TrainingSession): TrainingCommandResult {
+  if (session.script) {
+    const result = advanceScript(session);
+    if (result.rejected) return reject(session, result.rejected);
+    const base = update(session, result.events);
+    return result.completed ? { ...base, completed: true } : base;
+  }
   switch (session.step) {
     case "welcome":
       session.hand = [handCard(ROOKIE_HAND_ID, ROOKIE_CARD_ID, 1, "MINION", 1, 2)];
@@ -482,6 +549,12 @@ export function advanceTraining(session: TrainingSession): TrainingCommandResult
 }
 
 export function handleTrainingCommand(session: TrainingSession, command: GameCommand): TrainingCommandResult {
+  if (session.script) {
+    const result = handleScriptCommand(session, command);
+    if (result.rejected) return reject(session, result.rejected);
+    const base = update(session, result.events);
+    return result.completed ? { ...base, completed: true } : base;
+  }
   const action = trainingPrompt(session)?.allowedAction;
   if (command.type === "playCard" && action === "play_rookie" && command.handInstanceId === ROOKIE_HAND_ID) {
     return playRookie(session);

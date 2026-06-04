@@ -129,24 +129,34 @@
   position: absolute;
   left: var(--x, 0);
   top: var(--y, 0);
-  width: calc(var(--size, 24px) * 0.5);
-  height: calc(var(--size, 24px) * 0.5);
-  border-radius: 50%;
-  /* Particle dot — replaces the former literal "+" text glyph. */
-  background: radial-gradient(circle, #b6ffce 0%, #33ff66 55%, rgba(51, 255, 102, 0) 100%);
-  box-shadow: 0 0 8px rgba(51, 255, 102, 0.85);
+  /* Literal green "+" glyph surrounding the healed target — bold, glowing, and
+     visible whether the heal is single-target, AoE, or an overheal at full HP. */
+  font-family: Impact, "Arial Black", sans-serif;
+  font-weight: 900;
+  font-size: var(--size, 22px);
+  line-height: 1;
+  color: #5dff88;
+  text-shadow:
+    0 0 6px rgba(51, 255, 102, 1),
+    0 0 12px rgba(51, 255, 102, 0.85),
+    0 0 2px rgba(0, 40, 12, 0.9);
+  -webkit-text-stroke: 1px rgba(0, 60, 20, 0.55);
   opacity: 0;
-  animation: heal-particle-float-up 0.5s ease-out forwards;
+  animation: heal-particle-float-up 0.7s ease-out forwards;
   animation-delay: calc(var(--cue-delay, 0ms) + var(--particle-delay, 0ms));
 }
 
 @keyframes heal-particle-float-up {
   0% {
-    transform: translateY(0);
+    transform: translate(-50%, -50%) translateY(2px) scale(0.5) rotate(-10deg);
+    opacity: 0;
+  }
+  25% {
     opacity: 1;
+    transform: translate(-50%, -50%) translateY(-8px) scale(1.15) rotate(0deg);
   }
   100% {
-    transform: translateY(-50px);
+    transform: translate(-50%, -50%) translateY(-48px) scale(0.95) rotate(8deg);
     opacity: 0;
   }
 }
@@ -537,38 +547,33 @@
   left: 0;
   top: 0;
   /* 圖是寬刀刃(~6:1),box 用寬高比 contain 才不會被縮成一條細線。比命中版小一號。 */
-  width: 132px;
-  height: 48px;
-  margin: -24px 0 0 -66px;
+  width: 104px;
+  height: 38px;
+  margin: -19px 0 0 -52px;
   background: url("/images/fx/attack-frame-1.webp") center / contain no-repeat;
   filter: drop-shadow(0 1px 5px rgba(0, 0, 0, 0.5)) drop-shadow(0 0 9px rgba(255, 200, 120, 0.7));
   opacity: 0;
   transform-origin: center;
   z-index: 96;
-  /* fly = 從施放方飛到目標→命中淡出;flip = 每 80ms 換一張圖,飛行途中持續交替。 */
+  /* fly = 從施放方飛向目標,抵達前就淡出(命中靠 effect-strike 爆光,不在命中點留靜止刀刃);
+     flip = 飛行途中持續交替兩張影格。整體比原本快。 */
   animation:
-    attack-sprite-fly 0.5s cubic-bezier(0.35, 0.05, 0.4, 1) forwards,
-    attack-sprite-flip 0.16s steps(1, end) infinite;
+    attack-sprite-fly 0.34s cubic-bezier(0.3, 0.05, 0.4, 1) forwards,
+    attack-sprite-flip 0.1s steps(1, end) infinite;
   animation-delay: var(--cue-delay, 0ms), var(--cue-delay, 0ms);
 }
 
 @keyframes attack-sprite-fly {
   0% {
     opacity: 0;
-    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) rotate(var(--fly-angle, 0deg)) scale(0.7);
+    transform: translate(var(--fly-dx, 0), var(--fly-dy, 0)) rotate(var(--fly-angle, 0deg)) scale(0.92);
   }
-  15% { opacity: 1; }
-  70% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(1);
-  }
-  84% {
-    opacity: 1;
-    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(1.12);
-  }
+  18% { opacity: 1; }
+  /* 刀刃只在飛行途中可見;抵達目標(translate 0)時已淡出 → 命中點不殘留刀刃。 */
+  78% { opacity: 1; }
   100% {
     opacity: 0;
-    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(0.9);
+    transform: translate(0, 0) rotate(var(--fly-angle, 0deg)) scale(1);
   }
 }
 

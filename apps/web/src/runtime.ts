@@ -2380,17 +2380,19 @@ function renderEventCue(cue: AnimationCue): string {
 function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
   if (!cue.targetKey) return "";
   const particles = [
-    ["-24px", "-18px", "18px", "0ms"],
-    ["16px", "-22px", "24px", "80ms"],
-    ["-8px", "8px", "28px", "130ms"],
-    ["28px", "10px", "20px", "180ms"],
-    ["-30px", "20px", "26px", "240ms"],
-    ["8px", "24px", "18px", "320ms"]
+    ["-30px", "-20px", "20px", "0ms"],
+    ["20px", "-26px", "24px", "70ms"],
+    ["-40px", "4px", "18px", "120ms"],
+    ["36px", "-2px", "22px", "170ms"],
+    ["-14px", "18px", "20px", "220ms"],
+    ["24px", "22px", "18px", "280ms"],
+    ["0px", "-32px", "26px", "120ms"],
+    ["-26px", "26px", "16px", "340ms"]
   ];
-  // 全場治療由 aoeSweep 主導，單體粒子數調少。粒子改用 CSS 圓點，移除 "+" 文字字形。
-  const shown = cue.scope === "aoe" ? particles.slice(0, 3) : particles;
+  // 全場治療由 aoeSweep 主導，單體粒子數調少。粒子改用綠色 "+" 圍繞目標，更明顯。
+  const shown = cue.scope === "aoe" ? particles.slice(0, 4) : particles;
   const spans = shown.map(([x, y, size, delay]) => (
-    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}"></span>`
+    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}">+</span>`
   )).join("");
   return `<div class="heal-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans}</div>`;
 }
@@ -8010,8 +8012,21 @@ function applyPostRenderEffects(): void {
       const anchorKey = node.dataset.anchorKey ?? "";
       const selector = `[data-target-key="${cssEscape(anchorKey)}"]`;
       const target = document.querySelector<HTMLElement>(selector);
-      if (!target) continue;
-      const r = target.getBoundingClientRect();
+      let r = target?.getBoundingClientRect();
+      let targetVia = r && r.width > 0 ? "live" : "none";
+      if ((!r || r.width === 0) && !anchorKey.startsWith("board:")) {
+        // Target just left the board (e.g. killed by this same battlecry): the
+        // kill flush removes the minion while the effect cue is still alive, so
+        // a live DOM lookup misses. Fall back to the rect captured when it died
+        // (recentUnitRects, populated by applyDeathShatter) so an in-flight
+        // knife still lands on the spot instead of being orphaned and vanishing.
+        const recent = recentUnitRects.get(anchorKey);
+        if (recent && performance.now() - recent.atMs < 2000) {
+          r = recent.rect;
+          targetVia = "recent";
+        }
+      }
+      if (!r) continue;
       // A board-wide AOE sweep covers the whole board rect (top-left + size),
       // not a single point. The board element that this seat rendered into is
       // top or bottom depending on the local viewpoint, so the sweep mirrors.
@@ -8039,7 +8054,14 @@ function applyPostRenderEffects(): void {
       const sourceKey = node.dataset.sourceKey;
       const sprite = sourceKey ? node.querySelector<HTMLElement>(".attack-sprite") : null;
       if (sourceKey && sprite) {
-        const sourceEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(sourceKey)}"]`);
+        // The caster's real minion (sourceKey) may not be on the synced board
+        // yet: right after a lethal battlecry the board update is held while the
+        // kill animates, so the summoned minion only appears after the flush —
+        // long after the knife should fly. During that window the local caster
+        // is shown as a `.battlecry-preview` (which carries no target-key), so
+        // fall back to it to keep the knife flying from the right place.
+        const realSourceEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(sourceKey)}"]`);
+        const sourceEl = realSourceEl ?? document.querySelector<HTMLElement>(".battlecry-preview");
         if (sourceEl) {
           const sr = sourceEl.getBoundingClientRect();
           const src = localPointFromViewport(eventLayer, sr.left + sr.width / 2, sr.top + sr.height / 2);
@@ -8049,6 +8071,16 @@ function applyPostRenderEffects(): void {
           sprite.style.setProperty("--fly-dx", `${Math.round(dx)}px`);
           sprite.style.setProperty("--fly-dy", `${Math.round(dy)}px`);
           sprite.style.setProperty("--fly-angle", `${angle}deg`);
+          sprite.style.visibility = "";
+          blog("knife seeded", { cueId: node.dataset.cueId, targetVia, sourceVia: realSourceEl ? "real" : "preview", dx: Math.round(dx), dy: Math.round(dy) });
+        } else {
+          // Truly nothing on screen to fly from — hide the blade so it never
+          // shows as a static horizontal sliver at the impact point, and leave
+          // the node un-anchored so a later render can still seed a real fly
+          // vector. The node is removed when the cue expires, so this is bounded.
+          sprite.style.visibility = "hidden";
+          blog("knife hidden (no source)", { cueId: node.dataset.cueId, sourceKey, targetVia });
+          continue;
         }
       }
       node.dataset.anchored = "true";
