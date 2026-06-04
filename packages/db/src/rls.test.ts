@@ -27,6 +27,7 @@ const cardIdOwnershipMigration = readFileSync(
 const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_and_starter_cosmetics.sql", import.meta.url), "utf8");
 const trainingCompletionsMigration = readFileSync(new URL("../migrations/0019_training_completions.sql", import.meta.url), "utf8");
 const collisionTrainingMigration = readFileSync(new URL("../migrations/0020_training_collision_news.sql", import.meta.url), "utf8");
+const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_training_card_lessons.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -218,5 +219,9 @@ describe("Supabase RLS migration coverage", () => {
     expect(collisionTrainingMigration).toContain("when 'collision_news' then v_reward_gold := 100;");
     expect(collisionTrainingMigration).toContain("Unknown training level");
     expect(collisionTrainingMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
+    expect(cardLessonsTrainingMigration).toContain("when 'card_types' then v_reward_gold := 100;");
+    expect(cardLessonsTrainingMigration).toContain("when 'advanced_keywords' then v_reward_gold := 100;");
+    expect(cardLessonsTrainingMigration).toContain("when 'amp_field' then v_reward_gold := 100;");
+    expect(cardLessonsTrainingMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
   });
 });

@@ -665,7 +665,7 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
         session.players[PLAYER] = {
           ...session.players[PLAYER],
           board,
-          amplification: option ? { tier: option.tier, name: option.name } : undefined
+          amplification: option ? { id: option.id, tier: option.tier, name: option.name } : undefined
         };
         session.phase = "NORMAL_PLAY";
         session.amplificationOptions = undefined;

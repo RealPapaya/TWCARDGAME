@@ -476,6 +476,7 @@ export function trainingCanSelectAttacker(session: TrainingSession | undefined, 
 
 export function trainingCanEndTurn(session: TrainingSession | undefined): boolean {
   if (!session) return true;
+  if (session.script) return scriptCanEndTurn();
   return trainingPrompt(session)?.allowedAction === "end_turn";
 }
 
@@ -614,7 +615,7 @@ export function trainingPublicState(session: TrainingSession): PublicGameState {
     schemaVersion: 1,
     cardCatalogVersion: "training",
     status: session.status,
-    phase: "NORMAL_PLAY",
+    phase: session.phase ?? "NORMAL_PLAY",
     turn: {
       activeSeat: session.activeSeat,
       number: session.turnNumber,
@@ -623,7 +624,10 @@ export function trainingPublicState(session: TrainingSession): PublicGameState {
       actionSeq: session.actionSeq
     },
     players: clonePlayers(session.players),
-    result: session.result
+    result: session.result,
+    ...(session.specialPhase
+      ? { specialPhase: session.specialPhase as unknown as PublicGameState["specialPhase"] }
+      : {})
   };
 }
 

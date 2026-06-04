@@ -110,8 +110,6 @@ import {
   startRewardAnimation
 } from "./app/reward-screen.js";
 import {
-  COLLISION_NEWS_TRAINING,
-  SOCIAL_ROOKIE_TRAINING,
   TRAINING_LEVELS,
   advanceTraining,
   createTrainingSession,
@@ -272,6 +270,12 @@ let lastTurnAnnouncementKey: string | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
 const appliedDeathrattles = new Set<string>();
+// Battlecry flying knives are animated imperatively (like death shatter / attack
+// lunge) rather than as a declarative cue node, because the re-rendered node had
+// its CSS animation-delay reset on every morph patch — so a knife with a long
+// delay (fast play → effect waits for the landing to settle) never finished
+// flying. Firing once into a body-level element sidesteps the render churn.
+const appliedKnives = new Set<string>();
 // Last-seen on-screen rect per unit instanceId, so a deathrattle (遺志) plume can
 // anchor on a minion whose DOM has already been removed by its DESTROY (R4).
 const recentUnitRects = new Map<string, { rect: DOMRect; atMs: number }>();
@@ -373,6 +377,8 @@ function renderMenu(): string {
   switch (view.menuScreen) {
     case "battle":
       return renderBattleScreen();
+    case "training":
+      return renderTrainingScreen();
     case "profile":
       return renderProfileScreen();
     case "collection":
@@ -649,9 +655,6 @@ function renderBattleScreen(): string {
               ${view.joining ? "連線中..." : "開始對戰"}
             </button>
           </div>
-          <div class="battle-training-section">
-            ${renderTrainingLevelCards()}
-          </div>
           <details class="advanced-disclosure battle-advanced">
             <summary>進階設定</summary>
             <form id="join-form-advanced" class="advanced-form">
@@ -669,16 +672,29 @@ function renderBattleScreen(): string {
   `;
 }
 
+function renderTrainingScreen(): string {
+  return `
+    <section class="screen training-screen" data-screen="training">
+      <header class="screen-header">
+        <button class="back-button" data-menu-screen="battle" data-testid="training-back">← 返回</button>
+        <h2>訓練場</h2>
+      </header>
+      <p class="training-screen-intro">從基礎到進階，逐關認識遊戲機制。完成一關才會解鎖下一關。</p>
+      <div class="training-level-grid">
+        ${renderTrainingLevelCards()}
+      </div>
+    </section>
+  `;
+}
+
 function renderTrainingLevelCards(): string {
   return TRAINING_LEVELS.map((level, index) => {
     const unlocked = trainingLevelUnlocked(level.id);
     const completed = trainingLevelCompleted(level.id);
     const disabled = view.joining || Boolean(view.room) || !unlocked;
     const title = `第${index + 1}關：${level.name}`;
-    const description = level.id === SOCIAL_ROOKIE_TRAINING.id
-      ? "無牌組、無隨機性。完成後首通獲得 100 金幣。"
-      : "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。完成第一關後解鎖。";
-    const status = completed ? "已完成" : unlocked ? "可開始" : "完成第一關後解鎖";
+    const description = level.description;
+    const status = completed ? "已完成" : unlocked ? "可開始" : "完成前一關後解鎖";
     return `
       <div class="battle-training-card">
         <strong>${escapeHtml(title)}</strong>
@@ -2147,7 +2163,7 @@ function renderPhaseCountdown(label: string): string {
 
 /** Turn 6/14 deck-amplification chooser — presented mulligan-style with three highlighted picks. */
 function renderAmplificationOverlay(): string {
-  if (readPhase() !== "AMPLIFICATION_PHASE" || !view.room) return "";
+  if (readPhase() !== "AMPLIFICATION_PHASE" || (!view.room && !trainingSession)) return "";
   const options = view.amplificationOptions ?? [];
   const mySeat = view.mySeat;
   const sp = view.state?.specialPhase;
@@ -2186,7 +2202,7 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
 
 /** Turn 20 inverse-HP referendum ballot — three highlighted events, mulligan-style. */
 function renderVotingOverlay(): string {
-  if (readPhase() !== "VOTING_PHASE" || !view.room) return "";
+  if (readPhase() !== "VOTING_PHASE" || (!view.room && !trainingSession)) return "";
   const sp = view.state?.specialPhase;
   const events: Array<{ id: string; name: string; options: string[] }> = sp
     ? Array.from(sp.voteEvents ?? []).map((event: any) => ({
@@ -2404,11 +2420,9 @@ function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
 function renderEffectStrike(cue: AnimationCue, cueStyle: string, tone: "effect" | "combat" = "effect"): string {
   if (!cue.targetKey) return "";
   const shards = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 9);
-  // 只有戰吼傷害(tone "effect" 且有施放方)才飛刀:雙影格(Attack1 / Attack1-2)交替,
-  // 從施放方飛向目標。普通攻擊(combat)與無來源的效果傷害不畫刀。
-  const sprite = tone === "effect" && cue.sourceKey ? `<i class="attack-sprite" aria-hidden="true"></i>` : "";
-  const sourceAttr = sprite && cue.sourceKey ? ` data-source-key="${escapeAttr(cue.sourceKey)}"` : "";
-  return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}"${sourceAttr} data-testid="effect-strike">${sprite}<span class="effect-strike-core"></span>${shards}</div>`;
+  // 命中爆光(magenta strike)。戰吼飛刀本身改由 applyKnifeStrike 命令式繪製(body
+  // 層級、不受 re-render 重置),這裡不再放宣告式 sprite —— 命中點只留爆光,不留刀刃。
+  return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="effect-strike"><span class="effect-strike-core"></span>${shards}</div>`;
 }
 
 function cueStyleAttr(cue: AnimationCue): string {
@@ -2874,6 +2888,11 @@ function bindStaticActions(): void {
     on(el, "click", "battle-mode", () => {
       const mode = el.dataset.battleMode as BattleMode | undefined;
       if (!mode) return;
+      // 訓練場 is its own dedicated level-select page, not an inline battle mode.
+      if (mode === "training") {
+        navigateToScreen("training");
+        return;
+      }
       view.battleMode = mode;
       render();
     });
@@ -4134,6 +4153,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   view.events = [];
   view.animationCues = [];
   view.eventStatus = "in_progress";
+  view.amplificationOptions = undefined;
   view.selectedHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
@@ -4145,6 +4165,9 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
 
 function applyTrainingResult(result: TrainingCommandResult): void {
   if (!trainingSession) return;
+  // Mirror the session's special-phase amplification offer into the view so the
+  // real amplification overlay (driven by view.amplificationOptions) can render.
+  view.amplificationOptions = trainingSession.amplificationOptions;
   if (result.publicSync) {
     view.state = trainingPublicState(trainingSession);
     applyPublicSync(result.publicSync);
@@ -4224,9 +4247,10 @@ function trainingLevelCompleted(levelId: string): boolean {
 }
 
 function trainingLevelUnlocked(levelId: TrainingLevelId): boolean {
-  if (levelId === SOCIAL_ROOKIE_TRAINING.id) return true;
-  if (levelId === COLLISION_NEWS_TRAINING.id) return trainingLevelCompleted(SOCIAL_ROOKIE_TRAINING.id);
-  return false;
+  // Sequential unlock: each level requires the previous one in TRAINING_LEVELS order.
+  const index = TRAINING_LEVELS.findIndex((level) => level.id === levelId);
+  if (index <= 0) return true;
+  return trainingLevelCompleted(TRAINING_LEVELS[index - 1].id);
 }
 
 function isLocalTrainingComplete(levelId: string): boolean {
@@ -7912,6 +7936,50 @@ function startAttackLunge(cue: AnimationCue): boolean {
   return true;
 }
 
+// Battlecry flying knife — fired imperatively (once) when the effect cue is
+// ready, into a body-level sprite that the main render loop never touches, so
+// its CSS fly animation can't be reset by a re-render mid-flight.
+function applyKnifeStrike(cue: AnimationCue): void {
+  if (cue.kind !== "effectStrike" || !cue.sourceKey || !cue.targetKey || appliedKnives.has(cue.id)) return;
+  // Target rect: live on the board, or — when this same battlecry just killed it
+  // — the rect captured at death (recentUnitRects) so the knife still lands.
+  const targetEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
+  let tr = targetEl?.getBoundingClientRect();
+  if (!tr || tr.width === 0) {
+    const recent = recentUnitRects.get(cue.targetKey);
+    if (recent && performance.now() - recent.atMs < 2000) tr = recent.rect;
+  }
+  if (!tr || tr.width === 0) return; // not placeable yet — retry next render
+  // Source rect: the caster's real minion, or its in-flight battlecry preview
+  // (which carries no target-key) while the board update is still held.
+  const sourceEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.sourceKey)}"]`)
+    ?? document.querySelector<HTMLElement>(".battlecry-preview");
+  if (!sourceEl) return; // caster not on screen yet — retry next render
+  const sr = sourceEl.getBoundingClientRect();
+  appliedKnives.add(cue.id);
+
+  const tx = tr.left + tr.width / 2;
+  const ty = tr.top + tr.height / 2;
+  const dx = sr.left + sr.width / 2 - tx;
+  const dy = sr.top + sr.height / 2 - ty;
+  const angle = Math.round(Math.atan2(-dy, -dx) * (180 / Math.PI));
+
+  const knife = document.createElement("i");
+  knife.className = "attack-sprite";
+  knife.setAttribute("aria-hidden", "true");
+  knife.style.position = "fixed";
+  knife.style.left = `${Math.round(tx)}px`;
+  knife.style.top = `${Math.round(ty)}px`;
+  knife.style.zIndex = "2001";
+  knife.style.setProperty("--fly-dx", `${Math.round(dx)}px`);
+  knife.style.setProperty("--fly-dy", `${Math.round(dy)}px`);
+  knife.style.setProperty("--fly-angle", `${angle}deg`);
+  document.body.appendChild(knife);
+  // Removed after the fly animation (0.34s) finishes; the id stays in
+  // appliedKnives so the still-alive cue can't spawn a second knife.
+  window.setTimeout(() => knife.remove(), 420);
+}
+
 function applyDeathShatter(cue: AnimationCue): void {
   if (cue.kind !== "destroy" || !cue.targetKey || appliedDeathShatters.has(cue.id)) return;
   const minionEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
@@ -7999,6 +8067,9 @@ function applyPostRenderEffects(): void {
     if (cue.kind === "attackerMoves" && cue.attackerInstanceId && cue.targetKey && !appliedLunges.has(cue.id)) {
       startAttackLunge(cue);
     }
+    if (cue.kind === "effectStrike" && cue.sourceKey && cue.targetKey && cueIsReady(cue)) {
+      applyKnifeStrike(cue);
+    }
     if (cue.kind === "destroy" && cue.targetKey && cueIsReady(cue)) {
       applyDeathShatter(cue);
     }
@@ -8013,18 +8084,14 @@ function applyPostRenderEffects(): void {
       const selector = `[data-target-key="${cssEscape(anchorKey)}"]`;
       const target = document.querySelector<HTMLElement>(selector);
       let r = target?.getBoundingClientRect();
-      let targetVia = r && r.width > 0 ? "live" : "none";
       if ((!r || r.width === 0) && !anchorKey.startsWith("board:")) {
         // Target just left the board (e.g. killed by this same battlecry): the
         // kill flush removes the minion while the effect cue is still alive, so
         // a live DOM lookup misses. Fall back to the rect captured when it died
-        // (recentUnitRects, populated by applyDeathShatter) so an in-flight
-        // knife still lands on the spot instead of being orphaned and vanishing.
+        // (recentUnitRects, populated by applyDeathShatter) so the impact flash
+        // still lands on the spot instead of being orphaned.
         const recent = recentUnitRects.get(anchorKey);
-        if (recent && performance.now() - recent.atMs < 2000) {
-          r = recent.rect;
-          targetVia = "recent";
-        }
+        if (recent && performance.now() - recent.atMs < 2000) r = recent.rect;
       }
       if (!r) continue;
       // A board-wide AOE sweep covers the whole board rect (top-left + size),
@@ -8049,40 +8116,6 @@ function applyPostRenderEffects(): void {
       }
       node.style.left = `${x}px`;
       node.style.top = `${y}px`;
-      // Flying knife: point the sprite from its caster toward the target and seed
-      // the fly offset (caster − target, since the node sits at the target point).
-      const sourceKey = node.dataset.sourceKey;
-      const sprite = sourceKey ? node.querySelector<HTMLElement>(".attack-sprite") : null;
-      if (sourceKey && sprite) {
-        // The caster's real minion (sourceKey) may not be on the synced board
-        // yet: right after a lethal battlecry the board update is held while the
-        // kill animates, so the summoned minion only appears after the flush —
-        // long after the knife should fly. During that window the local caster
-        // is shown as a `.battlecry-preview` (which carries no target-key), so
-        // fall back to it to keep the knife flying from the right place.
-        const realSourceEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(sourceKey)}"]`);
-        const sourceEl = realSourceEl ?? document.querySelector<HTMLElement>(".battlecry-preview");
-        if (sourceEl) {
-          const sr = sourceEl.getBoundingClientRect();
-          const src = localPointFromViewport(eventLayer, sr.left + sr.width / 2, sr.top + sr.height / 2);
-          const dx = src.x - x;
-          const dy = src.y - y;
-          const angle = Math.round(Math.atan2(-dy, -dx) * (180 / Math.PI));
-          sprite.style.setProperty("--fly-dx", `${Math.round(dx)}px`);
-          sprite.style.setProperty("--fly-dy", `${Math.round(dy)}px`);
-          sprite.style.setProperty("--fly-angle", `${angle}deg`);
-          sprite.style.visibility = "";
-          blog("knife seeded", { cueId: node.dataset.cueId, targetVia, sourceVia: realSourceEl ? "real" : "preview", dx: Math.round(dx), dy: Math.round(dy) });
-        } else {
-          // Truly nothing on screen to fly from — hide the blade so it never
-          // shows as a static horizontal sliver at the impact point, and leave
-          // the node un-anchored so a later render can still seed a real fly
-          // vector. The node is removed when the cue expires, so this is bounded.
-          sprite.style.visibility = "hidden";
-          blog("knife hidden (no source)", { cueId: node.dataset.cueId, sourceKey, targetVia });
-          continue;
-        }
-      }
       node.dataset.anchored = "true";
     }
   }

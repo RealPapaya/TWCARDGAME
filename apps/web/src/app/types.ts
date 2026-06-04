@@ -85,7 +85,7 @@ export interface BattleLogEntry {
   /** Acting seat, for friendly/enemy tinting. */
   seat?: Seat;
 }
-export type MenuScreen = "main" | "battle" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai" | "test";
+export type MenuScreen = "main" | "battle" | "training" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai" | "test";
 export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
 export type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";

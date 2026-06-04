@@ -360,6 +360,28 @@
   line-height: 1.45;
 }
 
+/* Dedicated 訓練場 level-select page (reached from the battle screen's 訓練場 tile). */
+.training-screen-intro {
+  margin: 4px 0 18px;
+  color: #f4e4bc;
+  font-size: 16px;
+  text-align: center;
+  text-shadow: 0 2px 6px #000;
+}
+
+.training-level-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 360px));
+  justify-content: center;
+  gap: 18px;
+  padding-bottom: 24px;
+}
+
+.training-level-grid .battle-training-card {
+  max-width: none;
+  width: 100%;
+}
+
 .battle-private-room {
   margin: 0;
   padding: 0;
