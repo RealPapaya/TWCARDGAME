@@ -4246,11 +4246,9 @@ function trainingLevelCompleted(levelId: string): boolean {
   return remoteTrainingCompletions.has(levelId) || isLocalTrainingComplete(levelId);
 }
 
-function trainingLevelUnlocked(levelId: TrainingLevelId): boolean {
-  // Sequential unlock: each level requires the previous one in TRAINING_LEVELS order.
-  const index = TRAINING_LEVELS.findIndex((level) => level.id === levelId);
-  if (index <= 0) return true;
-  return trainingLevelCompleted(TRAINING_LEVELS[index - 1].id);
+function trainingLevelUnlocked(_levelId: TrainingLevelId): boolean {
+  // Training levels are teaching content — every level is freely selectable.
+  return true;
 }
 
 function isLocalTrainingComplete(levelId: string): boolean {

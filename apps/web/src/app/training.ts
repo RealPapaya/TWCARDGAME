@@ -61,7 +61,7 @@ export const COLLISION_NEWS_TRAINING = {
   name: "拜碼頭",
   rewardGold: 100,
   heroHealth: 10,
-  description: "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。完成第一關後解鎖。"
+  description: "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。"
 } as const;
 
 export const TRAINING_LEVELS = [
