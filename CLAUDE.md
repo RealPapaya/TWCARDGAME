@@ -75,6 +75,7 @@ The repo's own skills document the project workflow and coding style:
 
 - General project workflow: [.claude/skills/twcardgame-v2/SKILL.md](.claude/skills/twcardgame-v2/SKILL.md)
 - Coding style and module boundaries: [.claude/skills/twcardgame-v2-coding-style/SKILL.md](.claude/skills/twcardgame-v2-coding-style/SKILL.md)
+- Web battle animation (event→cue model, publicSync hold/flush, declarative-vs-imperative animation, anchoring to appearing/dead units): [.claude/skills/twcardgame-v2-web-animation/SKILL.md](.claude/skills/twcardgame-v2-web-animation/SKILL.md)
 
 Validation cadence:
 
