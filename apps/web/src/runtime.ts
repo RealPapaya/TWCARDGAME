@@ -2395,22 +2395,26 @@ function renderEventCue(cue: AnimationCue): string {
 
 function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
   if (!cue.targetKey) return "";
-  const particles = [
-    ["-30px", "-20px", "20px", "0ms"],
-    ["20px", "-26px", "24px", "70ms"],
-    ["-40px", "4px", "18px", "120ms"],
-    ["36px", "-2px", "22px", "170ms"],
-    ["-14px", "18px", "20px", "220ms"],
-    ["24px", "22px", "18px", "280ms"],
-    ["0px", "-32px", "26px", "120ms"],
-    ["-26px", "26px", "16px", "340ms"]
-  ];
-  // 全場治療由 aoeSweep 主導，單體粒子數調少。粒子改用綠色 "+" 圍繞目標，更明顯。
-  const shown = cue.scope === "aoe" ? particles.slice(0, 4) : particles;
-  const spans = shown.map(([x, y, size, delay]) => (
-    `<span style="--x:${x};--y:${y};--size:${size};--particle-delay:${delay}">+</span>`
-  )).join("");
-  return `<div class="heal-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans}</div>`;
+  // 綠色 "+" 圍繞卡牌四周升起。heal-burst 錨定於卡牌中心，故把符號沿橢圓環分布於
+  // 卡牌邊緣外側（卡牌約 128×184）。滿血、單體、全體治療都會繪製，讓「被回復」一目了然。
+  const isAoe = cue.scope === "aoe";
+  const count = isAoe ? 7 : 11;
+  const rx = 76; // 橢圓水平半徑（略大於半張卡寬）
+  const ry = 106; // 橢圓垂直半徑（略大於半張卡高）
+  const sizes = [30, 23, 27, 21, 29, 24, 26, 22, 28, 25, 31];
+  const spans: string[] = [];
+  for (let i = 0; i < count; i += 1) {
+    // 從正上方順時針均分，奇偶微量交錯避免機械對稱感。
+    const angle = (-90 + (360 / count) * i + (i % 2 === 0 ? 0 : 9)) * (Math.PI / 180);
+    const x = Math.round(Math.cos(angle) * rx);
+    const y = Math.round(Math.sin(angle) * ry);
+    const size = sizes[i % sizes.length];
+    const delay = i * 32;
+    spans.push(
+      `<span style="--x:${x}px;--y:${y}px;--size:${size}px;--particle-delay:${delay}ms">+</span>`
+    );
+  }
+  return `<div class="heal-burst${isAoe ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans.join("")}</div>`;
 }
 
 /**
@@ -7212,7 +7216,8 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     const lifetime =
       cue.kind === "play" ? 1350
       : cue.kind === "attackerMoves" ? ATTACK_LUNGE_MS
-      : cue.kind === "damage" || cue.kind === "heal" ? 1150
+      : cue.kind === "damage" ? 1150
+      : cue.kind === "heal" ? 1500
       : cue.kind === "effectStrike" ? 1150
       : cue.kind === "deathrattle" ? 1150
       : cue.kind === "aoeSweep" ? 1100

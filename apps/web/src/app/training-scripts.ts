@@ -265,6 +265,7 @@ function sameTarget(a: TargetRef | undefined, b: TargetRef): boolean {
 
 // ─── Lesson 3: 卡牌種類介紹 (嘲諷 / 光盾 / 戰吼) ──────────────────────────────
 
+const L3_TAUNT_HAND = "l3-taunt-hand";
 const L3_TAUNT = "l3-taunt";
 const L3_ENEMY = "l3-enemy";
 const L3_SHIELD = "l3-shield";
@@ -273,28 +274,53 @@ const L3_FRIEND_A = "l3-friend-a";
 const L3_FRIEND_B = "l3-friend-b";
 const L3_BATTLECRY_HAND = "l3-battlecry-hand";
 const L3_BATTLECRY_MINION = "l3-battlecry-minion";
+const L3_BC_ENEMY = "l3-bc-enemy";
 
 const CARD_TYPES_SCRIPT: TrainingScript = {
   level: CARD_TYPES_TRAINING,
   setup: () => ({
     players: {
-      player1: makePlayer(PLAYER, "玩家", 10, [makeMinion(L3_TAUNT, "TW023", PLAYER, 3, 8, { taunt: true })], 0),
+      player1: makePlayer(PLAYER, "玩家", 10, [], 1),
       player2: makePlayer(OPPONENT, "訓練教官", 0, [makeMinion(L3_ENEMY, "TW045", OPPONENT, 4, 5, { canAttack: true })], 0)
     },
-    hand: []
+    hand: [handCard(L3_TAUNT_HAND, "TW023", 7, "MINION", 3, 8)]
   }),
   steps: [
     {
       id: "l3_intro",
       title: "第三關：卡牌種類介紹",
-      body: "這一關介紹三種常見的卡牌關鍵字：嘲諷、光盾、戰吼。先看左邊我方的『陳玉珍』，它有【嘲諷】。",
+      body: "這一關介紹三種常見的卡牌關鍵字：嘲諷、光盾、戰吼。先看【嘲諷】——敵方有一個 4 攻擊的隨從正盯著你的英雄，下個回合就會直接打過來。我們用嘲諷把它擋下。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L3_TAUNT }]
+      highlights: [{ type: "unit", seat: OPPONENT, instanceId: L3_ENEMY }, { type: "hero", seat: PLAYER }]
     },
     {
       id: "l3_taunt_explain",
       title: "嘲諷",
-      body: "【嘲諷】：只要場上有嘲諷隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。按下一步，看敵方隨從被迫攻擊它。",
+      body: "【嘲諷】：只要場上有嘲諷隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。你手上的『陳玉珍』是 3/8 嘲諷，很適合擋在前線。",
+      action: "next",
+      highlights: [{ type: "hand", instanceId: L3_TAUNT_HAND }, { type: "cardCost", instanceId: L3_TAUNT_HAND }]
+    },
+    {
+      id: "l3_taunt_do",
+      title: "換你操作：築起嘲諷牆",
+      body: "把手牌的『陳玉珍』打到戰場上，擋在你的英雄前面。",
+      action: "script_play",
+      selectHandId: L3_TAUNT_HAND,
+      highlights: [{ type: "hand", instanceId: L3_TAUNT_HAND }],
+      match: (command) => command.type === "playCard" && command.handInstanceId === L3_TAUNT_HAND,
+      resolve: (session) => {
+        removeHand(session, L3_TAUNT_HAND);
+        setPlayerBoard(session, PLAYER, [makeMinion(L3_TAUNT, "TW023", PLAYER, 3, 8, { taunt: true, sleeping: true })]);
+        return [
+          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L3_TAUNT_HAND, cardId: "TW023" }),
+          ev(session, "MINION_SUMMONED", PLAYER, { target: L3_TAUNT, cardId: "TW023" })
+        ];
+      }
+    },
+    {
+      id: "l3_taunt_demo",
+      title: "嘲諷生效",
+      body: "陳玉珍站上了前線。按下一步，看敵方隨從的行動——它被迫攻擊有嘲諷的陳玉珍，完全碰不到你的英雄。",
       action: "next",
       highlights: [{ type: "unit", seat: PLAYER, instanceId: L3_TAUNT }, { type: "hero", seat: PLAYER }],
       apply: (session) => {
@@ -314,7 +340,7 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_taunt_result",
       title: "嘲諷的用途",
-      body: "看到了嗎？敵方隨從被迫攻擊嘲諷的陳玉珍，無法直接打你的英雄。嘲諷是很好的防守關鍵字。",
+      body: "成功擋下！敵方的攻擊被陳玉珍吸走，你的英雄毫髮無傷。嘲諷能把威脅引到隨從身上，是保護英雄、穩住戰局的防守關鍵字。",
       action: "next",
       highlights: [{ type: "unit", seat: PLAYER, instanceId: L3_TAUNT }],
       apply: (session) => {
@@ -362,12 +388,12 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
       action: "next",
       highlights: [{ type: "unit", seat: OPPONENT, instanceId: L3_SHIELD }],
       apply: (session) => {
-        // Switch to the battlecry demo: two friendly minions on board + a battlecry card in hand.
+        // Switch to the battlecry demo: two friendly minions + an enemy threat + a battlecry card in hand.
         const events = setBoard(session, PLAYER, [
-          makeMinion(L3_FRIEND_A, "TW045", PLAYER, 4, 5),
+          makeMinion(L3_FRIEND_A, "TW045", PLAYER, 4, 5, { canAttack: true }),
           makeMinion(L3_FRIEND_B, "TW058", PLAYER, 1, 1)
         ]);
-        events.push(...setBoard(session, OPPONENT, []));
+        events.push(...setBoard(session, OPPONENT, [makeMinion(L3_BC_ENEMY, "TW045", OPPONENT, 2, 5)]));
         addHand(session, handCard(L3_BATTLECRY_HAND, "TW016", 5, "MINION", 1, 3));
         events.push(ev(session, "CARD_DRAWN", PLAYER, { cardId: "TW016" }));
         return events;
@@ -376,9 +402,13 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_battlecry_explain",
       title: "戰吼",
-      body: "最後是【戰吼】，戰吼是隨從『打出當下』觸發一次的效果。你手牌的『吳敦義』戰吼是：賦予所有友方隨從 +1 攻擊力。",
+      body: "最後是【戰吼】，戰吼是隨從『打出當下』觸發一次的效果。敵方有個 2/5 隨從，你的『蘇巧慧』只有 4 攻擊，差一點打不死它。手牌的『吳敦義』戰吼是：賦予所有友方隨從 +1 攻擊力。",
       action: "next",
-      highlights: [{ type: "hand", instanceId: L3_BATTLECRY_HAND }, { type: "cardCost", instanceId: L3_BATTLECRY_HAND }]
+      highlights: [
+        { type: "hand", instanceId: L3_BATTLECRY_HAND },
+        { type: "cardCost", instanceId: L3_BATTLECRY_HAND },
+        { type: "unit", seat: OPPONENT, instanceId: L3_BC_ENEMY }
+      ]
     },
     {
       id: "l3_battlecry_do",
@@ -402,16 +432,45 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
       }
     },
     {
+      id: "l3_battlecry_payoff",
+      title: "換你操作：把握戰吼的力量",
+      body: "蘇巧慧的攻擊力 +1 變成 5，剛好夠一擊解決敵方的 2/5 隨從。用發亮的蘇巧慧攻擊敵方隨從。",
+      action: "script_attack",
+      selectAttackerId: L3_FRIEND_A,
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_A },
+        { type: "unit", seat: OPPONENT, instanceId: L3_BC_ENEMY }
+      ],
+      match: (command) => isAttack(command, L3_FRIEND_A, { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY }),
+      resolve: (session) => {
+        const attacker = findMinion(session, PLAYER, L3_FRIEND_A)!;
+        const enemy = findMinion(session, OPPONENT, L3_BC_ENEMY)!;
+        setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
+          m.instanceId === L3_FRIEND_A ? { ...m, currentHealth: m.currentHealth - enemy.attack, canAttack: false } : m));
+        setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.filter((m) => m.instanceId !== L3_BC_ENEMY));
+        session.players[OPPONENT] = {
+          ...session.players[OPPONENT],
+          graveyardCount: session.players[OPPONENT].graveyardCount + 1
+        };
+        return [
+          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L3_FRIEND_A, target: { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY } }),
+          ev(session, "DAMAGE", OPPONENT, { target: L3_BC_ENEMY, amount: attacker.attack }),
+          ev(session, "DAMAGE", PLAYER, { target: L3_FRIEND_A, amount: enemy.attack }),
+          ev(session, "DESTROY", OPPONENT, { target: L3_BC_ENEMY, cardId: "TW045" })
+        ];
+      }
+    },
+    {
       id: "l3_battlecry_result",
       title: "戰吼觸發了",
-      body: "所有友方隨從攻擊力都 +1 了！注意：戰吼只在打出當下觸發一次，之後不會再生效。",
+      body: "看到了嗎？戰吼的 +1 攻擊讓蘇巧慧剛好解決掉敵人，自己還存活下來。戰吼雖然只在打出當下觸發一次，但這一下就足以扭轉場面。",
       action: "next",
       highlights: [{ type: "unit", seat: PLAYER }]
     },
     {
       id: "l3_done",
       title: "完成第三關",
-      body: "太棒了！你已經認識嘲諷、光盾、戰吼。點下一步完成第三關。",
+      body: "太棒了！你已經實際操作過嘲諷、光盾、戰吼。點下一步完成第三關。",
       action: "next"
     }
   ]
