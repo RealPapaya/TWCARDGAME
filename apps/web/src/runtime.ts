@@ -2395,21 +2395,27 @@ function renderEventCue(cue: AnimationCue): string {
 
 function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
   if (!cue.targetKey) return "";
-  // 綠色 "+" 圍繞卡牌四周升起。heal-burst 錨定於卡牌中心，故把符號沿橢圓環分布於
-  // 卡牌邊緣外側（卡牌約 128×184）。滿血、單體、全體治療都會繪製，讓「被回復」一目了然。
+  // 綠色細 "+" 此起彼落地在卡牌四周冒出：位置隨機散布（非環狀），出現時間各自錯開，
+  // 營造「持續被治療」的層次感。滿血、單體、全體（如柯文哲全場回滿）都會繪製。
   const isAoe = cue.scope === "aoe";
-  const count = isAoe ? 7 : 11;
-  const rx = 76; // 橢圓水平半徑（略大於半張卡寬）
-  const ry = 106; // 橢圓垂直半徑（略大於半張卡高）
-  const sizes = [30, 23, 27, 21, 29, 24, 26, 22, 28, 25, 31];
+  const count = isAoe ? 6 : 9;
+  // 由 cue.id 衍生的確定性亂數，讓每個 cue 的散布固定（避免 re-render 跳動）。
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < cue.id.length; i += 1) {
+    hash ^= cue.id.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  const rand = (): number => {
+    hash = Math.imul(hash ^ (hash >>> 15), 2246822519) >>> 0;
+    hash = Math.imul(hash ^ (hash >>> 13), 3266489917) >>> 0;
+    return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
+  };
   const spans: string[] = [];
   for (let i = 0; i < count; i += 1) {
-    // 從正上方順時針均分，奇偶微量交錯避免機械對稱感。
-    const angle = (-90 + (360 / count) * i + (i % 2 === 0 ? 0 : 9)) * (Math.PI / 180);
-    const x = Math.round(Math.cos(angle) * rx);
-    const y = Math.round(Math.sin(angle) * ry);
-    const size = sizes[i % sizes.length];
-    const delay = i * 32;
+    const x = Math.round((rand() * 2 - 1) * 72); // 卡牌寬度範圍散布
+    const y = Math.round((rand() * 2 - 1) * 100); // 卡牌高度範圍散布
+    const size = 16 + Math.round(rand() * 12); // 16–28px，粗細一致只變大小
+    const delay = Math.round(rand() * 650); // 0–650ms 錯開出現，呈現此起彼落
     spans.push(
       `<span style="--x:${x}px;--y:${y}px;--size:${size}px;--particle-delay:${delay}ms">+</span>`
     );

@@ -479,12 +479,14 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
 // ─── Lesson 4: 進階關鍵字 (激怒 / 遺志 / 持續效果 / 回手牌) ────────────────────
 
 const L4_ENRAGE = "l4-enrage";
+const L4_ENEMY = "l4-enrage-enemy";
 const L4_DEATH = "l4-death";
 const L4_DEATH_HAND = "l4-death-hand";
 const L4_KILLER = "l4-killer";
 const L4_AURA = "l4-aura";
 const L4_AURA_L = "l4-aura-left";
 const L4_AURA_R = "l4-aura-right";
+const L4_AURA_HAND = "l4-aura-hand";
 const L4_BOUNCE = "l4-bounce";
 const L4_BOUNCE_HAND = "l4-bounce-hand";
 
@@ -493,7 +495,7 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
   setup: () => ({
     players: {
       player1: makePlayer(PLAYER, "玩家", 10, [makeMinion(L4_ENRAGE, "TW009", PLAYER, 1, 4)], 0),
-      player2: makePlayer(OPPONENT, "訓練教官", 0, [], 0)
+      player2: makePlayer(OPPONENT, "訓練教官", 0, [makeMinion(L4_ENEMY, "TW045", OPPONENT, 2, 4)], 0)
     },
     hand: []
   }),
@@ -501,22 +503,23 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_intro",
       title: "第四關：進階關鍵字",
-      body: "這一關介紹激怒、遺志、持續效果、回手牌。先看『台積電工程師』，它有【激怒】，現在攻擊是 1。",
+      body: "這一關介紹激怒、遺志、持續效果、回手牌，這次每一個都換你親自操作。場上敵方有個 2/4 隨從；先看我方『台積電工程師』(1/4) 的【激怒】，它現在只有 1 攻擊。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L4_ENRAGE },
-        { type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" }
+        { type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" },
+        { type: "unit", seat: OPPONENT, instanceId: L4_ENEMY }
       ]
     },
     {
       id: "l4_enrage_explain",
       title: "激怒",
-      body: "【激怒】：當隨從受傷（生命未滿）時獲得加成。台積電工程師激怒：+3 攻擊。按下一步，讓它受到 1 點傷害。",
+      body: "【激怒】：當隨從受傷（生命未滿）時獲得加成。台積電工程師激怒：+3 攻擊。按下一步，讓它受到 1 點傷害觸發激怒。",
       action: "next",
       highlights: [{ type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" }],
       apply: (session) => {
         setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
-          m.instanceId === L4_ENRAGE ? { ...m, currentHealth: m.currentHealth - 1, attack: m.attack + 3, isEnraged: true } : m));
+          m.instanceId === L4_ENRAGE ? { ...m, currentHealth: m.currentHealth - 1, attack: m.attack + 3, isEnraged: true, canAttack: true } : m));
         return [
           ev(session, "DAMAGE", PLAYER, { target: L4_ENRAGE, amount: 1 }),
           ev(session, "BUFF", PLAYER, { target: L4_ENRAGE, stat: "ATTACK", value: 3 })
@@ -524,49 +527,80 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
       }
     },
     {
-      id: "l4_enrage_active",
-      title: "激怒觸發",
-      body: "受傷了！生命從 4 變 3，激怒觸發，攻擊力從 1 暴增到 4。按下一步把它補滿血。",
-      action: "next",
+      id: "l4_enrage_do",
+      title: "換你操作：用怒氣反擊",
+      body: "激怒觸發了！攻擊力從 1 暴增到 4。換你操作：用發亮的台積電工程師攻擊敵方的 2/4 隨從，一擊把威脅解決掉。",
+      action: "script_attack",
+      selectAttackerId: L4_ENRAGE,
       highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L4_ENRAGE },
         { type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" },
-        { type: "minionStat", instanceId: L4_ENRAGE, stat: "health" }
+        { type: "unit", seat: OPPONENT, instanceId: L4_ENEMY }
       ],
-      apply: (session) => {
+      match: (command) => isAttack(command, L4_ENRAGE, { type: "MINION", side: OPPONENT, instanceId: L4_ENEMY }),
+      resolve: (session) => {
+        const attacker = findMinion(session, PLAYER, L4_ENRAGE)!;
+        const enemy = findMinion(session, OPPONENT, L4_ENEMY)!;
         setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
-          m.instanceId === L4_ENRAGE ? { ...m, currentHealth: m.health, attack: m.baseAttack, isEnraged: false } : m));
-        return [ev(session, "HEAL", PLAYER, { target: L4_ENRAGE, amount: 1 })];
+          m.instanceId === L4_ENRAGE ? { ...m, currentHealth: m.currentHealth - enemy.attack, canAttack: false } : m));
+        setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.filter((m) => m.instanceId !== L4_ENEMY));
+        session.players[OPPONENT] = {
+          ...session.players[OPPONENT],
+          graveyardCount: session.players[OPPONENT].graveyardCount + 1
+        };
+        return [
+          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L4_ENRAGE, target: { type: "MINION", side: OPPONENT, instanceId: L4_ENEMY } }),
+          ev(session, "DAMAGE", OPPONENT, { target: L4_ENEMY, amount: attacker.attack }),
+          ev(session, "DAMAGE", PLAYER, { target: L4_ENRAGE, amount: enemy.attack }),
+          ev(session, "DESTROY", OPPONENT, { target: L4_ENEMY, cardId: "TW045" })
+        ];
       }
     },
     {
-      id: "l4_enrage_heal",
-      title: "激怒解除",
-      body: "補滿血後激怒解除，攻擊力回到 1。激怒讓受傷的隨從更兇猛，但補血就會冷靜下來。",
+      id: "l4_enrage_result",
+      title: "激怒的力量",
+      body: "看到了嗎？平常只有 1 攻擊的它，受傷後用 4 攻擊一擊解決了威脅，自己還活著。激怒讓受傷的隨從更兇猛——這就是它逆轉戰局的方式。（小提醒：若把它補滿血，激怒就會解除，攻擊力回到 1。）",
       action: "next",
-      highlights: [{ type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" }],
+      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_ENRAGE }],
       apply: (session) => {
-        const events = setBoard(session, PLAYER, [makeMinion(L4_DEATH, "TW036", PLAYER, 2, 2)]);
-        events.push(...setBoard(session, OPPONENT, [makeMinion(L4_KILLER, "TW045", OPPONENT, 4, 5, { canAttack: true })]));
+        const events = setBoard(session, PLAYER, [makeMinion(L4_DEATH, "TW036", PLAYER, 2, 2, { canAttack: true })]);
+        events.push(...setBoard(session, OPPONENT, [makeMinion(L4_KILLER, "TW045", OPPONENT, 3, 2)]));
         return events;
       }
     },
     {
       id: "l4_death_explain",
       title: "遺志",
-      body: "【遺志】：隨從『死亡時』觸發的效果。我方『連勝文』遺志：死亡後回到手牌。按下一步，看敵方隨從攻擊並擊殺它。",
+      body: "【遺志】：隨從『死亡時』觸發的效果。我方『連勝文』(2/2) 遺志：死亡後回到手牌。敵方是 3/2，用連勝文去換掉它——就算它陣亡，也會回到你的手牌，等於不虧。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_DEATH }, { type: "unit", seat: OPPONENT, instanceId: L4_KILLER }],
-      apply: (session) => {
-        const killer = findMinion(session, OPPONENT, L4_KILLER)!;
-        const victim = findMinion(session, PLAYER, L4_DEATH)!;
+      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_DEATH }, { type: "unit", seat: OPPONENT, instanceId: L4_KILLER }]
+    },
+    {
+      id: "l4_death_do",
+      title: "換你操作：用遺志換牌",
+      body: "用發亮的連勝文攻擊敵方的 3/2 隨從。它雖然會在交換中陣亡，但遺志會把它送回你的手牌。",
+      action: "script_attack",
+      selectAttackerId: L4_DEATH,
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L4_DEATH },
+        { type: "unit", seat: OPPONENT, instanceId: L4_KILLER }
+      ],
+      match: (command) => isAttack(command, L4_DEATH, { type: "MINION", side: OPPONENT, instanceId: L4_KILLER }),
+      resolve: (session) => {
+        const attacker = findMinion(session, PLAYER, L4_DEATH)!;
+        const enemy = findMinion(session, OPPONENT, L4_KILLER)!;
         setPlayerBoard(session, PLAYER, session.players[PLAYER].board.filter((m) => m.instanceId !== L4_DEATH));
-        setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.map((m) =>
-          m.instanceId === L4_KILLER ? { ...m, currentHealth: m.currentHealth - victim.attack, canAttack: false } : m));
+        setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.filter((m) => m.instanceId !== L4_KILLER));
+        session.players[OPPONENT] = {
+          ...session.players[OPPONENT],
+          graveyardCount: session.players[OPPONENT].graveyardCount + 1
+        };
         addHand(session, handCard(L4_DEATH_HAND, "TW036", 4, "MINION", 2, 2));
         return [
-          ev(session, "ATTACK", OPPONENT, { attackerInstanceId: L4_KILLER, target: { type: "MINION", side: PLAYER, instanceId: L4_DEATH } }),
-          ev(session, "DAMAGE", PLAYER, { target: L4_DEATH, amount: killer.attack }),
-          ev(session, "DAMAGE", OPPONENT, { target: L4_KILLER, amount: victim.attack }),
+          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L4_DEATH, target: { type: "MINION", side: OPPONENT, instanceId: L4_KILLER } }),
+          ev(session, "DAMAGE", OPPONENT, { target: L4_KILLER, amount: attacker.attack }),
+          ev(session, "DAMAGE", PLAYER, { target: L4_DEATH, amount: enemy.attack }),
+          ev(session, "DESTROY", OPPONENT, { target: L4_KILLER, cardId: "TW045" }),
           ev(session, "DESTROY", PLAYER, { target: L4_DEATH, cardId: "TW036" }),
           ev(session, "DEATHRATTLE", PLAYER, { source: L4_DEATH, type: "BOUNCE_SELF" }),
           ev(session, "BOUNCE", PLAYER, { target: L4_DEATH, cardId: "TW036" })
@@ -576,42 +610,73 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_death_result",
       title: "遺志觸發了",
-      body: "連勝文陣亡，但遺志觸發，它回到了你的手牌！遺志能在死亡時帶來各種效果（抽牌、召喚、回手等）。",
+      body: "連勝文陣亡了——但遺志觸發，它回到了你的手牌！你換掉了敵人，自己卻完好回來。遺志能在死亡時帶來各種效果（抽牌、召喚、回手等），是讓你不吃虧的關鍵。",
       action: "next",
       highlights: [{ type: "hand", instanceId: L4_DEATH_HAND }],
       apply: (session) => {
         removeHand(session, L4_DEATH_HAND);
         const events = setBoard(session, PLAYER, [
-          makeMinion(L4_AURA_L, "TW058", PLAYER, 2, 2),
-          makeMinion(L4_AURA, "TW028", PLAYER, 0, 6),
-          makeMinion(L4_AURA_R, "TW058", PLAYER, 2, 2)
+          makeMinion(L4_AURA_L, "TW058", PLAYER, 1, 1),
+          makeMinion(L4_AURA_R, "TW058", PLAYER, 1, 1)
         ]);
         events.push(...setBoard(session, OPPONENT, []));
-        events.push(
-          ev(session, "AURA_UPDATED", PLAYER, { target: L4_AURA_L }),
-          ev(session, "BUFF", PLAYER, { target: L4_AURA_L, stat: "ATTACK", value: 1 }),
-          ev(session, "BUFF", PLAYER, { target: L4_AURA_R, stat: "ATTACK", value: 1 })
-        );
+        addHand(session, handCard(L4_AURA_HAND, "TW028", 6, "MINION", 0, 6));
+        events.push(ev(session, "CARD_DRAWN", PLAYER, { cardId: "TW028" }));
         return events;
       }
     },
     {
       id: "l4_aura_explain",
       title: "持續效果",
-      body: "【持續效果】：只要隨從在場上就『持續』生效，不是一次性。『京華城』持續效果賦予左右兩側隨從 +1/+1，所以兩側的蔡想想變成了 2/2。",
+      body: "【持續效果】：只要隨從在場上就『持續』生效，不是一次性。你手上的『京華城』(0/6) 持續效果：賦予左右兩側的隨從 +1/+1。場上兩個蔡想想現在都是 1/1。",
       action: "next",
       highlights: [
-        { type: "unit", seat: PLAYER, instanceId: L4_AURA },
+        { type: "hand", instanceId: L4_AURA_HAND },
+        { type: "cardCost", instanceId: L4_AURA_HAND },
         { type: "unit", seat: PLAYER, instanceId: L4_AURA_L },
         { type: "unit", seat: PLAYER, instanceId: L4_AURA_R }
       ]
     },
     {
-      id: "l4_aura_note",
+      id: "l4_aura_do",
+      title: "換你操作：打出持續效果",
+      body: "把『京華城』打到場上，看它如何讓兩側的蔡想想立刻變強。",
+      action: "script_play",
+      selectHandId: L4_AURA_HAND,
+      highlights: [{ type: "hand", instanceId: L4_AURA_HAND }],
+      match: (command) => command.type === "playCard" && command.handInstanceId === L4_AURA_HAND,
+      resolve: (session) => {
+        removeHand(session, L4_AURA_HAND);
+        const buffed = session.players[PLAYER].board.map((m) =>
+          (m.instanceId === L4_AURA_L || m.instanceId === L4_AURA_R)
+            ? { ...m, attack: m.attack + 1, baseAttack: m.baseAttack + 1, health: m.health + 1, currentHealth: m.currentHealth + 1 }
+            : m);
+        const aura = makeMinion(L4_AURA, "TW028", PLAYER, 0, 6, { sleeping: true });
+        setPlayerBoard(session, PLAYER, [
+          buffed.find((m) => m.instanceId === L4_AURA_L)!,
+          aura,
+          buffed.find((m) => m.instanceId === L4_AURA_R)!
+        ]);
+        return [
+          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L4_AURA_HAND, cardId: "TW028" }),
+          ev(session, "MINION_SUMMONED", PLAYER, { target: L4_AURA, cardId: "TW028" }),
+          ev(session, "AURA_UPDATED", PLAYER, { target: L4_AURA_L }),
+          ev(session, "AURA_UPDATED", PLAYER, { target: L4_AURA_R }),
+          ev(session, "BUFF", PLAYER, { target: L4_AURA_L, stat: "ATTACK", value: 1 }),
+          ev(session, "BUFF", PLAYER, { target: L4_AURA_R, stat: "ATTACK", value: 1 })
+        ];
+      }
+    },
+    {
+      id: "l4_aura_result",
       title: "持續 vs 一次性",
-      body: "如果京華城離場，這個 +1/+1 就會立刻消失。這就是持續效果與戰吼（打出時一次性）最大的差別。",
+      body: "兩側的蔡想想都從 1/1 變成 2/2！這是『持續』效果——只要京華城在場就一直生效。如果京華城離場，這個 +1/+1 會立刻消失，這就是它與戰吼（打出時一次性）最大的差別。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_AURA }],
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L4_AURA },
+        { type: "unit", seat: PLAYER, instanceId: L4_AURA_L },
+        { type: "unit", seat: PLAYER, instanceId: L4_AURA_R }
+      ],
       apply: (session) => {
         return setBoard(session, PLAYER, [makeMinion(L4_BOUNCE, "TW032", PLAYER, 2, 2)]);
       }
@@ -619,7 +684,7 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_bounce_explain",
       title: "回手牌",
-      body: "【回手牌】：把場上的隨從收回手牌。有些卡回到手牌會變強，例如『韓國瑜』回到手牌永久 +2/+2。按下一步，看它被收回。",
+      body: "【回手牌】：把場上的隨從收回手牌。有些卡回到手牌會變強——傳說卡『韓國瑜』(2/2) 回到手牌會永久 +2/+2。按下一步，先看它被收回手牌。",
       action: "next",
       highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_BOUNCE }],
       apply: (session) => {
@@ -629,16 +694,34 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
       }
     },
     {
+      id: "l4_bounce_replay",
+      title: "換你操作：把成長的隨從打回去",
+      body: "韓國瑜回到手牌後永久變成了 4/4！換你操作：把更強的它重新打回戰場上。",
+      action: "script_play",
+      selectHandId: L4_BOUNCE_HAND,
+      highlights: [{ type: "hand", instanceId: L4_BOUNCE_HAND }, { type: "cardCost", instanceId: L4_BOUNCE_HAND }],
+      match: (command) => command.type === "playCard" && command.handInstanceId === L4_BOUNCE_HAND,
+      resolve: (session) => {
+        removeHand(session, L4_BOUNCE_HAND);
+        const newcomer = makeMinion(L4_BOUNCE, "TW032", PLAYER, 4, 4, { sleeping: true });
+        setPlayerBoard(session, PLAYER, [...session.players[PLAYER].board, newcomer]);
+        return [
+          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L4_BOUNCE_HAND, cardId: "TW032" }),
+          ev(session, "MINION_SUMMONED", PLAYER, { target: L4_BOUNCE, cardId: "TW032" })
+        ];
+      }
+    },
+    {
       id: "l4_bounce_result",
       title: "回手並成長",
-      body: "韓國瑜被收回手牌，而且永久變成了 4/4！回手牌可以救援隨從、重複利用戰吼，或像這樣讓隨從越打越強。",
+      body: "韓國瑜重新上場，從 2/2 長成了 4/4！回手牌可以救援快死的隨從、重複利用戰吼，或像這樣讓隨從越打越強——是高手翻盤的常用手段。",
       action: "next",
-      highlights: [{ type: "hand", instanceId: L4_BOUNCE_HAND }]
+      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_BOUNCE }]
     },
     {
       id: "l4_done",
       title: "完成第四關",
-      body: "完成！你已經學會激怒、遺志、持續效果、回手牌。點下一步完成第四關。",
+      body: "完成！你已經親手操作過激怒、遺志、持續效果、回手牌。點下一步完成第四關。",
       action: "next"
     }
   ]
