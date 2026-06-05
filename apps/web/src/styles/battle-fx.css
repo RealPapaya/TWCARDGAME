@@ -790,6 +790,32 @@
   animation-delay: var(--cue-delay, 0ms);
 }
 
+.aoe-heal-plus-layer {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.aoe-heal-plus {
+  position: absolute;
+  left: var(--x, 50%);
+  top: var(--y, 50%);
+  font-family: "Segoe UI", system-ui, sans-serif;
+  font-size: var(--size, 24px);
+  font-weight: 300;
+  line-height: 1;
+  color: #7dffb0;
+  text-shadow:
+    0 0 7px rgba(80, 255, 150, 0.95),
+    0 0 14px rgba(50, 230, 120, 0.7),
+    0 1px 2px rgba(0, 0, 0, 0.65);
+  opacity: 0;
+  will-change: transform, opacity;
+  animation: aoe-heal-plus-rise 0.8s ease-out forwards;
+  animation-delay: calc(var(--cue-delay, 0ms) + var(--particle-delay, 0ms));
+}
+
 @keyframes aoe-shock-sweep {
   0% { transform: translateX(-110%); opacity: 0; }
   20% { opacity: 1; }
@@ -800,6 +826,21 @@
   0% { opacity: 0; }
   30% { opacity: 0.9; }
   100% { opacity: 0; }
+}
+
+@keyframes aoe-heal-plus-rise {
+  0% {
+    transform: translate(-50%, -50%) translateY(18px) scale(0.45);
+    opacity: 0;
+  }
+  24% {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0) scale(1);
+  }
+  100% {
+    transform: translate(-50%, -50%) translateY(-30px) scale(0.88);
+    opacity: 0;
+  }
 }
 
 .aoe-sweep-damage .aoe-sweep-wave { background: linear-gradient(90deg, transparent, rgba(255, 70, 210, 0.85), transparent); box-shadow: 0 0 40px rgba(255, 90, 220, 0.7); }
@@ -834,6 +875,7 @@
   .shield-shatter > span,
   .lock-clamp-ring,
   .lock-clamp > span,
+  .aoe-heal-plus,
   .aoe-sweep-wave {
     animation: none;
   }
@@ -863,6 +905,11 @@
 
   .death-burst > span {
     opacity: 0.9;
+  }
+
+  .aoe-heal-plus {
+    opacity: 0.9;
+    transform: translate(-50%, -50%);
   }
 
   .bounce-burst > span {

@@ -131,6 +131,11 @@ export function beginHandDrag(opts: HandDragOptions): void {
     onCancel: opts.onCancel
   };
 
+  // While a card is held, hovering across the rest of the hand must not pop
+  // those cards up (the held card "occupies" the pointer). The body flag lets
+  // CSS neutralize the hand-card hover state for the duration of the drag.
+  document.body.classList.add("hand-dragging");
+
   showLine(opts.lineKind, opts.startX, opts.startY);
   positionGhost(opts.startX, opts.startY);
   attachListeners();
@@ -271,6 +276,10 @@ function updatePlacementIndicator(x: number, y: number): void {
   }
 
   board.classList.add("drop-highlight");
+  // Hide the empty-board placeholder slots for the rest of the drag (not just
+  // while over the board), so the indicator's collapse animation on the way out
+  // doesn't snap to the grid-overflow position. Cleared in finishSession.
+  board.classList.add("placing");
   let indicator = session.indicator;
   if (!indicator || indicator.parentElement !== board) {
     indicator = ensureIndicator(board);
@@ -361,6 +370,7 @@ function cancelSession(): void {
 }
 
 function finishSession(silent: boolean): void {
+  document.body.classList.remove("hand-dragging");
   if (!session) {
     detachListeners();
     return;
@@ -369,6 +379,7 @@ function finishSession(silent: boolean): void {
   const board = session.playerBoardEl;
   if (board) {
     board.classList.remove("drop-highlight");
+    board.classList.remove("placing");
     const indicator = board.querySelector(".placement-indicator");
     if (indicator) indicator.remove();
   }

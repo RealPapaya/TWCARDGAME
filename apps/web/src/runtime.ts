@@ -2363,7 +2363,8 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "aoeSweep") {
     if (!cue.targetKey) return "";
     const variant = cue.variant ?? "damage";
-    return `<div class="aoe-sweep aoe-sweep-${variant}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="aoe-sweep"><span class="aoe-sweep-wave"></span><span class="aoe-sweep-glow"></span></div>`;
+    const healPluses = variant === "heal" ? renderAoeHealPluses(cue.id) : "";
+    return `<div class="aoe-sweep aoe-sweep-${variant}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="aoe-sweep"><span class="aoe-sweep-wave"></span><span class="aoe-sweep-glow"></span>${healPluses}</div>`;
   }
   if (cue.kind === "bounce") {
     if (!cue.targetKey) return "";
@@ -2421,6 +2422,30 @@ function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
     );
   }
   return `<div class="heal-burst${isAoe ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-heal-burst" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="heal-burst">${spans.join("")}</div>`;
+}
+
+function renderAoeHealPluses(seed: string): string {
+  let hash = 2166136261 >>> 0;
+  for (let i = 0; i < seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  const rand = (): number => {
+    hash = Math.imul(hash ^ (hash >>> 15), 2246822519) >>> 0;
+    hash = Math.imul(hash ^ (hash >>> 13), 3266489917) >>> 0;
+    return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
+  };
+  const spans: string[] = [];
+  for (let i = 0; i < 14; i += 1) {
+    const x = Math.round(8 + rand() * 84);
+    const y = Math.round(12 + rand() * 76);
+    const size = 18 + Math.round(rand() * 14);
+    const delay = Math.round(rand() * 560);
+    spans.push(
+      `<span class="aoe-heal-plus" style="--x:${x}%;--y:${y}%;--size:${size}px;--particle-delay:${delay}ms">+</span>`
+    );
+  }
+  return `<span class="aoe-heal-plus-layer">${spans.join("")}</span>`;
 }
 
 /**

@@ -651,6 +651,12 @@ input {
   box-shadow: 0 0 28px rgba(32, 214, 242, 0.68), 0 12px 26px rgba(0, 0, 0, 0.52);
 }
 
+/* While a card is being dragged, the other hand cards must stay put — don't let
+   the pointer passing over them trigger the hover pop-up. */
+body.hand-dragging .hand-row .card {
+  pointer-events: none;
+}
+
 .hand-row .card.selected {
   z-index: 50;
   border-color: var(--cyan);
@@ -2561,6 +2567,15 @@ input {
   margin: 0 5px;
 }
 .board.drop-highlight { box-shadow: none; }
+/* An empty board renders 7 placeholder `.slot` cells. While the placement
+   indicator is present they must be hidden, otherwise the appended indicator
+   becomes the 8th grid item and overflows the 7-column track (it shoots off to
+   the side). With the slots gone the indicator is the only grid item and lands
+   where the minion will actually be placed. This is keyed off `.placing` (kept
+   for the whole drag) rather than `.drop-highlight` (dropped the moment the
+   pointer leaves the board) so the indicator's collapse animation plays in
+   place instead of snapping back to the overflow position. */
+.board.placing .slot { display: none; }
 .battle-surface .board.drop-highlight::before {
   content: ""; position: absolute; left: -14px; right: -14px; top: -14px; bottom: -14px;
   border: 1px solid rgba(255, 238, 0, 0.28); background: rgba(255, 238, 0, 0.22);
