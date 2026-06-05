@@ -1,0 +1,14 @@
+import { chromium } from "playwright";
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const browser = await chromium.launch();
+const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+await page.goto("http://localhost:5174/?auth=dev", { waitUntil: "networkidle" });
+await sleep(700);
+await page.locator('[data-testid="menu-battle"]').click();
+await sleep(600);
+await page.screenshot({ path: ".tmp-probe-battle.png" });
+const testids = await page.$$eval("[data-testid]", els => [...new Set(els.map(e=>e.getAttribute("data-testid")))]);
+console.log("BATTLE-TESTIDS>", JSON.stringify(testids));
+const texts = await page.$$eval("button, [data-menu-screen], a", els => els.map(e=>e.textContent.trim()).filter(Boolean).slice(0,40));
+console.log("BATTLE-TEXTS>", JSON.stringify(texts));
+await browser.close();

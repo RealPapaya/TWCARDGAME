@@ -79,14 +79,15 @@ describe("social rookie training", () => {
 });
 
 describe("collision and news training", () => {
-  it("starts with a lethal enemy threat and scripted news cards", () => {
+  it("starts with a lethal enemy threat and no scripted news cards yet", () => {
     const session = createCollisionNewsTraining("Tester");
 
     expect(session.level).toBe(COLLISION_NEWS_TRAINING);
     expect(session.players.player1.hero.hp).toBe(3);
     expect(session.players.player2.board[0]?.attack).toBe(3);
     expect(session.players.player1.board[0]?.currentHealth).toBe(5);
-    expect(session.hand.map((card) => card.cardId)).toEqual(["S011", "S011", "S006"]);
+    expect(session.hand).toEqual([]);
+    expect(session.players.player1.handCount).toBe(0);
     expect(trainingPrompt(session)?.body).toContain("下回合英雄就會被擊倒");
   });
 
@@ -113,6 +114,8 @@ describe("collision and news training", () => {
     expect(session.step).toBe("collision_result");
     expect(session.players.player2.board).toHaveLength(0);
     expect(session.players.player1.board[0]?.currentHealth).toBe(2);
+    expect(session.hand.map((card) => card.cardId)).toEqual(["S011", "S011"]);
+    expect(session.players.player1.handCount).toBe(2);
 
     advanceTraining(session);
     advanceTraining(session);
@@ -123,6 +126,7 @@ describe("collision and news training", () => {
       target: { type: "MINION", side: "player1", instanceId: "training-minion-collision-friendly" }
     });
     expect(session.players.player1.board[0]?.currentHealth).toBe(4);
+    expect(session.hand.map((card) => card.cardId)).toEqual(["S011"]);
 
     expect(trainingPrompt(session)?.body).toContain("不會變成 6");
     advanceTraining(session);
@@ -132,6 +136,7 @@ describe("collision and news training", () => {
       target: { type: "MINION", side: "player1", instanceId: "training-minion-collision-friendly" }
     });
     expect(session.players.player1.board[0]?.currentHealth).toBe(5);
+    expect(session.hand.map((card) => card.cardId)).toEqual(["S006"]);
 
     advanceTraining(session);
     const result = handleTrainingCommand(session, {
@@ -186,14 +191,23 @@ describe("card types lesson (第三關)", () => {
       { type: "playCard", handInstanceId: "l3-taunt-hand" },
       { type: "attack", attackerInstanceId: "l3-attacker", target: { type: "MINION", side: "player2", instanceId: "l3-shield" } },
       { type: "playCard", handInstanceId: "l3-battlecry-hand" },
-      { type: "attack", attackerInstanceId: "l3-friend-a", target: { type: "MINION", side: "player2", instanceId: "l3-bc-enemy" } }
+      { type: "attack", attackerInstanceId: "l3-friend-a", target: { type: "MINION", side: "player2", instanceId: "l3-bc-enemy" } },
+      { type: "attack", attackerInstanceId: "l3-friend-b", target: { type: "MINION", side: "player2", instanceId: "l3-bc-enemy" } }
     ]);
 
     expect(session.status).toBe("finished");
     expect(session.result?.winnerSeat).toBe("player1");
-    // The buffed attacker (蘇巧慧, 5 attack) killed the 2/5 enemy and survived.
+    // 吳敦義's +1 raised the two attackers to 3 (王定宇, l3-friend-a) and 2 (條碼師, l3-friend-b);
+    // their combined 5 damage killed the 2/5 enemy and both survived (王定宇 7→5, 條碼師 4→2).
     expect(session.players.player2.board).toHaveLength(0);
-    expect(session.players.player1.board.find((m) => m.instanceId === "l3-friend-a")?.currentHealth).toBe(3);
+    const friendA = session.players.player1.board.find((m) => m.instanceId === "l3-friend-a");
+    const friendB = session.players.player1.board.find((m) => m.instanceId === "l3-friend-b");
+    expect(friendA?.attack).toBe(3);
+    expect(friendA?.baseAttack).toBe(2); // attack > baseAttack ⇒ rendered green (buffed)
+    expect(friendA?.currentHealth).toBe(5);
+    expect(friendB?.attack).toBe(2);
+    expect(friendB?.baseAttack).toBe(1);
+    expect(friendB?.currentHealth).toBe(2);
   });
 });
 
@@ -222,6 +236,66 @@ describe("advanced keywords lesson (第四關)", () => {
     const hanguoyu = session.players.player1.board.find((m) => m.instanceId === "l4-bounce");
     expect(hanguoyu?.attack).toBe(4);
     expect(hanguoyu?.health).toBe(4);
+  });
+
+  it("reverts conditional buffs: enrage clears on heal, aura dies with 京華城", () => {
+    const session = createTrainingSession("advanced_keywords");
+    const board = () => session.players.player1.board;
+    const find = (id: string) => board().find((m) => m.instanceId === id);
+    const advanceToGated = () => {
+      for (let guard = 0; guard < 100; guard++) {
+        if (trainingPrompt(session)?.allowedAction !== "next") return;
+        advanceTraining(session);
+      }
+    };
+
+    // Enrage segment → gated attack leaves 台積電工程師 wounded at green 4 attack.
+    advanceToGated();
+    handleTrainingCommand(session, {
+      type: "attack",
+      attackerInstanceId: "l4-enrage",
+      target: { type: "MINION", side: "player2", instanceId: "l4-enrage-enemy" }
+    });
+    expect(find("l4-enrage")?.attack).toBe(4);
+    expect(find("l4-enrage")?.isEnraged).toBe(true);
+
+    // Healing it back to full clears enrage: attack reverts to the original 1.
+    advanceTraining(session); // l4_enrage_result.apply heals it
+    expect(find("l4-enrage")?.attack).toBe(1);
+    expect(find("l4-enrage")?.baseAttack).toBe(1);
+    expect(find("l4-enrage")?.isEnraged).toBe(false);
+    expect(find("l4-enrage")?.currentHealth).toBe(4);
+
+    // 遺志 gated attack, then play 京華城 — its aura buffs both 蔡想想 to green 2/2.
+    advanceToGated();
+    handleTrainingCommand(session, {
+      type: "attack",
+      attackerInstanceId: "l4-death",
+      target: { type: "MINION", side: "player2", instanceId: "l4-killer" }
+    });
+    advanceToGated();
+    handleTrainingCommand(session, { type: "playCard", handInstanceId: "l4-aura-hand" });
+    for (const id of ["l4-aura-left", "l4-aura-right"]) {
+      expect(find(id)?.attack).toBe(2);
+      expect(find(id)?.baseAttack).toBe(1); // attack > baseAttack ⇒ green
+      expect(find(id)?.currentHealth).toBe(2); // currentHealth > catalog 1 ⇒ green
+    }
+
+    // 政治清算 kills 京華城 → aura vanishes, both 蔡想想 snap back to plain 1/1.
+    advanceTraining(session); // l4_aura_result.apply runs the removal
+    expect(find("l4-aura")).toBeUndefined();
+    for (const id of ["l4-aura-left", "l4-aura-right"]) {
+      expect(find(id)?.attack).toBe(1);
+      expect(find(id)?.attack).toBe(find(id)?.baseAttack); // back to neutral
+      expect(find(id)?.currentHealth).toBe(1);
+    }
+
+    // Replayed 韓國瑜 lands as a green 4/4 (attack 4 over baseAttack 2).
+    advanceToGated();
+    handleTrainingCommand(session, { type: "playCard", handInstanceId: "l4-bounce-hand" });
+    expect(find("l4-bounce")?.attack).toBe(4);
+    expect(find("l4-bounce")?.baseAttack).toBe(2);
+    expect(find("l4-bounce")?.currentHealth).toBe(4);
   });
 
   it("rejects commands that stray from the scripted attack", () => {

@@ -267,6 +267,7 @@ function sameTarget(a: TargetRef | undefined, b: TargetRef): boolean {
 
 const L3_TAUNT_HAND = "l3-taunt-hand";
 const L3_TAUNT = "l3-taunt";
+const L3_SAVED = "l3-saved";
 const L3_ENEMY = "l3-enemy";
 const L3_SHIELD = "l3-shield";
 const L3_ATTACKER = "l3-attacker";
@@ -280,7 +281,7 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
   level: CARD_TYPES_TRAINING,
   setup: () => ({
     players: {
-      player1: makePlayer(PLAYER, "玩家", 10, [], 1),
+      player1: makePlayer(PLAYER, "玩家", 10, [makeMinion(L3_SAVED, "TW044", PLAYER, 3, 2)], 1),
       player2: makePlayer(OPPONENT, "訓練教官", 0, [makeMinion(L3_ENEMY, "TW045", OPPONENT, 4, 5, { canAttack: true })], 0)
     },
     hand: [handCard(L3_TAUNT_HAND, "TW023", 7, "MINION", 3, 8)]
@@ -289,28 +290,34 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_intro",
       title: "第三關：卡牌種類介紹",
-      body: "這一關介紹三種常見的卡牌關鍵字：嘲諷、光盾、戰吼。先看【嘲諷】——敵方有一個 4 攻擊的隨從正盯著你的英雄，下個回合就會直接打過來。我們用嘲諷把它擋下。",
+      body: "這一關介紹三種常見的卡牌關鍵字：嘲諷、光盾、戰吼。先看【嘲諷】——敵方的『蘇巧慧』有 4 攻擊，下個回合就會撲過來殺掉你生命只剩 2 的『黃捷』。我們用嘲諷把它擋下，保住黃捷。",
       action: "next",
-      highlights: [{ type: "unit", seat: OPPONENT, instanceId: L3_ENEMY }, { type: "hero", seat: PLAYER }]
+      highlights: [
+        { type: "unit", seat: OPPONENT, instanceId: L3_ENEMY },
+        { type: "unit", seat: PLAYER, instanceId: L3_SAVED }
+      ]
     },
     {
       id: "l3_taunt_explain",
       title: "嘲諷",
-      body: "【嘲諷】：只要場上有嘲諷隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。你手上的『陳玉珍』是 3/8 嘲諷，很適合擋在前線。",
+      body: "【嘲諷】：只要場上有嘲諷隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。你手上的『陳玉珍』是 3/8 嘲諷，把她擋在前線，後面的黃捷就安全了。",
       action: "next",
       highlights: [{ type: "hand", instanceId: L3_TAUNT_HAND }, { type: "cardCost", instanceId: L3_TAUNT_HAND }]
     },
     {
       id: "l3_taunt_do",
       title: "換你操作：築起嘲諷牆",
-      body: "把手牌的『陳玉珍』打到戰場上，擋在你的英雄前面。",
+      body: "把手牌的『陳玉珍』打到戰場上，擋在黃捷前面。",
       action: "script_play",
       selectHandId: L3_TAUNT_HAND,
       highlights: [{ type: "hand", instanceId: L3_TAUNT_HAND }],
       match: (command) => command.type === "playCard" && command.handInstanceId === L3_TAUNT_HAND,
       resolve: (session) => {
         removeHand(session, L3_TAUNT_HAND);
-        setPlayerBoard(session, PLAYER, [makeMinion(L3_TAUNT, "TW023", PLAYER, 3, 8, { taunt: true, sleeping: true })]);
+        setPlayerBoard(session, PLAYER, [
+          ...session.players[PLAYER].board,
+          makeMinion(L3_TAUNT, "TW023", PLAYER, 3, 8, { taunt: true, sleeping: true })
+        ]);
         return [
           ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L3_TAUNT_HAND, cardId: "TW023" }),
           ev(session, "MINION_SUMMONED", PLAYER, { target: L3_TAUNT, cardId: "TW023" })
@@ -320,9 +327,12 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_taunt_demo",
       title: "嘲諷生效",
-      body: "陳玉珍站上了前線。按下一步，看敵方隨從的行動——它被迫攻擊有嘲諷的陳玉珍，完全碰不到你的英雄。",
+      body: "陳玉珍站上了前線。按下一步，看敵方蘇巧慧的行動——它被迫攻擊有嘲諷的陳玉珍，完全碰不到後面的黃捷。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L3_TAUNT }, { type: "hero", seat: PLAYER }],
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L3_TAUNT },
+        { type: "unit", seat: PLAYER, instanceId: L3_SAVED }
+      ],
       apply: (session) => {
         const taunt = findMinion(session, PLAYER, L3_TAUNT)!;
         const enemy = findMinion(session, OPPONENT, L3_ENEMY)!;
@@ -340,9 +350,12 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_taunt_result",
       title: "嘲諷的用途",
-      body: "成功擋下！敵方的攻擊被陳玉珍吸走，你的英雄毫髮無傷。嘲諷能把威脅引到隨從身上，是保護英雄、穩住戰局的防守關鍵字。",
+      body: "成功擋下！蘇巧慧的攻擊被陳玉珍吸走，後面的黃捷毫髮無傷地活了下來。嘲諷能把威脅引到嘲諷隨從身上，是保護其他隨從與英雄、穩住戰局的防守關鍵字。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L3_TAUNT }],
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L3_TAUNT },
+        { type: "unit", seat: PLAYER, instanceId: L3_SAVED }
+      ],
       apply: (session) => {
         // Switch to the divine-shield demo.
         const events = setBoard(session, PLAYER, [makeMinion(L3_ATTACKER, "TW045", PLAYER, 4, 5, { canAttack: true })]);
@@ -388,13 +401,13 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
       action: "next",
       highlights: [{ type: "unit", seat: OPPONENT, instanceId: L3_SHIELD }],
       apply: (session) => {
-        // Switch to the battlecry demo: two friendly minions + an enemy threat + a battlecry card in hand.
+        // Switch to the battlecry demo: 王定宇 (2/7) + 條碼師 (1/4) — original card stats — plus an enemy threat and a battlecry card in hand.
         const events = setBoard(session, PLAYER, [
-          makeMinion(L3_FRIEND_A, "TW045", PLAYER, 4, 5, { canAttack: true }),
-          makeMinion(L3_FRIEND_B, "TW058", PLAYER, 1, 1)
+          makeMinion(L3_FRIEND_A, "TW066", PLAYER, 2, 7, { canAttack: true }),
+          makeMinion(L3_FRIEND_B, "TW004", PLAYER, 1, 4, { canAttack: true })
         ]);
         events.push(...setBoard(session, OPPONENT, [makeMinion(L3_BC_ENEMY, "TW045", OPPONENT, 2, 5)]));
-        addHand(session, handCard(L3_BATTLECRY_HAND, "TW016", 5, "MINION", 1, 3));
+        addHand(session, handCard(L3_BATTLECRY_HAND, "TW016", 5, "MINION", 2, 3));
         events.push(ev(session, "CARD_DRAWN", PLAYER, { cardId: "TW016" }));
         return events;
       }
@@ -402,25 +415,28 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_battlecry_explain",
       title: "戰吼",
-      body: "最後是【戰吼】，戰吼是隨從『打出當下』觸發一次的效果。敵方有個 2/5 隨從，你的『蘇巧慧』只有 4 攻擊，差一點打不死它。手牌的『吳敦義』戰吼是：賦予所有友方隨從 +1 攻擊力。",
+      body: "最後是【戰吼】，戰吼是隨從『打出當下』觸發一次的效果。敵方有個 2/5 隨從；你場上有一個 2 攻擊的『王定宇』和 1 攻擊的『條碼師』，合計只有 3 攻擊，差一點打不死它。手牌的『吳敦義』戰吼是：賦予所有友方隨從 +1 攻擊力。",
       action: "next",
       highlights: [
         { type: "hand", instanceId: L3_BATTLECRY_HAND },
         { type: "cardCost", instanceId: L3_BATTLECRY_HAND },
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_A },
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_B },
         { type: "unit", seat: OPPONENT, instanceId: L3_BC_ENEMY }
       ]
     },
     {
       id: "l3_battlecry_do",
       title: "換你操作：打出戰吼",
-      body: "把『吳敦義』打到戰場上，看看戰吼如何讓全體友方隨從 +1 攻擊。",
+      body: "把『吳敦義』打到戰場上，看戰吼如何讓兩個友方隨從各 +1 攻擊——攻擊力會變成綠色，代表被強化了。",
       action: "script_play",
       selectHandId: L3_BATTLECRY_HAND,
       highlights: [{ type: "hand", instanceId: L3_BATTLECRY_HAND }],
       match: (command) => command.type === "playCard" && command.handInstanceId === L3_BATTLECRY_HAND,
       resolve: (session) => {
         removeHand(session, L3_BATTLECRY_HAND);
-        const buffed = session.players[PLAYER].board.map((m) => ({ ...m, attack: m.attack + 1, baseAttack: m.baseAttack + 1 }));
+        // Raise attack only (leave baseAttack) so the buffed value renders green (stat-higher).
+        const buffed = session.players[PLAYER].board.map((m) => ({ ...m, attack: m.attack + 1 }));
         const newcomer = makeMinion(L3_BATTLECRY_MINION, "TW016", PLAYER, 2, 3, { sleeping: true });
         setPlayerBoard(session, PLAYER, [...buffed, newcomer]);
         const events = [
@@ -432,13 +448,14 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
       }
     },
     {
-      id: "l3_battlecry_payoff",
-      title: "換你操作：把握戰吼的力量",
-      body: "蘇巧慧的攻擊力 +1 變成 5，剛好夠一擊解決敵方的 2/5 隨從。用發亮的蘇巧慧攻擊敵方隨從。",
+      id: "l3_battlecry_payoff_a",
+      title: "換你操作：聯手解決威脅 (1/2)",
+      body: "綠色的攻擊力代表被戰吼強化了：2 攻擊的『王定宇』+1 變成 3。先用它攻擊敵方的 2/5 隨從，把它打到只剩 2 點生命。",
       action: "script_attack",
       selectAttackerId: L3_FRIEND_A,
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_A },
+        { type: "minionStat", instanceId: L3_FRIEND_A, stat: "attack" },
         { type: "unit", seat: OPPONENT, instanceId: L3_BC_ENEMY }
       ],
       match: (command) => isAttack(command, L3_FRIEND_A, { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY }),
@@ -447,15 +464,41 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
         const enemy = findMinion(session, OPPONENT, L3_BC_ENEMY)!;
         setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
           m.instanceId === L3_FRIEND_A ? { ...m, currentHealth: m.currentHealth - enemy.attack, canAttack: false } : m));
+        setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.map((m) =>
+          m.instanceId === L3_BC_ENEMY ? { ...m, currentHealth: m.currentHealth - attacker.attack } : m));
+        return [
+          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L3_FRIEND_A, target: { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY } }),
+          ev(session, "DAMAGE", OPPONENT, { target: L3_BC_ENEMY, amount: attacker.attack }),
+          ev(session, "DAMAGE", PLAYER, { target: L3_FRIEND_A, amount: enemy.attack })
+        ];
+      }
+    },
+    {
+      id: "l3_battlecry_payoff_b",
+      title: "換你操作：補上最後一擊 (2/2)",
+      body: "條碼師也被 +1，攻擊力從 1 變成 2。用條碼師攻擊敵方隨從，補上最後 2 點傷害——3+2 剛好等於 5，把它解決掉。",
+      action: "script_attack",
+      selectAttackerId: L3_FRIEND_B,
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_B },
+        { type: "minionStat", instanceId: L3_FRIEND_B, stat: "attack" },
+        { type: "unit", seat: OPPONENT, instanceId: L3_BC_ENEMY }
+      ],
+      match: (command) => isAttack(command, L3_FRIEND_B, { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY }),
+      resolve: (session) => {
+        const attacker = findMinion(session, PLAYER, L3_FRIEND_B)!;
+        const enemy = findMinion(session, OPPONENT, L3_BC_ENEMY)!;
+        setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
+          m.instanceId === L3_FRIEND_B ? { ...m, currentHealth: m.currentHealth - enemy.attack, canAttack: false } : m));
         setPlayerBoard(session, OPPONENT, session.players[OPPONENT].board.filter((m) => m.instanceId !== L3_BC_ENEMY));
         session.players[OPPONENT] = {
           ...session.players[OPPONENT],
           graveyardCount: session.players[OPPONENT].graveyardCount + 1
         };
         return [
-          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L3_FRIEND_A, target: { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY } }),
+          ev(session, "ATTACK", PLAYER, { attackerInstanceId: L3_FRIEND_B, target: { type: "MINION", side: OPPONENT, instanceId: L3_BC_ENEMY } }),
           ev(session, "DAMAGE", OPPONENT, { target: L3_BC_ENEMY, amount: attacker.attack }),
-          ev(session, "DAMAGE", PLAYER, { target: L3_FRIEND_A, amount: enemy.attack }),
+          ev(session, "DAMAGE", PLAYER, { target: L3_FRIEND_B, amount: enemy.attack }),
           ev(session, "DESTROY", OPPONENT, { target: L3_BC_ENEMY, cardId: "TW045" })
         ];
       }
@@ -463,9 +506,12 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_battlecry_result",
       title: "戰吼觸發了",
-      body: "看到了嗎？戰吼的 +1 攻擊讓蘇巧慧剛好解決掉敵人，自己還存活下來。戰吼雖然只在打出當下觸發一次，但這一下就足以扭轉場面。",
+      body: "看到了嗎？吳敦義的戰吼讓兩個隨從各 +1 攻擊（綠字），合計攻擊力從 3 變成 5，剛好聯手解決掉敵人，自己都還存活下來。戰吼雖然只在打出當下觸發一次，但這一下就足以扭轉場面。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER }]
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_A },
+        { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_B }
+      ]
     },
     {
       id: "l3_done",
@@ -559,9 +605,29 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_enrage_result",
       title: "激怒的力量",
-      body: "看到了嗎？平常只有 1 攻擊的它，受傷後用 4 攻擊一擊解決了威脅，自己還活著。激怒讓受傷的隨從更兇猛——這就是它逆轉戰局的方式。（小提醒：若把它補滿血，激怒就會解除，攻擊力回到 1。）",
+      body: "看到了嗎？平常只有 1 攻擊的它，受傷後用綠色的 4 攻擊一擊解決了威脅，自己還活著。激怒是『條件型持續效果』——只要它還在受傷狀態，就一直 +3 攻擊。按下一步，我們幫它補滿血，看看會發生什麼事。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_ENRAGE }],
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L4_ENRAGE },
+        { type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" }
+      ],
+      apply: (session) => {
+        // Heal it back to full: the enrage condition (wounded) no longer holds, so
+        // attack reverts from the green 4 to its original baseAttack of 1.
+        setPlayerBoard(session, PLAYER, session.players[PLAYER].board.map((m) =>
+          m.instanceId === L4_ENRAGE ? { ...m, currentHealth: m.health, attack: m.baseAttack, isEnraged: false } : m));
+        return [ev(session, "HEAL", PLAYER, { target: L4_ENRAGE, amount: 3 })];
+      }
+    },
+    {
+      id: "l4_enrage_calmed",
+      title: "激怒解除",
+      body: "補滿血後，受傷的條件不再成立，激怒立刻解除——攻擊力從綠色的 4 變回原本的 1，血量也回滿了。這就是『持續效果』：條件消失，加成跟著消失，和打出時一次性的戰吼完全不同。按下一步，認識下一個關鍵字。",
+      action: "next",
+      highlights: [
+        { type: "unit", seat: PLAYER, instanceId: L4_ENRAGE },
+        { type: "minionStat", instanceId: L4_ENRAGE, stat: "attack" }
+      ],
       apply: (session) => {
         const events = setBoard(session, PLAYER, [makeMinion(L4_DEATH, "TW036", PLAYER, 2, 2, { canAttack: true })]);
         events.push(...setBoard(session, OPPONENT, [makeMinion(L4_KILLER, "TW045", OPPONENT, 3, 2)]));
@@ -647,9 +713,11 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
       match: (command) => command.type === "playCard" && command.handInstanceId === L4_AURA_HAND,
       resolve: (session) => {
         removeHand(session, L4_AURA_HAND);
+        // Raise attack/health only (leave baseAttack at the catalog base) so the
+        // +1/+1 buff renders green (stat-higher), matching a real match.
         const buffed = session.players[PLAYER].board.map((m) =>
           (m.instanceId === L4_AURA_L || m.instanceId === L4_AURA_R)
-            ? { ...m, attack: m.attack + 1, baseAttack: m.baseAttack + 1, health: m.health + 1, currentHealth: m.currentHealth + 1 }
+            ? { ...m, attack: m.attack + 1, health: m.health + 1, currentHealth: m.currentHealth + 1 }
             : m);
         const aura = makeMinion(L4_AURA, "TW028", PLAYER, 0, 6, { sleeping: true });
         setPlayerBoard(session, PLAYER, [
@@ -670,10 +738,36 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_aura_result",
       title: "持續 vs 一次性",
-      body: "兩側的蔡想想都從 1/1 變成 2/2！這是『持續』效果——只要京華城在場就一直生效。如果京華城離場，這個 +1/+1 會立刻消失，這就是它與戰吼（打出時一次性）最大的差別。",
+      body: "兩側的蔡想想都從 1/1 變成綠色的 2/2！這是『持續』效果——只要京華城在場就一直生效。但它有個弱點：只要京華城離場，加成就會立刻消失。按下一步，看教官用『政治清算』處決京華城。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L4_AURA },
+        { type: "unit", seat: PLAYER, instanceId: L4_AURA_L },
+        { type: "unit", seat: PLAYER, instanceId: L4_AURA_R }
+      ],
+      apply: (session) => {
+        // 政治清算 (S020) deals 7 to 京華城 → it dies, so its ongoing +1/+1 aura
+        // vanishes and both 蔡想想 snap back from green 2/2 to plain 1/1.
+        setPlayerBoard(session, PLAYER, session.players[PLAYER].board
+          .filter((m) => m.instanceId !== L4_AURA)
+          .map((m) => (m.instanceId === L4_AURA_L || m.instanceId === L4_AURA_R)
+            ? { ...m, attack: m.baseAttack, health: m.health - 1, currentHealth: m.currentHealth - 1 }
+            : m));
+        return [
+          ev(session, "CARD_PLAYED", OPPONENT, { cardId: "S020" }),
+          ev(session, "DAMAGE", PLAYER, { target: L4_AURA, amount: 7 }),
+          ev(session, "DESTROY", PLAYER, { target: L4_AURA, cardId: "TW028" }),
+          ev(session, "AURA_UPDATED", PLAYER, { target: L4_AURA_L }),
+          ev(session, "AURA_UPDATED", PLAYER, { target: L4_AURA_R })
+        ];
+      }
+    },
+    {
+      id: "l4_aura_gone",
+      title: "加成消失了",
+      body: "京華城被『政治清算』殺死，兩側的蔡想想立刻從綠色的 2/2 變回 1/1——持續效果隨來源一起消失。持續效果很強，但對手能靠移除來源一次拆光，這就是它與一次性戰吼最大的差別。按下一步，認識最後一個關鍵字。",
+      action: "next",
+      highlights: [
         { type: "unit", seat: PLAYER, instanceId: L4_AURA_L },
         { type: "unit", seat: PLAYER, instanceId: L4_AURA_R }
       ],
@@ -703,10 +797,14 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
       match: (command) => command.type === "playCard" && command.handInstanceId === L4_BOUNCE_HAND,
       resolve: (session) => {
         removeHand(session, L4_BOUNCE_HAND);
-        const newcomer = makeMinion(L4_BOUNCE, "TW032", PLAYER, 4, 4, { sleeping: true });
+        // baseAttack stays at the catalog 2 so the buffed 4 attack renders green
+        // (stat-higher); health 4 vs catalog 2 already shows green on the board.
+        const newcomer = makeMinion(L4_BOUNCE, "TW032", PLAYER, 4, 4, { sleeping: true, baseAttack: 2 });
         setPlayerBoard(session, PLAYER, [...session.players[PLAYER].board, newcomer]);
         return [
-          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L4_BOUNCE_HAND, cardId: "TW032" }),
+          // attack/health on the play cue make the focus-zoom card show a green 4/4,
+          // matching the buffed hand card and the board (same as a formal match).
+          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L4_BOUNCE_HAND, cardId: "TW032", attack: 4, health: 4 }),
           ev(session, "MINION_SUMMONED", PLAYER, { target: L4_BOUNCE, cardId: "TW032" })
         ];
       }

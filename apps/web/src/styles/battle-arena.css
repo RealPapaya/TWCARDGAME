@@ -823,7 +823,7 @@
   min-height: 104px;
   justify-content: flex-start;
   gap: 8px;
-  padding: 34px 42px 30px 62px;
+  padding: 34px 42px 30px 30px;
   border: 0;
   border-radius: 0;
   background: url("/images/ui/mana_frame.webp") center / 100% 100% no-repeat;
@@ -839,14 +839,16 @@
   width: 31px;
   height: 31px;
   flex-basis: 31px;
+  transition: opacity 240ms ease, transform 240ms ease, display 240ms allow-discrete;
 }
 
-.battle-surface .mana-crystal.spent {
-  display: none;
-}
-
+/* Spent crystals shrink + fade out, then collapse to display:none at the end of
+   the transition (allow-discrete) so they leave no ghost slot at rest. */
+.battle-surface .mana-crystal.spent,
 .battle-surface .mana-crystal.locked {
   display: none;
+  opacity: 0;
+  transform: rotate(45deg) scale(0.2);
 }
 
 .battle-surface .mana-text {
@@ -1892,12 +1894,12 @@
 }
 
 .battle-surface .mana-container.training-highlight-mana::before {
-  inset: 25px 34px 19px 54px;
+  inset: 30px 391px 26px 22px;
   border-radius: 999px;
 }
 
 .battle-surface .mana-container.training-highlight-mana::after {
-  inset: 21px 30px 15px 50px;
+  inset: 34px 395px 30px 26px;
   border-radius: 999px;
 }
 

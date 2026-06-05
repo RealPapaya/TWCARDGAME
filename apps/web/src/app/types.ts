@@ -125,6 +125,13 @@ export type AnimationCue = {
   /** For a flying effect (e.g. battlecry knife): the caster unit's key to fly FROM. */
   sourceKey?: string;
   cardId?: string;
+  /**
+   * Card-play overlay stat overrides. When set, the focus-zoom card face shows
+   * these (buffed) stats instead of the catalog base — e.g. a bounced 韓國瑜
+   * plays as a green 4/4. Omitted for normal plays, which fall back to catalog.
+   */
+  playAttack?: number;
+  playHealth?: number;
   attackerInstanceId?: string;
   amount?: number;
   delayMs?: number;

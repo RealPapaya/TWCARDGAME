@@ -175,3 +175,28 @@ export function mapEventToCueKind(event: GameEvent, isCombatDamage: boolean): An
       return undefined;
   }
 }
+
+/**
+ * The caster a single-target effect damage should fly FROM. Minion battlecries
+ * use the minion they just summoned; 砸雞蛋 is a NEWS card, so it borrows the
+ * caster hero as a stable on-screen source for the same blade trail.
+ */
+export function findEffectSourceKey(events: GameEvent[], startIndex: number): string | undefined {
+  if (startIndex < 0) return undefined;
+  for (let i = startIndex - 1; i >= 0; i--) {
+    const event = events[i];
+    if (event.type === "ATTACK") return undefined;
+    if (event.type === "CARD_PLAYED") {
+      const cardId = event.payload?.cardId;
+      for (let j = i + 1; j < startIndex; j++) {
+        const summon = events[j];
+        if (summon.type === "MINION_SUMMONED" && summon.seat === event.seat && summon.payload?.cardId === cardId) {
+          return typeof summon.payload?.target === "string" ? summon.payload.target : undefined;
+        }
+      }
+      if (cardId === "S006" && (event.seat === "player1" || event.seat === "player2")) return `${event.seat}:hero`;
+      return undefined;
+    }
+  }
+  return undefined;
+}

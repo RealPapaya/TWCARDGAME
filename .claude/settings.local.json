@@ -46,7 +46,9 @@
       "Bash(curl -s -o /dev/null -w \"frame-2: %{http_code}\\\\n\" http://localhost:5173/images/fx/attack-frame-2.webp)",
       "Bash(curl -s -o /dev/null -w \"root:    %{http_code}\\\\n\" http://localhost:5173/)",
       "PowerShell(node verify-attack-sprite.mjs 2>&1 | Select-Object -Last 5)",
-      "Bash(git grep *)"
+      "Bash(git grep *)",
+      "Bash(SETTLE=1000 node .tmp-repro-aura-death.mjs)",
+      "Bash(SETTLE=1600 node .tmp-repro-aura-death.mjs)"
     ],
     "additionalDirectories": [
       "\\tmp"

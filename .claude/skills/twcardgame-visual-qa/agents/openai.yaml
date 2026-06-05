@@ -1,0 +1,4 @@
+interface:
+  display_name: "TWCARDGAME Visual QA"
+  short_description: "Verify TWCARDGAME UI and effects with Playwright."
+  default_prompt: "Run a focused Playwright visual QA flow for a TWCARDGAME UI behavior or battle effect, and confirm the expected visual state is actually visible before reporting success."

@@ -66,7 +66,7 @@ import {
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
 import { playVoteRoulette, resetVoteRoulette, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
-import { classifyBatchScopes, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
+import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
@@ -267,6 +267,7 @@ let turnCountdownTimer: number | undefined;
 let turnCountdownWakeTimer: number | undefined;
 let turnCountdownWakeDeadlineAtMs: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
+let trainingRewardAnimationTimer: number | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
 const appliedDeathrattles = new Set<string>();
@@ -2363,7 +2364,7 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "aoeSweep") {
     if (!cue.targetKey) return "";
     const variant = cue.variant ?? "damage";
-    const healPluses = variant === "heal" ? renderAoeHealPluses(cue.id) : "";
+    const healPluses = variant === "heal" && cueIsReady(cue) ? renderAoeHealPluses(cue.id) : "";
     return `<div class="aoe-sweep aoe-sweep-${variant}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="aoe-sweep"><span class="aoe-sweep-wave"></span><span class="aoe-sweep-glow"></span>${healPluses}</div>`;
   }
   if (cue.kind === "bounce") {
@@ -2413,10 +2414,10 @@ function renderHealBurst(cue: AnimationCue, cueStyle: string): string {
   };
   const spans: string[] = [];
   for (let i = 0; i < count; i += 1) {
-    const x = Math.round((rand() * 2 - 1) * 72); // 卡牌寬度範圍散布
-    const y = Math.round((rand() * 2 - 1) * 100); // 卡牌高度範圍散布
-    const size = 16 + Math.round(rand() * 12); // 16–28px，粗細一致只變大小
-    const delay = Math.round(rand() * 650); // 0–650ms 錯開出現，呈現此起彼落
+    const x = i === 0 ? 0 : Math.round((rand() * 2 - 1) * 72); // 卡牌寬度範圍散布
+    const y = i === 0 ? -88 : Math.round((rand() * 2 - 1) * 100); // 卡牌高度範圍散布
+    const size = i === 0 ? 40 : 18 + Math.round(rand() * 14);
+    const delay = i === 0 ? 0 : Math.round(rand() * 650); // 0–650ms 錯開出現，呈現此起彼落
     spans.push(
       `<span style="--x:${x}px;--y:${y}px;--size:${size}px;--particle-delay:${delay}ms">+</span>`
     );
@@ -2436,10 +2437,10 @@ function renderAoeHealPluses(seed: string): string {
     return ((hash ^ (hash >>> 16)) >>> 0) / 4294967296;
   };
   const spans: string[] = [];
-  for (let i = 0; i < 14; i += 1) {
+  for (let i = 0; i < 18; i += 1) {
     const x = Math.round(8 + rand() * 84);
     const y = Math.round(12 + rand() * 76);
-    const size = 18 + Math.round(rand() * 14);
+    const size = 24 + Math.round(rand() * 18);
     const delay = Math.round(rand() * 560);
     spans.push(
       `<span class="aoe-heal-plus" style="--x:${x}%;--y:${y}%;--size:${size}px;--particle-delay:${delay}ms">+</span>`
@@ -4169,6 +4170,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
     window.clearTimeout(rewardFallbackTimer);
     rewardFallbackTimer = undefined;
   }
+  clearTrainingRewardAnimationTimer();
   resetRewardScreen(view);
   resetCardPlayCues();
   resetMinionVisualTracking();
@@ -4200,6 +4202,12 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
 
 function applyTrainingResult(result: TrainingCommandResult): void {
   if (!trainingSession) return;
+  // Commit any board state still pending from the previous step before applying
+  // the next one. Steps are user-paced, so a fast click can otherwise start a
+  // step (e.g. killing 京華城) while the prior step's minion is still an
+  // uncommitted summon preview — which renders at the wrong slot and makes its
+  // death animation fire there instead of in place.
+  if (!attackAnimationBusy()) applyPendingPublicSyncNow();
   // Mirror the session's special-phase amplification offer into the view so the
   // real amplification overlay (driven by view.amplificationOptions) can render.
   view.amplificationOptions = trainingSession.amplificationOptions;
@@ -4207,31 +4215,36 @@ function applyTrainingResult(result: TrainingCommandResult): void {
     view.state = trainingPublicState(trainingSession);
     applyPublicSync(result.publicSync);
   }
-  if (result.events.length > 0) handleEvents(result.events);
+  let cues: AnimationCue[] = [];
+  if (result.events.length > 0) cues = handleEvents(result.events);
   if (result.hand) handleHandSync(result.hand);
-  if (result.completed) void completeTrainingReward();
+  if (result.completed) {
+    const rewardDeferUntilMs = deferTrainingCompletionUntil(cues, result.events);
+    void completeTrainingReward(rewardDeferUntilMs);
+  }
   render();
 }
 
-async function completeTrainingReward(): Promise<void> {
+async function completeTrainingReward(deferUntilMs?: number): Promise<void> {
   const session = trainingSession;
   if (!session) return;
   const optimistic = localTrainingReward(session.level.id);
-  applyTrainingRewardSummary(optimistic);
+  applyTrainingRewardSummary(optimistic, deferUntilMs);
 
   if (!supabase || !view.session?.user) return;
   try {
     const { data, error } = await supabase.rpc("complete_training_level", { p_level_id: session.level.id });
     if (error) throw error;
+    if (trainingSession !== session) return;
     const payload = normalizeTrainingRewardRpc(data, optimistic);
     markLocalTrainingComplete(session.level.id);
-    applyTrainingRewardSummary(payload);
+    applyTrainingRewardSummary(payload, deferUntilMs);
   } catch (error) {
     console.warn("training reward persistence failed", error);
   }
 }
 
-function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: number; rewardGold: number }): void {
+function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: number; rewardGold: number }, deferUntilMs?: number): void {
   view.rewardSummary = createTrainingRewardSummary(result);
   if (view.profile) {
     view.profile = {
@@ -4239,8 +4252,34 @@ function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: num
       gold: result.goldAfter
     };
   }
+  if (deferUntilMs && performance.now() < deferUntilMs) {
+    const delayMs = Math.max(0, deferUntilMs - performance.now());
+    if (trainingRewardAnimationTimer !== undefined) window.clearTimeout(trainingRewardAnimationTimer);
+    trainingRewardAnimationTimer = window.setTimeout(() => {
+      trainingRewardAnimationTimer = undefined;
+      startRewardAnimation(view, render);
+    }, delayMs);
+    render();
+    return;
+  }
+  clearTrainingRewardAnimationTimer();
   startRewardAnimation(view, render);
   render();
+}
+
+function deferTrainingCompletionUntil(cues: AnimationCue[], events: GameEvent[]): number | undefined {
+  if (!trainingSession || trainingSession.level.id !== "collision_news") return undefined;
+  if (!events.some((event) => event.type === "GAME_FINISHED")) return undefined;
+  const finalCueDelayMs = cues.reduce((max, cue) => Math.max(max, cue.delayMs ?? 0), 0);
+  const delayMs = finalCueDelayMs + TRAINING_RESULT_PAUSE_AFTER_FINAL_CUE_MS;
+  holdPendingPublicSyncFor(delayMs);
+  return performance.now() + delayMs;
+}
+
+function clearTrainingRewardAnimationTimer(): void {
+  if (trainingRewardAnimationTimer === undefined) return;
+  window.clearTimeout(trainingRewardAnimationTimer);
+  trainingRewardAnimationTimer = undefined;
 }
 
 function localTrainingReward(levelId: string): { goldBefore: number; goldAfter: number; rewardGold: number } {
@@ -4347,6 +4386,7 @@ function showDevTestRewardScreen(summary: RewardSummary): void {
     window.clearTimeout(rewardFallbackTimer);
     rewardFallbackTimer = undefined;
   }
+  clearTrainingRewardAnimationTimer();
   resetRewardScreen(view);
   resetCardPlayCues();
   resetMinionVisualTracking();
@@ -6636,7 +6676,7 @@ function appendBattleLog(message: GameEvent[]): void {
   view.battleLog = [...view.battleLog, ...entries].slice(-50);
 }
 
-function handleEvents(message: GameEvent[]): void {
+function handleEvents(message: GameEvent[]): AnimationCue[] {
   view.events = [...message, ...view.events].slice(0, 50);
   appendBattleLog(message);
   maybeShowTurnAnnouncement(message);
@@ -6670,6 +6710,7 @@ function handleEvents(message: GameEvent[]): void {
   const voteResolved = message.find((item) => item.type === "VOTE_RESOLVED");
   if (voteResolved) startVoteRouletteFromEvent(voteResolved);
   render();
+  return cues;
 }
 
 /** Kicks off the turn-20 referendum roulette from a `VOTE_RESOLVED` event. */
@@ -6848,6 +6889,7 @@ const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 const BOUNCE_EFFECT_SYNC_LAG_MS = 650;
 const DESTROY_EFFECT_SYNC_LAG_MS = 820;
+const TRAINING_RESULT_PAUSE_AFTER_FINAL_CUE_MS = 1200;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -7189,7 +7231,12 @@ function playNextCardPlayCue(): void {
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = `event-card-preview card ${cue.seat === view.mySeat ? "from-player" : "from-opponent"}`;
-  el.innerHTML = renderCardFace(resolveCatalogCard(card, cue.id), "mulligan");
+  // A buffed play (e.g. a bounced 韓國瑜) carries its boosted stats on the cue so
+  // the focus-zoom shows a green 4/4; without them we render the catalog base.
+  const resolvedPlay = resolveCatalogCard(card, cue.id);
+  if (typeof cue.playAttack === "number") resolvedPlay.attack = cue.playAttack;
+  if (typeof cue.playHealth === "number") resolvedPlay.health = cue.playHealth;
+  el.innerHTML = renderCardFace(resolvedPlay, "mulligan");
   overlay.appendChild(el);
   // Two phases mirror LEGACY showCardPlayPreview: a 0.8s entrance + hold, then
   // a staged shrink-and-fade slam. Minions fire smoke + shake during the slam,
@@ -7225,8 +7272,16 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   const rawCues = events
     .map((event, index) => eventToCue(event, events, index, combatDamageSeqs))
     .filter((cue): cue is AnimationCue => Boolean(cue));
+  const koSoloHealCluster = appendKoSoloHealCue(rawCues, events);
   for (const cue of rawCues) {
     if (cue.seq !== undefined && aoeSeqs.has(cue.seq)) cue.scope = "aoe";
+  }
+  if (koSoloHealCluster) {
+    const koSoloHealSeqs = new Set(koSoloHealCluster.memberSeqs);
+    for (const cue of rawCues) {
+      if (cue.seq !== undefined && koSoloHealSeqs.has(cue.seq)) cue.scope = "aoe";
+    }
+    aoeClusters.push(koSoloHealCluster);
   }
   insertAoeSweepCues(rawCues, aoeClusters);
   // Keep battlecry effects visually behind their card-play cue. The helper also
@@ -7264,6 +7319,33 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     }, lifetime + (cue.delayMs ?? 0));
   }
   return cues;
+}
+
+function appendKoSoloHealCue(cues: AnimationCue[], events: GameEvent[]): AoeCluster | undefined {
+  if (events.some((event) => event.type === "HEAL")) return undefined;
+  const summon = events.find((event) => event.type === "MINION_SUMMONED" && event.payload?.cardId === "TW011");
+  const targetKey = typeof summon?.payload?.target === "string" ? summon.payload.target : undefined;
+  if (!summon || !targetKey) return undefined;
+  const playedKo = events.some((event) => event.type === "CARD_PLAYED" && event.payload?.cardId === "TW011");
+  if (!playedKo) return undefined;
+  const seq = summon.seq + 0.011;
+  cues.push({
+    id: `${summon.seq}-KO-SOLO-HEAL-${createClientId()}`,
+    kind: "heal",
+    text: "+0",
+    seat: summon.seat,
+    targetKey,
+    cardId: "TW011",
+    amount: 0,
+    scope: "aoe",
+    seq
+  });
+  return {
+    kind: "aoeSweep",
+    variant: "heal",
+    seat: summon.seat,
+    memberSeqs: [seq]
+  };
 }
 
 /** Builds the single board-wide overlay cue for one AOE cluster. */
@@ -7440,6 +7522,8 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
       text: cardName(playedCardId) ?? "Card played",
       seat: event.seat,
       cardId: playedCardId,
+      playAttack: typeof payload.attack === "number" ? payload.attack : undefined,
+      playHealth: typeof payload.health === "number" ? payload.health : undefined,
       targetKey: findLandingTargetKey(events, index, event.seat, playedCardId)
     };
   }
@@ -7470,42 +7554,13 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
       : effectKind === "destroy" ? "Destroyed"
       : effectKind === "deathrattle" ? "Deathrattle"
       : "Buff";
-    // Battlecry damage flies a knife from the caster minion (summoned earlier in
-    // this same batch) to the target. Spells / triggered damage have no such
-    // source → sourceKey stays undefined and no knife is drawn.
+    // Battlecry damage and selected NEWS damage can carry a sourceKey so the
+    // imperative blade sprite knows where to fly from.
     const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
     return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq };
   }
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "動作被拒絕。"), seat: event.seat };
-  return undefined;
-}
-
-/**
- * The caster a battlecry's damage should fly FROM: the minion summoned by the
- * card play that owns this effect. A play batch runs
- * CARD_PLAYED → MINION_SUMMONED → DAMAGE…; note a DAMAGE event carries the
- * *target* owner's seat (it's emitted from the victim), so we must NOT match on
- * the damage seat. Instead find the nearest preceding CARD_PLAYED and the minion
- * it summoned (same seat + cardId). A spell (CARD_PLAYED with no own summon) or a
- * triggered effect (no CARD_PLAYED / an ATTACK boundary) yields no flying source.
- */
-function findEffectSourceKey(events: GameEvent[], startIndex: number): string | undefined {
-  if (startIndex < 0) return undefined;
-  for (let i = startIndex - 1; i >= 0; i--) {
-    const event = events[i];
-    if (event.type === "ATTACK") return undefined;
-    if (event.type === "CARD_PLAYED") {
-      const cardId = event.payload?.cardId;
-      for (let j = i + 1; j < startIndex; j++) {
-        const summon = events[j];
-        if (summon.type === "MINION_SUMMONED" && summon.seat === event.seat && summon.payload?.cardId === cardId) {
-          return typeof summon.payload?.target === "string" ? summon.payload.target : undefined;
-        }
-      }
-      return undefined;
-    }
-  }
   return undefined;
 }
 
@@ -8021,6 +8076,7 @@ function applyDeathShatter(cue: AnimationCue): void {
   appliedDeathShatters.add(cue.id);
 
   const rect = minionEl.getBoundingClientRect();
+  blog("DEATHSHATTER-DBG fired", { targetKey: cue.targetKey, left: Math.round(rect.left) });
   recentUnitRects.set(cue.targetKey, { rect, atMs: performance.now() });
   const artEl = minionEl.querySelector<HTMLElement>(".minion-art");
   const bgImg = artEl ? artEl.style.backgroundImage : null;

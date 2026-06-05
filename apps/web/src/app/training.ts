@@ -215,7 +215,7 @@ export function createSocialRookieTraining(playerName = "玩家"): TrainingSessi
 }
 
 export function createCollisionNewsTraining(playerName = "玩家"): TrainingSession {
-  const player = createPlayer(PLAYER, playerName, 3, 4, 4, COLLISION_NEWS_TRAINING.heroHealth);
+  const player = createPlayer(PLAYER, playerName, 0, 4, 4, COLLISION_NEWS_TRAINING.heroHealth);
   const opponent = createPlayer(OPPONENT, "訓練教官", 0, 0, 0, COLLISION_NEWS_TRAINING.heroHealth);
   player.hero = { hp: 3, maxHp: COLLISION_NEWS_TRAINING.heroHealth };
   opponent.hero = { hp: 3, maxHp: COLLISION_NEWS_TRAINING.heroHealth };
@@ -230,11 +230,7 @@ export function createCollisionNewsTraining(playerName = "玩家"): TrainingSess
     actionSeq: 0,
     seq: 1,
     players: { player1: player, player2: opponent },
-    hand: [
-      handCard(VACCINE_HAND_ID_1, VACCINE_CARD_ID, 0, "NEWS"),
-      handCard(VACCINE_HAND_ID_2, VACCINE_CARD_ID, 0, "NEWS"),
-      handCard(EGG_HAND_ID, EGG_CARD_ID, 2, "NEWS")
-    ]
+    hand: []
   };
 }
 
@@ -774,13 +770,23 @@ function attackCollisionThreat(session: TrainingSession): TrainingCommandResult 
       .map((item) => item.instanceId === COLLISION_ENEMY_MINION_ID ? nextDefender : item)
       .filter((item) => item.currentHealth > 0)
   };
+  session.hand = [
+    handCard(VACCINE_HAND_ID_1, VACCINE_CARD_ID, 0, "NEWS"),
+    handCard(VACCINE_HAND_ID_2, VACCINE_CARD_ID, 0, "NEWS")
+  ];
+  session.players[PLAYER] = {
+    ...session.players[PLAYER],
+    handCount: session.hand.length
+  };
   session.step = "collision_result";
   session.actionSeq += 1;
   return update(session, [
     event(session, "ATTACK", PLAYER, { attackerInstanceId: COLLISION_FRIENDLY_MINION_ID, target: { type: "MINION", side: OPPONENT, instanceId: COLLISION_ENEMY_MINION_ID } }),
     event(session, "DAMAGE", OPPONENT, { target: COLLISION_ENEMY_MINION_ID, amount: attackerDamage }),
     event(session, "DAMAGE", PLAYER, { target: COLLISION_FRIENDLY_MINION_ID, amount: defenderDamage }),
-    event(session, "DESTROY", OPPONENT, { target: COLLISION_ENEMY_MINION_ID, cardId: COLLISION_ENEMY_CARD_ID })
+    event(session, "DESTROY", OPPONENT, { target: COLLISION_ENEMY_MINION_ID, cardId: COLLISION_ENEMY_CARD_ID }),
+    event(session, "CARD_DRAWN", PLAYER, { cardId: VACCINE_CARD_ID, handCount: 1 }),
+    event(session, "CARD_DRAWN", PLAYER, { cardId: VACCINE_CARD_ID, handCount: 2 })
   ]);
 }
 
@@ -798,12 +804,21 @@ function playVaccine(session: TrainingSession, handInstanceId: string, nextStep:
     board: healedBoard,
     handCount: session.hand.length
   };
-  session.step = nextStep;
-  session.actionSeq += 1;
-  return update(session, [
+  const events = [
     event(session, "CARD_PLAYED", PLAYER, { handInstanceId, cardId: VACCINE_CARD_ID }),
     event(session, "HEAL", PLAYER, { target: COLLISION_FRIENDLY_MINION_ID, amount: after - before })
-  ]);
+  ];
+  if (nextStep === "egg_intro") {
+    session.hand = [handCard(EGG_HAND_ID, EGG_CARD_ID, 2, "NEWS")];
+    session.players[PLAYER] = {
+      ...session.players[PLAYER],
+      handCount: session.hand.length
+    };
+    events.push(event(session, "CARD_DRAWN", PLAYER, { cardId: EGG_CARD_ID, handCount: 1 }));
+  }
+  session.step = nextStep;
+  session.actionSeq += 1;
+  return update(session, events);
 }
 
 function eggFinish(session: TrainingSession): TrainingCommandResult {

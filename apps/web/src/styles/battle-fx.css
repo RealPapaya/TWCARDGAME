@@ -132,30 +132,36 @@
   /* Thin, borderless green "+" scattered around the healed unit — pops in and
      out at staggered times. Visible whether single-target, AoE, or full-HP. */
   font-family: "Segoe UI", system-ui, sans-serif;
-  font-weight: 300;
+  font-weight: 700;
   font-size: var(--size, 22px);
   line-height: 1;
-  color: #7dffb0;
+  color: #32ff6a;
   text-shadow:
-    0 0 6px rgba(80, 255, 150, 0.9),
-    0 0 12px rgba(50, 230, 120, 0.55);
+    0 0 7px rgba(50, 255, 120, 1),
+    0 0 15px rgba(20, 230, 90, 0.95),
+    0 1px 2px rgba(0, 0, 0, 0.65);
+  -webkit-text-stroke: 1px rgba(0, 95, 28, 0.45);
   opacity: 0;
   will-change: transform, opacity;
-  animation: heal-particle-float-up 0.72s ease-out forwards;
+  animation: heal-particle-float-up 1.05s ease-out forwards;
   animation-delay: calc(var(--cue-delay, 0ms) + var(--particle-delay, 0ms));
 }
 
 @keyframes heal-particle-float-up {
   0% {
-    transform: translate(-50%, -50%) scale(0.4);
-    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.75);
+    opacity: 0.95;
   }
   28% {
     opacity: 1;
     transform: translate(-50%, -50%) translateY(-4px) scale(1);
   }
+  68% {
+    opacity: 0.95;
+    transform: translate(-50%, -50%) translateY(-14px) scale(0.96);
+  }
   100% {
-    transform: translate(-50%, -50%) translateY(-22px) scale(0.9);
+    transform: translate(-50%, -50%) translateY(-30px) scale(0.9);
     opacity: 0;
   }
 }
@@ -803,17 +809,20 @@
   top: var(--y, 50%);
   font-family: "Segoe UI", system-ui, sans-serif;
   font-size: var(--size, 24px);
-  font-weight: 300;
+  font-weight: 600;
   line-height: 1;
-  color: #7dffb0;
+  color: #53ff8d;
   text-shadow:
-    0 0 7px rgba(80, 255, 150, 0.95),
-    0 0 14px rgba(50, 230, 120, 0.7),
-    0 1px 2px rgba(0, 0, 0, 0.65);
+    0 0 8px rgba(80, 255, 150, 1),
+    0 0 18px rgba(50, 230, 120, 0.95),
+    0 0 30px rgba(40, 210, 100, 0.6),
+    0 2px 3px rgba(0, 0, 0, 0.75);
+  -webkit-text-stroke: 1px rgba(0, 80, 28, 0.35);
   opacity: 0;
+  z-index: 2;
   will-change: transform, opacity;
-  animation: aoe-heal-plus-rise 0.8s ease-out forwards;
-  animation-delay: calc(var(--cue-delay, 0ms) + var(--particle-delay, 0ms));
+  animation: aoe-heal-plus-rise 1s ease-out forwards;
+  animation-delay: var(--particle-delay, 0ms);
 }
 
 @keyframes aoe-shock-sweep {
@@ -837,8 +846,12 @@
     opacity: 1;
     transform: translate(-50%, -50%) translateY(0) scale(1);
   }
+  62% {
+    opacity: 0.92;
+    transform: translate(-50%, -50%) translateY(-14px) scale(0.96);
+  }
   100% {
-    transform: translate(-50%, -50%) translateY(-30px) scale(0.88);
+    transform: translate(-50%, -50%) translateY(-36px) scale(0.88);
     opacity: 0;
   }
 }

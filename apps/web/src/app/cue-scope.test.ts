@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { GameEvent, GameEventType } from "@twcardgame/shared";
-import { classifyBatchScopes, mapEventToCueKind } from "./cue-scope.js";
+import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind } from "./cue-scope.js";
 
 let nextSeq = 0;
 function ev(type: GameEventType, payload?: Record<string, unknown>, seat: GameEvent["seat"] = "player1"): GameEvent {
@@ -144,5 +144,32 @@ describe("mapEventToCueKind", () => {
     expect(mapEventToCueKind(ev("DESTROY", { target: "m1", cardId: "c" }), false)).toBe("destroy");
     expect(mapEventToCueKind(ev("DEATHRATTLE", { source: "m1", type: "SUMMON" }), false)).toBe("deathrattle");
     expect(mapEventToCueKind(ev("TURN_STARTED", { turn: 2 }), false)).toBeUndefined();
+  });
+});
+
+describe("findEffectSourceKey", () => {
+  it("anchors minion battlecry damage to the summoned minion", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "TW002" });
+    const summon = ev("MINION_SUMMONED", { cardId: "TW002", target: "student-1" });
+    const damage = ev("DAMAGE", { target: "enemy-1", amount: 1 }, "player2");
+
+    expect(findEffectSourceKey([played, summon, damage], 2)).toBe("student-1");
+  });
+
+  it("anchors 砸雞蛋 damage to the caster hero so it can reuse the blade trail", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "S006" }, "player1");
+    const damage = ev("DAMAGE", { target: "player2:hero", amount: 3 }, "player1");
+
+    expect(findEffectSourceKey([played, damage], 1)).toBe("player1:hero");
+  });
+
+  it("leaves ordinary spell damage without a blade source", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "S002" }, "player1");
+    const damage = ev("DAMAGE", { target: "player2:hero", amount: 3 }, "player1");
+
+    expect(findEffectSourceKey([played, damage], 1)).toBeUndefined();
   });
 });
