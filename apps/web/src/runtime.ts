@@ -51,7 +51,6 @@ import { betaDbResetEnabled, defaultServerUrl, forceDevAuth, isLocalDevHost, ser
 import {
   buildCollectionMap,
   collectionQuantity,
-  filterOwnedCollectionCards,
   ownedCollectionCards,
   ownedCollectionTypeCount,
   compareCollectionCards as compareCollectionCardsBySort
@@ -546,7 +545,7 @@ function renderMainMenu(): string {
           </div>
         </aside>
         <nav class="menu-corner-rail" aria-label="底部功能">
-          <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection" ${accountMode ? "" : "disabled title='Sign in required'"}>
+          <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection">
             <img class="corner-icon" src="/images/ui/Vault.webp" alt="收藏庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">🃏</span>
             <span class="corner-label">收藏庫</span>
@@ -1063,12 +1062,13 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
   const collectionMap = buildCollectionMap(view.collection);
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
   const ownedCards = usesDbCollectionOwnership() ? ownedCollectionCards(collectibles, collectionMap) : collectibles;
+  const filterOptionCards = view.collectionFilter === "owned" ? ownedCards : collectibles;
   const filtered = filterCollectionCards(collectibles, collectionMap);
   const ownedTotal = usesDbCollectionOwnership()
     ? ownedCollectionTypeCount(collectibles, collectionMap)
     : collectibles.filter((card) => collectionQuantityFor(card, collectionMap) > 0).length;
-  const categories = uniqueCollectionCategories(ownedCards);
-  const rarities = uniqueCollectionRarities(ownedCards);
+  const categories = uniqueCollectionCategories(filterOptionCards);
+  const rarities = uniqueCollectionRarities(filterOptionCards);
   const deck = view.editingDeck;
   const selectedCounts = countCards(deck?.card_ids ?? []);
   const selectedTotal = deck?.card_ids.length ?? 0;
@@ -1119,8 +1119,8 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           </div>
           ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
           <section class="collection-card-library" aria-label="卡牌庫">
-            <label class="show-unowned-label" hidden>
-              <input type="checkbox" id="show-unowned-checkbox" disabled />
+            <label class="show-unowned-label">
+              <input type="checkbox" id="show-unowned-checkbox" ${view.collectionFilter === "all" ? "checked" : ""} />
               顯示未擁有的卡牌
             </label>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
@@ -1158,14 +1158,6 @@ function uniqueCollectionRarities(cards: readonly CardDefinition[]): string[] {
 }
 
 function filterCollectionCards(cards: readonly CardDefinition[], collectionMap: Map<string, number>): CardDefinition[] {
-  if (usesDbCollectionOwnership()) {
-    return filterOwnedCollectionCards(cards, collectionMap, {
-      category: view.collectionCategory,
-      rarity: view.collectionRarity,
-      search: view.collectionSearch,
-      sort: view.collectionSort
-    });
-  }
   const search = view.collectionSearch.trim().toLowerCase();
   return cards
     .filter((card) => {
@@ -3001,8 +2993,7 @@ function bindStaticActions(): void {
     on(el, "click", "pick-title", () => void pickTitle(el.dataset.pickTitle));
   }
   on(document.querySelector<HTMLInputElement>("#show-unowned-checkbox"), "change", "show-unowned-checkbox", (event) => {
-    (event.currentTarget as HTMLInputElement).checked = false;
-    view.collectionFilter = "owned";
+    view.collectionFilter = (event.currentTarget as HTMLInputElement).checked ? "all" : "owned";
     render();
   });
   on(document.querySelector<HTMLSelectElement>("#collection-sort-select"), "change", "collection-sort-select", (event) => {
