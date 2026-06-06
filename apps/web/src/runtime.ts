@@ -143,6 +143,11 @@ const TITLE_LABELS: Record<string, string> = {
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
+// Hero death shatter is deliberately slower than the minion one (0.78s) for a
+// dramatic finish; the victory/defeat overlay is held until it finishes plus a
+// short settle pause.
+const HERO_SHATTER_MS = 1600;
+const RESULT_OVERLAY_PAUSE_MS = 400;
 const APP_VERSION = "v1.0.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
@@ -270,6 +275,17 @@ let lastTurnAnnouncementKey: string | undefined;
 let trainingRewardAnimationTimer: number | undefined;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
+// The losing hero's portrait shatters once per match on GAME_FINISHED; this gate
+// stops repeat renders from re-spawning it. resultOverlayHoldUntilMs defers the
+// VICTORY/DEFEAT overlay (and reward animation) until that shatter has finished.
+// Both reset on each new match in resetMinionVisualTracking().
+let heroShatterFired = false;
+let resultOverlayHoldUntilMs = 0;
+// Seat of the hero currently shattering; renderHero hides its intact portrait
+// (via .hero-shattering) so only the flying fragments are seen. Set the moment
+// the shatter spawns, cleared on the next match. (Inline styles/classes added
+// imperatively are stripped by the render morph, so this must drive the template.)
+let shatteringHeroSeat: Seat | undefined;
 const appliedDeathrattles = new Set<string>();
 // Battlecry flying knives are animated imperatively (like death shatter / attack
 // lunge) rather than as a declarative cue node, because the re-rendered node had
@@ -289,6 +305,9 @@ function resetMinionVisualTracking(): void {
   summonPreviewedTargets.clear();
   loggedSummonPreviewSlots.clear();
   loggedSkippedSummonAnimations.clear();
+  heroShatterFired = false;
+  resultOverlayHoldUntilMs = 0;
+  shatteringHeroSeat = undefined;
 }
 
 export function startApp(): void {
@@ -1738,7 +1757,8 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
     isTargetHighlighted(targetRef) && "valid-target",
     sameTarget(view.selectedTarget, targetRef) && "target-selected",
     (hasCue(targetKey, "damage") || hasCue(targetKey, "effectStrike")) && "taking-damage",
-    hasCue(targetKey, "heal") && "receiving-heal"
+    hasCue(targetKey, "heal") && "receiving-heal",
+    seat === shatteringHeroSeat && "hero-shattering"
   ]);
 
   return `
@@ -2250,6 +2270,10 @@ function renderVoteOption(event: { id: string; name: string; options: string[] }
 
 function renderResultOverlay(status: GameStatus | ""): string {
   if (status !== "finished" && status !== "abandoned") return "";
+  // Hold the VICTORY/DEFEAT screen until the losing hero's death shatter has
+  // finished. scheduleHeroDeathSequence set this deadline on GAME_FINISHED and
+  // scheduled a render at it; until then keep the battlefield visible.
+  if (resultOverlayHoldUntilMs !== 0 && performance.now() < resultOverlayHoldUntilMs) return "";
   // The animated post-match reward screen replaces the old static overlay.
   // If we don't yet have a RewardSummary from the server, fall back to a
   // synthesized loss summary so the player sees DEFEAT without blocking.
@@ -4215,11 +4239,10 @@ function applyTrainingResult(result: TrainingCommandResult): void {
     view.state = trainingPublicState(trainingSession);
     applyPublicSync(result.publicSync);
   }
-  let cues: AnimationCue[] = [];
-  if (result.events.length > 0) cues = handleEvents(result.events);
+  if (result.events.length > 0) handleEvents(result.events);
   if (result.hand) handleHandSync(result.hand);
   if (result.completed) {
-    const rewardDeferUntilMs = deferTrainingCompletionUntil(cues, result.events);
+    const rewardDeferUntilMs = deferTrainingCompletionUntil(result.events);
     void completeTrainingReward(rewardDeferUntilMs);
   }
   render();
@@ -4267,13 +4290,14 @@ function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: num
   render();
 }
 
-function deferTrainingCompletionUntil(cues: AnimationCue[], events: GameEvent[]): number | undefined {
-  if (!trainingSession || trainingSession.level.id !== "collision_news") return undefined;
+function deferTrainingCompletionUntil(events: GameEvent[]): number | undefined {
+  if (!trainingSession) return undefined;
   if (!events.some((event) => event.type === "GAME_FINISHED")) return undefined;
-  const finalCueDelayMs = cues.reduce((max, cue) => Math.max(max, cue.delayMs ?? 0), 0);
-  const delayMs = finalCueDelayMs + TRAINING_RESULT_PAUSE_AFTER_FINAL_CUE_MS;
-  holdPendingPublicSyncFor(delayMs);
-  return performance.now() + delayMs;
+  // scheduleHeroDeathSequence (in handleEvents) already computed the hero death
+  // shatter hold for every level (第一關 included, not just collision_news), and
+  // holds publicSync for it. Start the reward XP/gold animation when the
+  // VICTORY/DEFEAT overlay reveals so the two stay in sync.
+  return resultOverlayHoldUntilMs || undefined;
 }
 
 function clearTrainingRewardAnimationTimer(): void {
@@ -6695,10 +6719,12 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
     }
     showBattleToast(String(rejection.payload?.reason ?? "動作被拒絕。"));
   }
-  if (message.some((item) => item.type === "GAME_FINISHED")) {
+  const finishedEvent = message.find((item) => item.type === "GAME_FINISHED");
+  if (finishedEvent) {
     view.eventStatus = "finished";
     // Match is over — no point offering a resume after a later refresh.
     forgetActiveMatch();
+    scheduleHeroDeathSequence(finishedEvent, cues);
   } else if (message.some((item) => item.type === "TURN_STARTED")) {
     view.eventStatus = "in_progress";
   }
@@ -6889,7 +6915,6 @@ const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 const BOUNCE_EFFECT_SYNC_LAG_MS = 650;
 const DESTROY_EFFECT_SYNC_LAG_MS = 820;
-const TRAINING_RESULT_PAUSE_AFTER_FINAL_CUE_MS = 1200;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -8069,6 +8094,50 @@ function applyKnifeStrike(cue: AnimationCue): void {
   window.setTimeout(() => knife.remove(), 420);
 }
 
+// Shared core for the death-shatter visual: slices `bgImg` (sampled over `rect`)
+// into a cols×rows grid of fragments that fly apart and fade. Used by both the
+// minion shatter (fast, 0.78s) and the hero shatter (slow, HERO_SHATTER_MS).
+// `spreadScale` widens the fly distance for the larger hero portrait. Returns
+// the body-level container so callers can schedule its own removal.
+function spawnShatter(
+  rect: DOMRect,
+  bgImg: string | null,
+  opts: { durationMs: number; cols: number; rows: number; spreadScale?: number }
+): HTMLElement {
+  const { durationMs, cols, rows, spreadScale = 1 } = opts;
+  const container = document.createElement("div");
+  container.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;pointer-events:none;z-index:2000;overflow:visible;`;
+  document.body.appendChild(container);
+
+  const fragW = rect.width / cols;
+  const fragH = rect.height / rows;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const frag = document.createElement("div");
+      frag.className = "shatter-fragment";
+      frag.style.width = `${fragW}px`;
+      frag.style.height = `${fragH}px`;
+      frag.style.left = `${c * fragW}px`;
+      frag.style.top = `${r * fragH}px`;
+      frag.style.setProperty("--shatter-dur", `${durationMs}ms`);
+      if (bgImg) {
+        frag.style.backgroundImage = bgImg;
+        frag.style.backgroundSize = `${rect.width}px ${rect.height}px`;
+        frag.style.backgroundPosition = `-${c * fragW}px -${r * fragH}px`;
+      } else {
+        frag.style.background = "linear-gradient(135deg,#444,#111)";
+      }
+      const angle = Math.random() * Math.PI * 2;
+      const dist = (50 + Math.random() * 150) * spreadScale;
+      frag.style.setProperty("--dx", `${Math.round(Math.cos(angle) * dist)}px`);
+      frag.style.setProperty("--dy", `${Math.round(Math.sin(angle) * dist)}px`);
+      frag.style.setProperty("--dr", `${Math.round((Math.random() - 0.5) * 600)}deg`);
+      container.appendChild(frag);
+    }
+  }
+  return container;
+}
+
 function applyDeathShatter(cue: AnimationCue): void {
   if (cue.kind !== "destroy" || !cue.targetKey || appliedDeathShatters.has(cue.id)) return;
   const minionEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
@@ -8081,40 +8150,68 @@ function applyDeathShatter(cue: AnimationCue): void {
   const artEl = minionEl.querySelector<HTMLElement>(".minion-art");
   const bgImg = artEl ? artEl.style.backgroundImage : null;
 
-  const container = document.createElement("div");
-  container.style.cssText = `position:fixed;left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;pointer-events:none;z-index:2000;overflow:visible;`;
-  document.body.appendChild(container);
-
-  const cols = 4, rows = 5;
-  const fragW = rect.width / cols;
-  const fragH = rect.height / rows;
-  for (let r = 0; r < rows; r++) {
-    for (let c = 0; c < cols; c++) {
-      const frag = document.createElement("div");
-      frag.className = "shatter-fragment";
-      frag.style.width = `${fragW}px`;
-      frag.style.height = `${fragH}px`;
-      frag.style.left = `${c * fragW}px`;
-      frag.style.top = `${r * fragH}px`;
-      if (bgImg) {
-        frag.style.backgroundImage = bgImg;
-        frag.style.backgroundSize = `${rect.width}px ${rect.height}px`;
-        frag.style.backgroundPosition = `-${c * fragW}px -${r * fragH}px`;
-      } else {
-        frag.style.background = "linear-gradient(135deg,#444,#111)";
-      }
-      const angle = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * 150;
-      frag.style.setProperty("--dx", `${Math.round(Math.cos(angle) * dist)}px`);
-      frag.style.setProperty("--dy", `${Math.round(Math.sin(angle) * dist)}px`);
-      frag.style.setProperty("--dr", `${Math.round((Math.random() - 0.5) * 600)}deg`);
-      container.appendChild(frag);
-    }
-  }
+  const container = spawnShatter(rect, bgImg, { durationMs: 780, cols: 4, rows: 5 });
   window.setTimeout(() => {
     container.remove();
     appliedDeathShatters.delete(cue.id);
   }, 800);
+}
+
+// Hero counterpart of applyDeathShatter: when a hero dies (GAME_FINISHED), the
+// losing hero's circular portrait shatters — slower (HERO_SHATTER_MS) and more
+// dramatically than a minion. The portrait image is a CSS background on the
+// `.avatar` child, so it must be read via getComputedStyle (not inline .style).
+// Fires once per match, gated by heroShatterFired.
+function applyHeroShatter(loserSeat: Seat): void {
+  if (heroShatterFired) return;
+  const heroEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(`${loserSeat}:hero`)}"]`);
+  const avatarEl = heroEl?.querySelector<HTMLElement>(".avatar");
+  if (!heroEl || !avatarEl) return;
+  heroShatterFired = true;
+
+  const rect = avatarEl.getBoundingClientRect();
+  const computedBg = getComputedStyle(avatarEl).backgroundImage;
+  const bgImg = computedBg && computedBg !== "none" ? computedBg : null;
+  recentUnitRects.set(`${loserSeat}:hero`, { rect, atMs: performance.now() });
+  // Hide the intact portrait from here on (driven by the render template, since
+  // the very next render() reconciles this hero button).
+  shatteringHeroSeat = loserSeat;
+
+  const container = spawnShatter(rect, bgImg, {
+    durationMs: HERO_SHATTER_MS,
+    cols: 5,
+    rows: 6,
+    spreadScale: 1.4
+  });
+  window.setTimeout(() => container.remove(), HERO_SHATTER_MS + 60);
+}
+
+// On GAME_FINISHED, play the losing hero's slow death shatter, then reveal the
+// VICTORY/DEFEAT overlay only after it finishes. Shared by PvP / PvE / training
+// (all flow through handleEvents). `hero_destroyed`/`concede` both shatter the
+// loser; `abandoned` (disconnect) emits no GAME_FINISHED so the overlay still
+// shows immediately. Sets resultOverlayHoldUntilMs, which gates
+// renderResultOverlay and the training reward animation.
+function scheduleHeroDeathSequence(finishedEvent: GameEvent, cues: AnimationCue[]): void {
+  if (resultOverlayHoldUntilMs !== 0) return; // already scheduled this match
+  const winnerSeat =
+    (finishedEvent.payload?.winnerSeat as Seat | undefined)
+    ?? view.publicSync?.result?.winnerSeat
+    ?? view.state?.result?.winnerSeat;
+  if (!winnerSeat) return;
+  const loserSeat = otherSeat(winnerSeat);
+  // Let the killing blow's damage number land before the portrait shatters.
+  const finalCueDelayMs = cues.reduce((max, cue) => Math.max(max, cue.delayMs ?? 0), 0);
+  const holdMs = finalCueDelayMs + HERO_SHATTER_MS + RESULT_OVERLAY_PAUSE_MS;
+  resultOverlayHoldUntilMs = performance.now() + holdMs;
+  // Keep the board (counts) from snapping to the post-match state early.
+  holdPendingPublicSyncFor(holdMs);
+  window.setTimeout(() => {
+    applyHeroShatter(loserSeat);
+    render();
+  }, finalCueDelayMs);
+  // Reveal the overlay once the shatter (and settle pause) has elapsed.
+  window.setTimeout(() => render(), holdMs);
 }
 
 // Spawns the 遺志 soul plume imperatively at the dead minion's slot. The unit

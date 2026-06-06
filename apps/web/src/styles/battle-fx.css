@@ -451,13 +451,22 @@
   }
 }
 
+/* While the losing hero's portrait is breaking apart, hide the intact avatar so
+   only the body-level flying fragments are visible (the hero element itself is
+   never removed from the board, unlike a dead minion). */
+.hero.hero-shattering .avatar {
+  visibility: hidden;
+}
+
 /* --- Minion death shatter fragments (matched from LEGACY animateShatter) --- */
 .shatter-fragment {
   position: absolute;
   background-size: cover;
   background-repeat: no-repeat;
   border-radius: 2px;
-  animation: shatter-fly 0.78s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  /* Duration is variable so the hero death shatter can run slower (~1.6s) than
+     the minion one (0.78s default); spawnShatter sets --shatter-dur per unit. */
+  animation: shatter-fly var(--shatter-dur, 0.78s) cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
 }
 
 @keyframes shatter-fly {
