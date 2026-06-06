@@ -48,6 +48,10 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
   opponent.hero.maxHp = Math.max(opponent.hero.maxHp, opponent.hero.hp);
   applyMana(player.mana, setup.playerMana);
   applyMana(opponent.mana, setup.opponentMana);
+  state.private.devTestInfiniteMana = {
+    player1: setup.infiniteMana?.player1 === true,
+    player2: setup.infiniteMana?.player2 === true
+  };
 
   for (const cardId of setup.handCardIds ?? []) {
     const def = catalog.get(cardId)!;

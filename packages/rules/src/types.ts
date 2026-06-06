@@ -139,6 +139,7 @@ export interface PrivateMatchState {
   eventLog: GameEvent[];
   turnActionTaken: boolean;
   turnTimeLimitMs: number;
+  devTestInfiniteMana?: Partial<Record<Seat, boolean>>;
 }
 
 export interface MatchState {

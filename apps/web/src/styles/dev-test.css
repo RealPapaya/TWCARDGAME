@@ -1,0 +1,250 @@
+.dev-test-screen {
+  gap: 18px;
+  align-items: stretch;
+  color: #1d2430;
+  overflow: auto;
+}
+
+.dev-test-screen h2 {
+  margin: 0;
+}
+
+.dev-test-screen fieldset {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid rgba(72, 61, 43, 0.24);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.84);
+}
+
+.dev-test-screen legend {
+  padding: 0 8px;
+  font-weight: 700;
+}
+
+.dev-test-screen label {
+  display: grid;
+  gap: 6px;
+  font-weight: 700;
+}
+
+.dev-test-screen input,
+.dev-test-screen select {
+  min-height: 36px;
+  padding: 6px 8px;
+  border: 1px solid rgba(44, 52, 65, 0.3);
+  border-radius: 6px;
+  background: #fff;
+  color: #1d2430;
+}
+
+.dev-test-screen button {
+  min-height: 34px;
+  padding: 6px 10px;
+  border: 1px solid rgba(44, 52, 65, 0.28);
+  border-radius: 6px;
+  background: #f7f4ed;
+  color: #1d2430;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.dev-test-screen button:disabled {
+  opacity: 0.48;
+  cursor: not-allowed;
+}
+
+.dev-test-card-selectors {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.dev-card-selector {
+  display: grid;
+  grid-template-rows: auto auto auto 112px auto minmax(0, 1fr);
+  gap: 10px;
+  min-width: 0;
+  height: min(760px, calc(100vh - 150px));
+  min-height: 560px;
+  padding: 12px;
+  border: 1px solid rgba(44, 52, 65, 0.18);
+  border-radius: 8px;
+  background: #fbfaf6;
+}
+
+.dev-card-selector-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.dev-card-selector h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.dev-card-count {
+  flex: 0 0 auto;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: #25313f;
+  color: #fff;
+  font-size: 0.82rem;
+}
+
+.dev-card-search-label span {
+  font-size: 0.86rem;
+}
+
+.dev-card-filters {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.dev-card-filters label {
+  gap: 4px;
+  min-width: 0;
+  font-size: 0.78rem;
+}
+
+.dev-card-filters select {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  font-size: 0.8rem;
+}
+
+.dev-selected-cards,
+.dev-card-results {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  min-height: 0;
+}
+
+.dev-selected-cards {
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.dev-card-result-summary {
+  min-height: 18px;
+  color: #5d6877;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.dev-card-results {
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.dev-card-empty {
+  margin: 0;
+  padding: 10px;
+  border: 1px dashed rgba(44, 52, 65, 0.22);
+  border-radius: 6px;
+  color: #5d6877;
+  font-weight: 600;
+}
+
+.dev-selected-card,
+.dev-card-result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid rgba(44, 52, 65, 0.16);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.dev-selected-card-name,
+.dev-card-result strong,
+.dev-card-result span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-selected-card-meta {
+  color: #647081;
+  font-size: 0.82rem;
+}
+
+.dev-card-result {
+  grid-template-columns: 42px minmax(0, 1fr) auto auto;
+}
+
+.dev-card-result img {
+  width: 42px;
+  height: 58px;
+  object-fit: cover;
+  border-radius: 5px;
+  background: #d9d4ca;
+}
+
+.dev-card-result-body {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.dev-card-result-body span {
+  color: #647081;
+  font-size: 0.78rem;
+}
+
+.dev-card-cost {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #2f6f8f;
+  color: #fff;
+  font-weight: 800;
+}
+
+.dev-test-toggle {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: start;
+}
+
+.dev-test-toggle input {
+  min-height: auto;
+}
+
+@media (max-width: 980px) {
+  .dev-test-card-selectors {
+    grid-template-columns: 1fr;
+  }
+
+  .dev-card-selector {
+    height: min(720px, calc(100vh - 120px));
+  }
+}
+
+@media (max-width: 560px) {
+  .dev-card-filters {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dev-card-result {
+    grid-template-columns: 38px minmax(0, 1fr) auto;
+  }
+
+  .dev-card-result button {
+    grid-column: 2 / 4;
+    justify-self: stretch;
+  }
+}

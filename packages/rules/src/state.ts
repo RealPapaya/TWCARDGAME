@@ -149,6 +149,7 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
 }
 
 export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCard): number {
+  if (state.private.devTestInfiniteMana?.[seat]) return 0;
   let cost = card.cost;
   if (card.type === "NEWS") {
     for (const minion of state.players[seat].board) {

@@ -19,6 +19,7 @@
 @import "./styles/leaderboard.css";
 @import "./styles/shop.css";
 @import "./styles/pack-opening.css";
+@import "/src/styles/dev-test.css";
 @import "./styles/settings.css";
 @import "./styles/changelog.css";
 @import "./styles/battle-arena.css";

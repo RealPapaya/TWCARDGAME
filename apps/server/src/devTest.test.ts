@@ -1,5 +1,5 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
-import { createInitialMatch } from "@twcardgame/rules";
+import { createInitialMatch, reduce } from "@twcardgame/rules";
 import { describe, expect, it } from "vitest";
 import { defaultDeckIds } from "./accounts.js";
 import { applyDevTestMatchSetup, isDevTestRequestAllowed } from "./devTest.js";
@@ -55,9 +55,60 @@ describe("developer test mode helpers", () => {
     expect(state.players.player2.hero.hp).toBe(8);
     expect(state.players.player1.mana).toEqual({ current: 4, max: 6 });
     expect(state.players.player2.mana).toEqual({ current: 2, max: 5 });
+    expect(state.private.devTestInfiniteMana).toEqual({ player1: false, player2: false });
     expect(state.turn.number).toBe(3);
     expect(state.turn.activeSeat).toBe("player1");
     expect(state.private.eventLog).toEqual([]);
+  });
+
+  it("lets each dev-test seat opt into infinite mana independently", () => {
+    const card = CARD_CATALOG.find((candidate) =>
+      candidate.type === "MINION" &&
+      candidate.cost > 0 &&
+      !candidate.keywords?.battlecry
+    );
+    expect(card).toBeDefined();
+
+    const infinite = createMatch();
+    applyDevTestMatchSetup(infinite, {
+      handCardIds: [card!.id],
+      playerMana: { current: 0, max: 0 },
+      infiniteMana: { player1: true, player2: false },
+      activeSeat: "player1"
+    }, 1000);
+
+    const playable = infinite.players.player1.hand[0]!;
+    const played = reduce(infinite, {
+      commandId: "infinite-mana-play",
+      seat: "player1",
+      nowMs: 1100,
+      command: { type: "playCard", handInstanceId: playable.instanceId }
+    }, CARD_CATALOG).state;
+
+    expect(played.private.devTestInfiniteMana).toEqual({ player1: true, player2: false });
+    expect(played.players.player1.hand).toHaveLength(0);
+    expect(played.players.player1.board.map((minion) => minion.cardId)).toEqual([card!.id]);
+    expect(played.players.player1.mana).toEqual({ current: 0, max: 0 });
+
+    const finite = createMatch();
+    applyDevTestMatchSetup(finite, {
+      handCardIds: [card!.id],
+      playerMana: { current: 0, max: 0 },
+      infiniteMana: { player1: false },
+      activeSeat: "player1"
+    }, 1000);
+
+    const blockedCard = finite.players.player1.hand[0]!;
+    const blocked = reduce(finite, {
+      commandId: "finite-mana-play",
+      seat: "player1",
+      nowMs: 1100,
+      command: { type: "playCard", handInstanceId: blockedCard.instanceId }
+    }, CARD_CATALOG);
+
+    expect(blocked.state.players.player1.hand).toHaveLength(1);
+    expect(blocked.state.players.player1.board).toHaveLength(0);
+    expect(blocked.events.map((event) => event.type)).toContain("COMMAND_REJECTED");
   });
 
   it("rejects invalid card ids and non-minion board cards", () => {

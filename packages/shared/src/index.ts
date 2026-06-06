@@ -33,6 +33,7 @@ export interface DevTestMatchSetup {
   opponentHp?: number;
   playerMana?: { current?: number; max?: number };
   opponentMana?: { current?: number; max?: number };
+  infiniteMana?: Partial<Record<Seat, boolean>>;
   turnNumber?: number;
   activeSeat?: Seat;
 }
