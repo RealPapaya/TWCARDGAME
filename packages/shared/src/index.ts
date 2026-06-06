@@ -345,7 +345,8 @@ export type GameEventType =
   | "VOTE_CAST"
   | "VOTE_RESOLVED"
   | "ENVIRONMENT_APPLIED"
-  | "ENVIRONMENT_EXPIRED";
+  | "ENVIRONMENT_EXPIRED"
+  | "EVENT_NOTICE";
 
 export interface GameEvent {
   seq: number;

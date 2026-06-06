@@ -806,7 +806,7 @@ function bounceMinion(state: MatchState, owner: PlayerState, minion: RuntimeMini
   addEvent(state, events, "BOUNCE", { target: removed.instanceId, cardId: removed.cardId }, owner.seat);
 }
 
-function summonCard(state: MatchState, player: PlayerState, card: CardDefinition, events: EffectContext["events"], index?: number, temporaryTurns?: number): RuntimeMinion | undefined {
+export function summonCard(state: MatchState, player: PlayerState, card: CardDefinition, events: EffectContext["events"], index?: number, temporaryTurns?: number): RuntimeMinion | undefined {
   if (player.board.length >= 7 || card.type !== "MINION") return undefined;
   const runtimeCard = createCardForHand(state, card, player.seat);
   const minion = createMinionFromCard(state, runtimeCard, player.seat);

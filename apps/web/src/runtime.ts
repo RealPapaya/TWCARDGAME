@@ -64,7 +64,7 @@ import {
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
-import { playVoteRoulette, resetVoteRoulette, type VoteRouletteChoice } from "./app/vote-roulette.js";
+import { playVoteRoulette, resetVoteRoulette, VOTE_ROULETTE_TOTAL_MS, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
 import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
@@ -6544,6 +6544,11 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
       const processText = typeof payload.processText === "string" ? payload.processText : "公投結果出爐";
       return { ...base, kind: "play", tile: { name: "公投" }, badge: "sparkle", label: processText };
     }
+    case "EVENT_NOTICE": {
+      const text = typeof payload.text === "string" ? payload.text : "";
+      if (!text) return undefined;
+      return { ...base, kind: "play", tile: { name: "公投" }, badge: "sparkle", label: text };
+    }
     // BUFF is handled by the grouping pass in appendBattleLog (multiple events → one actor entry).
     default:
       return undefined;
@@ -6735,6 +6740,14 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
   }
   const voteResolved = message.find((item) => item.type === "VOTE_RESOLVED");
   if (voteResolved) startVoteRouletteFromEvent(voteResolved);
+  // Surface event reminders (e.g. 鬼門開 場上已滿 無法復活) as an on-screen toast.
+  // When a vote roulette is playing in the same batch, hold the toast until the
+  // roulette finishes so it isn't hidden behind the overlay.
+  const notice = message.filter((item) => item.type === "EVENT_NOTICE").map((item) => String(item.payload?.text ?? "")).filter(Boolean).at(-1);
+  if (notice) {
+    if (voteResolved) setTimeout(() => showBattleToast(notice), VOTE_ROULETTE_TOTAL_MS);
+    else showBattleToast(notice);
+  }
   render();
   return cues;
 }

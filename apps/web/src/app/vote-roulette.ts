@@ -39,6 +39,10 @@ const MAX_STEP_MS = 360;
 const REVEAL_HOLD_MS = 850;
 const FADE_OUT_MS = 280;
 
+/** Total wall-clock of the roulette (spin → reveal hold → fade), for callers that
+ * need to wait for it to clear (e.g. holding an event-notice toast). */
+export const VOTE_ROULETTE_TOTAL_MS = SPIN_MS + REVEAL_HOLD_MS + FADE_OUT_MS;
+
 interface Slot {
   choice: VoteRouletteChoice;
   seats: Seat[];

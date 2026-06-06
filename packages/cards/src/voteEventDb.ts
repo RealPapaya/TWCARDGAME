@@ -45,25 +45,55 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_UTILITY_HIKE",
-    name: "油電雙漲",
+    name: "物價通膨",
     tierWeight: 35,
-    options: ["所有卡牌消耗 +2（上限 10）", "所有卡牌消耗 +2（上限 10）", "所有卡牌消耗 +2（上限 10）"],
+    options: ["所有卡牌費用 +2（上限 10）", "所有卡牌費用 +2（上限 10）", "所有卡牌費用 +2（上限 10）"],
     apply: { mode: "ENVIRONMENT", durationTurns: 4, effect: { type: "ENV_COST_PLUS_CAPPED", value: 2 } }
   },
   {
     id: "VE_MORAKOT",
-    name: "莫拉克颱風",
+    name: "莫拉克風災",
     tierWeight: 20,
-    options: ["場上所有隨從死亡", "場上所有隨從死亡", "場上所有隨從死亡"],
+    options: ["摧毀場上所有隨從", "摧毀場上所有隨從", "摧毀場上所有隨從"],
     apply: { mode: "IMMEDIATE", effect: { type: "DESTROY_ALL_MINIONS" } }
   },
   { id: "VE_KAOHSIUNG_BLAST", name: "高雄氣爆", tierWeight: 35, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
-  { id: "VE_MAZU", name: "媽祖繞境", tierWeight: 35, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
+  {
+    id: "VE_MAZU",
+    name: "媽祖大繞境",
+    tierWeight: 30,
+    options: ["全場隨從獲得光盾", "全場隨從獲得光盾", "全場隨從獲得光盾"],
+    apply: { mode: "IMMEDIATE", effect: { type: "GIVE_DIVINE_SHIELD_ALL_BOARD" } }
+  },
   { id: "VE_MARTIAL_LAW", name: "戒嚴", tierWeight: 20, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
-  { id: "VE_SLOT_07", name: "（事件待補 07）", tierWeight: 45, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
-  { id: "VE_SLOT_08", name: "（事件待補 08）", tierWeight: 45, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
-  { id: "VE_SLOT_09", name: "（事件待補 09）", tierWeight: 45, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
-  { id: "VE_SLOT_10", name: "（事件待補 10）", tierWeight: 45, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP }
+  {
+    id: "VE_GHOST_GATE",
+    name: "鬼門開",
+    tierWeight: 25,
+    options: ["雙方同時從墓場隨機復活 2 隻隨從", "雙方同時從墓場隨機復活 2 隻隨從", "雙方同時從墓場隨機復活 2 隻隨從"],
+    apply: { mode: "IMMEDIATE", effect: { type: "SUMMON_FROM_GRAVEYARD", count: 2 } }
+  },
+  {
+    id: "VE_FINANCIAL_CRISIS",
+    name: "金融海嘯",
+    tierWeight: 20,
+    options: ["雙方水晶歸 1 重新累加", "雙方水晶歸 1 重新累加", "雙方水晶歸 1 重新累加"],
+    apply: { mode: "IMMEDIATE", effect: { type: "RESET_MANA_ALL" } }
+  },
+  {
+    id: "VE_BASEBALL_CHAMPION",
+    name: "歡慶 12 強冠軍",
+    tierWeight: 20,
+    options: ["雙方英雄血量回滿", "雙方英雄血量回滿", "雙方英雄血量回滿"],
+    apply: { mode: "IMMEDIATE", effect: { type: "FULL_HEAL_BOTH_HEROES" } }
+  },
+  {
+    id: "VE_CASH_HANDOUT",
+    name: "普發現金",
+    tierWeight: 30,
+    options: ["下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0"],
+    apply: { mode: "ENVIRONMENT", durationTurns: 2, effect: { type: "ENV_COST_ZERO" } }
+  }
 ];
 
 /** Validates the vote-event DB: unique ids, positive weights, exactly 3 options. Effect logic not yet required. */

@@ -6,13 +6,15 @@ import { damageHealHandlers } from "./damage-heal.js";
 import { environmentHandlers } from "./environment.js";
 import { handHandlers } from "./hand.js";
 import { summonDestroyBounceHandlers } from "./summon-destroy-bounce.js";
+import { voteEventHandlers } from "./voteEvents.js";
 
 export const effectHandlers: Record<string, EffectHandler> = {
   ...handHandlers,
   ...summonDestroyBounceHandlers,
   ...buffKeywordLockHandlers,
   ...damageHealHandlers,
-  ...environmentHandlers
+  ...environmentHandlers,
+  ...voteEventHandlers
 };
 
 export function resolveEffect(effect: EffectDefinition | undefined, context: EffectContext): void {

@@ -19,7 +19,7 @@ export function environmentCostDelta(state: MatchState): number {
   return 0;
 }
 
-function isEnvironmentActive(state: MatchState, env: ActiveEnvironment): boolean {
+export function isEnvironmentActive(state: MatchState, env: ActiveEnvironment): boolean {
   return env.expiresTurn === undefined || state.turn.number <= env.expiresTurn;
 }
 
