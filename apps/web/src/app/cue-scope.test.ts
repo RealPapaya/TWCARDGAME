@@ -167,9 +167,46 @@ describe("findEffectSourceKey", () => {
 
   it("leaves ordinary spell damage without a blade source", () => {
     reset();
-    const played = ev("CARD_PLAYED", { cardId: "S002" }, "player1");
+    const played = ev("CARD_PLAYED", { cardId: "S999" }, "player1");
     const damage = ev("DAMAGE", { target: "player2:hero", amount: 3 }, "player1");
 
     expect(findEffectSourceKey([played, damage], 1)).toBeUndefined();
+  });
+
+  it("anchors 彈劾賴皇 (S002) multi-hit damage to the caster hero", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "S002" }, "player2");
+    const hit1 = ev("DAMAGE", { target: "enemy-1", amount: 1 }, "player1");
+    const hit2 = ev("DAMAGE", { target: "player1:hero", amount: 1 }, "player1");
+
+    // The blade flies from the CASTER hero (player2), not the victim's seat.
+    expect(findEffectSourceKey([played, hit1, hit2], 1)).toBe("player2:hero");
+    expect(findEffectSourceKey([played, hit1, hit2], 2)).toBe("player2:hero");
+  });
+});
+
+describe("classifyBatchScopes — multi-hit strike (S002)", () => {
+  it("keeps S002's hits individual (not an AOE sweep) and tags them multiHit", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "S002" }, "player1");
+    const h1 = ev("DAMAGE", { target: "e1", amount: 1 }, "player2");
+    const h2 = ev("DAMAGE", { target: "e2", amount: 1 }, "player2");
+    const h3 = ev("DAMAGE", { target: "player2:hero", amount: 1 }, "player2");
+    const { aoeClusters, aoeSeqs, multiHitSeqs } = classifyBatchScopes([played, h1, h2, h3]);
+
+    expect(aoeClusters).toHaveLength(0);
+    expect(multiHitSeqs).toEqual(new Set([h1.seq, h2.seq, h3.seq]));
+    for (const seq of multiHitSeqs) expect(aoeSeqs.has(seq)).toBe(false);
+  });
+
+  it("does not pull a later unrelated DAMAGE into the multi-hit set", () => {
+    reset();
+    const played = ev("CARD_PLAYED", { cardId: "S002" }, "player1");
+    const h1 = ev("DAMAGE", { target: "e1", amount: 1 }, "player2");
+    const attack = ev("ATTACK", { attackerInstanceId: "m1", target: { type: "MINION", instanceId: "e2" } });
+    const combat = ev("DAMAGE", { target: "e2", amount: 4 }, "player2");
+    const { multiHitSeqs } = classifyBatchScopes([played, h1, attack, combat]);
+
+    expect(multiHitSeqs).toEqual(new Set([h1.seq]));
   });
 });

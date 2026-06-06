@@ -32,7 +32,21 @@ export type BatchScopeResult = {
   /** seqs of every event that is a member of some AOE cluster. */
   aoeSeqs: Set<number>;
   aoeClusters: AoeCluster[];
+  /**
+   * seqs of DAMAGE events that belong to a multi-hit strike card (e.g. 彈劾賴皇
+   * S002 — "隨機分配 N 點傷害"). These stay individual `effectStrike` cues
+   * (one staggered flying blade per point) instead of being clustered into a
+   * single `aoeSweep`. The runtime reuses this set to apply the per-hit stagger.
+   */
+  multiHitSeqs: Set<number>;
 };
+
+/**
+ * Cards whose damage is dealt as N separate 1-point hits and should animate as
+ * N staggered flying blades rather than one whole-board sweep. The rules engine
+ * already emits one DAMAGE event per point; this is purely a presentation opt-in.
+ */
+export const MULTI_HIT_STRIKE_CARD_IDS = new Set<string>(["S002"]);
 
 /** Effect families that can sweep the board. Order fixes sweep stacking. */
 type Family = "damage" | "heal" | "bounce" | "buff" | "lock" | "destroy";
@@ -102,14 +116,43 @@ export function findCombatDamageSeqs(events: GameEvent[]): Set<number> {
   return combat;
 }
 
+/**
+ * Marks DAMAGE events that belong to a multi-hit strike card (e.g. S002). We
+ * collect every DAMAGE seq from a `CARD_PLAYED` of such a card up to the next
+ * `CARD_PLAYED`/`ATTACK` boundary, so an unrelated effect in the same batch is
+ * never swept in. The card id rides on the CARD_PLAYED event; the per-hit DAMAGE
+ * events only carry the victim's target/seat, hence this batch-level pass.
+ */
+export function findMultiHitDamageSeqs(events: GameEvent[]): Set<number> {
+  const multiHit = new Set<number>();
+  let collecting = false;
+  for (const event of events) {
+    if (event.type === "CARD_PLAYED") {
+      const cardId = (event.payload ?? {}).cardId;
+      collecting = typeof cardId === "string" && MULTI_HIT_STRIKE_CARD_IDS.has(cardId);
+      continue;
+    }
+    if (event.type === "ATTACK") {
+      collecting = false;
+      continue;
+    }
+    if (collecting && event.type === "DAMAGE") multiHit.add(event.seq);
+  }
+  return multiHit;
+}
+
 export function classifyBatchScopes(events: GameEvent[]): BatchScopeResult {
   const combatDamageSeqs = findCombatDamageSeqs(events);
+  const multiHitSeqs = findMultiHitDamageSeqs(events);
 
   // Bucket by (family, owner seat): a both-board AOE (e.g. destroy-all) sweeps
   // each side separately, so the opponent's board and ours both get an overlay.
   type Bucket = { family: Family; seqs: number[]; targets: Set<string>; seat?: Seat };
   const buckets = new Map<string, Bucket>();
   for (const event of events) {
+    // Multi-hit strike damage stays individual (one staggered blade per hit),
+    // so it must never be bucketed into an aoeSweep.
+    if (multiHitSeqs.has(event.seq)) continue;
     const family = familyOf(event, combatDamageSeqs);
     if (!family) continue;
     const target = eventTargetKey(event);
@@ -147,7 +190,7 @@ export function classifyBatchScopes(events: GameEvent[]): BatchScopeResult {
     });
   }
 
-  return { combatDamageSeqs, aoeSeqs, aoeClusters };
+  return { combatDamageSeqs, aoeSeqs, aoeClusters, multiHitSeqs };
 }
 
 /**
@@ -194,7 +237,16 @@ export function findEffectSourceKey(events: GameEvent[], startIndex: number): st
           return typeof summon.payload?.target === "string" ? summon.payload.target : undefined;
         }
       }
-      if (cardId === "S006" && (event.seat === "player1" || event.seat === "player2")) return `${event.seat}:hero`;
+      // 砸雞蛋 (S006) and multi-hit strike NEWS cards (e.g. 彈劾賴皇 S002) have no
+      // summoned minion to fly from, so the blade borrows the caster hero as a
+      // stable on-screen source. `event.seat` here is the CARD_PLAYED seat = the
+      // caster, so the blade flies caster→victim (not from the victim's side).
+      if (
+        (cardId === "S006" || (typeof cardId === "string" && MULTI_HIT_STRIKE_CARD_IDS.has(cardId))) &&
+        (event.seat === "player1" || event.seat === "player2")
+      ) {
+        return `${event.seat}:hero`;
+      }
       return undefined;
     }
   }

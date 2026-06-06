@@ -6915,6 +6915,13 @@ const CARD_PLAY_EFFECT_DELAY_MS = CARD_PLAY_FULL_MS + 160;
 const POST_PLAY_STATE_SYNC_LAG_MS = 180;
 const BOUNCE_EFFECT_SYNC_LAG_MS = 650;
 const DESTROY_EFFECT_SYNC_LAG_MS = 820;
+// Multi-hit strike cards (e.g. 彈劾賴皇 S002) fire N staggered flying blades, one
+// per 1-damage hit. Each hit's cue delay is base + index*stagger so the blades
+// overlap into a ~1.5s flurry; the board HP snaps once, held until the last
+// blade's impact peak (D-i: single final snap, not per-hit decrement).
+const MULTI_HIT_STRIKE_STAGGER_MS = 110;
+const MULTI_HIT_STRIKE_COUNT_CAP = 10;
+const MULTI_HIT_STRIKE_FLUSH_IMPACT_OFFSET_MS = 500;
 
 // A locally-played battlecry card runs its own card-play animation, so the
 // server's echoed `CARD_PLAYED` cue for it is suppressed (matched by seat +
@@ -7293,7 +7300,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   blog("events received", { types: events.map((e) => e.type) });
   // Single vs whole-board (全場) is a presentation concern, so it is decided
   // here from the batch — the rules engine stays pure and carries no aoe flag.
-  const { combatDamageSeqs, aoeSeqs, aoeClusters } = classifyBatchScopes(events);
+  const { combatDamageSeqs, aoeSeqs, aoeClusters, multiHitSeqs } = classifyBatchScopes(events);
   const rawCues = events
     .map((event, index) => eventToCue(event, events, index, combatDamageSeqs))
     .filter((cue): cue is AnimationCue => Boolean(cue));
@@ -7311,7 +7318,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   insertAoeSweepCues(rawCues, aoeClusters);
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
-  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues));
+  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues, multiHitSeqs));
   if (cues.length === 0) return [];
   blog("events cues", {
     cues: cues.map((c) => ({ kind: c.kind, delayMs: c.delayMs, targetKey: c.targetKey, cardId: c.cardId }))
@@ -7319,7 +7326,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   // An AOE batch can spawn many short-lived per-target cues plus a sweep, so
   // lift the retained-cue cap when a sweep is present (R1) instead of silently
   // dropping the oldest cues.
-  const cueCap = cues.some((cue) => cue.kind === "aoeSweep") ? 28 : 12;
+  const cueCap = cues.some((cue) => cue.kind === "aoeSweep") || multiHitSeqs.size > 0 ? 28 : 12;
   view.animationCues = [...cues, ...view.animationCues].slice(0, cueCap);
   for (const cue of cues) {
     if (cue.kind === "play") enqueueCardPlayCue(cue);
@@ -7406,12 +7413,13 @@ function insertAoeSweepCues(cues: AnimationCue[], clusters: AoeCluster[]): void 
   }
 }
 
-function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
+function applyPostPlayEffectDelays(rawCues: AnimationCue[], multiHitSeqs: Set<number> = new Set()): AnimationCue[] {
   const cues: AnimationCue[] = [];
   let queuedPlaySlot = cardPlayCueQueue.length + (cardPlayCueActive ? 1 : 0);
   let currentPostPlayDelay = 0;
   let currentSummonPreviewDelay = 0;
   let currentLandingTargetKey: string | undefined;
+  let multiHitIndex = 0;
 
   for (const cue of rawCues) {
     if (cue.kind === "play") {
@@ -7446,6 +7454,32 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
         delayMs,
         readyAtMs: delayMs !== undefined ? performance.now() + delayMs : cue.readyAtMs,
         suppressBoardAnimation: true
+      });
+      continue;
+    }
+    // Multi-hit strike (e.g. S002): stagger each hit's blade by index so the N
+    // blades fly one after another, and hold the board HP until the LAST hit's
+    // impact peak so the digits snap once at the finale (D-i).
+    if (
+      currentPostPlayDelay > 0 &&
+      !isLandingSummon &&
+      isPostPlayEffectCue(cue) &&
+      cue.seq !== undefined &&
+      multiHitSeqs.has(cue.seq)
+    ) {
+      const staggered = currentPostPlayDelay + multiHitIndex * MULTI_HIT_STRIKE_STAGGER_MS;
+      multiHitIndex += 1;
+      // Fixed cap (not the live index) so every cue's hold covers all N hits,
+      // even though cues are processed before the final index is known.
+      holdPendingPublicSyncFor(
+        currentPostPlayDelay +
+          (MULTI_HIT_STRIKE_COUNT_CAP - 1) * MULTI_HIT_STRIKE_STAGGER_MS +
+          MULTI_HIT_STRIKE_FLUSH_IMPACT_OFFSET_MS
+      );
+      cues.push({
+        ...cue,
+        delayMs: Math.max(cue.delayMs ?? 0, staggered),
+        readyAtMs: performance.now() + staggered
       });
       continue;
     }
