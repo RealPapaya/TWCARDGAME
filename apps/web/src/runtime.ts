@@ -1486,7 +1486,7 @@ function renderGame(status: GameStatus | ""): string {
   const battleLocked = isBattleActionLocked();
   const targetHint = view.pendingBattlecry?.phase === "aiming"
     ? view.pendingBattlecry.isMinion
-      ? "請選擇戰吼的目標！"
+      ? "請選擇觸發的目標！"
       : "請選擇目標！"
     : selectedCard
     ? cardNeedsTarget(selectedCard.cardId)
@@ -2480,7 +2480,7 @@ function renderAoeHealPluses(seed: string): string {
 function renderEffectStrike(cue: AnimationCue, cueStyle: string, tone: "effect" | "combat" = "effect"): string {
   if (!cue.targetKey) return "";
   const shards = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 9);
-  // 命中爆光(magenta strike)。戰吼飛刀本身改由 applyKnifeStrike 命令式繪製(body
+  // 命中爆光(magenta strike)。觸發飛刀本身改由 applyKnifeStrike 命令式繪製(body
   // 層級、不受 re-render 重置),這裡不再放宣告式 sprite —— 命中點只留爆光,不留刀刃。
   return `<div class="effect-strike ${tone}${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}-strike" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="effect-strike"><span class="effect-strike-core"></span>${shards}</div>`;
 }
@@ -5427,7 +5427,7 @@ function enterBattlecryTargeting(card: HandCardView, boardIndex: number, lineKin
     blog("phase landing→aiming", { handInstanceId: card.instanceId, cardId: card.cardId });
     render(); // the card is now on the field
     triggerBattlecryLandImpact(card.cardId); // board slam + dust, like any card
-    showToast(isMinion ? "請選擇戰吼的目標！" : "請選擇目標！");
+    showToast(isMinion ? "請選擇觸發的目標！" : "請選擇目標！");
     beginBattlecryTargeting({
       lineKind,
       getAnchor: battlecryAnchor,
@@ -6423,17 +6423,17 @@ function logTargetRef(target: string): BattleLogCardRef {
 }
 
 /** Display name (Traditional Chinese) for a granted keyword code. */
-const KEYWORD_LABEL: Record<string, string> = { taunt: "嘲諷", charge: "衝鋒" };
+const KEYWORD_LABEL: Record<string, string> = { taunt: "沙包", charge: "衝蹦" };
 
 /**
  * Generic, player-facing explanation for each card keyword — what the mechanic *does*,
  * independent of the card's own `description`. Order here is the display order.
  */
 const KEYWORD_GLOSSARY: { has: (k: NonNullable<CardDefinition["keywords"]>) => boolean; label: string; text: string }[] = [
-  { has: (k) => Boolean(k.battlecry), label: "戰吼", text: "當此隨從從手牌打出、放置在場上時會發動這個效果。" },
-  { has: (k) => Boolean(k.taunt || k.baseTaunt), label: "嘲諷", text: "敵方必須先攻擊有嘲諷的隨從，才能攻擊其他目標。" },
+  { has: (k) => Boolean(k.battlecry), label: "觸發", text: "當此隨從從手牌打出、放置在場上時會發動這個效果。" },
+  { has: (k) => Boolean(k.taunt || k.baseTaunt), label: "沙包", text: "敵方必須先攻擊有沙包的隨從，才能攻擊其他目標。" },
   { has: (k) => Boolean(k.divineShield), label: "光盾", text: "第一次受到傷害時會免除該次傷害，之後光盾消失。" },
-  { has: (k) => Boolean(k.charge), label: "衝鋒", text: "此隨從進場的當回合就能攻擊，不需等待。" },
+  { has: (k) => Boolean(k.charge), label: "衝蹦", text: "此隨從進場的當回合就能攻擊，不需等待。" },
   { has: (k) => Boolean(k.deathrattle), label: "遺志", text: "當此隨從死亡、離開場上時會發動這個效果。" },
   { has: (k) => Boolean(k.ongoing), label: "持續效果", text: "只要此隨從在場上，這個效果就會持續生效。" },
   { has: (k) => Boolean(k.enrage), label: "激怒", text: "當此隨從受到傷害（生命未滿）時會獲得額外效果。" },
@@ -7873,7 +7873,7 @@ function attackTargetError(target: TargetRef | undefined): string | undefined {
   if (target.type === "MINION" && !targetMinionExists(target)) return "找不到目標隨從。";
   const enemyTaunts = Array.from(readPlayer(enemy)?.board ?? []).filter((minion) => minion.taunt);
   if (enemyTaunts.length > 0 && !(target.type === "MINION" && enemyTaunts.some((minion) => minion.instanceId === target.instanceId))) {
-    return "請先攻擊具有嘲諷的敵方隨從。";
+    return "請先攻擊具有沙包的敵方隨從。";
   }
   return undefined;
 }

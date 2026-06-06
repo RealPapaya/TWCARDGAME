@@ -3712,11 +3712,11 @@ async function executeOpponentAction(action) {
                     if (unit) {
                         const newIdx = gameState.players[sideToSearch].board.indexOf(unit);
                         if (newIdx !== target.index) {
-                            console.log(`[PvP] 修正戰吼目標 Index: ${target.index} -> ${newIdx}`);
+                            console.log(`[PvP] 修正觸發目標 Index: ${target.index} -> ${newIdx}`);
                             target.index = newIdx;
                         }
                     } else {
-                        console.warn(`[PvP] 戰吼目標 instanceId 丟失: ${targetInstanceId}, 回退使用 Index`);
+                        console.warn(`[PvP] 觸發目標 instanceId 丟失: ${targetInstanceId}, 回退使用 Index`);
                     }
                 }
             }
@@ -3774,7 +3774,7 @@ async function executeOpponentAction(action) {
                         console.log('[PvP] 創建新隨從:', minion.name, minion.instanceId);
                     }
 
-                    // 處理戰吼（如果有）
+                    // 處理觸發（如果有）
                     // 【修正】使用 resolvedEffect 避免 desync
                     if (card.keywords?.battlecry) {
                         let battlecryResult = null;
@@ -3789,7 +3789,7 @@ async function executeOpponentAction(action) {
                     // board 會由 onGameStateUpdate 進一步確認同步，但本地先加確保流暢與邏輯正確
                 } else if (card.type === 'NEWS') {
                     // 新聞牌直接執行效果
-                    console.log('[PvP] 對手出 NEWS 卡，戰吼前手牌數:', opponent.hand.length);
+                    console.log('[PvP] 對手出 NEWS 卡，觸發前手牌數:', opponent.hand.length);
 
                     let battlecryResult = null;
                     if (card.keywords?.battlecry) {
@@ -3808,9 +3808,9 @@ async function executeOpponentAction(action) {
                         }
                     }
 
-                    // 處理戰吼結果（特別是 DISCARD_DRAW 需要抽牌）
+                    // 處理觸發結果（特別是 DISCARD_DRAW 需要抽牌）
                     if (battlecryResult) {
-                        console.log('[PvP] 對手戰吼結果:', battlecryResult);
+                        console.log('[PvP] 對手觸發結果:', battlecryResult);
                         if (battlecryResult.type === 'DISCARD_DRAW' && battlecryResult.drawCount) {
                             console.log('[PvP] DISCARD_DRAW 前手牌數:', opponent.hand.length);
                             // 對手執行抽牌
@@ -3822,7 +3822,7 @@ async function executeOpponentAction(action) {
                     }
                 }
 
-                // [新增] 處理戰吼動畫
+                // [新增] 處理觸發動畫
                 if (target && card.keywords?.battlecry) {
                     const board = document.getElementById('opp-board');
 
@@ -3852,7 +3852,7 @@ async function executeOpponentAction(action) {
                         let color = '#ff0000';
                         let effectType = 'DAMAGE';
 
-                        // 根據戰吼類型設置顏色和特效
+                        // 根據觸發類型設置顏色和特效
                         if (type === 'HEAL' || type === 'FULL_HEAL') {
                             color = '#43e97b';
                             effectType = 'HEAL';
@@ -5270,7 +5270,7 @@ function formatDesc(text, newsBonus = 0, isNews = false) {
     formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<b>$1</b>');
 
     // 2. Auto-bold common keywords
-    const keywords = ["戰吼", "嘲諷", "衝鋒", "光盾", "激怒", "持續效果", "沉默", "沈默", "遺志", "任務"];
+    const keywords = ["觸發", "沙包", "衝蹦", "光盾", "激怒", "持續效果", "沉默", "沈默", "遺志", "任務"];
     keywords.forEach(k => {
         const reg = new RegExp(k, 'g');
         formatted = formatted.replace(reg, `<b>${k}</b>`);
@@ -5343,11 +5343,11 @@ function showPreview(card) {
 
     // Check for Charge
     if (card.keywords?.charge) {
-        keywordsList.push({ title: "衝鋒", desc: "上場即可馬上攻擊" });
+        keywordsList.push({ title: "衝蹦", desc: "上場即可馬上攻擊" });
     }
     // Check for Taunt
     if (card.keywords?.taunt) {
-        keywordsList.push({ title: "嘲諷", desc: "敵人必須優先攻擊此隨從" });
+        keywordsList.push({ title: "沙包", desc: "敵人必須優先攻擊此隨從" });
     }
     // Check for Divine Shield
     if (card.keywords?.divineShield) {
@@ -5355,7 +5355,7 @@ function showPreview(card) {
     }
     // Check for Battlecry (Exclude NEWS cards)
     if (card.keywords?.battlecry && card.type !== 'NEWS') {
-        keywordsList.push({ title: "戰吼", desc: "從手牌打出時觸發的效果" });
+        keywordsList.push({ title: "觸發", desc: "從手牌打出時觸發的效果" });
     }
     // Check for Deathrattle
     if (card.keywords?.deathrattle) {
@@ -6147,7 +6147,7 @@ async function onDragEnd(e) {
 
                     // ✅ 5. PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
-                        // 計算戰吼效果值（含 News Power 加成）
+                        // 計算觸發效果值（含 News Power 加成）
                         let resolvedEffect = null;
                         if (playedCard.keywords?.battlecry) {
                             const bc = playedCard.keywords.battlecry;
@@ -6658,7 +6658,7 @@ async function onDragEnd(e) {
 
                     // ✅ PvP 同步 - 在死亡處理後
                     if (isPvPMode && window.pvpManager) {
-                        // 計算效果值（隨從戰吼不加 News Power，但仍傳遞以確保一致）
+                        // 計算效果值（隨從觸發不加 News Power，但仍傳遞以確保一致）
                         let resolvedEffect = null;
                         if (minionInfo?.keywords?.battlecry) {
                             const bc = minionInfo.keywords.battlecry;

@@ -20,14 +20,14 @@ const UI_TEXT = {
     // 目標驗證類
     NO_VALID_TARGET: "目前沒有合法的目標！",
     INVALID_TARGET: "這不是有效的目標！",
-    NEED_TAUNT_TARGET: "你必須先攻擊具有「嘲諷」技能的隨從！",
+    NEED_TAUNT_TARGET: "你必須先攻擊具有「沙包」技能的隨從！",
 
     // 卡牌操作類
     HAND_FULL: "手牌已滿！",
     PLAY_CANCELLED: "操作已取消",
     DISCARD_FAILED: "手牌不足以發動棄牌效果！",
     CANNOT_PLAY_CARD: "無法打出此卡！",
-    BATTLECRY_CHOOSE_TARGET: "請選擇戰吼的目標！",
+    BATTLECRY_CHOOSE_TARGET: "請選擇觸發的目標！",
     SPELL_CHOOSE_TARGET: "請選擇目標！",
 
     // 系統狀態
@@ -39,9 +39,9 @@ const UI_TEXT = {
     // 對戰紀錄歷史 (模板)
     HISTORY_PLAY: "<b>{player}</b> 打出了 <b>{card}</b>",
     HISTORY_NORMAL_ATTACK: "<b>{attacker}</b> 普通攻擊 <b>{target}</b> 造成了 {damage} 點傷害",
-    HISTORY_BATTLECRY_DAMAGE: "<b>{source}</b> 戰吼攻擊 <b>{target}</b> 造成了 {value} 點傷害",
-    HISTORY_BATTLECRY_HEAL: "<b>{source}</b> 戰吼為 <b>{target}</b> 回復了 {value} 點生命",
-    HISTORY_BATTLECRY_DESTROY: "<b>{source}</b> 戰吼擊殺了 <b>{target}</b>",
+    HISTORY_BATTLECRY_DAMAGE: "<b>{source}</b> 觸發攻擊 <b>{target}</b> 造成了 {value} 點傷害",
+    HISTORY_BATTLECRY_HEAL: "<b>{source}</b> 觸發為 <b>{target}</b> 回復了 {value} 點生命",
+    HISTORY_BATTLECRY_DESTROY: "<b>{source}</b> 觸發擊殺了 <b>{target}</b>",
     HISTORY_NEWS_DAMAGE: "<b>{source}</b> 攻擊 <b>{target}</b> 造成了 {value} 點傷害",
     HISTORY_NEWS_HEAL: "<b>{source}</b> 為 <b>{target}</b> 回復了 {value} 點生命",
     HISTORY_NEWS_DESTROY: "<b>{source}</b> 擊殺了 <b>{target}</b>",

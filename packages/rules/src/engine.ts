@@ -353,7 +353,7 @@ function attack(
   }
   const taunts = enemy.board.filter((minion) => minion.keywords.taunt);
   if (taunts.length > 0 && !(target?.type === "MINION" && taunts.some((minion) => minion.instanceId === target.instanceId))) {
-    reject(state, events, seat, "請先攻擊具有嘲諷的敵方隨從。");
+    reject(state, events, seat, "請先攻擊具有沙包的敵方隨從。");
     return;
   }
 

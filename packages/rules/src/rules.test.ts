@@ -455,7 +455,7 @@ describe("target legality", () => {
       { commandId: "tl6", seat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "my_attacker", target: { type: "HERO", side: enemy } } },
       catalog
     );
-    expect(rejectionReason(result.events)).toBe("請先攻擊具有嘲諷的敵方隨從。");
+    expect(rejectionReason(result.events)).toBe("請先攻擊具有沙包的敵方隨從。");
 
     // Attack the taunt minion → accepted
     const result2 = reduce(

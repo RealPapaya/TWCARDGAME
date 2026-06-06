@@ -553,8 +553,8 @@
   box-shadow: 0 0 8px rgba(255, 120, 60, 0.9);
 }
 
-/* 戰吼飛刀:Attack1 / Attack1-2 兩張不斷交替(看起來像 sprite 動畫),從施放方
-   飛向目標。只掛在 effect-strike.effect(戰吼/效果傷害)且有施放方時 —— 普通攻擊
+/* 觸發飛刀:Attack1 / Attack1-2 兩張不斷交替(看起來像 sprite 動畫),從施放方
+   飛向目標。只掛在 effect-strike.effect(觸發/效果傷害)且有施放方時 —— 普通攻擊
    (combat)不畫刀。--fly-dx/dy 是「施放方 − 目標」的位移,--fly-angle 讓刀尖朝行進方向。 */
 .attack-sprite {
   position: absolute;

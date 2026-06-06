@@ -10,7 +10,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼: 對一個非民進黨政治人物造成3點傷害",
+    "description": "觸發: 對一個非民進黨政治人物造成3點傷害",
     "keywords": {
       "battlecry": {
         "type": "DAMAGE_NON_CATEGORY",
@@ -96,7 +96,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 4,
     "type": "MINION",
     "rarity": "LEGENDARY",
-    "description": "戰吼:將對手隨從全部放回手牌，並召喚蔡樂樂與蔡想想",
+    "description": "觸發:將對手隨從全部放回手牌，並召喚蔡樂樂與蔡想想",
     "keywords": {
       "battlecry": {
         "type": "BOUNCE_ALL_ENEMY",
@@ -117,7 +117,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼：深藍能量！賦予所有友方隨從 +1 攻擊力",
+    "description": "觸發：深藍能量！賦予所有友方隨從 +1 攻擊力",
     "keywords": {
       "battlecry": {
         "type": "BUFF_ALL",
@@ -136,7 +136,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 8,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "嘲諷。金門坦克",
+    "description": "沙包。金門坦克",
     "keywords": {
       "taunt": true
     },
@@ -151,7 +151,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "LEGENDARY",
-    "description": "死亡之握\n戰吼: 直接擊殺一個隨從",
+    "description": "死亡之握\n觸發: 直接擊殺一個隨從",
     "keywords": {
       "battlecry": {
         "type": "DESTROY",
@@ -172,7 +172,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "戰吼：對兩側單位 +1/+1",
+    "description": "觸發：對兩側單位 +1/+1",
     "keywords": {
       "battlecry": {
         "type": "BUFF_ADJACENT",
@@ -203,7 +203,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "臺北市正常上班上課\n戰吼：將一個隨從放回手牌",
+    "description": "臺北市正常上班上課\n觸發：將一個隨從放回手牌",
     "keywords": {
       "battlecry": {
         "type": "BOUNCE_TARGET",
@@ -237,7 +237,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "嘲諷+戰吼：消滅一個友方隨從並獲得其體質",
+    "description": "沙包+觸發：消滅一個友方隨從並獲得其體質",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -259,7 +259,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼：丟棄一張隨機手牌",
+    "description": "觸發：丟棄一張隨機手牌",
     "keywords": {
       "battlecry": {
         "type": "DISCARD_RANDOM"
@@ -293,7 +293,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 4,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼: 擊殺一名我方隨從",
+    "description": "觸發: 擊殺一名我方隨從",
     "keywords": {
       "battlecry": {
         "type": "DESTROY",
@@ -314,7 +314,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "LEGENDARY",
-    "description": "戰吼：將自己戰場上的隨從血量全部回復",
+    "description": "觸發：將自己戰場上的隨從血量全部回復",
     "keywords": {
       "battlecry": {
         "type": "HEAL_ALL_FRIENDLY"
@@ -331,7 +331,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼：回復一個隨從3點血量",
+    "description": "觸發：回復一個隨從3點血量",
     "keywords": {
       "battlecry": {
         "type": "HEAL",
@@ -353,7 +353,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼：賦予一個隨從「光盾」",
+    "description": "觸發：賦予一個隨從「光盾」",
     "keywords": {
       "battlecry": {
         "type": "GIVE_DIVINE_SHIELD",
@@ -374,7 +374,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼：將一個隨從生命回復全滿",
+    "description": "觸發：將一個隨從生命回復全滿",
     "keywords": {
       "battlecry": {
         "type": "FULL_HEAL",
@@ -395,7 +395,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "衝鋒+激怒：+3攻擊。你在大聲甚麼！！！",
+    "description": "衝蹦+激怒：+3攻擊。你在大聲甚麼！！！",
     "keywords": {
       "charge": true,
       "enrage": {
@@ -415,7 +415,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "珊言良語\n光盾+嘲諷",
+    "description": "珊言良語\n光盾+沙包",
     "keywords": {
       "divineShield": true,
       "taunt": true
@@ -431,7 +431,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 4,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "嘲諷+戰吼：賦予所有我方「民眾黨政治人物」光盾",
+    "description": "沙包+觸發：賦予所有我方「民眾黨政治人物」光盾",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -450,7 +450,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "持續效果:賦予我方兩側「國民黨政治人物」嘲諷+1生命值",
+    "description": "持續效果:賦予我方兩側「國民黨政治人物」沙包+1生命值",
     "keywords": {
       "ongoing": {
         "type": "ADJACENT_BUFF_CATEGORY_ATTRS",
@@ -470,7 +470,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "嘲諷+戰吼:賦予我方「民進黨政治人物」+2/+2",
+    "description": "沙包+觸發:賦予我方「民進黨政治人物」+2/+2",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -509,7 +509,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼：賦予所有友方隨從 +1 生命值",
+    "description": "觸發：賦予所有友方隨從 +1 生命值",
     "keywords": {
       "battlecry": {
         "type": "BUFF_ALL",
@@ -547,7 +547,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼: 賦予所有\"勞工\"血量上限+2",
+    "description": "觸發: 賦予所有\"勞工\"血量上限+2",
     "keywords": {
       "battlecry": {
         "type": "BUFF_CATEGORY",
@@ -567,7 +567,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 10,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "嘲諷+戰吼: 造成\"我方\"隨機一個單位2點傷害",
+    "description": "沙包+觸發: 造成\"我方\"隨機一個單位2點傷害",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -586,7 +586,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼：賦予兩側的隨從「嘲諷」",
+    "description": "觸發：賦予兩側的隨從「沙包」",
     "keywords": {
       "battlecry": {
         "type": "GIVE_KEYWORD_ADJACENT",
@@ -634,7 +634,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "戰吼：對一個單位造成 1 點傷害",
+    "description": "觸發：對一個單位造成 1 點傷害",
     "keywords": {
       "battlecry": {
         "type": "DAMAGE",
@@ -656,7 +656,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "嘲諷",
+    "description": "沙包",
     "keywords": {
       "taunt": true
     },
@@ -707,7 +707,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "我是外送師！！\n衝鋒",
+    "description": "我是外送師！！\n衝蹦",
     "keywords": {
       "charge": true
     },
@@ -722,7 +722,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼: 回復一個單位2點血量",
+    "description": "觸發: 回復一個單位2點血量",
     "keywords": {
       "battlecry": {
         "type": "HEAL",
@@ -763,7 +763,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "嘲諷",
+    "description": "沙包",
     "keywords": {
       "taunt": true
     },
@@ -793,7 +793,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "戰吼:抽一張新聞牌",
+    "description": "觸發:抽一張新聞牌",
     "keywords": {
       "battlecry": {
         "type": "DRAW_NEWS"
@@ -1025,7 +1025,7 @@ export const CARD_CATALOG_GENERATED = [
     "cost": 1,
     "type": "NEWS",
     "rarity": "COMMON",
-    "description": "使一個隨從獲得 +1 生命值上限並獲得嘲諷",
+    "description": "使一個隨從獲得 +1 生命值上限並獲得沙包",
     "keywords": {
       "battlecry": {
         "type": "BUFF_HEALTH_AND_TAUNT_TARGET",
@@ -1335,7 +1335,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "衝鋒",
+    "description": "衝蹦",
     "keywords": {
       "charge": true
     },
@@ -1350,7 +1350,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 6,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "校正回歸\n戰吼: 手牌增加三張\"高端疫苗\"",
+    "description": "校正回歸\n觸發: 手牌增加三張\"高端疫苗\"",
     "keywords": {
       "battlecry": {
         "type": "ADD_CARD_TO_HAND",
@@ -1369,7 +1369,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 6,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "連戰都站不穩\n戰吼: 擊殺一名我方隨從",
+    "description": "連戰都站不穩\n觸發: 擊殺一名我方隨從",
     "keywords": {
       "battlecry": {
         "type": "DESTROY",
@@ -1390,7 +1390,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "哈們\n戰吼: 交換一名隨從的攻擊力和生命值",
+    "description": "哈們\n觸發: 交換一名隨從的攻擊力和生命值",
     "keywords": {
       "battlecry": {
         "type": "SWAP_ATTACK_HEALTH",
@@ -1429,7 +1429,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "LEGENDARY",
-    "description": "花蓮國王\n衝鋒 每當有一張卡牌被丟棄獲得+2/+2",
+    "description": "花蓮國王\n衝蹦 每當有一張卡牌被丟棄獲得+2/+2",
     "keywords": {
       "charge": true,
       "triggered": {
@@ -1448,7 +1448,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 4,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼:隨機丟棄三張手牌",
+    "description": "觸發:隨機丟棄三張手牌",
     "keywords": {
       "battlecry": {
         "type": "DISCARD_RANDOM",
@@ -1496,7 +1496,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 8,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼: 對自己造成3點傷害",
+    "description": "觸發: 對自己造成3點傷害",
     "keywords": {
       "battlecry": {
         "type": "DAMAGE_SELF",
@@ -1514,7 +1514,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 6,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "戰吼: 對自己造成2點傷害",
+    "description": "觸發: 對自己造成2點傷害",
     "keywords": {
       "battlecry": {
         "type": "DAMAGE_SELF",
@@ -1565,7 +1565,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 1,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "衝鋒",
+    "description": "衝蹦",
     "keywords": {
       "charge": true
     },
@@ -1595,7 +1595,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 6,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "在那叫甚麼?\n衝鋒+戰吼:使一名隨從回到手牌",
+    "description": "在那叫甚麼?\n衝蹦+觸發:使一名隨從回到手牌",
     "keywords": {
       "charge": true,
       "battlecry": {
@@ -1617,7 +1617,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼:沈默所有敵方隨從2回合\n遺志:召喚藍亦明",
+    "description": "觸發:沈默所有敵方隨從2回合\n遺志:召喚藍亦明",
     "keywords": {
       "battlecry": {
         "type": "LOCK_ALL_ENEMY",
@@ -1678,7 +1678,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "摸頭燦笑\n嘲諷+戰吼: 使一名敵軍回到手牌",
+    "description": "摸頭燦笑\n沙包+觸發: 使一名敵軍回到手牌",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -1700,7 +1700,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 3,
     "type": "MINION",
     "rarity": "COMMON",
-    "description": "衝鋒",
+    "description": "衝蹦",
     "keywords": {
       "charge": true
     },
@@ -1715,7 +1715,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 7,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "衝鋒\n每當使用一張新聞，回復2點生命",
+    "description": "衝蹦\n每當使用一張新聞，回復2點生命",
     "keywords": {
       "charge": true,
       "triggered": {
@@ -1735,7 +1735,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 4,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "衝鋒\n戰吼: 沈默所有敵方隨從2回合",
+    "description": "衝蹦\n觸發: 沈默所有敵方隨從2回合",
     "keywords": {
       "charge": true,
       "battlecry": {
@@ -1754,7 +1754,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 6,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "戰吼: 將所有隨從攻擊力設為1",
+    "description": "觸發: 將所有隨從攻擊力設為1",
     "keywords": {
       "battlecry": {
         "type": "SET_ATTACK_ALL",
@@ -1772,7 +1772,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 2,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "嘲諷\n戰吼: 隨機將一名敵方隨從放回手牌",
+    "description": "沙包\n觸發: 隨機將一名敵方隨從放回手牌",
     "keywords": {
       "taunt": true,
       "battlecry": {
@@ -1829,7 +1829,7 @@ export const CARD_CATALOG_GENERATED = [
     "health": 8,
     "type": "MINION",
     "rarity": "RARE",
-    "description": "戰吼: 沈默自己6回合",
+    "description": "觸發: 沈默自己6回合",
     "keywords": {
       "battlecry": {
         "type": "LOCK_SELF",

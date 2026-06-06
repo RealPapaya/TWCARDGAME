@@ -46,9 +46,9 @@
 
 ### 3. 常見關鍵字與效果類型
 - **Keywords**:
-    - `taunt`: 嘲諷（敵人必須先攻擊此單位）
-    - `charge`: 衝鋒（下場即可攻擊）
-    - `battlecry`: 戰吼（下場立即執行的效果）
+    - `taunt`: 沙包（敵人必須先攻擊此單位）
+    - `charge`: 衝蹦（下場即可攻擊）
+    - `battlecry`: 觸發（下場立即執行的效果）
 - **Effect Types (`battlecry.type`)**:
     - `DAMAGE`: 造成傷害
     - `DAMAGE_SELF`: 對自己造成傷害

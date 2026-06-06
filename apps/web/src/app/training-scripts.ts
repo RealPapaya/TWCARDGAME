@@ -80,7 +80,7 @@ export const CARD_TYPES_TRAINING = {
   name: "卡牌種類介紹",
   rewardGold: 100,
   heroHealth: HERO_HP,
-  description: "認識嘲諷、光盾、戰吼三種常見關鍵字。"
+  description: "認識沙包、光盾、觸發三種常見關鍵字。"
 } as const;
 
 export const ADVANCED_KEYWORDS_TRAINING = {
@@ -263,7 +263,7 @@ function sameTarget(a: TargetRef | undefined, b: TargetRef): boolean {
   return true;
 }
 
-// ─── Lesson 3: 卡牌種類介紹 (嘲諷 / 光盾 / 戰吼) ──────────────────────────────
+// ─── Lesson 3: 卡牌種類介紹 (沙包 / 光盾 / 觸發) ──────────────────────────────
 
 const L3_TAUNT_HAND = "l3-taunt-hand";
 const L3_TAUNT = "l3-taunt";
@@ -290,7 +290,7 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_intro",
       title: "第三關：卡牌種類介紹",
-      body: "這一關介紹三種常見的卡牌關鍵字：嘲諷、光盾、戰吼。先看【嘲諷】——敵方的『蘇巧慧』有 4 攻擊，下個回合就會撲過來殺掉你生命只剩 2 的『黃捷』。我們用嘲諷把它擋下，保住黃捷。",
+      body: "這一關介紹三種常見的卡牌關鍵字：沙包、光盾、觸發。先看【沙包】——敵方的『蘇巧慧』有 4 攻擊，下個回合就會撲過來殺掉你生命只剩 2 的『黃捷』。我們用沙包把它擋下，保住黃捷。",
       action: "next",
       highlights: [
         { type: "unit", seat: OPPONENT, instanceId: L3_ENEMY },
@@ -299,14 +299,14 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_taunt_explain",
-      title: "嘲諷",
-      body: "【嘲諷】：只要場上有嘲諷隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。你手上的『陳玉珍』是 3/8 嘲諷，把她擋在前線，後面的黃捷就安全了。",
+      title: "沙包",
+      body: "【沙包】：只要場上有沙包隨從，敵方就必須先攻擊它，不能越過去打你的英雄或其他隨從。你手上的『陳玉珍』是 3/8 沙包，把她擋在前線，後面的黃捷就安全了。",
       action: "next",
       highlights: [{ type: "hand", instanceId: L3_TAUNT_HAND }, { type: "cardCost", instanceId: L3_TAUNT_HAND }]
     },
     {
       id: "l3_taunt_do",
-      title: "換你操作：築起嘲諷牆",
+      title: "換你操作：築起沙包牆",
       body: "把手牌的『陳玉珍』打到戰場上，擋在黃捷前面。",
       action: "script_play",
       selectHandId: L3_TAUNT_HAND,
@@ -326,8 +326,8 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_taunt_demo",
-      title: "嘲諷生效",
-      body: "陳玉珍站上了前線。按下一步，看敵方蘇巧慧的行動——它被迫攻擊有嘲諷的陳玉珍，完全碰不到後面的黃捷。",
+      title: "沙包生效",
+      body: "陳玉珍站上了前線。按下一步，看敵方蘇巧慧的行動——它被迫攻擊有沙包的陳玉珍，完全碰不到後面的黃捷。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L3_TAUNT },
@@ -349,8 +349,8 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_taunt_result",
-      title: "嘲諷的用途",
-      body: "成功擋下！蘇巧慧的攻擊被陳玉珍吸走，後面的黃捷毫髮無傷地活了下來。嘲諷能把威脅引到嘲諷隨從身上，是保護其他隨從與英雄、穩住戰局的防守關鍵字。",
+      title: "沙包的用途",
+      body: "成功擋下！蘇巧慧的攻擊被陳玉珍吸走，後面的黃捷毫髮無傷地活了下來。沙包能把威脅引到沙包隨從身上，是保護其他隨從與英雄、穩住戰局的防守關鍵字。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L3_TAUNT },
@@ -414,8 +414,8 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_battlecry_explain",
-      title: "戰吼",
-      body: "最後是【戰吼】，戰吼是隨從『打出當下』觸發一次的效果。敵方有個 2/5 隨從；你場上有一個 2 攻擊的『王定宇』和 1 攻擊的『條碼師』，合計只有 3 攻擊，差一點打不死它。手牌的『吳敦義』戰吼是：賦予所有友方隨從 +1 攻擊力。",
+      title: "觸發",
+      body: "最後是【觸發】，觸發是隨從『打出當下』觸發一次的效果。敵方有個 2/5 隨從；你場上有一個 2 攻擊的『王定宇』和 1 攻擊的『條碼師』，合計只有 3 攻擊，差一點打不死它。手牌的『吳敦義』觸發是：賦予所有友方隨從 +1 攻擊力。",
       action: "next",
       highlights: [
         { type: "hand", instanceId: L3_BATTLECRY_HAND },
@@ -427,8 +427,8 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_battlecry_do",
-      title: "換你操作：打出戰吼",
-      body: "把『吳敦義』打到戰場上，看戰吼如何讓兩個友方隨從各 +1 攻擊——攻擊力會變成綠色，代表被強化了。",
+      title: "換你操作：打出觸發",
+      body: "把『吳敦義』打到戰場上，看觸發如何讓兩個友方隨從各 +1 攻擊——攻擊力會變成綠色，代表被強化了。",
       action: "script_play",
       selectHandId: L3_BATTLECRY_HAND,
       highlights: [{ type: "hand", instanceId: L3_BATTLECRY_HAND }],
@@ -450,7 +450,7 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_battlecry_payoff_a",
       title: "換你操作：聯手解決威脅 (1/2)",
-      body: "綠色的攻擊力代表被戰吼強化了：2 攻擊的『王定宇』+1 變成 3。先用它攻擊敵方的 2/5 隨從，把它打到只剩 2 點生命。",
+      body: "綠色的攻擊力代表被觸發強化了：2 攻擊的『王定宇』+1 變成 3。先用它攻擊敵方的 2/5 隨從，把它打到只剩 2 點生命。",
       action: "script_attack",
       selectAttackerId: L3_FRIEND_A,
       highlights: [
@@ -505,8 +505,8 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     },
     {
       id: "l3_battlecry_result",
-      title: "戰吼觸發了",
-      body: "看到了嗎？吳敦義的戰吼讓兩個隨從各 +1 攻擊（綠字），合計攻擊力從 3 變成 5，剛好聯手解決掉敵人，自己都還存活下來。戰吼雖然只在打出當下觸發一次，但這一下就足以扭轉場面。",
+      title: "觸發觸發了",
+      body: "看到了嗎？吳敦義的觸發讓兩個隨從各 +1 攻擊（綠字），合計攻擊力從 3 變成 5，剛好聯手解決掉敵人，自己都還存活下來。觸發雖然只在打出當下觸發一次，但這一下就足以扭轉場面。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L3_FRIEND_A },
@@ -516,7 +516,7 @@ const CARD_TYPES_SCRIPT: TrainingScript = {
     {
       id: "l3_done",
       title: "完成第三關",
-      body: "太棒了！你已經實際操作過嘲諷、光盾、戰吼。點下一步完成第三關。",
+      body: "太棒了！你已經實際操作過沙包、光盾、觸發。點下一步完成第三關。",
       action: "next"
     }
   ]
@@ -622,7 +622,7 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_enrage_calmed",
       title: "激怒解除",
-      body: "補滿血後，受傷的條件不再成立，激怒立刻解除——攻擊力從綠色的 4 變回原本的 1，血量也回滿了。這就是『持續效果』：條件消失，加成跟著消失，和打出時一次性的戰吼完全不同。按下一步，認識下一個關鍵字。",
+      body: "補滿血後，受傷的條件不再成立，激怒立刻解除——攻擊力從綠色的 4 變回原本的 1，血量也回滿了。這就是『持續效果』：條件消失，加成跟著消失，和打出時一次性的觸發完全不同。按下一步，認識下一個關鍵字。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L4_ENRAGE },
@@ -765,7 +765,7 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_aura_gone",
       title: "加成消失了",
-      body: "京華城被『政治清算』殺死，兩側的蔡想想立刻從綠色的 2/2 變回 1/1——持續效果隨來源一起消失。持續效果很強，但對手能靠移除來源一次拆光，這就是它與一次性戰吼最大的差別。按下一步，認識最後一個關鍵字。",
+      body: "京華城被『政治清算』殺死，兩側的蔡想想立刻從綠色的 2/2 變回 1/1——持續效果隨來源一起消失。持續效果很強，但對手能靠移除來源一次拆光，這就是它與一次性觸發最大的差別。按下一步，認識最後一個關鍵字。",
       action: "next",
       highlights: [
         { type: "unit", seat: PLAYER, instanceId: L4_AURA_L },
@@ -812,7 +812,7 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
     {
       id: "l4_bounce_result",
       title: "回手並成長",
-      body: "韓國瑜重新上場，從 2/2 長成了 4/4！回手牌可以救援快死的隨從、重複利用戰吼，或像這樣讓隨從越打越強——是高手翻盤的常用手段。",
+      body: "韓國瑜重新上場，從 2/2 長成了 4/4！回手牌可以救援快死的隨從、重複利用觸發，或像這樣讓隨從越打越強——是高手翻盤的常用手段。",
       action: "next",
       highlights: [{ type: "unit", seat: PLAYER, instanceId: L4_BOUNCE }]
     },
