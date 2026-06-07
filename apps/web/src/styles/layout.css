@@ -387,6 +387,15 @@ input {
   grid-row: 1 / span 2;
 }
 
+.hero-frame {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: max-content;
+  height: max-content;
+  overflow: visible;
+}
+
 .hero {
   position: relative;
   display: grid;
@@ -1560,6 +1569,7 @@ body.hand-dragging .hand-row .card {
   justify-content: center;
   width: 26px;
   height: 26px;
+  padding: 0;
   border-radius: 50%;
   font-size: 10px;
   font-weight: 700;
@@ -1570,6 +1580,14 @@ body.hand-dragging .hand-row .card {
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
   overflow: hidden;
   pointer-events: auto;
+  cursor: help;
+  text-shadow: none;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+.hero-augment-dot:hover {
+  transform: scale(1.14);
+  filter: brightness(1.08);
+  box-shadow: 0 0 0 2px rgba(93, 46, 23, 0.45), 0 0 16px rgba(255, 226, 126, 0.78);
 }
 .hero-augment-dot.amp-tier-low { background: #bfe0a6; }
 .hero-augment-dot.amp-tier-mid { background: #f0cd7e; }

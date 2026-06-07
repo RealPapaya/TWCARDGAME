@@ -5,6 +5,7 @@ import type {
   AiDifficulty,
   AiTheme,
   AmplificationOption,
+  AmplificationSelection,
   FriendRequestRow,
   FriendRow,
   GameEvent,
@@ -213,6 +214,8 @@ export type ClientViewState = {
   hoveredCardId?: string;
   hoveredCard?: ResolvedCardView;
   hoverAnchor?: { x: number; y: number; width: number; height: number };
+  hoveredAugment?: AmplificationSelection & { description?: string };
+  augmentHoverAnchor?: { x: number; y: number; width: number; height: number };
   confirmingConcede?: boolean;
   menuScreen: MenuScreen;
   matchmaking?: MatchmakingState;

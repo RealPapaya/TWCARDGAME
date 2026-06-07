@@ -1,9 +1,10 @@
 import { Client, type Room } from "@colyseus/sdk";
-import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
+import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
 import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared";
 import type {
   AiDifficulty,
   AmplificationOption,
+  AmplificationSelection,
   ClientCommandMessage,
   DevTestMatchSetup,
   FriendRow,
@@ -172,6 +173,7 @@ const supabase = configuredSupabase;
 const devTestModeAvailable = import.meta.env.DEV && isLocalDevHost();
 let devTestPanel: typeof import("./app/dev-test.js") | undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
+const amplificationCatalog = new Map(AMPLIFICATION_DB.map((augment) => [augment.id, augment]));
 const seats: Seat[] = ["player1", "player2"];
 /**
  * Remembers each minion's card identity by `instanceId` for the battle log. Populated when a minion
@@ -358,6 +360,7 @@ function renderNow(): void {
       ${renderToast()}
       ${renderLegacyShopPackOverlay()}
       ${renderHoverTooltip()}
+      ${renderAugmentTooltip()}
     </main>
   `;
 
@@ -1768,14 +1771,16 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   ]);
 
   return `
-    <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
-      <span class="avatar" aria-hidden="true"></span>
-      <strong>${escapeHtml(name)}</strong>
-      <span class="hero-hp">${hp}/${maxHp}</span>
-      <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
-      <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
+    <div class="hero-frame" data-seat="${seat}">
+      <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
+        <span class="avatar" aria-hidden="true"></span>
+        <strong>${escapeHtml(name)}</strong>
+        <span class="hero-hp">${hp}/${maxHp}</span>
+        <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
+        <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
+      </button>
       ${renderAmplificationBadge(player)}
-    </button>
+    </div>
   `;
 }
 
@@ -1791,7 +1796,7 @@ function renderAmplificationBadge(player: PublicPlayer | undefined): string {
   const dots = augments
     .map((aug) => {
       const tierClass = AMP_TIER_CLASS[aug.tier] ?? "amp-tier-low";
-      return `<span class="hero-augment-dot ${tierClass}" data-augment-id="${escapeAttr(aug.id)}" title="${escapeAttr(`${aug.tier}・${aug.name}`)}">${escapeHtml(aug.name.slice(0, 2))}</span>`;
+      return `<button class="hero-augment-dot ${tierClass}" type="button" data-augment-id="${escapeAttr(aug.id)}" aria-label="${escapeAttr(`${aug.tier} ${aug.name}`)}">${escapeHtml(aug.name.slice(0, 2))}</button>`;
     })
     .join("");
   return `<span class="hero-augments" aria-hidden="false">${dots}</span>`;
@@ -2574,6 +2579,33 @@ function renderHoverTooltip(): string {
   return `
     <div class="hover-tooltip${glossary ? " has-glossary" : ""}" data-testid="hover-tooltip" style="left:${left}px;top:${top}px">
       ${glossarySide === "left" && glossary ? glossary + card : card + glossary}
+    </div>
+  `;
+}
+
+function renderAugmentTooltip(): string {
+  if (!view.hoveredAugment || !view.augmentHoverAnchor) return "";
+  const shell = document.querySelector<HTMLElement>(".app-shell");
+  const anchor = shell ? localAnchorFromViewport(shell, view.augmentHoverAnchor) : view.augmentHoverAnchor;
+  const margin = 16;
+  const gap = 18;
+  const tooltipWidth = 250;
+  const tooltipHeight = 128;
+  const viewportWidth = shell?.offsetWidth || window.innerWidth;
+  const viewportHeight = shell?.offsetHeight || window.innerHeight;
+  const anchorLeft = anchor.x - anchor.width / 2;
+  const anchorRight = anchor.x + anchor.width / 2;
+  const preferRight = viewportWidth - anchorRight >= anchorLeft;
+  let left = preferRight ? anchorRight + gap : anchorLeft - tooltipWidth - gap;
+  left = Math.max(margin, Math.min(left, viewportWidth - tooltipWidth - margin));
+  let top = anchor.y - tooltipHeight / 2;
+  top = Math.max(margin, Math.min(top, viewportHeight - tooltipHeight - margin));
+  const tierClass = AMP_TIER_CLASS[view.hoveredAugment.tier] ?? "amp-tier-low";
+  return `
+    <div class="augment-tooltip ${tierClass}" data-testid="augment-tooltip" style="left:${left}px;top:${top}px">
+      <div class="augment-tooltip-tier">${escapeHtml(view.hoveredAugment.tier)}</div>
+      <div class="augment-tooltip-name">${escapeHtml(view.hoveredAugment.name)}</div>
+      <div class="augment-tooltip-desc">${escapeHtml(view.hoveredAugment.description ?? "")}</div>
     </div>
   `;
 }
@@ -5098,6 +5130,16 @@ function bindSelectionActions(): void {
     bindHoverPreview(el, () => minionCardFromElement(el));
   }
 
+  for (const el of document.querySelectorAll<HTMLElement>("[data-augment-id]")) {
+    bindAugmentHover(el);
+    on(el, "pointerdown", "augment-pointer-isolate", (event) => {
+      event.stopPropagation();
+    });
+    on(el, "click", "augment-click-isolate", (event) => {
+      event.stopPropagation();
+    });
+  }
+
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
@@ -5168,6 +5210,7 @@ function bindSelectionActions(): void {
 }
 
 const hoverState: { timer?: number; lastCardId?: string; lastEl?: HTMLElement } = {};
+const augmentHoverState: { timer?: number; lastEl?: HTMLElement } = {};
 
 function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | undefined): void {
   const hoverCapable = typeof window !== "undefined" && (
@@ -5213,11 +5256,61 @@ function clearHoverTooltip(): void {
   window.clearTimeout(hoverState.timer);
   hoverState.timer = undefined;
   hoverState.lastEl = undefined;
+  window.clearTimeout(augmentHoverState.timer);
+  augmentHoverState.timer = undefined;
+  augmentHoverState.lastEl = undefined;
   if (view.hoveredCardId) {
     view.hoveredCardId = undefined;
     view.hoveredCard = undefined;
     view.hoverAnchor = undefined;
   }
+  if (view.hoveredAugment) {
+    view.hoveredAugment = undefined;
+    view.augmentHoverAnchor = undefined;
+  }
+}
+
+function bindAugmentHover(el: HTMLElement): void {
+  const hoverCapable = typeof window !== "undefined" && (
+    (typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches) ||
+    (window as any).__el !== undefined
+  );
+  if (!hoverCapable) return;
+  on(el, "mouseenter", "augment-hover-enter", () => {
+    if (view.confirmingConcede || view.pendingBattlecry) return;
+    const augment = augmentFromElement(el);
+    if (!augment) return;
+    window.clearTimeout(augmentHoverState.timer);
+    augmentHoverState.lastEl = el;
+    const rect = el.getBoundingClientRect();
+    const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
+    augmentHoverState.timer = window.setTimeout(() => {
+      if (augmentHoverState.lastEl !== el) return;
+      view.hoveredAugment = augment;
+      view.augmentHoverAnchor = anchor;
+      render();
+    }, 120);
+  });
+  on(el, "mouseleave", "augment-hover-leave", () => {
+    if (augmentHoverState.lastEl === el) augmentHoverState.lastEl = undefined;
+    window.clearTimeout(augmentHoverState.timer);
+    augmentHoverState.timer = undefined;
+    if (view.hoveredAugment) {
+      view.hoveredAugment = undefined;
+      view.augmentHoverAnchor = undefined;
+      render();
+    }
+  });
+}
+
+function augmentFromElement(el: HTMLElement): (AmplificationSelection & { description?: string }) | undefined {
+  const augmentId = el.dataset.augmentId;
+  const seat = el.closest<HTMLElement>(".hero-frame")?.dataset.seat as Seat | undefined;
+  if (!augmentId || !seat) return undefined;
+  const player = readPlayer(seat);
+  const selected = (player?.augments?.length ? player.augments : player?.amplification ? [player.amplification] : []).find((augment) => augment.id === augmentId);
+  if (!selected) return undefined;
+  return { ...selected, description: amplificationCatalog.get(augmentId)?.description };
 }
 
 function minionCardFromElement(el: HTMLElement): ResolvedCardView | undefined {
@@ -5588,6 +5681,7 @@ function cancelBattlecry(): void {
 function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void {
   if (isBattleActionLocked() || view.pendingBattlecry) return;
   if (event.pointerType === "mouse" && event.button !== 0) return;
+  if (sourceEl.dataset.cardType !== "MINION") return;
   const attackerId = sourceEl.dataset.attackerId;
   if (!attackerId) return;
   const minion = findMinion(attackerId);

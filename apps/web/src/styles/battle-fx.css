@@ -354,6 +354,70 @@
   line-height: 1.32;
 }
 
+.augment-tooltip {
+  position: absolute;
+  z-index: 1500;
+  width: 250px;
+  min-height: 118px;
+  padding: 12px 14px 14px;
+  pointer-events: none;
+  color: var(--wood-dark, #3a1f10);
+  background:
+    linear-gradient(180deg, rgba(255, 248, 224, 0.98), rgba(231, 202, 154, 0.98));
+  border: 4px solid var(--wood-dark, #5d2e17);
+  border-radius: 8px;
+  box-shadow:
+    0 14px 32px rgba(0, 0, 0, 0.56),
+    inset 0 0 0 2px rgba(255, 255, 255, 0.25);
+}
+
+.augment-tooltip::before {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1px solid rgba(93, 46, 23, 0.24);
+  border-radius: 4px;
+  pointer-events: none;
+}
+
+.augment-tooltip-tier {
+  display: inline-block;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  color: #1a1008;
+  background: #d8c08a;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 900;
+  line-height: 1.2;
+}
+
+.augment-tooltip.amp-tier-low .augment-tooltip-tier { background: #bfe0a6; }
+.augment-tooltip.amp-tier-mid .augment-tooltip-tier { background: #f0cd7e; }
+.augment-tooltip.amp-tier-high .augment-tooltip-tier { background: #f0998f; }
+
+.augment-tooltip-name {
+  position: relative;
+  z-index: 1;
+  margin-bottom: 6px;
+  font-family: var(--font-display);
+  font-size: 19px;
+  font-weight: 900;
+  line-height: 1.18;
+  color: var(--wood-dark, #3a1f10);
+}
+
+.augment-tooltip-desc {
+  position: relative;
+  z-index: 1;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.45;
+  color: rgba(58, 31, 16, 0.86);
+}
+
 .confirm-overlay {
   position: fixed;
   inset: 0;

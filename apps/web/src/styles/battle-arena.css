@@ -756,7 +756,7 @@
   height: 375px;
 }
 
-.battle-surface .hero {
+.battle-surface .hero-frame {
   position: absolute;
   left: 50%;
   width: 112px;
@@ -765,16 +765,37 @@
   z-index: 25;
 }
 
-.battle-surface .hero:hover:not(:disabled) {
-  transform: translateX(-50%) scale(1.05);
+.battle-surface .hero {
+  position: relative;
+  left: auto;
+  top: auto;
+  bottom: auto;
+  width: 112px;
+  height: 112px;
+  transform: none;
+  z-index: 1;
 }
 
-.battle-surface .opponent-hero {
+.battle-surface .hero:hover:not(:disabled) {
+  transform: scale(1.05);
+}
+
+.battle-surface .player-area.opponent .hero-frame {
   top: 138px;
 }
 
-.battle-surface .player-hero {
+.battle-surface .player-area:not(.opponent) .hero-frame {
   bottom: 154px;
+}
+
+.battle-surface .opponent-hero,
+.battle-surface .player-hero {
+  top: auto;
+  bottom: auto;
+}
+
+.battle-surface .hero.lunging {
+  animation-name: attack-lunge;
 }
 
 .battle-surface .avatar {
