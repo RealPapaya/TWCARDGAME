@@ -1,8 +1,8 @@
 import {
-  AMPLIFICATION_TIERS,
   SEATS,
   type AiPartyTag,
   type AmplificationOption,
+  type AmplificationTier,
   type GameEvent,
   type Phase,
   type Seat,
@@ -11,19 +11,18 @@ import {
 } from "@twcardgame/shared";
 import {
   AMPLIFICATION_DB,
-  filterAmplification,
   VOTE_EVENT_DB,
   type AmplificationDbEntry,
   type CardDefinition,
   type EnvironmentDescriptor,
   type VoteEventDbEntry
 } from "@twcardgame/cards";
-import { resolveEffect, resolvePostAction } from "./effects.js";
+import { applyAugmentSelection, resolveEffect, resolvePostAction } from "./effects.js";
 import { applyEnvironmentTick } from "./effects/environment.js";
-import { nextInt } from "./rng.js";
+import { nextInt, normalizeSeed } from "./rng.js";
 import { addEvent } from "./state.js";
 import { turnTimeLimitForPlayer } from "./timing.js";
-import type { MatchState, SpecialPhaseState } from "./types.js";
+import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, SpecialPhaseState } from "./types.js";
 
 /** One seat's referendum pick, carried on the `VOTE_RESOLVED` event payload. */
 export interface VoteResolvedChoice {
@@ -138,32 +137,75 @@ export function weightedIndex(rngState: number, weights: readonly number[]): { v
   return { value: weights.length - 1, state: roll.state };
 }
 
+// --- Game-start tier roll ---------------------------------------------------
+
+/** Per-phase tier probabilities (加減賺 45% / 吃紅 35% / 卯死 20%). */
+const TIER_ROLL_WEIGHTS: ReadonlyArray<readonly [AmplificationTier, number]> = [
+  ["加減賺", 45],
+  ["吃紅", 35],
+  ["卯死", 20]
+];
+
+function rollOneTier(state: number): { tier: AmplificationTier; state: number } {
+  const pick = weightedIndex(state, TIER_ROLL_WEIGHTS.map(([, weight]) => weight));
+  return { tier: TIER_ROLL_WEIGHTS[pick.value][0], state: pick.state };
+}
+
 /**
- * Builds the three tier-graded amplification options for a player: one per tier
- * (加減賺 / 吃紅 / 卯死). Falls back to topping up from the remaining pool if a tier
- * has no entries. Deterministic for a given seed.
+ * Rolls the two amplification-phase tiers (turn 6, turn 14) at match creation.
+ * Uses a seed derived from the match seed so the MAIN RNG stream (deck shuffle /
+ * opening hands) is untouched — keeping existing seeded goldens stable. Both seats
+ * share the result; only the per-seat option content differs.
  */
-export function sampleAmplificationOptions(
-  rngState: number,
-  pool: readonly AmplificationDbEntry[],
-  count = 3
-): { options: AmplificationOption[]; rngState: number } {
-  let state = rngState;
-  const options: AmplificationOption[] = [];
-  for (const tier of AMPLIFICATION_TIERS) {
-    if (options.length >= count) break;
-    const candidates = pool.filter((entry) => entry.tier === tier);
-    if (candidates.length === 0) continue;
-    const pick = nextInt(state, candidates.length);
-    state = pick.state;
-    options.push(toOption(candidates[pick.value]));
-  }
-  if (options.length < count) {
-    const used = new Set(options.map((o) => o.id));
-    for (const entry of pool) {
-      if (options.length >= count) break;
-      if (!used.has(entry.id)) options.push(toOption(entry));
+export function rollAugmentTiers(seed: number): [AmplificationTier, AmplificationTier] {
+  let state = normalizeSeed(seed ^ 0x9e3779b9);
+  const first = rollOneTier(state);
+  state = first.state;
+  const second = rollOneTier(state);
+  return [first.tier, second.tier];
+}
+
+/**
+ * Builds a player's amplification options for one phase: `count` picks of the
+ * phase's single tier, weighted by deck composition, without repeating an
+ * already-selected augment. Generic augments carry a flat base weight; faction
+ * augments (颱風假 / 島嶼天光) are weighted by their category's deck share and dropped
+ * when the deck has none. `0050` / `違約交割` are first-phase-only, and `0050` is
+ * dropped when the second phase is already 卯死. Deterministic for a given seed.
+ */
+export function sampleAugmentOptions(args: {
+  rngState: number;
+  pool: readonly AmplificationDbEntry[];
+  categoryCounts: Record<string, number>;
+  excludeIds: ReadonlySet<string>;
+  isFirstPhase: boolean;
+  secondPhaseTier: AmplificationTier;
+  count?: number;
+}): { options: AmplificationOption[]; rngState: number } {
+  const count = args.count ?? 3;
+  let state = args.rngState;
+  const deckTotal = Object.values(args.categoryCounts).reduce((sum, n) => sum + n, 0) || 1;
+
+  const candidates: Array<{ entry: AmplificationDbEntry; weight: number }> = [];
+  for (const entry of args.pool) {
+    if (args.excludeIds.has(entry.id)) continue;
+    if (entry.firstPhaseOnly && !args.isFirstPhase) continue;
+    if (entry.id === "AMP_0050" && args.secondPhaseTier === "卯死") continue;
+    let weight = 10;
+    if (entry.factionTags.length > 0) {
+      const supported = entry.factionTags.reduce((best, tag) => Math.max(best, args.categoryCounts[tag] ?? 0), 0);
+      if (supported <= 0) continue; // no deck support → never offered
+      weight = Math.round(10 * (0.25 + 4 * (supported / deckTotal)));
     }
+    candidates.push({ entry, weight });
+  }
+
+  const options: AmplificationOption[] = [];
+  while (options.length < count && candidates.length > 0) {
+    const pick = weightedIndex(state, candidates.map((candidate) => candidate.weight));
+    state = pick.state;
+    const [chosen] = candidates.splice(pick.value, 1);
+    options.push(toOption(chosen.entry));
   }
   return { options, rngState: state };
 }
@@ -216,10 +258,21 @@ export function enterSpecialPhase(
   if (phase === "AMPLIFICATION_PHASE") {
     sp.amplificationOptions = { player1: [], player2: [] };
     sp.amplificationChoice = {};
+    // Both phases share their tier (rolled at match creation); only the per-seat
+    // option content differs, weighted by each deck and excluding prior picks.
+    const phaseIndex = Math.max(0, AMPLIFICATION_TURNS.indexOf(state.turn.number));
+    const tier = state.augmentTiers[phaseIndex] ?? state.augmentTiers[0];
+    const pool = AMPLIFICATION_DB.filter((entry) => entry.tier === tier);
     for (const seat of SEATS) {
-      const dom = dominantFaction(state.players[seat].registeredCategoryCounts);
-      const pool = filterAmplification(AMPLIFICATION_DB, dom.dominantCategory);
-      const sampled = sampleAmplificationOptions(state.private.rngState, pool.length > 0 ? pool : AMPLIFICATION_DB);
+      const excludeIds = new Set(state.players[seat].augments.map((augment) => augment.id));
+      const sampled = sampleAugmentOptions({
+        rngState: state.private.rngState,
+        pool,
+        categoryCounts: state.players[seat].registeredCategoryCounts,
+        excludeIds,
+        isFirstPhase: phaseIndex === 0,
+        secondPhaseTier: state.augmentTiers[1]
+      });
       state.private.rngState = sampled.rngState;
       sp.amplificationOptions[seat] = sampled.options;
     }
@@ -284,7 +337,8 @@ function recordAmplification(
 }
 
 function defaultAmplification(options: readonly AmplificationOption[]): AmplificationOption | undefined {
-  return options.find((option) => option.tier === "加減賺") ?? options[0];
+  // Single-tier phases now: the timeout fallback is simply the first offered option.
+  return options[0];
 }
 
 function resolveAmplificationPhase(state: MatchState, nowMs: number, events: GameEvent[]): void {
@@ -294,10 +348,11 @@ function resolveAmplificationPhase(state: MatchState, nowMs: number, events: Gam
     const choiceId = sp.amplificationChoice?.[seat];
     const option = sp.amplificationOptions?.[seat]?.find((o) => o.id === choiceId);
     if (!option) continue;
-    state.players[seat].amplification = { id: option.id, tier: option.tier, name: option.name };
-    // Bind the modifier; passive effects are consulted by the cost/stat readers,
-    // one-shot effects are authored to resolve here once real DB content exists.
-    state.players[seat].amplificationEffect = AMPLIFICATION_DB.find((e) => e.id === option.id)?.effect;
+    const selection = { id: option.id, tier: option.tier, name: option.name };
+    state.players[seat].amplification = selection; // most-recent (badge back-compat)
+    state.players[seat].augments.push(selection); // accumulate (drives indicators / no-repeat)
+    const entry = AMPLIFICATION_DB.find((e) => e.id === option.id);
+    if (entry) applyAugmentSelection(state, seat, entry, events);
   }
   endSpecialPhase(state, nowMs, "AMPLIFICATION_PHASE", events);
 }
@@ -391,7 +446,16 @@ function resolveVotingPhase(
   };
 
   const dbEntry = VOTE_EVENT_DB.find((entry) => entry.id === winningEvent.id);
-  if (dbEntry) applyVoteEventEffect(state, dbEntry.apply, winningEvent.id, winningEvent.name, winningSeat, events, catalog);
+  if (dbEntry) {
+    // 潛逃國外: snapshot any referendum-immune seat's units/resources, then restore
+    // them after the effect resolves so they end up untouched by this turn-20 event.
+    // Scoped here (not in the shared handlers) so card effects reusing the same
+    // effect types are unaffected. Persistent referendum environments separately
+    // skip immune seats (silence tick + getCardActualCost).
+    const immuneSnapshot = snapshotReferendumImmune(state);
+    applyVoteEventEffect(state, dbEntry.apply, winningEvent.id, winningEvent.name, winningSeat, events, catalog);
+    restoreReferendumImmune(state, immuneSnapshot);
+  }
 
   const winnerName = state.players[winningSeat].displayName;
   const processText = `中選會公投：${winnerName}（中選率 ${display[winningSeat]}%，弱勢族群加成）勝出，通過「${winningEvent.name}」。`;
@@ -430,6 +494,53 @@ function applyVoteEventEffect(
   };
   addEvent(state, events, "ENVIRONMENT_APPLIED", { id: eventId, name: eventName, expiresTurn });
   applyEnvironmentTick(state, events);
+}
+
+type ImmuneSnapshot = Partial<
+  Record<
+    Seat,
+    {
+      board: RuntimeMinion[];
+      hero: PlayerState["hero"];
+      mana: PlayerState["mana"];
+      hand: RuntimeCard[];
+      deck: RuntimeCard[];
+      graveyard: RuntimeCard[];
+    }
+  >
+>;
+
+/** Captures referendum-immune seats' mutable units/resources before a vote effect. */
+function snapshotReferendumImmune(state: MatchState): ImmuneSnapshot {
+  const snapshot: ImmuneSnapshot = {};
+  for (const seat of SEATS) {
+    if (!state.players[seat].augmentFlags.referendumImmune) continue;
+    const player = state.players[seat];
+    snapshot[seat] = {
+      board: structuredClone(player.board),
+      hero: structuredClone(player.hero),
+      mana: structuredClone(player.mana),
+      hand: structuredClone(player.hand),
+      deck: structuredClone(player.deck),
+      graveyard: structuredClone(player.graveyard)
+    };
+  }
+  return snapshot;
+}
+
+/** Restores the snapshot so a referendum-immune seat ends up untouched by the vote effect. */
+function restoreReferendumImmune(state: MatchState, snapshot: ImmuneSnapshot): void {
+  for (const seat of SEATS) {
+    const saved = snapshot[seat];
+    if (!saved) continue;
+    const player = state.players[seat];
+    player.board = saved.board;
+    player.hero = saved.hero;
+    player.mana = saved.mana;
+    player.hand = saved.hand;
+    player.deck = saved.deck;
+    player.graveyard = saved.graveyard;
+  }
 }
 
 function rejectPhase(state: MatchState, events: GameEvent[], seat: Seat, reason: string): void {

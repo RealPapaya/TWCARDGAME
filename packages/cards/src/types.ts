@@ -30,6 +30,10 @@ export interface EffectDefinition {
   turns?: number;
   summonCardId?: string;
   effect?: EffectDefinition;
+  /** Augment grants: crystals awarded (now or deferred). */
+  crystals?: number;
+  /** Augment durations: turns a deferred/passive augment effect lasts. */
+  durationTurns?: number;
 }
 
 export interface CardKeywords {
@@ -129,3 +133,31 @@ export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS"] as con
 export const SUPPORTED_ENRAGE_EFFECTS = ["BUFF_STAT"] as const;
 export const SUPPORTED_QUEST_EFFECTS = ["DAMAGE_ALL_MINIONS"] as const;
 export const SUPPORTED_ON_DISCARD_ACTIONS = ["SUMMON"] as const;
+
+/**
+ * Effect types valid on a dynamic-amplification (增幅) entry. These do NOT flow
+ * through the card `resolveEffect` dispatch — they are resolved per-seat by the
+ * rules `applyAugmentSelection` (one-shot) or read as flags by passive readers
+ * (cost / damage / summon). Listed here so `validateAmplificationDb` can guard
+ * the DB the same way `SUPPORTED_BATTLECRY_EFFECTS` guards cards.
+ */
+export const SUPPORTED_AUGMENT_EFFECTS = [
+  "AUG_GRANT_CRYSTALS",
+  "AUG_GRANT_CRYSTALS_NEXT_TURN",
+  "AUG_NEXT_DRAW_HALF",
+  "AUG_HAND_COST_SET",
+  "AUG_HAND_COST_DELTA",
+  "AUG_FREEZE",
+  "AUG_REVIVE_VANILLA",
+  "AUG_DAMAGE_REDUCTION",
+  "AUG_DOUBLE_CATEGORY",
+  "AUG_PERSIST_LOWCOST_ATTACK",
+  "AUG_PERSIST_CATEGORY_BUFF",
+  "AUG_NEWS_COST",
+  "AUG_BUILDING_COST",
+  "AUG_COST_MULTIPLIER",
+  "AUG_PLAYED_MAXHP",
+  "AUG_EXTRA_DRAW_TURNS",
+  "AUG_REFERENDUM_IMMUNE",
+  "AUG_RAISE_NEXT_TIER"
+] as const;

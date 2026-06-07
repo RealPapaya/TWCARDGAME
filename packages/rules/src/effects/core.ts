@@ -13,6 +13,7 @@ import {
 import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
 import { applyEnvironmentTick } from "./environment.js";
+import { applyPersistentMinionAugments, applyStartOfTurnAugments, tryReviveMinion } from "./augments.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
   ADD_CARD_TO_HAND: addCardToHand,
@@ -98,6 +99,9 @@ export function startTurn(state: MatchState, nowMs: number, events: EffectContex
   if (player.mana.max < 10) player.mana.max += 1;
   player.mana.current = player.mana.max;
   drawCards(state, player, 1, events);
+  // Augment start-of-turn grants (消費券3600 deferred crystals, 大薯買一送一 extra
+  // draw) and freeze-expiry housekeeping, after the normal refill + draw.
+  applyStartOfTurnAugments(state, player, events);
   for (const minion of player.board) {
     minion.sleeping = false;
     minion.canAttack = minion.lockedTurns <= 0;
@@ -143,6 +147,13 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
     }
     const card = index >= 0 ? player.deck.splice(index, 1)[0] : player.deck.shift();
     if (!card) continue;
+    // 股東紀念品: the next drawn card is permanently half-costed, then the flag clears.
+    if (player.augmentFlags.nextDrawHalfCost) {
+      card.cost = Math.floor(card.cost / 2);
+      card.isReduced = true;
+      player.augmentFlags.nextDrawHalfCost = false;
+      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_SHAREHOLDER_GIFT" }, player.seat);
+    }
     if (reduction > 0) {
       card.cost = Math.max(0, card.cost - reduction);
       card.isReduced = true;
@@ -170,8 +181,14 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
     updateEnrage(minion);
     addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount }, ref.owner.seat);
   } else {
-    ref.owner.hero.hp -= amount;
-    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount }, ref.owner.seat);
+    // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
+    const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
+    const dealt = reduction > 0 ? Math.max(0, amount - reduction) : amount;
+    if (reduction > 0 && dealt < amount) {
+      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAX_CUT" }, ref.owner.seat);
+    }
+    ref.owner.hero.hp -= dealt;
+    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt }, ref.owner.seat);
   }
 }
 
@@ -274,6 +291,8 @@ export function resolveDeaths(state: MatchState, events: EffectContext["events"]
         player.graveyard.push(minionToCard(state, minion));
         addEvent(state, events, "DESTROY", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
         resolveDeathrattle(state, player, minion, events, catalog);
+        // 普渡: revive the owner's minion once as a 1/1 token (after the deathrattle).
+        tryReviveMinion(state, player, minion, events);
         removed = true;
       }
     }
@@ -816,6 +835,7 @@ export function summonCard(state: MatchState, player: PlayerState, card: CardDef
   }
   const insertion = typeof index === "number" ? Math.max(0, Math.min(index, player.board.length)) : player.board.length;
   player.board.splice(insertion, 0, minion);
+  applyPersistentMinionAugments(state, player.seat, minion, events);
   addEvent(state, events, "MINION_SUMMONED", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
   return minion;
 }

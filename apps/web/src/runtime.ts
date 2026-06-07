@@ -1119,10 +1119,11 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           </div>
           ${accountMode ? "" : `<p class="muted collection-note">登入後可查看收藏數量；目前顯示完整卡牌目錄。</p>`}
           <section class="collection-card-library" aria-label="卡牌庫">
-            <label class="show-unowned-label">
-              <input type="checkbox" id="show-unowned-checkbox" ${view.collectionFilter === "all" ? "checked" : ""} />
-              顯示未擁有的卡牌
-            </label>
+            <div class="collection-filter-tabs" aria-label="收藏篩選">
+              ${renderCollectionFilterButton("all", "全部", "filter-all")}
+              ${renderCollectionFilterButton("owned", "已擁有", "filter-owned")}
+              ${renderCollectionFilterButton("missing", "未擁有", "filter-missing")}
+            </div>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
               ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
                 const qty = collectionQuantityFor(card, collectionMap);
@@ -1137,6 +1138,19 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
       </aside>
       ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
     </section>
+  `;
+}
+
+function renderCollectionFilterButton(filter: CollectionFilter, label: string, testId: string): string {
+  const active = view.collectionFilter === filter;
+  return `
+    <button
+      type="button"
+      class="collection-filter-tab ${active ? "active" : ""}"
+      data-collection-filter="${filter}"
+      data-testid="${testId}"
+      aria-pressed="${active}"
+    >${label}</button>
   `;
 }
 
@@ -1765,12 +1779,22 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   `;
 }
 
-/** Small badge beside the hero showing the amplification this player bound (turn 6/14). */
+/**
+ * Circular 增幅 indicators beside the hero — one per bound augment (0..2). Each
+ * carries `data-augment-id` so `applyAugmentGlow` can pulse the right one when
+ * that augment fires (AUGMENT_TRIGGERED). Falls back to the single most-recent
+ * `amplification` for back-compat.
+ */
 function renderAmplificationBadge(player: PublicPlayer | undefined): string {
-  const amp = player?.amplification;
-  if (!amp?.name) return "";
-  const tierClass = AMP_TIER_CLASS[amp.tier] ?? "amp-tier-low";
-  return `<span class="hero-amp-badge ${tierClass}" title="${escapeAttr(`${amp.tier}・${amp.name}`)}">${escapeHtml(amp.name)}</span>`;
+  const augments = player?.augments?.length ? player.augments : player?.amplification ? [player.amplification] : [];
+  if (augments.length === 0) return "";
+  const dots = augments
+    .map((aug) => {
+      const tierClass = AMP_TIER_CLASS[aug.tier] ?? "amp-tier-low";
+      return `<span class="hero-augment-dot ${tierClass}" data-augment-id="${escapeAttr(aug.id)}" title="${escapeAttr(`${aug.tier}・${aug.name}`)}">${escapeHtml(aug.name.slice(0, 2))}</span>`;
+    })
+    .join("");
+  return `<span class="hero-augments" aria-hidden="false">${dots}</span>`;
 }
 
 function renderMana(current: number, max: number, role: "player" | "opponent", seat: Seat): string {
@@ -2992,10 +3016,14 @@ function bindStaticActions(): void {
   for (const el of document.querySelectorAll<HTMLElement>("[data-pick-title]")) {
     on(el, "click", "pick-title", () => void pickTitle(el.dataset.pickTitle));
   }
-  on(document.querySelector<HTMLInputElement>("#show-unowned-checkbox"), "change", "show-unowned-checkbox", (event) => {
-    view.collectionFilter = (event.currentTarget as HTMLInputElement).checked ? "all" : "owned";
-    render();
-  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-filter]")) {
+    on(el, "click", "collection-filter", () => {
+      const filter = el.dataset.collectionFilter as CollectionFilter | undefined;
+      if (!filter || view.collectionFilter === filter) return;
+      view.collectionFilter = filter;
+      render();
+    });
+  }
   on(document.querySelector<HTMLSelectElement>("#collection-sort-select"), "change", "collection-sort-select", (event) => {
     const value = (event.currentTarget as HTMLSelectElement).value as CollectionSort;
     view.collectionSort = value;
@@ -3364,6 +3392,7 @@ function navigateToScreen(target: MenuScreen): void {
   if (target === "leaderboard") void loadLeaderboard();
   if (target === "shop") void loadShopItems();
   render();
+  if (target === "collection" && supabase && view.session?.user) void loadAccountData();
 }
 
 function flipPackRewardCard(index: number): void {
@@ -6696,7 +6725,28 @@ function appendBattleLog(message: GameEvent[]): void {
   view.battleLog = [...view.battleLog, ...entries].slice(-50);
 }
 
+function shouldClearHoverForEvents(events: GameEvent[]): boolean {
+  return events.some((event) => {
+    switch (event.type) {
+      case "CARD_PLAYED":
+      case "MINION_SUMMONED":
+      case "DAMAGE":
+      case "HEAL":
+      case "BUFF":
+      case "SHIELD_POPPED":
+      case "BOUNCE":
+      case "DESTROY":
+      case "DEATHRATTLE":
+      case "VOTE_RESOLVED":
+        return true;
+      default:
+        return false;
+    }
+  });
+}
+
 function handleEvents(message: GameEvent[]): AnimationCue[] {
+  if (shouldClearHoverForEvents(message)) clearHoverTooltip();
   view.events = [...message, ...view.events].slice(0, 50);
   appendBattleLog(message);
   maybeShowTurnAnnouncement(message);
@@ -7593,6 +7643,12 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
   if (event.type === "MINION_SUMMONED") {
     return { id, kind: "summon", text: "Summoned", seat: event.seat, targetKey: target, cardId };
   }
+  if (event.type === "AUGMENT_TRIGGERED") {
+    // The augment indicator pulse is applied imperatively (applyAugmentGlow) off
+    // the owner's seat; cardId carries the augment id so the right dot lights up.
+    const augmentId = typeof payload.augmentId === "string" ? payload.augmentId : undefined;
+    return { id, kind: "augmentGlow", text: "", seat: event.seat, cardId: augmentId };
+  }
   if (event.type === "ATTACK") {
     const attackerInstanceId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
     const targetRef = (payload.target ?? undefined) as TargetRef | undefined;
@@ -8301,6 +8357,9 @@ function applyPostRenderEffects(): void {
     if (cue.kind === "deathrattle" && cue.targetKey && cueIsReady(cue)) {
       applyDeathrattlePlume(cue);
     }
+    if (cue.kind === "augmentGlow" && cue.seat && cueIsReady(cue)) {
+      applyAugmentGlow(cue);
+    }
   }
   if (eventLayer) {
     for (const node of eventLayer.querySelectorAll<HTMLElement>("[data-anchor-key]")) {
@@ -8346,6 +8405,40 @@ function applyPostRenderEffects(): void {
   }
 }
 
+
+const appliedAugmentGlow = new Set<string>();
+
+/**
+ * Pulses the firing player's 增幅 indicator(s). A specific augment id (from the
+ * AUGMENT_TRIGGERED payload, carried on `cue.cardId`) lights up its matching dot;
+ * a general/persist trigger pulses all of that seat's dots. A body-level ring is
+ * also spawned so the flash survives the publicSync re-render of the hero DOM.
+ */
+function applyAugmentGlow(cue: AnimationCue): void {
+  if (appliedAugmentGlow.has(cue.id)) return;
+  const dots = Array.from(document.querySelectorAll<HTMLElement>(`[data-seat="${cue.seat}"] .hero-augment-dot`));
+  if (dots.length === 0) return;
+  appliedAugmentGlow.add(cue.id);
+  const matched = cue.cardId ? dots.filter((dot) => dot.dataset.augmentId === cue.cardId) : [];
+  const targets = matched.length > 0 ? matched : dots;
+  for (const dot of targets) spawnAugmentGlow(dot);
+  window.setTimeout(() => appliedAugmentGlow.delete(cue.id), 1200);
+}
+
+function spawnAugmentGlow(dot: HTMLElement): void {
+  const rect = dot.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+  dot.classList.remove("augment-trigger");
+  void dot.offsetWidth; // restart the dot's own pulse
+  dot.classList.add("augment-trigger");
+  window.setTimeout(() => dot.classList.remove("augment-trigger"), 720);
+  const glow = document.createElement("div");
+  glow.className = "augment-glow-fx";
+  glow.style.left = `${rect.left + rect.width / 2}px`;
+  glow.style.top = `${rect.top + rect.height / 2}px`;
+  document.body.appendChild(glow);
+  window.setTimeout(() => glow.remove(), 720);
+}
 
 function cardName(cardId: string | undefined): string | undefined {
   return cardId ? cardCatalog.get(cardId)?.name ?? cardId : undefined;

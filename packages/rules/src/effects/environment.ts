@@ -41,6 +41,8 @@ export function applyEnvironmentTick(state: MatchState, events: EffectContext["e
 
 function silenceAllMinions(state: MatchState): void {
   for (const player of Object.values(state.players)) {
+    // 潛逃國外: the referendum silence environment skips an immune player's board.
+    if (player.augmentFlags.referendumImmune) continue;
     for (const minion of player.board) {
       minion.lockedTurns = Math.max(minion.lockedTurns, 1);
       minion.canAttack = false;

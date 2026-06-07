@@ -2,7 +2,7 @@ import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcard
 import type { CommandEnvelope, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch } from "../engine.js";
-import { effectHandlers, getCardActualCost, reduce, resolveEffect } from "../index.js";
+import { effectHandlers, getCardActualCost, reduce, resolveEffect, resolvePostAction } from "../index.js";
 import type { EffectContext, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 
 function legalDeckIds(): string[] {
@@ -60,7 +60,29 @@ function graveMinion(seat: Seat, suffix: string): RuntimeCard {
 }
 
 function boardMinion(instanceId: string): RuntimeMinion {
-  return { instanceId, keywords: {} } as RuntimeMinion;
+  return {
+    instanceId,
+    cardId: MINION_DEF.id,
+    ownerSeat: instanceId.startsWith("p2") ? "player2" : "player1",
+    name: MINION_DEF.name,
+    category: MINION_DEF.category,
+    cost: MINION_DEF.cost,
+    type: "MINION",
+    rarity: MINION_DEF.rarity,
+    attack: MINION_DEF.attack ?? 1,
+    baseAttack: MINION_DEF.attack ?? 1,
+    health: MINION_DEF.health ?? 1,
+    currentHealth: MINION_DEF.health ?? 1,
+    keywords: {},
+    sleeping: false,
+    canAttack: true,
+    isEnraged: false,
+    lockedTurns: 0,
+    auraAttack: 0,
+    auraHealth: 0,
+    auraTaunt: false,
+    tempBuffs: []
+  };
 }
 
 describe("turn-20 vote-event handlers", () => {
@@ -70,10 +92,40 @@ describe("turn-20 vote-event handlers", () => {
       "RESET_MANA_ALL",
       "FULL_HEAL_BOTH_HEROES",
       "GIVE_DIVINE_SHIELD_ALL_BOARD",
+      "DESTROY_RIGHTMOST_MINIONS",
       "ENV_COST_ZERO"
     ]) {
       expect(effectHandlers[type]).toBeTypeOf("function");
     }
+  });
+
+  it("高雄氣爆 DESTROY_RIGHTMOST_MINIONS destroys only each side's rightmost minion", () => {
+    const state = startMatch(13);
+    state.players.player1.board = [boardMinion("p1-left"), boardMinion("p1-right")];
+    state.players.player2.board = [boardMinion("p2-left"), boardMinion("p2-middle"), boardMinion("p2-right")];
+
+    const context = ctx(state);
+    resolveEffect({ type: "DESTROY_RIGHTMOST_MINIONS" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    expect(state.players.player1.board.map((m) => m.instanceId)).toEqual(["p1-left"]);
+    expect(state.players.player2.board.map((m) => m.instanceId)).toEqual(["p2-left", "p2-middle"]);
+    const destroyedTargets = context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target);
+    expect(destroyedTargets).toEqual(["p1-right", "p2-right"]);
+  });
+
+  it("高雄氣爆 DESTROY_RIGHTMOST_MINIONS skips sides with no minions", () => {
+    const state = startMatch(14);
+    state.players.player1.board = [];
+    state.players.player2.board = [boardMinion("p2-only")];
+
+    const context = ctx(state);
+    resolveEffect({ type: "DESTROY_RIGHTMOST_MINIONS" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    expect(state.players.player1.board).toHaveLength(0);
+    expect(state.players.player2.board).toHaveLength(0);
+    expect(context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target)).toEqual(["p2-only"]);
   });
 
   describe("鬼門開 SUMMON_FROM_GRAVEYARD", () => {

@@ -91,10 +91,16 @@ function scoreMove(state: MatchState, seat: Seat, move: GameCommand): number {
 const TIER_RANK: Record<string, number> = { 加減賺: 1, 吃紅: 2, 卯死: 3 };
 
 function scoreAmplification(state: MatchState, seat: Seat, move: Extract<GameCommand, { type: "selectAmplification" }>): number {
-  // Placeholder heuristic until real amplification effects exist: prefer the
-  // stronger tier (卯死 > 吃紅 > 加減賺).
+  // A phase's options now share one tier, so prefer a faction augment the deck
+  // actually supports (颱風假 needs 勞工, 島嶼天光 needs 民進黨政治人物); otherwise the
+  // tier rank breaks ties deterministically.
   const option = state.specialPhase?.amplificationOptions?.[seat]?.find((o) => o.id === move.optionId);
-  return option ? TIER_RANK[option.tier] ?? 0 : 0;
+  if (!option) return 0;
+  let score = TIER_RANK[option.tier] ?? 0;
+  const counts = state.players[seat].registeredCategoryCounts;
+  if (option.id === "AMP_TYPHOON_DAY") score += counts["勞工"] ?? 0;
+  if (option.id === "AMP_ISLAND_DAWN") score += counts["民進黨政治人物"] ?? 0;
+  return score;
 }
 
 function endTurnScore(state: MatchState, seat: Seat): number {

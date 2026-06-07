@@ -247,7 +247,10 @@ export interface PublicPlayer {
   graveyardCount: number;
   mulliganReady: boolean;
   board: PublicMinion[];
+  /** Most-recently bound amplification (retained for back-compat with the single badge). */
   amplification?: AmplificationSelection;
+  /** All amplifications this player has bound (0..2), in phase order; drives the avatar indicators. */
+  augments?: AmplificationSelection[];
 }
 
 export interface TurnState {
@@ -342,6 +345,7 @@ export type GameEventType =
   | "PHASE_STARTED"
   | "PHASE_ENDED"
   | "AMPLIFICATION_SELECTED"
+  | "AUGMENT_TRIGGERED"
   | "VOTE_CAST"
   | "VOTE_RESOLVED"
   | "ENVIRONMENT_APPLIED"

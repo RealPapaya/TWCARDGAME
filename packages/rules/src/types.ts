@@ -1,6 +1,7 @@
 import type {
   AmplificationOption,
   AmplificationSelection,
+  AmplificationTier,
   CommandEnvelope,
   GameEvent,
   GameStatus,
@@ -70,6 +71,46 @@ export interface RuntimeMinion {
   tempBuffs: TempBuff[];
   bounce_bonus?: number;
   hanBounceBonus?: number;
+  /** Marks a 1/1 token spawned by 普渡 so it cannot itself re-revive. */
+  revivedByPurdo?: boolean;
+}
+
+/**
+ * Flat, cheap-to-read flags derived from a player's bound amplifications. Hot
+ * paths (cost reader, hero damage, summon) consult these instead of scanning an
+ * effect list. Populated by `applyAugmentSelection`; reset to defaults at match
+ * creation. See [[packages/rules/src/effects/augments.ts]].
+ */
+export interface AugmentFlags {
+  /** 言論自由: flat NEWS cost reduction. */
+  newsCostReduce: number;
+  /** 新青安: flat 建築 cost reduction. */
+  buildingCostReduce: number;
+  /** 乞丐超人: cost multiplier in tenths (7 = ×0.7) once past `costMultiplierAfterTurn`. */
+  costMultiplierTenths?: number;
+  costMultiplierAfterTurn?: number;
+  /** 股東紀念品: the next drawn card is half-costed, then this clears. */
+  nextDrawHalfCost: boolean;
+  /** 颱風假: +value/+value to summoned minions of a category (and current board). */
+  categoryBuff?: { category: string; value: number };
+  /** 基本工資調漲: +attack to summoned minions of printed cost 1-3. */
+  lowCostMinionAttackBuff: number;
+  /** 育兒津貼: +maxHP to every minion this player plays. */
+  playedMinionMaxHpBonus: number;
+  /** 島嶼天光: minions of this category have attack & health doubled. */
+  doubleCategory?: string;
+  /** 減稅: hero takes this much less from every damage instance. */
+  damageReductionPerInstance: number;
+  /** 普渡: own minions revive once as a 1/1 when they die. */
+  reviveOnceAsVanilla: boolean;
+  /** 潛逃國外: exempt from the turn-20 referendum effect. */
+  referendumImmune: boolean;
+  /** 違約交割: cannot attack / play cards while `turn.number <= frozenUntilTurn`. */
+  frozenUntilTurn?: number;
+  /** 消費券3600: crystals granted at the start of the player's next turn (one-shot). */
+  bonusCrystalsNextTurn?: number;
+  /** 大薯買一送一: extra card drawn at the start of each of the next N turns. */
+  extraDrawTurnsRemaining: number;
 }
 
 export interface PlayerState {
@@ -86,10 +127,12 @@ export interface PlayerState {
   board: RuntimeMinion[];
   mulliganReady: boolean;
   shortTurnPenalty: boolean;
-  /** Amplification chosen in a previous AMPLIFICATION_PHASE; shown by the avatar. */
+  /** Most-recently bound amplification; shown by the avatar badge (back-compat). */
   amplification?: AmplificationSelection;
-  /** The amplification effect bound to this player (passive modifiers consult it). */
-  amplificationEffect?: EffectDefinition;
+  /** All amplifications bound to this player (0..2), in phase order. */
+  augments: AmplificationSelection[];
+  /** Derived flat flags consulted by the hot-path passive readers (cost / damage / summon). */
+  augmentFlags: AugmentFlags;
   /**
    * Card-category histogram of the registered 30-card deck, computed once at
    * match creation. Drives the deck analyzer. NEVER projected to public state
@@ -149,6 +192,8 @@ export interface MatchState {
   status: GameStatus;
   phase: Phase;
   turn: TurnState;
+  /** The two amplification-phase tiers, rolled once at match creation and shared by both seats. */
+  augmentTiers: [AmplificationTier, AmplificationTier];
   players: Record<Seat, PlayerState>;
   pendingPrompt?: PendingPrompt;
   specialPhase?: SpecialPhaseState;

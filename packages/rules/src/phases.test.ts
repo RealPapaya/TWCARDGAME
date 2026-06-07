@@ -7,7 +7,8 @@ import {
   effectHandlers,
   getCardActualCost,
   reduce,
-  sampleAmplificationOptions,
+  rollAugmentTiers,
+  sampleAugmentOptions,
   sampleVoteEvents,
   toPublicState,
   voteWeightsDisplay,
@@ -100,12 +101,45 @@ describe("phase pure helpers", () => {
     expect(dominantFaction({ 勞工: 10, 學生: 5 }).dominantCategory).toBeUndefined();
   });
 
-  it("samples three distinct-tier amplification options, reproducibly per seed", () => {
-    const a = sampleAmplificationOptions(999, AMPLIFICATION_DB);
-    const b = sampleAmplificationOptions(999, AMPLIFICATION_DB);
+  it("rolls two shared augment tiers reproducibly per seed (≈45/35/20)", () => {
+    expect(rollAugmentTiers(123)).toEqual(rollAugmentTiers(123));
+    const counts: Record<string, number> = { 加減賺: 0, 吃紅: 0, 卯死: 0 };
+    for (let seed = 0; seed < 3000; seed++) {
+      for (const tier of rollAugmentTiers(seed)) counts[tier] += 1;
+    }
+    const total = 6000;
+    expect(counts["加減賺"] / total).toBeGreaterThan(0.4);
+    expect(counts["加減賺"] / total).toBeLessThan(0.5);
+    expect(counts["卯死"] / total).toBeGreaterThan(0.15);
+    expect(counts["卯死"] / total).toBeLessThan(0.25);
+  });
+
+  it("samples weighted single-tier options reproducibly, sharing the tier and excluding prior picks", () => {
+    const pool = AMPLIFICATION_DB.filter((entry) => entry.tier === "加減賺");
+    const base = {
+      pool,
+      categoryCounts: { 勞工: 10, 平民: 20 } as Record<string, number>,
+      excludeIds: new Set<string>(),
+      isFirstPhase: true,
+      secondPhaseTier: "吃紅" as const
+    };
+    const a = sampleAugmentOptions({ rngState: 999, ...base });
+    const b = sampleAugmentOptions({ rngState: 999, ...base });
     expect(a.options.map((o) => o.id)).toEqual(b.options.map((o) => o.id));
-    expect(new Set(a.options.map((o) => o.tier)).size).toBe(a.options.length);
     expect(a.options.length).toBe(3);
+    expect(a.options.every((o) => o.tier === "加減賺")).toBe(true);
+    const excluded = sampleAugmentOptions({ rngState: 999, ...base, excludeIds: new Set([a.options[0].id]) });
+    expect(excluded.options.map((o) => o.id)).not.toContain(a.options[0].id);
+  });
+
+  it("offers 0050 only in the first phase, and never when phase 2 is already 卯死", () => {
+    const low = AMPLIFICATION_DB.filter((entry) => entry.tier === "加減賺");
+    const counts: Record<string, number> = { 平民: 30 };
+    const all = (isFirstPhase: boolean, secondPhaseTier: "加減賺" | "吃紅" | "卯死") =>
+      sampleAugmentOptions({ rngState: 5, pool: low, categoryCounts: counts, excludeIds: new Set(), isFirstPhase, secondPhaseTier, count: 99 }).options.map((o) => o.id);
+    expect(all(true, "吃紅")).toContain("AMP_0050");
+    expect(all(false, "吃紅")).not.toContain("AMP_0050");
+    expect(all(true, "卯死")).not.toContain("AMP_0050");
   });
 
   it("draws three unique vote events, reproducibly per seed", () => {
@@ -165,8 +199,9 @@ describe("amplification phase (turn 6)", () => {
       CARD_CATALOG
     ).state;
     expect(state.phase).toBe("NORMAL_PLAY");
-    expect(state.players.player1.amplification?.tier).toBe("加減賺");
-    expect(state.players.player2.amplification?.tier).toBe("加減賺");
+    // Both seats share the phase's rolled tier (no longer always 加減賺).
+    expect(state.players.player1.amplification?.tier).toBe(state.augmentTiers[0]);
+    expect(state.players.player2.amplification?.tier).toBe(state.augmentTiers[0]);
   });
 
   it("triggers again at turn 14 but not on the same turn twice", () => {

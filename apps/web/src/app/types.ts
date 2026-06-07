@@ -40,7 +40,8 @@ export type AnimationKind =
   | "deathrattle" // 遺志 — soul plume rising from a dead minion's slot
   | "shieldPop" // divine shield breaking (split out of "buff")
   | "lock" // silence / lock (split out of "buff")
-  | "aoeSweep"; // one board-wide overlay drawn per AOE cluster
+  | "aoeSweep" // one board-wide overlay drawn per AOE cluster
+  | "augmentGlow"; // 增幅 indicator pulse when a bound augment fires
 
 /** Whether an effect hit a single target or swept the whole board (全場). */
 export type AnimationScope = "single" | "aoe";

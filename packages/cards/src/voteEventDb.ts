@@ -57,7 +57,13 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     options: ["摧毀場上所有隨從", "摧毀場上所有隨從", "摧毀場上所有隨從"],
     apply: { mode: "IMMEDIATE", effect: { type: "DESTROY_ALL_MINIONS" } }
   },
-  { id: "VE_KAOHSIUNG_BLAST", name: "高雄氣爆", tierWeight: 35, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
+  {
+    id: "VE_KAOHSIUNG_BLAST",
+    name: "高雄氣爆",
+    tierWeight: 35,
+    options: ["雙方最右邊的隨從死亡", "雙方最右邊的隨從死亡", "雙方最右邊的隨從死亡"],
+    apply: { mode: "IMMEDIATE", effect: { type: "DESTROY_RIGHTMOST_MINIONS" } }
+  },
   {
     id: "VE_MAZU",
     name: "媽祖大繞境",

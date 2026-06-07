@@ -70,6 +70,15 @@ export function giveDivineShieldAllBoard(_effect: EffectDefinition, context: Eff
   }
 }
 
+/** 高雄氣爆：雙方各自最右邊的隨從死亡。 */
+export function destroyRightmostMinions(_effect: EffectDefinition, context: EffectContext): void {
+  for (const seat of SEATS) {
+    const board = context.state.players[seat].board;
+    const rightmost = board[board.length - 1];
+    if (rightmost) rightmost.currentHealth = 0;
+  }
+}
+
 /**
  * 普發現金：判斷目前是否處於「下一整輪卡牌費用 0」的環境。
  * 由 `getCardActualCost` 讀取。gate `turn.number > appliedTurn` 排除公投當下
@@ -87,6 +96,7 @@ export const voteEventHandlers: Record<string, EffectHandler> = {
   RESET_MANA_ALL: resetManaAll,
   FULL_HEAL_BOTH_HEROES: fullHealBothHeroes,
   GIVE_DIVINE_SHIELD_ALL_BOARD: giveDivineShieldAllBoard,
+  DESTROY_RIGHTMOST_MINIONS: destroyRightmostMinions,
   // Passive: the actual zero-cost is applied in getCardActualCost via environmentForcesZeroCost.
   ENV_COST_ZERO: () => {}
 };

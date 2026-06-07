@@ -1413,9 +1413,9 @@ body.hand-dragging .hand-row .card {
 
 /* --- Turn-20 referendum roulette: flips between the two voted cards, fast → slow --- */
 .vote-roulette-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  z-index: 90;
+  z-index: 3000;
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, 0.78);
@@ -1542,6 +1542,65 @@ body.hand-dragging .hand-row .card {
 .hero-amp-badge.amp-tier-low { background: #bfe0a6; }
 .hero-amp-badge.amp-tier-mid { background: #f0cd7e; }
 .hero-amp-badge.amp-tier-high { background: #f0998f; }
+
+/* Circular 增幅 indicators beside the hero avatar (one per bound augment). */
+.hero-augments {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 30;
+  pointer-events: none;
+}
+.hero-augment-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #1a1008;
+  background: #d8c08a;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  pointer-events: auto;
+}
+.hero-augment-dot.amp-tier-low { background: #bfe0a6; }
+.hero-augment-dot.amp-tier-mid { background: #f0cd7e; }
+.hero-augment-dot.amp-tier-high { background: #f0998f; }
+
+/* Brief pulse on the dot itself when its augment fires (declarative, best-effort). */
+.hero-augment-dot.augment-trigger {
+  animation: augment-dot-pulse 0.7s ease-out;
+}
+@keyframes augment-dot-pulse {
+  0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(255, 240, 170, 0.9); }
+  35% { transform: scale(1.35); box-shadow: 0 0 14px 5px rgba(255, 240, 170, 0.95); }
+  100% { transform: scale(1); box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45); }
+}
+
+/* Body-level ring spawned over a firing dot so the flash survives a hero re-render. */
+.augment-glow-fx {
+  position: fixed;
+  width: 26px;
+  height: 26px;
+  margin: -13px 0 0 -13px;
+  border-radius: 50%;
+  pointer-events: none;
+  z-index: 9999;
+  background: radial-gradient(circle, rgba(255, 245, 190, 0.85) 0%, rgba(255, 215, 120, 0.5) 45%, rgba(255, 215, 120, 0) 70%);
+  animation: augment-glow-ring 0.72s ease-out forwards;
+}
+@keyframes augment-glow-ring {
+  0% { transform: scale(0.5); opacity: 0.95; }
+  100% { transform: scale(3.2); opacity: 0; }
+}
 
 .mulligan-replace-tag {
   position: absolute;

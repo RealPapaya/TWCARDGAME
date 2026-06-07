@@ -1,4 +1,5 @@
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
+import { isFrozen } from "./effects/augmentFlags.js";
 import { getCardActualCost } from "./state.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
 
@@ -17,6 +18,9 @@ export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   if (state.phase === "VOTING_PHASE") return legalVoteMoves(state, seat);
   if (state.turn.activeSeat !== seat) return [];
   if (state.pendingPrompt && state.pendingPrompt.seat !== seat) return [];
+  // 違約交割: a frozen player can only end their turn (avoids a deadlock and keeps
+  // the bot's only legal move well-defined).
+  if (isFrozen(state, seat)) return [{ type: "endTurn" }];
 
   const moves: GameCommand[] = [];
   for (const cmd of legalPlays(state, seat)) moves.push(cmd);

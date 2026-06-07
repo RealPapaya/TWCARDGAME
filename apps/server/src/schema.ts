@@ -67,6 +67,17 @@ defineTypes(PublicMinionSchema, {
   temporaryUntilTurn: "number"
 });
 
+export class AugmentSchema extends Schema {
+  id = "";
+  name = "";
+  tier = "";
+}
+defineTypes(AugmentSchema, {
+  id: "string",
+  name: "string",
+  tier: "string"
+});
+
 export class PublicPlayerSchema extends Schema {
   userId = "";
   displayName = "";
@@ -79,10 +90,12 @@ export class PublicPlayerSchema extends Schema {
   graveyardCount = 0;
   mulliganReady = false;
   board = new ArraySchema<PublicMinionSchema>();
-  // Bound amplification (flattened for the avatar badge); "" when none chosen.
+  // Most-recently bound amplification (flattened for the single avatar badge); "" when none.
   amplificationId = "";
   amplificationName = "";
   amplificationTier = "";
+  // All bound amplifications (0..2), in phase order — drives the avatar indicators.
+  augments = new ArraySchema<AugmentSchema>();
 }
 defineTypes(PublicPlayerSchema, {
   userId: "string",
@@ -98,7 +111,8 @@ defineTypes(PublicPlayerSchema, {
   board: [PublicMinionSchema],
   amplificationId: "string",
   amplificationName: "string",
-  amplificationTier: "string"
+  amplificationTier: "string",
+  augments: [AugmentSchema]
 });
 
 export class VoteEventSchema extends Schema {
@@ -233,6 +247,15 @@ function syncPlayer(target: PublicPlayerSchema, player: PublicPlayer): void {
   const incoming = player.board.map(toMinionSchema);
   // Rebuild the ArraySchema so Colyseus keeps typed array item metadata intact.
   target.board = new ArraySchema<PublicMinionSchema>(...incoming);
+  target.augments = new ArraySchema<AugmentSchema>(...(player.augments ?? []).map(toAugmentSchema));
+}
+
+function toAugmentSchema(augment: { id: string; name: string; tier: string }): AugmentSchema {
+  const schema = new AugmentSchema();
+  schema.id = augment.id;
+  schema.name = augment.name;
+  schema.tier = augment.tier;
+  return schema;
 }
 
 function toMinionSchema(minion: PublicMinion): PublicMinionSchema {

@@ -12,3 +12,15 @@ export {
   updateAuras,
   updateEnrage
 } from "./effects/core.js";
+export {
+  applyAugmentSelection,
+  applyPersistentMinionAugments,
+  bumpTier
+} from "./effects/augments.js";
+export {
+  augmentCostMultiplierTenths,
+  augmentFlatCostReduction,
+  defaultAugmentFlags,
+  isFrozen,
+  isReferendumImmune
+} from "./effects/augmentFlags.js";

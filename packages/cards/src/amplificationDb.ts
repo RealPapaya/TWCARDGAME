@@ -1,63 +1,207 @@
 import type { AmplificationTier } from "@twcardgame/shared";
+import { SUPPORTED_AUGMENT_EFFECTS } from "./types.js";
 import type { EffectDefinition } from "./types.js";
 
 /**
- * One entry in the dynamic-amplification database. Filterable by faction tag
- * (card `category`) and strength tier. The `effect` is the bound modifier — its
- * internal mechanic is intentionally left as a `NOOP` stub for now; fill these in
- * per faction × tier later.
- *
- * NOTE: only the three example rows below are populated. Author the real
- * KMT / DPP / TPP (and neutral) pools here; the sampler ({@link filterAmplification}
- * consumed by `packages/rules`) groups by `tier` and offers one option per tier.
+ * One entry in the dynamic-amplification (增幅) database. Filterable by faction
+ * tag (card `category`) and strength tier. The `effect` is the bound modifier —
+ * its `type` is an `AUG_*` discriminator resolved per-seat by the rules engine's
+ * `applyAugmentSelection` (one-shot) or consulted as a flag by the passive
+ * readers (cost / damage / summon). Augments do NOT flow through the card
+ * `resolveEffect` dispatch.
  */
 export interface AmplificationDbEntry {
   id: string;
   name: string;
   description: string;
   tier: AmplificationTier;
-  /** Card categories this amplification is offered for, e.g. "民進黨政治人物". Empty = any. */
+  /** Card categories this amplification is offered for, e.g. "勞工". Empty = universal. */
   factionTags: string[];
+  /** Offered only in the FIRST amplification phase (turn 6), within its tier's pool. */
+  firstPhaseOnly?: boolean;
   effect: EffectDefinition;
 }
 
 /**
- * 【動態增幅效果資料庫插槽】
- * Three representative rows, one per tier. `factionTags: []` means "offered to any
- * dominant faction" so the sampler always has a full tier set to draw from until
- * faction-specific pools are authored.
+ * 【動態增幅效果資料庫】加減賺 / 吃紅 / 卯死 三等級。每個階段的等級於開局抽定
+ * （見 rules `phases.ts`），雙方共用同等級、各自依牌組加權抽出 3 個選項。派系
+ * 增幅（`factionTags` 非空）僅在牌組含該類別時才可能出現，權重隨占比上升。
  */
 export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
+  // ---- 加減賺（低增幅）----------------------------------------------------
   {
-    id: "AMP_LOW_JOINT_ELECTION",
-    name: "九合一選舉",
-    description: "（低增幅）效果待補。",
+    id: "AMP_INVOICE_200",
+    name: "發票中200",
+    description: "額外獲得一顆水晶。",
     tier: "加減賺",
     factionTags: [],
-    effect: { type: "NOOP" }
+    effect: { type: "AUG_GRANT_CRYSTALS", crystals: 1 }
   },
   {
-    id: "AMP_MID_GREAT_RECALL",
-    name: "大罷免大失敗",
-    description: "（中增幅）效果待補。",
+    id: "AMP_VOUCHER_3600",
+    name: "消費券3600",
+    description: "下一回合獲得 3 顆水晶（僅一回合）。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_GRANT_CRYSTALS_NEXT_TURN", crystals: 3 }
+  },
+  {
+    id: "AMP_SHAREHOLDER_GIFT",
+    name: "股東紀念品",
+    description: "抽到的下一張卡費用永久減半。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_NEXT_DRAW_HALF" }
+  },
+  {
+    id: "AMP_0050",
+    name: "0050",
+    description: "下一次增幅的等級提升一階。",
+    tier: "加減賺",
+    factionTags: [],
+    firstPhaseOnly: true,
+    effect: { type: "AUG_RAISE_NEXT_TIER" }
+  },
+  {
+    id: "AMP_MIN_WAGE",
+    name: "基本工資調漲",
+    description: "費用 1-3 的隨從 攻擊 +2（含之後打出，整局有效）。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_PERSIST_LOWCOST_ATTACK", value: 2 }
+  },
+  {
+    id: "AMP_FRIES_BOGO",
+    name: "大薯買一送一",
+    description: "接下來 2 回合 都可以多抽一張牌。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_EXTRA_DRAW_TURNS", durationTurns: 2, value: 1 }
+  },
+  {
+    id: "AMP_FLEE_ABROAD",
+    name: "潛逃國外",
+    description: "此局必定不會受第 20 回合公投事件影響。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_REFERENDUM_IMMUNE" }
+  },
+  {
+    id: "AMP_TYPHOON_DAY",
+    name: "颱風假",
+    description: "所有勞工永久 +1/+1（含之後打出，整局有效）。",
+    tier: "加減賺",
+    factionTags: ["勞工"],
+    effect: { type: "AUG_PERSIST_CATEGORY_BUFF", target_category: "勞工", stat: "ALL", value: 1 }
+  },
+
+  // ---- 吃紅（中增幅）------------------------------------------------------
+  {
+    id: "AMP_DIVIDEND",
+    name: "股利分紅",
+    description: "手上所有卡牌費用 -2（僅當下手牌）。",
     tier: "吃紅",
     factionTags: [],
-    effect: { type: "NOOP" }
+    effect: { type: "AUG_HAND_COST_DELTA", value: 2 }
   },
   {
-    id: "AMP_HIGH_SUNFLOWER",
-    name: "太陽花學運",
-    description: "（高增幅）效果待補。",
+    id: "AMP_INVOICE_1000",
+    name: "發票中1000",
+    description: "額外獲得兩顆水晶。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_GRANT_CRYSTALS", crystals: 2 }
+  },
+  {
+    id: "AMP_TAX_CUT",
+    name: "減稅",
+    description: "此局英雄每次受到傷害 -1。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_DAMAGE_REDUCTION", value: 1 }
+  },
+  {
+    id: "AMP_CHILDCARE",
+    name: "育兒津貼",
+    description: "每當打出隨從牌 該隨從最大生命 +1。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_PLAYED_MAXHP", value: 1 }
+  },
+  {
+    id: "AMP_FREE_SPEECH",
+    name: "言論自由",
+    description: "新聞費用永久 -2。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_NEWS_COST", value: 2 }
+  },
+  {
+    id: "AMP_NEW_HOUSING",
+    name: "新青安",
+    description: "建築費用永久 -4。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_BUILDING_COST", value: 4 }
+  },
+
+  // ---- 卯死（高增幅）------------------------------------------------------
+  {
+    id: "AMP_ISLAND_DAWN",
+    name: "島嶼天光",
+    description: "天色漸漸光 — 所有民進黨政治人物在此局生命及攻擊變成兩倍。",
+    tier: "卯死",
+    factionTags: ["民進黨政治人物"],
+    effect: { type: "AUG_DOUBLE_CATEGORY", target_category: "民進黨政治人物" }
+  },
+  {
+    id: "AMP_DEFAULT_SETTLEMENT",
+    name: "違約交割",
+    description: "獲得 10 點水晶 但接下來 10 回合動彈不得（雙方合計）。",
     tier: "卯死",
     factionTags: [],
-    effect: { type: "NOOP" }
+    firstPhaseOnly: true,
+    effect: { type: "AUG_FREEZE", crystals: 10, durationTurns: 10 }
+  },
+  {
+    id: "AMP_JACKPOT",
+    name: "發票中頭獎",
+    description: "獲得 3 顆水晶。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_GRANT_CRYSTALS", crystals: 3 }
+  },
+  {
+    id: "AMP_BEGGAR_HERO",
+    name: "乞丐超人",
+    description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_COST_MULTIPLIER", value: 7, turns: 8 }
+  },
+  {
+    id: "AMP_PUDU",
+    name: "普渡",
+    description: "本場我方隨從死後都會復活一次 但攻擊 / 生命只有 1。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_REVIVE_VANILLA" }
+  },
+  {
+    id: "AMP_TW_40000",
+    name: "台股四萬點",
+    description: "手上的牌 費用全部歸剩下 1（僅當下手牌）。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_HAND_COST_SET", value: 1 }
   }
 ];
 
 /**
  * Filters the amplification DB by dominant faction category and (optionally) tier.
  * An entry matches a faction when its `factionTags` is empty (universal) or
- * contains the category.
+ * contains the category. (Retained for back-compat; the deck-weighted sampler in
+ * `packages/rules` filters by tier directly and weights faction entries itself.)
  */
 export function filterAmplification(
   db: readonly AmplificationDbEntry[],
@@ -71,7 +215,14 @@ export function filterAmplification(
   });
 }
 
-/** Validates the amplification DB: unique ids + valid tiers. Effect logic is not yet required. */
+const AUGMENT_EFFECT_TYPES = new Set<string>(SUPPORTED_AUGMENT_EFFECTS);
+const FIRST_PHASE_ONLY_IDS = new Set<string>(["AMP_0050", "AMP_DEFAULT_SETTLEMENT"]);
+
+/**
+ * Validates the amplification DB: unique ids, valid tiers, supported effect
+ * types, `firstPhaseOnly` restricted to the two designed augments, and faction
+ * entries carrying a non-empty `factionTags`.
+ */
 export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const ids = new Set<string>();
@@ -80,6 +231,11 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
     if (ids.has(entry.id)) errors.push(`${entry.id}: duplicate amplification id`);
     ids.add(entry.id);
     if (!tiers.has(entry.tier)) errors.push(`${entry.id}: invalid tier ${entry.tier}`);
+    const type = entry.effect?.type;
+    if (!type || !AUGMENT_EFFECT_TYPES.has(type)) errors.push(`${entry.id}: unsupported augment effect type ${type ?? "(none)"}`);
+    if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
+      errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);
+    }
   }
   return { valid: errors.length === 0, errors };
 }

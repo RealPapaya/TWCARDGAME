@@ -22,7 +22,31 @@ describe("special-phase databases", () => {
   });
 
   it("filters amplifications by faction tag, treating empty tags as universal", () => {
-    // All seeded rows are universal (factionTags: []), so any faction sees them all.
-    expect(filterAmplification(AMPLIFICATION_DB, "民進黨政治人物").length).toBe(AMPLIFICATION_DB.length);
+    const universal = AMPLIFICATION_DB.filter((e) => e.factionTags.length === 0);
+    // DPP sees all universal entries plus DPP-tagged ones, but never the 勞工 entry.
+    const dpp = filterAmplification(AMPLIFICATION_DB, "民進黨政治人物");
+    expect(dpp.some((e) => e.id === "AMP_ISLAND_DAWN")).toBe(true);
+    expect(dpp.some((e) => e.id === "AMP_TYPHOON_DAY")).toBe(false);
+    expect(dpp.every((e) => e.factionTags.length === 0 || e.factionTags.includes("民進黨政治人物"))).toBe(true);
+    // Labor sees its own entry; a no-faction query sees only the universal entries.
+    expect(filterAmplification(AMPLIFICATION_DB, "勞工").some((e) => e.id === "AMP_TYPHOON_DAY")).toBe(true);
+    expect(filterAmplification(AMPLIFICATION_DB, undefined).length).toBe(universal.length);
+  });
+
+  it("flags an unsupported augment effect type", () => {
+    const bad = [
+      ...AMPLIFICATION_DB,
+      { id: "AMP_BAD", name: "x", description: "x", tier: "加減賺" as const, factionTags: [], effect: { type: "NOPE" } }
+    ];
+    const result = validateAmplificationDb(bad);
+    expect(result.valid).toBe(false);
+    expect(result.errors.some((e) => e.includes("AMP_BAD"))).toBe(true);
+  });
+
+  it("restricts firstPhaseOnly to the two designed augments", () => {
+    expect(AMPLIFICATION_DB.filter((e) => e.firstPhaseOnly).map((e) => e.id).sort()).toEqual([
+      "AMP_0050",
+      "AMP_DEFAULT_SETTLEMENT"
+    ]);
   });
 });

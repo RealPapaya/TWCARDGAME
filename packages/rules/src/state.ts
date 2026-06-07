@@ -11,6 +11,7 @@ import {
 import { createRuntimeCard } from "./deck.js";
 import { environmentCostDelta } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
+import { augmentCostMultiplierTenths, augmentFlatCostReduction, isReferendumImmune } from "./effects/augmentFlags.js";
 import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "./types.js";
 
 export function cloneState(state: MatchState): MatchState {
@@ -112,7 +113,8 @@ export function toPublicPlayer(player: PlayerState) {
     graveyardCount: player.graveyard.length,
     mulliganReady: player.mulliganReady,
     board: player.board.map(toPublicMinion),
-    amplification: player.amplification ? structuredClone(player.amplification) : undefined
+    amplification: player.amplification ? structuredClone(player.amplification) : undefined,
+    augments: player.augments.map((augment) => structuredClone(augment))
   };
 }
 
@@ -151,7 +153,8 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
 
 export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCard): number {
   if (state.private.devTestInfiniteMana?.[seat]) return 0;
-  if (environmentForcesZeroCost(state)) return 0;
+  const immune = isReferendumImmune(state, seat);
+  if (!immune && environmentForcesZeroCost(state)) return 0;
   let cost = card.cost;
   if (card.type === "NEWS") {
     for (const minion of state.players[seat].board) {
@@ -160,10 +163,17 @@ export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCa
       }
     }
   }
-  // Global environment cost penalty (e.g. 油電雙漲). Applied on top of any
-  // reduction and hard-capped at 10 so drawn cards inherit it automatically.
-  const envDelta = environmentCostDelta(state);
-  if (envDelta > 0) cost = Math.min(10, cost + envDelta);
+  // Augment flat cost reductions (言論自由 新聞 −2 / 新青安 建築 −4).
+  cost -= augmentFlatCostReduction(state, seat, card);
+  // Augment cost multiplier (乞丐超人 ×0.7 四捨五入, once past its turn threshold).
+  const multiplierTenths = augmentCostMultiplierTenths(state, seat);
+  if (multiplierTenths !== undefined) cost = Math.round((cost * multiplierTenths) / 10);
+  // Global environment cost penalty (e.g. 油電雙漲), skipped for 潛逃國外. Applied on
+  // top of any reduction and hard-capped at 10 so drawn cards inherit it automatically.
+  if (!immune) {
+    const envDelta = environmentCostDelta(state);
+    if (envDelta > 0) cost = Math.min(10, cost + envDelta);
+  }
   return Math.max(0, cost);
 }
 

@@ -2,10 +2,13 @@ import type { CardDefinition, EffectDefinition } from "@twcardgame/cards";
 import { opponentOf, type CommandEnvelope, type GameEvent, type Seat, type TargetRef } from "@twcardgame/shared";
 import { createRuntimeCard, validateDeck } from "./deck.js";
 import {
+  applyPersistentMinionAugments,
+  defaultAugmentFlags,
   drawCards,
   finishIfHeroDead,
   handlePlayNews,
   applyDamage,
+  isFrozen,
   processEndOfTurn,
   resolveEffect,
   resolvePostAction,
@@ -15,7 +18,8 @@ import {
   enterSpecialPhase,
   handleSelectAmplification,
   handleSubmitVote,
-  phaseTriggerForTurn
+  phaseTriggerForTurn,
+  rollAugmentTiers
 } from "./phases.js";
 import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
@@ -59,6 +63,9 @@ export function createInitialMatch(input: CreateMatchInput): RulesResult {
       deadlineAtMs: input.nowMs + (input.mulliganTimeLimitMs ?? DEFAULT_MULLIGAN_TIME_LIMIT_MS),
       actionSeq: 0
     },
+    // Both amplification-phase tiers, rolled from a derived seed so the main RNG
+    // stream (deck shuffle / opening hands) is unchanged. Shared by both seats.
+    augmentTiers: rollAugmentTiers(input.seed),
     players: {
       player1: createPlayer(input.players[0]),
       player2: createPlayer(input.players[1])
@@ -174,7 +181,7 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   } else if (envelope.command.type === "attack") {
     attack(next, envelope.seat, envelope.command.attackerInstanceId, envelope.command.target, events, catalog);
   } else if (envelope.command.type === "endTurn") {
-    if (serverTimeoutEndTurn && !next.private.turnActionTaken) {
+    if (serverTimeoutEndTurn && !next.private.turnActionTaken && !isFrozen(next, envelope.seat)) {
       next.players[envelope.seat].shortTurnPenalty = true;
     }
     endTurn(next, envelope.nowMs, events, catalog);
@@ -207,6 +214,8 @@ function createPlayer(setup: PlayerSetup): PlayerState {
     board: [],
     mulliganReady: false,
     shortTurnPenalty: false,
+    augments: [],
+    augmentFlags: defaultAugmentFlags(),
     registeredCategoryCounts: {}
   };
 }
@@ -266,6 +275,10 @@ function playCard(
   catalog: Map<string, CardDefinition>
 ): void {
   const player = state.players[seat];
+  if (isFrozen(state, seat)) {
+    reject(state, events, seat, "被違約交割凍結，本回合無法出牌。");
+    return;
+  }
   const found = findCardInHand(player, handInstanceId);
   if (!found) {
     reject(state, events, seat, "這張牌不在手牌中。");
@@ -301,6 +314,7 @@ function playCard(
     const minion = createMinionFromCard(state, card, seat);
     const insertion = typeof boardIndex === "number" ? Math.max(0, Math.min(boardIndex, player.board.length)) : player.board.length;
     player.board.splice(insertion, 0, minion);
+    applyPersistentMinionAugments(state, seat, minion, events);
     addEvent(state, events, "MINION_SUMMONED", { cardId: minion.cardId, target: minion.instanceId }, seat);
     resolveEffect(minion.keywords.battlecry, { state, activeSeat: seat, source: minion, target, events, catalog });
   } else {
@@ -324,6 +338,10 @@ function attack(
 ): void {
   const player = state.players[seat];
   const enemy = state.players[opponentOf(seat)];
+  if (isFrozen(state, seat)) {
+    reject(state, events, seat, "被違約交割凍結，本回合無法攻擊。");
+    return;
+  }
   const found = findMinion(player, attackerInstanceId);
   if (!found) {
     reject(state, events, seat, "找不到攻擊者。");
