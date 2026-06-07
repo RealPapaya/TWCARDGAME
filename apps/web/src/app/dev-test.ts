@@ -1,5 +1,14 @@
-import { CARD_CATALOG, type CardDefinition } from "@twcardgame/cards";
-import { applyXpAndComputeLevelUps, type AiDifficulty, type AiTheme, type DevTestMatchSetup, type RewardSummary } from "@twcardgame/shared";
+import { AMPLIFICATION_DB, CARD_CATALOG, VOTE_EVENT_DB, type CardDefinition } from "@twcardgame/cards";
+import {
+  AMPLIFICATION_TIERS,
+  applyXpAndComputeLevelUps,
+  type AiDifficulty,
+  type AiTheme,
+  type AmplificationTier,
+  type DevTestMatchSetup,
+  type Phase,
+  type RewardSummary
+} from "@twcardgame/shared";
 import { assetUrl, escapeAttr, escapeHtml } from "../ui.js";
 import type { MenuScreen } from "./types.js";
 
@@ -14,6 +23,7 @@ type OnBinder = <T extends EventTarget>(
 ) => void;
 
 type DevCardSlot = "hand" | "playerBoard" | "opponentBoard";
+type DevAmplificationSlot = "turn6" | "turn14";
 
 type DevCardSlotConfig = {
   title: string;
@@ -54,80 +64,79 @@ const selectedDevCards: Record<DevCardSlot, string[]> = {
   opponentBoard: []
 };
 const devCardRarities = ["COMMON", "RARE", "EPIC", "LEGENDARY"] as const;
+const devPhaseOptions: Array<{ value: Phase; label: string }> = [
+  { value: "NORMAL_PLAY", label: "Normal play" },
+  { value: "AMPLIFICATION_PHASE", label: "Amplification" },
+  { value: "VOTING_PHASE", label: "Vote event" }
+];
 
 export function renderDevTestPanel(busy: boolean): string {
   const screens: MenuScreen[] = ["main", "battle", "ai", "deckEditor", "collection", "shop", "profile", "friends", "leaderboard"];
   return `
     <section class="screen dev-test-screen" data-screen="test">
-      <h2>Developer Test Mode</h2>
-      <button data-menu-screen="main">Back</button>
+      <div class="dev-test-header">
+        <h2>Developer Test Mode</h2>
+        <button data-menu-screen="main">Back</button>
+      </div>
 
-      <fieldset>
-        <legend>Jump to screen</legend>
-        <select id="dev-test-screen">
-          ${screens.map((screen) => `<option value="${screen}">${screen}</option>`).join("")}
-        </select>
-        <button id="dev-test-jump" type="button">Jump</button>
-      </fieldset>
+      <div class="dev-test-dashboard">
+        <fieldset class="dev-test-panel dev-test-jump-panel">
+          <legend>Jump</legend>
+          <select id="dev-test-screen">
+            ${screens.map((screen) => `<option value="${screen}">${screen}</option>`).join("")}
+          </select>
+          <button id="dev-test-jump" type="button">Jump</button>
+        </fieldset>
 
-      <fieldset>
-        <legend>PvE match setup</legend>
-        <div class="dev-test-card-selectors">
-          ${devCardSlotOrder.map(renderDevCardSelector).join("")}
+        <fieldset class="dev-test-panel dev-test-match-panel">
+          <legend>PvE setup</legend>
+          <div class="dev-test-compact-grid">
+            <label><span>Preset</span><select id="dev-test-turn-preset"><option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option></select></label>
+            <label><span>Turn</span><input id="dev-test-turn-number" type="number" min="1" max="999" value="1" /></label>
+            <label><span>Phase</span><select id="dev-test-phase">${devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join("")}</select></label>
+            <label><span>Active</span><select id="dev-test-active-seat"><option value="player1">player1</option><option value="player2">player2</option></select></label>
+            <label><span>Player HP</span><input id="dev-test-player-hp" type="number" min="1" max="99" value="30" /></label>
+            <label><span>Opponent HP</span><input id="dev-test-opponent-hp" type="number" min="1" max="99" value="30" /></label>
+            <label><span>P mana</span><input id="dev-test-player-mana-current" type="number" min="0" max="10" value="10" /></label>
+            <label><span>P max</span><input id="dev-test-player-mana-max" type="number" min="0" max="10" value="10" /></label>
+            <label><span>O mana</span><input id="dev-test-opponent-mana-current" type="number" min="0" max="10" value="10" /></label>
+            <label><span>O max</span><input id="dev-test-opponent-mana-max" type="number" min="0" max="10" value="10" /></label>
+            <label><span>增幅1等級</span><select id="dev-test-amp-tier-turn6">${renderAmplificationTierOptions(AMPLIFICATION_TIERS[0])}</select></label>
+            <label><span>增幅2等級</span><select id="dev-test-amp-tier-turn14">${renderAmplificationTierOptions(AMPLIFICATION_TIERS[1])}</select></label>
+            <label class="dev-test-wide"><span>增幅1內容</span><select id="dev-test-amp-id-turn6">${renderAmplificationOptions(AMPLIFICATION_TIERS[0])}</select></label>
+            <label class="dev-test-wide"><span>增幅2內容</span><select id="dev-test-amp-id-turn14">${renderAmplificationOptions(AMPLIFICATION_TIERS[1])}</select></label>
+            <label class="dev-test-wide"><span>事件</span><select id="dev-test-vote-event">${renderVoteEventOptions()}</select></label>
+            <label class="dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" /> P infinite</label>
+            <label class="dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" /> O infinite</label>
+          </div>
+          <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
+        </fieldset>
+      </div>
+
+      <div class="dev-test-card-selectors">
+        ${devCardSlotOrder.map(renderDevCardSelector).join("")}
+      </div>
+
+      <details class="dev-test-reward-details">
+        <summary>Reward screen</summary>
+        <div class="dev-test-reward-grid">
+          <label><span>Result</span><select id="dev-test-reward-result"><option value="win">win</option><option value="loss">loss</option></select></label>
+          <label><span>Mode</span><select id="dev-test-reward-mode"><option value="pve">pve</option><option value="pvp">pvp</option></select></label>
+          <label><span>Source</span><select id="dev-test-reward-source"><option value="pve_first">pve_first</option><option value="pve_repeat">pve_repeat</option><option value="pvp">pvp</option><option value="none">none</option></select></label>
+          <label><span>XP before</span><input id="dev-test-xp-before" type="number" value="0" /></label>
+          <label><span>XP gained</span><input id="dev-test-xp-gained" type="number" value="100" /></label>
+          <label><span>XP after</span><input id="dev-test-xp-after" type="number" placeholder="auto" /></label>
+          <label><span>Level before</span><input id="dev-test-level-before" type="number" value="1" /></label>
+          <label><span>Level after</span><input id="dev-test-level-after" type="number" placeholder="auto" /></label>
+          <label><span>Level-ups CSV</span><input id="dev-test-level-ups" placeholder="auto, or 2:100,3:100" /></label>
+          <label><span>Gold before</span><input id="dev-test-gold-before" type="number" value="0" /></label>
+          <label><span>Gold gained</span><input id="dev-test-gold-gained" type="number" placeholder="auto" /></label>
+          <label><span>Gold after</span><input id="dev-test-gold-after" type="number" placeholder="auto" /></label>
+          <label><span>First gold</span><input id="dev-test-gold-first" type="number" value="50" /></label>
+          <label><span>Level gold</span><input id="dev-test-gold-level" type="number" placeholder="auto" /></label>
+          <button id="dev-test-reward" type="button">Show Reward Screen</button>
         </div>
-        <label>Player HP <input id="dev-test-player-hp" type="number" value="30" /></label>
-        <label>Opponent HP <input id="dev-test-opponent-hp" type="number" value="30" /></label>
-        <label>Player mana current <input id="dev-test-player-mana-current" type="number" value="10" /></label>
-        <label>Player mana max <input id="dev-test-player-mana-max" type="number" value="10" /></label>
-        <label>Opponent mana current <input id="dev-test-opponent-mana-current" type="number" value="10" /></label>
-        <label>Opponent mana max <input id="dev-test-opponent-mana-max" type="number" value="10" /></label>
-        <label class="dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" /> Player infinite mana</label>
-        <label class="dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" /> Opponent infinite mana</label>
-        <label>Turn number <input id="dev-test-turn-number" type="number" value="1" /></label>
-        <label>Active seat
-          <select id="dev-test-active-seat">
-            <option value="player1">player1</option>
-            <option value="player2">player2</option>
-          </select>
-        </label>
-        <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
-      </fieldset>
-
-      <fieldset>
-        <legend>Reward screen</legend>
-        <label>Result
-          <select id="dev-test-reward-result">
-            <option value="win">win</option>
-            <option value="loss">loss</option>
-          </select>
-        </label>
-        <label>Mode
-          <select id="dev-test-reward-mode">
-            <option value="pve">pve</option>
-            <option value="pvp">pvp</option>
-          </select>
-        </label>
-        <label>Source
-          <select id="dev-test-reward-source">
-            <option value="pve_first">pve_first</option>
-            <option value="pve_repeat">pve_repeat</option>
-            <option value="pvp">pvp</option>
-            <option value="none">none</option>
-          </select>
-        </label>
-        <label>XP before <input id="dev-test-xp-before" type="number" value="0" /></label>
-        <label>XP gained <input id="dev-test-xp-gained" type="number" value="100" /></label>
-        <label>XP after <input id="dev-test-xp-after" type="number" placeholder="auto" /></label>
-        <label>Level before <input id="dev-test-level-before" type="number" value="1" /></label>
-        <label>Level after <input id="dev-test-level-after" type="number" placeholder="auto" /></label>
-        <label>Level-ups CSV <input id="dev-test-level-ups" placeholder="auto, or 2:100,3:100" /></label>
-        <label>Gold before <input id="dev-test-gold-before" type="number" value="0" /></label>
-        <label>Gold gained <input id="dev-test-gold-gained" type="number" placeholder="auto" /></label>
-        <label>Gold after <input id="dev-test-gold-after" type="number" placeholder="auto" /></label>
-        <label>First victory gold <input id="dev-test-gold-first" type="number" value="50" /></label>
-        <label>Level-up gold <input id="dev-test-gold-level" type="number" placeholder="auto" /></label>
-        <button id="dev-test-reward" type="button">Show Reward Screen</button>
-      </fieldset>
+      </details>
     </section>
   `;
 }
@@ -158,6 +167,17 @@ export function bindDevTestActions(opts: {
     const slot = parseDevCardSlot(select?.dataset.devCardFilter);
     if (slot) updateDevCardSelector(slot);
   });
+  opts.on(screen, "change", "dev-test-flow-controls", (event) => {
+    const select = event.target instanceof HTMLSelectElement ? event.target : undefined;
+    if (select?.id === "dev-test-turn-preset") applyDevTurnPreset(select.value);
+    if (select?.id === "dev-test-phase") syncDevPhaseDefaults();
+    if (select?.id === "dev-test-amp-tier-turn6") updateDevAmplificationOptions("turn6");
+    if (select?.id === "dev-test-amp-tier-turn14") updateDevAmplificationOptions("turn14");
+  });
+  opts.on(screen, "input", "dev-test-turn-input", (event) => {
+    const input = event.target instanceof HTMLInputElement ? event.target : undefined;
+    if (input?.id === "dev-test-turn-number") setInputValue("dev-test-turn-preset", "custom");
+  });
   opts.on(screen, "click", "dev-test-card-selector-click", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : undefined;
     const addButton = target?.closest<HTMLButtonElement>("[data-dev-add-card]");
@@ -181,6 +201,7 @@ export function bindDevTestActions(opts: {
 
 function readDevTestMatchSetup(): DevTestMatchSetup {
   const activeSeatValue = readInputValue("dev-test-active-seat");
+  const phase = readDevTestPhase();
   return {
     handCardIds: [...selectedDevCards.hand],
     playerBoardCardIds: [...selectedDevCards.playerBoard],
@@ -200,8 +221,45 @@ function readDevTestMatchSetup(): DevTestMatchSetup {
       player2: readCheckedInput("dev-test-opponent-infinite-mana")
     },
     turnNumber: readNumberInput("dev-test-turn-number", 1),
-    activeSeat: activeSeatValue === "player2" ? "player2" : "player1"
+    activeSeat: activeSeatValue === "player2" ? "player2" : "player1",
+    phase,
+    amplificationTiers: {
+      turn6: readAmplificationTier("dev-test-amp-tier-turn6"),
+      turn14: readAmplificationTier("dev-test-amp-tier-turn14")
+    },
+    amplificationIds: {
+      turn6: readAmplificationId("turn6"),
+      turn14: readAmplificationId("turn14")
+    },
+    voteEventId: readVoteEventId()
   };
+}
+
+function renderAmplificationTierOptions(selected: AmplificationTier): string {
+  return AMPLIFICATION_TIERS
+    .map((tier) => `<option value="${escapeAttr(tier)}" ${tier === selected ? "selected" : ""}>${escapeHtml(tier)}</option>`)
+    .join("");
+}
+
+function renderAmplificationOptions(tier: AmplificationTier, selectedId?: string): string {
+  const options = AMPLIFICATION_DB.filter((entry) => entry.tier === tier);
+  const selected = selectedId && options.some((entry) => entry.id === selectedId) ? selectedId : options[0]?.id;
+  return options
+    .map((entry) => {
+      const label = `${entry.name} (${entry.id})`;
+      return `<option value="${escapeAttr(entry.id)}" ${entry.id === selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
+}
+
+function renderVoteEventOptions(selectedId?: string): string {
+  const selected = selectedId && VOTE_EVENT_DB.some((event) => event.id === selectedId) ? selectedId : VOTE_EVENT_DB[0]?.id;
+  return VOTE_EVENT_DB
+    .map((event) => {
+      const label = `${event.name} (${event.id})`;
+      return `<option value="${escapeAttr(event.id)}" ${event.id === selected ? "selected" : ""}>${escapeHtml(label)}</option>`;
+    })
+    .join("");
 }
 
 function renderDevCardSelector(slot: DevCardSlot): string {
@@ -288,7 +346,7 @@ function renderSelectedDevCards(slot: DevCardSlot): string {
         <div class="dev-selected-card" data-dom-key="dev-selected-${slot}-${index}-${escapeAttr(cardId)}">
           <span class="dev-selected-card-name">${escapeHtml(card?.name ?? cardId)}</span>
           <span class="dev-selected-card-meta">${escapeHtml(card?.id ?? cardId)}${card ? ` - ${card.cost}` : ""}</span>
-          <button type="button" data-dev-slot="${slot}" data-dev-remove-card="${index}" aria-label="Remove ${escapeAttr(card?.name ?? cardId)}">Remove</button>
+          <button type="button" data-dev-slot="${slot}" data-dev-remove-card="${index}" aria-label="Remove ${escapeAttr(card?.name ?? cardId)}">x</button>
         </div>
       `;
     })
@@ -393,6 +451,72 @@ function parseDevCardSlot(value: string | undefined): DevCardSlot | undefined {
   return value && Object.prototype.hasOwnProperty.call(devCardSlots, value) ? value as DevCardSlot : undefined;
 }
 
+function updateDevAmplificationOptions(slot: DevAmplificationSlot): void {
+  const tierId = slot === "turn6" ? "dev-test-amp-tier-turn6" : "dev-test-amp-tier-turn14";
+  const selectId = slot === "turn6" ? "dev-test-amp-id-turn6" : "dev-test-amp-id-turn14";
+  const select = document.getElementById(selectId);
+  if (!(select instanceof HTMLSelectElement)) return;
+  const previous = select.value;
+  select.innerHTML = renderAmplificationOptions(readAmplificationTier(tierId), previous);
+}
+
+function applyDevTurnPreset(value: string): void {
+  if (value === "turn6") {
+    setInputValue("dev-test-turn-number", "6");
+    setInputValue("dev-test-phase", "AMPLIFICATION_PHASE");
+    return;
+  }
+  if (value === "turn14") {
+    setInputValue("dev-test-turn-number", "14");
+    setInputValue("dev-test-phase", "AMPLIFICATION_PHASE");
+    return;
+  }
+  if (value === "turn20") {
+    setInputValue("dev-test-turn-number", "20");
+    setInputValue("dev-test-phase", "VOTING_PHASE");
+    return;
+  }
+  if (value === "normal") {
+    setInputValue("dev-test-turn-number", "1");
+    setInputValue("dev-test-phase", "NORMAL_PLAY");
+  }
+}
+
+function syncDevPhaseDefaults(): void {
+  const phase = readInputValue("dev-test-phase");
+  const turn = readNumberInput("dev-test-turn-number", 1);
+  if (phase === "AMPLIFICATION_PHASE" && turn !== 6 && turn !== 14) {
+    setInputValue("dev-test-turn-number", "6");
+    setInputValue("dev-test-turn-preset", "turn6");
+  }
+  if (phase === "VOTING_PHASE" && turn !== 20) {
+    setInputValue("dev-test-turn-number", "20");
+    setInputValue("dev-test-turn-preset", "turn20");
+  }
+  if (phase === "NORMAL_PLAY") setInputValue("dev-test-turn-preset", "custom");
+}
+
+function readDevTestPhase(): Phase {
+  const phase = readInputValue("dev-test-phase");
+  if (phase === "AMPLIFICATION_PHASE" || phase === "VOTING_PHASE") return phase;
+  return "NORMAL_PLAY";
+}
+
+function readAmplificationTier(id: string): AmplificationTier {
+  const value = readInputValue(id) as AmplificationTier;
+  return AMPLIFICATION_TIERS.includes(value) ? value : AMPLIFICATION_TIERS[0];
+}
+
+function readAmplificationId(slot: DevAmplificationSlot): string | undefined {
+  const id = readInputValue(slot === "turn6" ? "dev-test-amp-id-turn6" : "dev-test-amp-id-turn14");
+  return AMPLIFICATION_DB.some((entry) => entry.id === id) ? id : undefined;
+}
+
+function readVoteEventId(): string | undefined {
+  const id = readInputValue("dev-test-vote-event");
+  return VOTE_EVENT_DB.some((event) => event.id === id) ? id : undefined;
+}
+
 function cardById(cardId: string): CardDefinition | undefined {
   return CARD_CATALOG.find((card) => card.id === cardId);
 }
@@ -478,4 +602,9 @@ function readCheckedInput(id: string): boolean {
 function readInputValue(id: string): string {
   const element = document.getElementById(id);
   return element instanceof HTMLInputElement || element instanceof HTMLSelectElement ? element.value : "";
+}
+
+function setInputValue(id: string, value: string): void {
+  const element = document.getElementById(id);
+  if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) element.value = value;
 }

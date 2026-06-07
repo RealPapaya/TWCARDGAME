@@ -141,7 +141,7 @@ export class BotRoom extends GameRoom {
     if (!setup) return;
     this.devTestActive = true;
     events.length = 0;
-    applyDevTestMatchSetup(state, setup);
+    applyDevTestMatchSetup(state, setup, Date.now(), events);
   }
 
   protected override afterCommandApplied(_envelope: CommandEnvelope, events: GameEvent[]): void {

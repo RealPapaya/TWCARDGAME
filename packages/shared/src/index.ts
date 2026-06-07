@@ -36,6 +36,11 @@ export interface DevTestMatchSetup {
   infiniteMana?: Partial<Record<Seat, boolean>>;
   turnNumber?: number;
   activeSeat?: Seat;
+  phase?: Phase;
+  amplificationTiers?: Partial<Record<"turn6" | "turn14", AmplificationTier>>;
+  amplificationIds?: Partial<Record<"turn6" | "turn14", string>>;
+  voteEventId?: string;
+  voteEventIds?: string[];
 }
 
 export const AI_THEMES: readonly AiThemeDefinition[] = [

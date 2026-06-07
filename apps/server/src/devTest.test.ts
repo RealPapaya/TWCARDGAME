@@ -1,5 +1,6 @@
-import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
+import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, VOTE_EVENT_DB } from "@twcardgame/cards";
 import { createInitialMatch, reduce } from "@twcardgame/rules";
+import { AMPLIFICATION_TIERS } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { defaultDeckIds } from "./accounts.js";
 import { applyDevTestMatchSetup, isDevTestRequestAllowed } from "./devTest.js";
@@ -61,6 +62,50 @@ describe("developer test mode helpers", () => {
     expect(state.private.eventLog).toEqual([]);
   });
 
+  it("can open a requested amplification phase with exact tier setup", () => {
+    const state = createMatch();
+    const events: any[] = [];
+    const requested = AMPLIFICATION_DB.find((entry) => entry.tier === AMPLIFICATION_TIERS[2]);
+    expect(requested).toBeDefined();
+
+    applyDevTestMatchSetup(state, {
+      turnNumber: 14,
+      phase: "AMPLIFICATION_PHASE",
+      amplificationTiers: {
+        turn6: AMPLIFICATION_TIERS[0],
+        turn14: AMPLIFICATION_TIERS[2]
+      },
+      amplificationIds: {
+        turn14: requested!.id
+      },
+      activeSeat: "player1"
+    }, 1000, events);
+
+    expect(state.status).toBe("in_progress");
+    expect(state.phase).toBe("AMPLIFICATION_PHASE");
+    expect(state.augmentTiers).toEqual([AMPLIFICATION_TIERS[0], AMPLIFICATION_TIERS[2]]);
+    expect(state.specialPhase?.amplificationOptions?.player1.every((option) => option.tier === AMPLIFICATION_TIERS[2])).toBe(true);
+    expect(state.specialPhase?.amplificationOptions?.player1[0]?.id).toBe(requested!.id);
+    expect(state.specialPhase?.amplificationOptions?.player2[0]?.id).toBe(requested!.id);
+    expect(events.map((event) => event.type)).toContain("PHASE_STARTED");
+  });
+
+  it("can open voting with a requested event first", () => {
+    const state = createMatch();
+    const selected = VOTE_EVENT_DB[2]!.id;
+
+    applyDevTestMatchSetup(state, {
+      turnNumber: 20,
+      phase: "VOTING_PHASE",
+      voteEventId: selected,
+      activeSeat: "player1"
+    }, 1000, []);
+
+    expect(state.phase).toBe("VOTING_PHASE");
+    expect(state.specialPhase?.voteEvents?.[0]?.id).toBe(selected);
+    expect(state.specialPhase?.voteEvents).toHaveLength(3);
+  });
+
   it("lets each dev-test seat opt into infinite mana independently", () => {
     const card = CARD_CATALOG.find((candidate) =>
       candidate.type === "MINION" &&
@@ -117,5 +162,7 @@ describe("developer test mode helpers", () => {
     if (news) {
       expect(() => applyDevTestMatchSetup(createMatch(), { playerBoardCardIds: [news.id] })).toThrow(/must be a MINION/);
     }
+    expect(() => applyDevTestMatchSetup(createMatch(), { voteEventIds: ["NOPE"] })).toThrow(/Unknown dev test vote event id/);
+    expect(() => applyDevTestMatchSetup(createMatch(), { amplificationIds: { turn6: "NOPE" } })).toThrow(/Unknown dev test amplification id/);
   });
 });

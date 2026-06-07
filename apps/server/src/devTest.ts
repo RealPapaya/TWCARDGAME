@@ -1,8 +1,10 @@
-import { CARD_CATALOG } from "@twcardgame/cards";
-import { createCardForHand, createMinionFromCard, type MatchState } from "@twcardgame/rules";
-import type { DevTestMatchSetup, Seat } from "@twcardgame/shared";
+import { AMPLIFICATION_DB, CARD_CATALOG, VOTE_EVENT_DB, type AmplificationDbEntry } from "@twcardgame/cards";
+import { createCardForHand, createMinionFromCard, enterSpecialPhase, type MatchState } from "@twcardgame/rules";
+import type { AmplificationOption, DevTestMatchSetup, GameEvent, Phase, Seat, VoteEvent } from "@twcardgame/shared";
 
 const catalog = new Map(CARD_CATALOG.map((card) => [card.id, card]));
+const amplifications = new Map(AMPLIFICATION_DB.map((entry) => [entry.id, entry]));
+const voteEvents = new Map(VOTE_EVENT_DB.map((event) => [event.id, event]));
 
 export function isDevTestRequestAllowed(context: any): boolean {
   if (process.env.NODE_ENV === "production") return false;
@@ -16,7 +18,7 @@ export function isDevTestRequestAllowed(context: any): boolean {
   return originAllowed && endpointIsLocal;
 }
 
-export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSetup, nowMs = Date.now()): void {
+export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSetup, nowMs = Date.now(), events: GameEvent[] = []): void {
   validateSetup(setup);
   const activeSeat = setup.activeSeat === "player2" ? "player2" : "player1";
   const player = state.players.player1;
@@ -30,6 +32,9 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
   state.turn.startedAtMs = nowMs;
   state.turn.deadlineAtMs = nowMs + 60_000;
   state.turn.actionSeq = 0;
+  state.phase = "NORMAL_PLAY";
+  state.specialPhase = undefined;
+  state.currentEnvironment = undefined;
   state.private.eventLog = [];
   state.private.processedCommandIds = [];
   state.private.actionLog = [];
@@ -52,6 +57,10 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
     player1: setup.infiniteMana?.player1 === true,
     player2: setup.infiniteMana?.player2 === true
   };
+  state.augmentTiers = [
+    setup.amplificationTiers?.turn6 ?? state.augmentTiers[0],
+    setup.amplificationTiers?.turn14 ?? state.augmentTiers[1]
+  ];
 
   for (const cardId of setup.handCardIds ?? []) {
     const def = catalog.get(cardId)!;
@@ -59,12 +68,16 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
   }
   addBoardMinions(state, "player1", setup.playerBoardCardIds ?? [], activeSeat);
   addBoardMinions(state, "player2", setup.opponentBoardCardIds ?? [], activeSeat);
+  enterRequestedPhase(state, setup, nowMs, events);
 }
 
 function validateSetup(setup: DevTestMatchSetup): void {
   validateCards(setup.handCardIds ?? [], "hand", 10, false);
   validateCards(setup.playerBoardCardIds ?? [], "player board", 7, true);
   validateCards(setup.opponentBoardCardIds ?? [], "opponent board", 7, true);
+  validateAmplifications(setup.amplificationIds);
+  if (setup.voteEventId !== undefined) validateVoteEvents([setup.voteEventId]);
+  validateVoteEvents(setup.voteEventIds ?? []);
 }
 
 function validateCards(cardIds: readonly string[], label: string, max: number, minionOnly: boolean): void {
@@ -86,6 +99,73 @@ function addBoardMinions(state: MatchState, seat: Seat, cardIds: readonly string
     minion.canAttack = seat === activeSeat && minion.lockedTurns <= 0;
     player.board.push(minion);
   }
+}
+
+function enterRequestedPhase(state: MatchState, setup: DevTestMatchSetup, nowMs: number, events: GameEvent[]): void {
+  const phase = validPhase(setup.phase);
+  if (!phase || phase === "NORMAL_PLAY") return;
+  enterSpecialPhase(state, phase, nowMs, events);
+  if (phase === "AMPLIFICATION_PHASE" && state.specialPhase?.phase === "AMPLIFICATION_PHASE") {
+    applyRequestedAmplificationOptions(state, setup);
+  }
+  if (phase === "VOTING_PHASE" && setup.voteEventIds?.length && state.specialPhase?.phase === "VOTING_PHASE") {
+    state.specialPhase.voteEvents = buildVoteEvents(setup.voteEventIds);
+  } else if (phase === "VOTING_PHASE" && setup.voteEventId && state.specialPhase?.phase === "VOTING_PHASE") {
+    state.specialPhase.voteEvents = buildVoteEvents([setup.voteEventId]);
+  }
+}
+
+function validPhase(value: unknown): Phase | undefined {
+  return value === "NORMAL_PLAY" || value === "AMPLIFICATION_PHASE" || value === "VOTING_PHASE" ? value : undefined;
+}
+
+function validateVoteEvents(ids: readonly string[]): void {
+  if (ids.length > 3) throw new Error("Dev test vote setup may contain at most 3 events.");
+  for (const id of ids) {
+    if (!voteEvents.has(id)) throw new Error(`Unknown dev test vote event id: ${id}`);
+  }
+}
+
+function validateAmplifications(ids: DevTestMatchSetup["amplificationIds"]): void {
+  for (const id of [ids?.turn6, ids?.turn14]) {
+    if (id !== undefined && !amplifications.has(id)) throw new Error(`Unknown dev test amplification id: ${id}`);
+  }
+}
+
+function applyRequestedAmplificationOptions(state: MatchState, setup: DevTestMatchSetup): void {
+  const phaseKey = state.turn.number === 14 ? "turn14" : "turn6";
+  const entry = setup.amplificationIds?.[phaseKey] ? amplifications.get(setup.amplificationIds[phaseKey]!) : undefined;
+  if (!entry || !state.specialPhase?.amplificationOptions) return;
+  const option = toAmplificationOption(entry);
+  state.specialPhase.amplificationOptions.player1 = withRequestedOption(option, state.specialPhase.amplificationOptions.player1);
+  state.specialPhase.amplificationOptions.player2 = withRequestedOption(option, state.specialPhase.amplificationOptions.player2);
+}
+
+function withRequestedOption(option: AmplificationOption, options: AmplificationOption[]): AmplificationOption[] {
+  const rest = options.filter((candidate) => candidate.id !== option.id && candidate.tier === option.tier);
+  return [option, ...rest].slice(0, 3);
+}
+
+function toAmplificationOption(entry: AmplificationDbEntry): AmplificationOption {
+  return { id: entry.id, tier: entry.tier, name: entry.name, description: entry.description };
+}
+
+function buildVoteEvents(requestedIds: readonly string[]): VoteEvent[] {
+  const ids: string[] = [];
+  for (const id of requestedIds) {
+    if (voteEvents.has(id) && !ids.includes(id)) ids.push(id);
+  }
+  for (const id of voteEvents.keys()) {
+    if (ids.length >= 3) break;
+    if (!ids.includes(id)) ids.push(id);
+  }
+  return ids.map(toVoteEvent).filter((event): event is VoteEvent => Boolean(event)).slice(0, 3);
+}
+
+function toVoteEvent(id: string): VoteEvent | undefined {
+  const entry = voteEvents.get(id);
+  if (!entry) return undefined;
+  return { id: entry.id, name: entry.name, options: [...entry.options] as [string, string, string] };
 }
 
 function applyMana(target: { current: number; max: number }, input: DevTestMatchSetup["playerMana"]): void {
