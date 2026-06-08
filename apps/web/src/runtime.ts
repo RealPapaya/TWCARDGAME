@@ -2250,7 +2250,7 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
   `;
 }
 
-const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 吃紅: "amp-tier-mid", 卯死: "amp-tier-high" };
+const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 穩穩仔賺: "amp-tier-mid", 卯死: "amp-tier-high" };
 
 function renderPhaseCountdown(label: string): string {
   const seconds = phaseCountdownSeconds();
@@ -2321,7 +2321,7 @@ function renderAmplificationOverlay(): string {
   return `
     <section id="amplification-modal" class="mulligan-overlay amp-overlay ${submitted ? "submitted" : ""}" data-testid="amplification-overlay">
       <div class="${contentClass}">
-        <h2>政黨增幅</h2>
+        <h2>好運一番賞</h2>
         <p>${submitted ? "已選擇，等待對手…" : "依你的牌組陣營，選擇一項增幅"}</p>
         ${renderPhaseCountdown("增幅倒數")}
         ${renderSpecialPhaseActions({ submitted, canReroll: Boolean(view.room), rerollUsed, rerollRemaining, rerolling })}

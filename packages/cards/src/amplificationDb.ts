@@ -23,7 +23,7 @@ export interface AmplificationDbEntry {
 }
 
 /**
- * 【動態增幅效果資料庫】加減賺 / 吃紅 / 卯死 三等級。每個階段的等級於開局抽定
+ * 【動態增幅效果資料庫】加減賺 / 穩穩仔賺 / 卯死 三等級。每個階段的等級於開局抽定
  * （見 rules `phases.ts`），雙方共用同等級、各自依牌組加權抽出 3 個選項。派系
  * 增幅（`factionTags` 非空）僅在牌組含該類別時才可能出現，權重隨占比上升。
  */
@@ -32,7 +32,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_INVOICE_200",
     name: "發票中200",
-    description: "額外獲得一顆水晶。",
+    description: "額外獲得一顆水晶，水晶上限 +1。",
     tier: "加減賺",
     factionTags: [],
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 1 }
@@ -136,20 +136,20 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 1 }
   },
 
-  // ---- 吃紅（中增幅）------------------------------------------------------
+  // ---- 穩穩仔賺（中增幅）------------------------------------------------------
   {
     id: "AMP_DIVIDEND",
     name: "股利分紅",
     description: "手上所有卡牌費用 -2（僅當下手牌）。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_HAND_COST_DELTA", value: 2 }
   },
   {
     id: "AMP_INVOICE_1000",
     name: "發票中1000",
-    description: "額外獲得兩顆水晶。",
-    tier: "吃紅",
+    description: "額外獲得兩顆水晶，水晶上限 +2。",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 2 }
   },
@@ -157,7 +157,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_TAX_CUT",
     name: "減稅",
     description: "此局英雄每次受到傷害 -1。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_DAMAGE_REDUCTION", value: 1 }
   },
@@ -165,7 +165,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_CHILDCARE",
     name: "育兒津貼",
     description: "每當打出隨從牌 該隨從最大生命 +1。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_PLAYED_MAXHP", value: 1 }
   },
@@ -173,7 +173,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_FREE_SPEECH",
     name: "言論自由",
     description: "新聞費用永久 -2。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_NEWS_COST", value: 2 }
   },
@@ -181,7 +181,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_NEW_HOUSING",
     name: "新青年安心成家貸款",
     description: "建築費用永久 -4。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_BUILDING_COST", value: 4 }
   },
@@ -189,7 +189,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_BETEL_NUT_500",
     name: "林北檳榔擠剛攏哺500啦",
     description: "獲得 3 張檳榔到手牌。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: ["勞工"],
     effect: { type: "AUG_ADD_CARD_TO_HAND", cardId: "S029", count: 3 }
   },
@@ -197,7 +197,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_BEGGAR_HERO",
     name: "乞丐超人",
     description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_COST_MULTIPLIER", value: 7, turns: 8 }
   },
@@ -205,7 +205,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_DCA",
     name: "定期定額",
     description: "第 10 回合起，每回合水晶成長 +2，上限提升至 15。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 10, manaCap: 15, manaGrowth: 2 }
   },
@@ -213,7 +213,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_PARTY_ASSET_SUPPLEMENT",
     name: "黨產大補丸",
     description: "英雄生命上限 +10。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_HERO_MAX_HP", value: 10 }
   },
@@ -221,7 +221,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_NATIONAL_HOLIDAY",
     name: "國定假日",
     description: "自己目前場上隨從立刻回到手牌，並且獲得 +2/+2，費用 -1。",
-    tier: "吃紅",
+    tier: "穩穩仔賺",
     factionTags: [],
     effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 2, costReduction: 1 }
   },
@@ -247,7 +247,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_JACKPOT",
     name: "發票中頭獎",
-    description: "獲得 3 顆水晶。",
+    description: "額外獲得 3 顆水晶，水晶上限 +3。",
     tier: "卯死",
     factionTags: [],
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 3 }
@@ -331,7 +331,7 @@ const FIRST_PHASE_ONLY_IDS = new Set<string>(["AMP_0050", "AMP_GO_FOR_BROKE", "A
 export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const ids = new Set<string>();
-  const tiers = new Set<AmplificationTier>(["加減賺", "吃紅", "卯死"]);
+  const tiers = new Set<AmplificationTier>(["加減賺", "穩穩仔賺", "卯死"]);
   for (const entry of db) {
     if (ids.has(entry.id)) errors.push(`${entry.id}: duplicate amplification id`);
     ids.add(entry.id);

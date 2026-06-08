@@ -89,12 +89,41 @@ function makeMinion(over: Partial<RuntimeMinion>): RuntimeMinion {
 }
 
 describe("augment one-shot grants & hand snapshots", () => {
-  it("發票中200 grants a crystal immediately", () => {
+  it("發票中200 grants a crystal and raises the crystal cap immediately", () => {
     const state = startInProgress(1);
     const seat = state.turn.activeSeat;
     const before = state.players[seat].mana.current;
+    const beforeMax = state.players[seat].mana.max;
     applyAugmentSelection(state, seat, entry("AMP_INVOICE_200"), []);
     expect(state.players[seat].mana.current).toBe(before + 1);
+    expect(state.players[seat].mana.max).toBe(beforeMax + 1);
+    expect(state.players[seat].augmentFlags.manaCapBonus).toBe(1);
+  });
+
+  it("invoice crystal cap bonuses match each invoice tier and persist into future turns", () => {
+    const cases = [
+      ["AMP_INVOICE_200", 1],
+      ["AMP_INVOICE_1000", 2],
+      ["AMP_JACKPOT", 3]
+    ] as const;
+
+    for (const [augmentId, crystals] of cases) {
+      const state = startInProgress(100 + crystals);
+      const seat = state.turn.activeSeat;
+      const player = state.players[seat];
+      player.deck = [];
+      player.mana.current = 10;
+      player.mana.max = 10;
+
+      applyAugmentSelection(state, seat, entry(augmentId), []);
+      expect(player.mana.current).toBe(10 + crystals);
+      expect(player.mana.max).toBe(10 + crystals);
+      expect(player.augmentFlags.manaCapBonus).toBe(crystals);
+
+      startTurn(state, 3000 + crystals, []);
+      expect(player.mana.max).toBe(10 + crystals);
+      expect(player.mana.current).toBe(10 + crystals);
+    }
   });
 
   it("跳樓大拍賣 sets current hand to cost 1 but leaves future draws untouched", () => {
@@ -205,7 +234,7 @@ describe("augment passive cost readers", () => {
     const state = startInProgress(6);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_BEGGAR_HERO"), []);
-    expect(entry("AMP_BEGGAR_HERO").tier).toBe("吃紅");
+    expect(entry("AMP_BEGGAR_HERO").tier).toBe("穩穩仔賺");
     state.turn.number = 8;
     expect(getCardActualCost(state, seat, makeCard({ type: "MINION", cost: 10 }))).toBe(10);
     state.turn.number = 9;
@@ -404,7 +433,7 @@ describe("augment triggers & meta", () => {
   it("0050 raises the second phase tier by one, capped at 卯死", () => {
     const state = startInProgress(14);
     const seat = state.turn.activeSeat;
-    state.augmentTiers = ["加減賺", "吃紅"];
+    state.augmentTiers = ["加減賺", "穩穩仔賺"];
     applyAugmentSelection(state, seat, entry("AMP_0050"), []);
     expect(state.augmentTiers[1]).toBe("卯死");
     state.augmentTiers = ["加減賺", "卯死"];

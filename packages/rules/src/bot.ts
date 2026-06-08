@@ -88,7 +88,7 @@ function scoreMove(state: MatchState, seat: Seat, move: GameCommand): number {
   return 0;
 }
 
-const TIER_RANK: Record<string, number> = { 加減賺: 1, 吃紅: 2, 卯死: 3 };
+const TIER_RANK: Record<string, number> = { 加減賺: 1, 穩穩仔賺: 2, 卯死: 3 };
 
 function scoreAmplification(state: MatchState, seat: Seat, move: Extract<GameCommand, { type: "selectAmplification" }>): number {
   // A phase's options now share one tier, so prefer a faction augment the deck

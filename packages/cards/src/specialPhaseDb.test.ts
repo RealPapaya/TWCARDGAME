@@ -16,7 +16,7 @@ describe("special-phase databases", () => {
   });
 
   it("offers at least one amplification per tier so the sampler can fill three picks", () => {
-    for (const tier of ["加減賺", "吃紅", "卯死"] as const) {
+    for (const tier of ["加減賺", "穩穩仔賺", "卯死"] as const) {
       expect(filterAmplification(AMPLIFICATION_DB, undefined, tier).length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -50,7 +50,7 @@ describe("special-phase databases", () => {
         id: "AMP_BAD_RAMP",
         name: "x",
         description: "x",
-        tier: "吃紅" as const,
+        tier: "穩穩仔賺" as const,
         factionTags: [],
         effect: { type: "AUG_MANA_RAMP_AFTER_TURN", manaCap: 15 }
       }
@@ -75,7 +75,7 @@ describe("special-phase databases", () => {
         id: "AMP_BAD_BOUNCE_BUFF",
         name: "x",
         description: "x",
-        tier: "吃紅" as const,
+        tier: "穩穩仔賺" as const,
         factionTags: [],
         effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF" }
       }

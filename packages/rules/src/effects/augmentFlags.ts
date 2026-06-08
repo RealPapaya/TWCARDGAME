@@ -25,6 +25,7 @@ export function defaultAugmentFlags(): AugmentFlags {
     payCostWithHealthNextTurn: false,
     payCostWithHealthThisTurn: false,
     manaRamps: [],
+    manaCapBonus: 0,
     lowHpManaCapUnlocked: false
   };
 }
@@ -37,11 +38,12 @@ export function augmentManaRamp(state: MatchState, seat: Seat): { cap: number; g
 
   const unlockedLowHpCap = unlockLowHpManaCap(player);
 
-  let cap = flags.lowHpManaCapUnlocked ? flags.lowHpManaCap ?? 10 : 10;
+  const capBonus = flags.manaCapBonus ?? 0;
+  let cap = (flags.lowHpManaCapUnlocked ? flags.lowHpManaCap ?? 10 : 10) + capBonus;
   let growth = 1;
   for (const ramp of flags.manaRamps ?? []) {
     if (state.turn.number < ramp.turnThreshold) continue;
-    cap = Math.max(cap, ramp.cap);
+    cap = Math.max(cap, ramp.cap + capBonus);
     growth = Math.max(growth, ramp.growth);
   }
   return { cap, growth, unlockedLowHpCap };

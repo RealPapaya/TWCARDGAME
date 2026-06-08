@@ -123,6 +123,8 @@ export interface AugmentFlags {
   payCostWithHealthThisTurn: boolean;
   /** Turn-gated mana ramps. Active ramps combine by highest cap and highest growth. */
   manaRamps: Array<{ augmentId: string; turnThreshold: number; cap: number; growth: number }>;
+  /** Permanent bonus to the player's crystal cap from instant crystal augments. */
+  manaCapBonus: number;
   /** 壽險理賠: HP threshold and cap, latched permanently by `lowHpManaCapUnlocked`. */
   lowHpManaCapThreshold?: number;
   lowHpManaCap?: number;

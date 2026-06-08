@@ -486,7 +486,7 @@ function h<K extends keyof HTMLElementTagNameMap>(
 
 function tierClass(tier: AmplificationTier): string {
   if (tier === "加減賺") return "be-tier--low";
-  if (tier === "吃紅") return "be-tier--mid";
+  if (tier === "穩穩仔賺") return "be-tier--mid";
   return "be-tier--high";
 }
 
@@ -1053,7 +1053,7 @@ function renderAmpsPanel(): HTMLElement {
   const panel = h("div");
   const tierGroups: Record<AmplificationTier, AmplificationDbEntry[]> = {
     "加減賺": [],
-    "吃紅": [],
+    "穩穩仔賺": [],
     "卯死": []
   };
   for (const a of amps) tierGroups[a.tier].push(a);

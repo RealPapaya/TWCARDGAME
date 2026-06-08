@@ -192,9 +192,9 @@ export interface PublicMinion {
 export type Phase = "NORMAL_PLAY" | "AMPLIFICATION_PHASE" | "VOTING_PHASE";
 
 /** Amplification strength tiers, weakest → strongest. */
-export type AmplificationTier = "加減賺" | "吃紅" | "卯死";
+export type AmplificationTier = "加減賺" | "穩穩仔賺" | "卯死";
 
-export const AMPLIFICATION_TIERS: readonly AmplificationTier[] = ["加減賺", "吃紅", "卯死"] as const;
+export const AMPLIFICATION_TIERS: readonly AmplificationTier[] = ["加減賺", "穩穩仔賺", "卯死"] as const;
 
 /** One of the three upgrade choices privately offered to a player. */
 export interface AmplificationOption {
