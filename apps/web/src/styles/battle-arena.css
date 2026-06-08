@@ -932,6 +932,12 @@
   z-index: 1900;
 }
 
+/* 社交距離: the board cap drops to 3, so spread the survivors further apart. */
+.battle-surface .board.distanced-board {
+  gap: 56px;
+  transition: gap 280ms ease;
+}
+
 .battle-surface .player-area.opponent .board {
   bottom: -54px;
   top: auto;

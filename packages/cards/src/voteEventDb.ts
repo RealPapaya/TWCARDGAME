@@ -127,6 +127,17 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     apply: { mode: "ENVIRONMENT", effect: { type: "ENV_TURN_TIME_LIMIT_MS", value: 15000 } }
   },
   {
+    id: "VE_SOCIAL_DISTANCING",
+    name: "社交距離",
+    tierWeight: 20,
+    options: [
+      "場上隨從上限永久改為 3，多餘的隨從回到手牌（滿手則死亡）",
+      "場上隨從上限永久改為 3，多餘的隨從回到手牌（滿手則死亡）",
+      "場上隨從上限永久改為 3，多餘的隨從回到手牌（滿手則死亡）"
+    ],
+    apply: { mode: "ENVIRONMENT", effect: { type: "ENV_BOARD_LIMIT", value: 3 } }
+  },
+  {
     id: "VE_EQUALITY_FOR_ALL",
     name: "人人平等",
     tierWeight: 25,

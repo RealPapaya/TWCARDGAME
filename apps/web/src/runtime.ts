@@ -1589,7 +1589,7 @@ function renderPlayerArea(seat: Seat, player: PublicPlayer | undefined, role: "p
   const handCount = role === "player" ? view.hand.length : player?.handCount ?? 0;
   const areaClasses = classNames(["player-area", "player", role, isMe && "me", active && "active-turn", !connected && "disconnected"]);
   const boardHasActiveAttackLunge = board.some((minion) => activeAttackLunges.has(minion.instanceId));
-  const boardClasses = classNames(["board", boardHasActiveAttackLunge && "lunging-board", activeTargeting() && "targeting-board", view.selectedAttackerId && "attacking-board"]);
+  const boardClasses = classNames(["board", boardHasActiveAttackLunge && "lunging-board", activeTargeting() && "targeting-board", view.selectedAttackerId && "attacking-board", readBoardLimit() < 7 && "distanced-board"]);
 
   return `
     <section class="${areaClasses}" data-seat="${seat}" data-testid="${role}-area">
@@ -4778,6 +4778,7 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
       actionSeq?: number;
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
+      boardLimit?: number;
     }) => {
       applyPublicSync(message);
     }
@@ -8078,6 +8079,11 @@ function readTurnNumber(): number {
 
 function readPhase(): Phase {
   return (view.publicSync?.phase as Phase | undefined) ?? (view.state?.phase as Phase | undefined) ?? "NORMAL_PLAY";
+}
+
+/** Current per-side board cap (7 normally; lowered to 3 by the 社交距離 referendum). */
+function readBoardLimit(): number {
+  return view.publicSync?.boardLimit ?? (view.state?.boardLimit as number | undefined) ?? 7;
 }
 
 function readPhaseDeadlineAtMs(): number {

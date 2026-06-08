@@ -294,6 +294,8 @@ export interface PublicGameState {
   pendingPrompt?: PendingPrompt;
   specialPhase?: SpecialPhaseView;
   result?: MatchResult;
+  /** Current per-side board cap (7 normally, lowered by the 社交距離 referendum). */
+  boardLimit: number;
 }
 
 export interface HandCardView {

@@ -4,7 +4,7 @@ import { nextInt } from "../rng.js";
 import { addEvent } from "../state.js";
 import type { EffectContext, EffectHandler, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 import { bounceMinion, healUnit, summonCard } from "./core.js";
-import { isEnvironmentActive } from "./environment.js";
+import { boardLimit, isEnvironmentActive } from "./environment.js";
 
 /**
  * 【第 20 回合公投事件 — 集中模組】
@@ -23,7 +23,7 @@ export function summonFromGraveyard(effect: EffectDefinition, context: EffectCon
   const count = effect.count ?? 2;
   for (const seat of SEATS) {
     const player = state.players[seat];
-    if (player.board.length >= 7) {
+    if (player.board.length >= boardLimit(state, seat)) {
       addEvent(state, events, "EVENT_NOTICE", { text: `鬼門開：${player.displayName} 場上已滿，無法復活` }, seat);
       continue;
     }
@@ -133,6 +133,29 @@ export function martialLawBounceAllCost10(_effect: EffectDefinition, context: Ef
           card.cost = 10;
         }
       });
+    }
+  }
+}
+
+/**
+ * 社交距離：場上隨從上限降為 3（持久環境 `ENV_BOARD_LIMIT`，由 `boardLimit()` 讀取）。
+ * 安裝當下若某方場上超過上限，最右邊的多餘隨從依序回手；回手時該方手牌已達 10 張，
+ * 則改為死亡結算（與戒嚴同邏輯，由呼叫端的 `resolvePostAction` 清算）。之後的召喚與
+ * 相關效果都被 `boardLimit()` 限制在新的上限內。referendum-immune 一方上限不變、不受裁切。
+ */
+export function enforceBoardLimit(_effect: EffectDefinition, context: EffectContext): void {
+  const { state, events, catalog } = context;
+  for (const seat of SEATS) {
+    const player = state.players[seat];
+    const limit = boardLimit(state, seat);
+    if (player.board.length <= limit) continue;
+    // Keep the leftmost `limit` minions; the rightmost surplus returns to hand.
+    for (const minion of player.board.slice(limit)) {
+      if (player.hand.length >= 10) {
+        minion.currentHealth = 0;
+        continue;
+      }
+      bounceMinion(state, player, minion, catalog, events);
     }
   }
 }

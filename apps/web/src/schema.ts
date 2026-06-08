@@ -166,6 +166,7 @@ export class GameStateSchema extends Schema {
   specialPhase = new SpecialPhaseSchema();
   resultWinnerSeat = "";
   resultReason = "";
+  boardLimit = 7;
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -182,4 +183,5 @@ defineTypes(GameStateSchema, {
   specialPhase: SpecialPhaseSchema,
   resultWinnerSeat: "string",
   resultReason: "string",
+  boardLimit: "number",
 });

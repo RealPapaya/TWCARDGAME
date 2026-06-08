@@ -12,7 +12,7 @@ import {
 } from "../state.js";
 import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
-import { applyEnvironmentTick, environmentTurnTimeLimitMs, suppressRuntimeCardMinionEffects } from "./environment.js";
+import { applyEnvironmentTick, boardLimit, environmentTurnTimeLimitMs, suppressRuntimeCardMinionEffects } from "./environment.js";
 import { applyPersistentMinionAugments, applyStartOfTurnAugments, tryReviveMinion } from "./augments.js";
 import { augmentManaRamp, unlockLowHpManaCap } from "./augmentFlags.js";
 
@@ -891,7 +891,7 @@ export function bounceMinion(
 }
 
 export function summonCard(state: MatchState, player: PlayerState, card: CardDefinition, events: EffectContext["events"], index?: number, temporaryTurns?: number): RuntimeMinion | undefined {
-  if (player.board.length >= 7 || card.type !== "MINION") return undefined;
+  if (player.board.length >= boardLimit(state, player.seat) || card.type !== "MINION") return undefined;
   const runtimeCard = createCardForHand(state, card, player.seat);
   const minion = createMinionFromCard(state, runtimeCard, player.seat);
   if (temporaryTurns) {

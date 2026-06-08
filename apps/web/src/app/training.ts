@@ -621,6 +621,7 @@ export function trainingPublicState(session: TrainingSession): PublicGameState {
     },
     players: clonePlayers(session.players),
     result: session.result,
+    boardLimit: 7,
     ...(session.specialPhase
       ? { specialPhase: session.specialPhase as unknown as PublicGameState["specialPhase"] }
       : {})

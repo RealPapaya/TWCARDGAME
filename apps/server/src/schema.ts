@@ -176,6 +176,7 @@ export class GameStateSchema extends Schema {
   specialPhase = new SpecialPhaseSchema();
   resultWinnerSeat = "";
   resultReason = "";
+  boardLimit = 7;
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -191,7 +192,8 @@ defineTypes(GameStateSchema, {
   pendingPromptKind: "string",
   specialPhase: SpecialPhaseSchema,
   resultWinnerSeat: "string",
-  resultReason: "string"
+  resultReason: "string",
+  boardLimit: "number"
 });
 
 export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameState): void {
@@ -213,6 +215,7 @@ export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameS
   syncSpecialPhase(schema.specialPhase, state.specialPhase);
   schema.resultWinnerSeat = state.result?.winnerSeat ?? "";
   schema.resultReason = state.result?.reason ?? "";
+  schema.boardLimit = state.boardLimit;
 }
 
 function syncSpecialPhase(target: SpecialPhaseSchema, sp: SpecialPhaseView | undefined): void {

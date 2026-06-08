@@ -23,7 +23,7 @@ import {
   phaseTriggerForTurn,
   rollAugmentTiers
 } from "./phases.js";
-import { suppressRuntimeCardMinionEffects } from "./effects/environment.js";
+import { boardLimit, suppressRuntimeCardMinionEffects } from "./effects/environment.js";
 import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
   activePlayer,
@@ -305,7 +305,7 @@ function playCard(
     reject(state, events, seat, "魔力不足。");
     return;
   }
-  if (card.type === "MINION" && player.board.length >= 7) {
+  if (card.type === "MINION" && player.board.length >= boardLimit(state, seat)) {
     reject(state, events, seat, "場上已滿，無法再召喚隨從。");
     return;
   }

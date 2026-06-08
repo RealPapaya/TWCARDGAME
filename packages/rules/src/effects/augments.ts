@@ -3,6 +3,7 @@ import { AMPLIFICATION_TIERS, type AmplificationTier, type Seat } from "@twcardg
 import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
 import { bounceMinion, drawCards, updateEnrage } from "./core.js";
+import { boardLimit } from "./environment.js";
 import { unlockLowHpManaCap } from "./augmentFlags.js";
 
 /**
@@ -274,7 +275,7 @@ export function tryReviveMinion(state: MatchState, player: PlayerState, deadMini
   const flags = player.augmentFlags;
   if (!flags?.reviveOnceAsVanilla) return;
   if (deadMinion.revivedByPurdo) return;
-  if (player.board.length >= 7) return;
+  if (player.board.length >= boardLimit(state, player.seat)) return;
 
   const token: RuntimeMinion = {
     instanceId: nextInstanceId(state, "minion"),

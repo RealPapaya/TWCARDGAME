@@ -19,6 +19,7 @@ import {
 } from "@twcardgame/cards";
 import { applyAugmentSelection, finishIfHeroDead, resolveEffect, resolvePostAction } from "./effects.js";
 import { applyEnvironmentTick, environmentTurnTimeLimitMs } from "./effects/environment.js";
+import { enforceBoardLimit } from "./effects/voteEvents.js";
 import { nextInt, normalizeSeed } from "./rng.js";
 import { addEvent } from "./state.js";
 import { turnTimeLimitForPlayer } from "./timing.js";
@@ -586,6 +587,12 @@ function applyVoteEventEffect(
   };
   addEvent(state, events, "ENVIRONMENT_APPLIED", { id: eventId, name: eventName, expiresTurn });
   applyEnvironmentTick(state, events);
+  // 社交距離: trim each side down to the freshly-installed board cap once, then
+  // resolve any minions that died because their owner's hand was already full.
+  if (descriptor.effect.type === "ENV_BOARD_LIMIT") {
+    enforceBoardLimit(descriptor.effect, { state, activeSeat, events, catalog });
+    resolvePostAction(state, events, catalog);
+  }
 }
 
 type ImmuneSnapshot = Partial<

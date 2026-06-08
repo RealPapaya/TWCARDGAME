@@ -333,7 +333,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       ...phaseSync,
       actionSeq: this.match.turn.actionSeq,
       result: this.match.result,
-      players: publicState.players
+      players: publicState.players,
+      boardLimit: publicState.boardLimit
     });
   }
 

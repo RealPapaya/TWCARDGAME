@@ -12,6 +12,33 @@ import type { ActiveEnvironment, EffectContext, EffectHandler, MatchState, Runti
  * harmlessly instead of throwing `Unhandled effect type`.
  */
 
+/** Default maximum number of minions a single side may field on the board. */
+export const DEFAULT_BOARD_LIMIT = 7;
+
+/**
+ * Maximum minions `seat` may field, honouring the 社交距離 referendum environment
+ * (`ENV_BOARD_LIMIT`, e.g. cap 3). A referendum-immune seat keeps the default cap,
+ * matching how the other persistent environments skip immune players.
+ */
+export function boardLimit(state: MatchState, seat: Seat): number {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return DEFAULT_BOARD_LIMIT;
+  if (env.effect.type !== "ENV_BOARD_LIMIT") return DEFAULT_BOARD_LIMIT;
+  if (state.players[seat].augmentFlags.referendumImmune) return DEFAULT_BOARD_LIMIT;
+  return env.effect.value ?? DEFAULT_BOARD_LIMIT;
+}
+
+/**
+ * The board cap imposed by the active environment, ignoring per-seat immunity.
+ * Used for the global public projection that drives the client's board spacing.
+ */
+export function environmentBoardLimit(state: MatchState): number {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return DEFAULT_BOARD_LIMIT;
+  if (env.effect.type !== "ENV_BOARD_LIMIT") return DEFAULT_BOARD_LIMIT;
+  return env.effect.value ?? DEFAULT_BOARD_LIMIT;
+}
+
 /** Cost penalty currently imposed by the environment (e.g. 油電雙漲 +2). Read by `getCardActualCost`. */
 export function environmentCostDelta(state: MatchState): number {
   const env = state.currentEnvironment;
@@ -121,5 +148,8 @@ export const environmentHandlers: Record<string, EffectHandler> = {
   ENV_COST_PLUS_CAPPED: () => {},
   ENV_SILENCE_ALL: (_effect: EffectDefinition, context: EffectContext) => silenceAllMinions(context.state),
   ENV_TURN_TIME_LIMIT_MS: () => {},
+  // Passive: the cap is read in boardLimit() while the environment is active; the
+  // one-time board trim runs from applyVoteEventEffect when the event installs.
+  ENV_BOARD_LIMIT: () => {},
   ENV_DISABLE_ALL_MINION_EFFECTS: (_effect: EffectDefinition, context: EffectContext) => disableAllMinionEffects(context.state)
 };

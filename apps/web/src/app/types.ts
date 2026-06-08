@@ -171,6 +171,7 @@ export type ClientViewState = {
     actionSeq?: number;
     result?: any;
     players?: Partial<Record<Seat, PublicPlayer>>;
+    boardLimit?: number;
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];

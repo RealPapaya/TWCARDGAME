@@ -14,8 +14,12 @@ import {
   resolvePostAction,
   startTurn,
   toHandView,
+  toPublicState,
   updateAuras
 } from "../index.js";
+import { summonCard } from "./core.js";
+import { boardLimit, environmentBoardLimit } from "./environment.js";
+import { enforceBoardLimit } from "./voteEvents.js";
 import type { EffectContext, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 
 function legalDeckIds(): string[] {
@@ -125,6 +129,7 @@ describe("turn-20 vote-event handlers", () => {
       "MARTIAL_LAW_BOUNCE_ALL_COST_10",
       "ENV_COST_ZERO",
       "ENV_TURN_TIME_LIMIT_MS",
+      "ENV_BOARD_LIMIT",
       "ENV_DISABLE_ALL_MINION_EFFECTS"
     ]) {
       expect(effectHandlers[type]).toBeTypeOf("function");
@@ -253,6 +258,78 @@ describe("turn-20 vote-event handlers", () => {
     expect(state.players.player1.graveyard.length).toBe(p1GraveBefore + 2);
     expect(context.events.filter((e) => e.type === "BOUNCE")).toHaveLength(3);
     expect(context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target)).toEqual(["p1-overflow-b", "p1-overflow-a"]);
+  });
+
+  describe("社交距離 ENV_BOARD_LIMIT", () => {
+    function installSocialDistancing(state: MatchState): void {
+      state.currentEnvironment = {
+        id: "VE_SOCIAL_DISTANCING",
+        name: "社交距離",
+        appliedTurn: state.turn.number,
+        expiresTurn: undefined,
+        effect: { type: "ENV_BOARD_LIMIT", value: 3 }
+      };
+    }
+
+    it("trims each side to the cap, bouncing the rightmost surplus to hand", () => {
+      const state = startMatch(50);
+      state.players.player1.hand = [];
+      state.players.player1.board = Array.from({ length: 5 }, (_, i) => boardMinion(`p1-${i}`));
+      state.players.player2.board = Array.from({ length: 3 }, (_, i) => boardMinion(`p2-${i}`));
+      installSocialDistancing(state);
+
+      const context = ctx(state);
+      enforceBoardLimit({ type: "ENV_BOARD_LIMIT", value: 3 }, context);
+      resolvePostAction(state, context.events, CATALOG_MAP);
+
+      expect(state.players.player1.board.map((m) => m.instanceId)).toEqual(["p1-0", "p1-1", "p1-2"]);
+      expect(state.players.player1.hand).toHaveLength(2);
+      // Already within the cap → untouched.
+      expect(state.players.player2.board).toHaveLength(3);
+      expect(context.events.filter((e) => e.type === "BOUNCE")).toHaveLength(2);
+    });
+
+    it("kills the surplus instead of bouncing when the owner's hand is full", () => {
+      const state = startMatch(51);
+      state.players.player1.hand = Array.from({ length: 10 }, (_, i) => graveMinion("player1", `h-${i}`));
+      state.players.player1.board = Array.from({ length: 5 }, (_, i) => boardMinion(`p1-${i}`));
+      const graveBefore = state.players.player1.graveyard.length;
+      installSocialDistancing(state);
+
+      const context = ctx(state);
+      enforceBoardLimit({ type: "ENV_BOARD_LIMIT", value: 3 }, context);
+      resolvePostAction(state, context.events, CATALOG_MAP);
+
+      expect(state.players.player1.board).toHaveLength(3);
+      expect(state.players.player1.hand).toHaveLength(10);
+      expect(state.players.player1.graveyard.length).toBe(graveBefore + 2);
+      const destroyed = context.events.filter((e) => e.type === "DESTROY").map((e) => String(e.payload?.target));
+      expect(destroyed.sort()).toEqual(["p1-3", "p1-4"]);
+      expect(context.events.filter((e) => e.type === "BOUNCE")).toHaveLength(0);
+    });
+
+    it("caps further summons at the lowered limit", () => {
+      const state = startMatch(52);
+      state.players.player1.board = Array.from({ length: 3 }, (_, i) => boardMinion(`p1-${i}`));
+      installSocialDistancing(state);
+
+      const summoned = summonCard(state, state.players.player1, MINION_DEF, []);
+      expect(summoned).toBeUndefined();
+      expect(state.players.player1.board).toHaveLength(3);
+    });
+
+    it("exposes the lowered cap publicly but exempts referendum-immune seats", () => {
+      const state = startMatch(53);
+      installSocialDistancing(state);
+
+      expect(environmentBoardLimit(state)).toBe(3);
+      expect(toPublicState(state).boardLimit).toBe(3);
+      expect(boardLimit(state, "player1")).toBe(3);
+
+      state.players.player1.augmentFlags.referendumImmune = true;
+      expect(boardLimit(state, "player1")).toBe(7);
+      expect(boardLimit(state, "player2")).toBe(3);
+    });
   });
 
   describe("鬼門開 SUMMON_FROM_GRAVEYARD", () => {

@@ -9,7 +9,7 @@ import {
   type TargetRef
 } from "@twcardgame/shared";
 import { createRuntimeCard } from "./deck.js";
-import { environmentCostDelta, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
+import { environmentBoardLimit, environmentCostDelta, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
 import { effectNeedsTarget } from "./targeting.js";
 import {
@@ -64,7 +64,8 @@ export function toPublicState(state: MatchState): PublicGameState {
     },
     pendingPrompt: state.pendingPrompt ? structuredClone(state.pendingPrompt) : undefined,
     specialPhase: toSpecialPhaseView(state),
-    result: state.result ? structuredClone(state.result) : undefined
+    result: state.result ? structuredClone(state.result) : undefined,
+    boardLimit: environmentBoardLimit(state)
   };
 }
 
