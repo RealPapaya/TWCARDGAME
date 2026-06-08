@@ -859,7 +859,7 @@
 
 .battle-surface .mana-layout-double {
   --mana-crystal-size: 23px;
-  --mana-column-gap: 9px;
+  --mana-column-gap: 17px;
   --mana-row-gap: 3px;
   padding-top: 28px;
   padding-bottom: 26px;
@@ -867,7 +867,7 @@
 
 .battle-surface .mana-layout-triple {
   --mana-crystal-size: 18px;
-  --mana-column-gap: 8px;
+  --mana-column-gap: 22.5px;
   --mana-row-gap: 2px;
   padding-top: 23px;
   padding-bottom: 23px;

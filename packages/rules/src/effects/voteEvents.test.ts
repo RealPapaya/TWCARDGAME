@@ -13,6 +13,7 @@ import {
   resolveEffect,
   resolvePostAction,
   startTurn,
+  toHandView,
   updateAuras
 } from "../index.js";
 import type { EffectContext, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
@@ -478,6 +479,24 @@ describe("turn-20 vote-event handlers", () => {
 
       expect(state.players.player1.hand).toHaveLength(0);
       expect(state.players.player1.board.at(-1)?.keywords).toEqual({});
+    });
+
+    it("marks targeted hand minions as not needing targets in the private hand view", () => {
+      const state = startMatch(44);
+      const targeted = createCardForHand(state, KEYWORD_MINION_DEF, "player1");
+      targeted.keywords = { battlecry: { type: "DAMAGE", value: 1, target: { side: "ENEMY", type: "MINION" } } };
+      state.players.player1.hand = [targeted];
+      expect(toHandView(state, "player1")[0].needsTarget).toBe(true);
+
+      state.currentEnvironment = {
+        id: "VE_EQUALITY_FOR_ALL",
+        name: "人人平等",
+        appliedTurn: state.turn.number,
+        effect: { type: "ENV_DISABLE_ALL_MINION_EFFECTS" }
+      };
+      applyEnvironmentTick(state, []);
+
+      expect(toHandView(state, "player1")[0].needsTarget).toBe(false);
     });
   });
 

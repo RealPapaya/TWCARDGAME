@@ -1498,7 +1498,7 @@ function renderGame(status: GameStatus | ""): string {
       ? "請選擇觸發的目標！"
       : "請選擇目標！"
     : selectedCard
-    ? cardNeedsTarget(selectedCard.cardId)
+    ? handCardNeedsTarget(selectedCard)
       ? view.selectedTarget
         ? `Target: ${targetLabel(view.selectedTarget)}`
         : "Choose target"
@@ -1848,7 +1848,7 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
   const selected = view.selectedHandId === card.instanceId;
   const mulliganSelected = view.mulliganSelection.has(card.instanceId);
   const playable = canAfford(card.cost);
-  const needsTarget = cardNeedsTarget(card.cardId);
+  const needsTarget = handCardNeedsTarget(card);
   const rejected = view.rejectedHandIds.has(card.instanceId);
   const e2eType = view.rejectedHandIds.has(card.instanceId) ? "REJECTED_CARD" : card.type;
   const classes = classNames([
@@ -2053,7 +2053,7 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
   const battleLocked = isBattleActionLocked();
   const localTraining = Boolean(trainingSession);
   const selectedCard = selectedHandCard();
-  const selectedNeedsTarget = selectedCard ? cardNeedsTarget(selectedCard.cardId) : false;
+  const selectedNeedsTarget = handCardNeedsTarget(selectedCard);
   const canPlay = Boolean(selectedCard && canAfford(selectedCard.cost) && (!selectedNeedsTarget || view.selectedTarget));
   const canAttack = Boolean(!battleLocked && view.selectedAttackerId && view.selectedTarget && isLegalAttackTarget(view.selectedTarget));
   const canEndTurn = Boolean(isMyTurn && !battleLocked && (localTraining ? trainingCanEndTurn(trainingSession) : view.room));
@@ -5166,7 +5166,7 @@ function bindSelectionActions(): void {
         return;
       }
       const card = selectedHandCard();
-      if (card && cardNeedsTarget(card.cardId)) {
+      if (card && handCardNeedsTarget(card)) {
         const reason = cardTargetError(target);
         if (reason) {
           showBattleToast(reason);
@@ -5406,7 +5406,7 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   // Targeted-battlecry cards are played in two stages (LEGACY v1 parity): the
   // drop just places the card; the effect target is aimed afterwards. The drag
   // is therefore always placement-only — no arrow snapping during the drag.
-  const isTargeted = cardNeedsTarget(card.cardId);
+  const isTargeted = handCardNeedsTarget(card);
   const lineKind = classifyEffectKind(cardDef?.keywords?.battlecry?.type);
   const startX = event.clientX;
   const startY = event.clientY;
@@ -7815,7 +7815,7 @@ function pruneSelections(): void {
   if (view.selectedTarget) {
     const target = view.selectedTarget;
     if (view.selectedAttackerId && !isLegalAttackTarget(target)) view.selectedTarget = undefined;
-    if (view.selectedHandId && cardNeedsTarget(selectedHandCard()?.cardId ?? "") && !isLegalCardTarget(target)) {
+    if (view.selectedHandId && handCardNeedsTarget(selectedHandCard()) && !isLegalCardTarget(target)) {
       view.selectedTarget = undefined;
     }
   }
@@ -8040,13 +8040,13 @@ function isTargetHighlighted(target: TargetRef): boolean {
   if (view.pendingBattlecry) return view.pendingBattlecry.phase === "aiming" && isLegalCardTarget(target);
   if (sameTarget(view.selectedTarget, target)) return true;
   if (view.selectedAttackerId) return isLegalAttackTarget(target);
-  if (view.selectedHandId) return isLegalCardTarget(target);
+  if (handCardNeedsTarget(selectedHandCard())) return isLegalCardTarget(target);
   return false;
 }
 
 function activeTargeting(): boolean {
   if (view.pendingBattlecry) return view.pendingBattlecry.phase === "aiming";
-  return Boolean(view.selectedAttackerId || (selectedHandCard() && cardNeedsTarget(selectedHandCard()!.cardId)));
+  return Boolean(view.selectedAttackerId || handCardNeedsTarget(selectedHandCard()));
 }
 
 function selectedHandCard(): HandCardView | undefined {
@@ -8592,6 +8592,11 @@ function canAfford(cost: number): boolean {
   if (isBattleActionLocked()) return false;
   const player = view.mySeat ? readPlayer(view.mySeat) : undefined;
   return Boolean(player && player.mana.current >= cost && readActiveSeat() === view.mySeat);
+}
+
+function handCardNeedsTarget(card: HandCardView | undefined): boolean {
+  if (!card) return false;
+  return card.needsTarget ?? cardNeedsTarget(card.cardId);
 }
 
 function cardNeedsTarget(cardId: string): boolean {

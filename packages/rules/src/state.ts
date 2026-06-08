@@ -153,7 +153,8 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
     cost: getCardActualCost(state, seat, card),
     type: card.type,
     attack: card.attack,
-    health: card.health
+    health: card.health,
+    needsTarget: Boolean(card.keywords.battlecry?.target)
   }));
 }
 

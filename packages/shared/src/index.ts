@@ -299,6 +299,7 @@ export interface HandCardView {
   type: CardType;
   attack?: number;
   health?: number;
+  needsTarget?: boolean;
 }
 
 export type GameCommand =
