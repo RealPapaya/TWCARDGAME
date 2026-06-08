@@ -20,6 +20,7 @@ import {
 import { summonCard } from "./core.js";
 import { boardLimit, environmentBoardLimit } from "./environment.js";
 import { enforceBoardLimit } from "./voteEvents.js";
+import { DEFAULT_TURN_TIME_LIMIT_MS } from "../timing.js";
 import type { EffectContext, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 
 function legalDeckIds(): string[] {
@@ -451,7 +452,7 @@ describe("turn-20 vote-event handlers", () => {
 
       startTurn(state, 9000, []);
 
-      expect(state.turn.deadlineAtMs).toBe(59000);
+      expect(state.turn.deadlineAtMs).toBe(9000 + DEFAULT_TURN_TIME_LIMIT_MS);
     });
   });
 
