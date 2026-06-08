@@ -70,6 +70,59 @@ const devPhaseOptions: Array<{ value: Phase; label: string }> = [
   { value: "VOTING_PHASE", label: "Vote event" }
 ];
 
+const DEV_SETTINGS_KEY = "twcardgame.devtest.v1";
+const devInput: Record<string, string> = {};
+const devChecked: Record<string, boolean> = {};
+
+try {
+  const raw = typeof window !== "undefined" ? window.localStorage?.getItem(DEV_SETTINGS_KEY) : null;
+  if (raw) {
+    const parsed = JSON.parse(raw) as { inputs?: Record<string, string>; checked?: Record<string, boolean>; cards?: Record<DevCardSlot, string[]> };
+    Object.assign(devInput, parsed.inputs ?? {});
+    Object.assign(devChecked, parsed.checked ?? {});
+    const savedCards = parsed.cards;
+    if (savedCards) {
+      for (const slot of devCardSlotOrder) {
+        const arr = savedCards[slot];
+        if (Array.isArray(arr)) selectedDevCards[slot] = arr.filter((id): id is string => typeof id === "string");
+      }
+    }
+  }
+} catch {
+  // ignore localStorage errors
+}
+
+function persistDevSettings(): void {
+  try {
+    window.localStorage.setItem(DEV_SETTINGS_KEY, JSON.stringify({
+      inputs: devInput,
+      checked: devChecked,
+      cards: {
+        hand: [...selectedDevCards.hand],
+        playerBoard: [...selectedDevCards.playerBoard],
+        opponentBoard: [...selectedDevCards.opponentBoard]
+      }
+    }));
+  } catch {
+    // ignore
+  }
+}
+
+function sv(id: string, def: string): string {
+  return devInput[id] ?? def;
+}
+
+function sc(id: string, def = false): boolean {
+  return devChecked[id] ?? def;
+}
+
+function applySelectedToOptions(optionsHtml: string, savedValue: string | undefined): string {
+  if (!savedValue) return optionsHtml;
+  const escaped = escapeAttr(savedValue);
+  const cleared = optionsHtml.replace(/ selected(?=>|\s)/g, "");
+  return cleared.replace(`value="${escaped}"`, `value="${escaped}" selected`);
+}
+
 export function renderDevTestPanel(busy: boolean): string {
   const screens: MenuScreen[] = ["main", "battle", "ai", "deckEditor", "collection", "shop", "profile", "friends", "leaderboard"];
   return `
@@ -95,17 +148,17 @@ export function renderDevTestPanel(busy: boolean): string {
             ${renderSelectControl("dev-test-active-seat", "Active", `<option value="player1">player1</option><option value="player2">player2</option>`)}
             ${renderSliderControl("dev-test-player-hp", "Player HP", 1, 99, 1)}
             ${renderSliderControl("dev-test-opponent-hp", "Opponent HP", 1, 99, 1)}
-            ${renderSliderControl("dev-test-player-mana-current", "P mana", 0, 10, 1)}
-            ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 10, 1)}
-            ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 10, 1)}
-            ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 10, 1)}
+            ${renderSliderControl("dev-test-player-mana-current", "P mana", 0, 30, 1)}
+            ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 30, 1)}
+            ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 30, 1)}
+            ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 30, 1)}
             ${renderSelectControl("dev-test-amp-tier-turn6", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
             ${renderSelectControl("dev-test-amp-tier-turn14", "增幅2等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[1]))}
             ${renderSelectControl("dev-test-amp-id-turn6", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
             ${renderSelectControl("dev-test-amp-id-turn14", "增幅2內容", renderAmplificationOptions(AMPLIFICATION_TIERS[1]), true)}
             ${renderSelectControl("dev-test-vote-event", "事件", renderVoteEventOptions(), true)}
-            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" /> <span class="dev-test-label-text">P infinite</span></label>
-            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" /> <span class="dev-test-label-text">O infinite</span></label>
+            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" ${sc("dev-test-player-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">P infinite</span></label>
+            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" ${sc("dev-test-opponent-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">O infinite</span></label>
           </div>
           <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
         </fieldset>
@@ -210,6 +263,27 @@ export function bindDevTestActions(opts: {
   });
   opts.on(document.querySelector<HTMLButtonElement>("#dev-test-reward"), "click", "dev-test-reward", () => {
     opts.showReward(readDevTestRewardSummary(opts.getAiTheme(), opts.getAiDifficulty()));
+  });
+  opts.on(screen, "input", "dev-test-persist-input", (event) => {
+    const el = event.target;
+    if (el instanceof HTMLInputElement) {
+      if (el.type === "checkbox") {
+        devChecked[el.id] = el.checked;
+      } else {
+        devInput[el.id] = el.value;
+      }
+      persistDevSettings();
+    }
+  });
+  opts.on(screen, "change", "dev-test-persist-change", (event) => {
+    const el = event.target;
+    if (el instanceof HTMLSelectElement) {
+      devInput[el.id] = el.value;
+      persistDevSettings();
+    } else if (el instanceof HTMLInputElement && el.type === "checkbox") {
+      devChecked[el.id] = el.checked;
+      persistDevSettings();
+    }
   });
 }
 
@@ -441,12 +515,14 @@ function addDevCard(slot: DevCardSlot, cardId: string): void {
   if (selectedDevCards[slot].length >= config.max) return;
   selectedDevCards[slot].push(cardId);
   updateDevCardSelector(slot);
+  persistDevSettings();
 }
 
 function removeDevCard(slot: DevCardSlot, index: number): void {
   if (index < 0 || index >= selectedDevCards[slot].length) return;
   selectedDevCards[slot].splice(index, 1);
   updateDevCardSelector(slot);
+  persistDevSettings();
 }
 
 function updateDevCardSelector(slot: DevCardSlot): void {
@@ -628,6 +704,8 @@ function setInputValue(id: string, value: string): void {
       const display = document.getElementById(`${id}-val`);
       if (display) display.textContent = value;
     }
+    devInput[id] = value;
+    persistDevSettings();
   }
 }
 
@@ -639,14 +717,15 @@ function renderSliderControl(
   defaultValue: number,
   isWide = false
 ): string {
+  const value = sv(id, String(defaultValue));
   const wideClass = isWide ? "dev-test-wide" : "";
   return `
     <div class="dev-test-control-box ${wideClass}">
       <div class="dev-test-label-row">
         <span class="dev-test-label-text">${escapeHtml(label)}</span>
-        <span class="dev-test-value-box" id="${id}-val">${defaultValue}</span>
+        <span class="dev-test-value-box" id="${id}-val">${value}</span>
       </div>
-      <input id="${id}" type="range" min="${min}" max="${max}" value="${defaultValue}" />
+      <input id="${id}" type="range" min="${min}" max="${max}" value="${value}" />
     </div>
   `;
 }
@@ -659,20 +738,22 @@ function renderAutoSliderControl(
   defaultValue: number,
   isWide = false
 ): string {
+  const value = sv(id, String(defaultValue));
+  const isAuto = sc(`${id}-auto`, true);
   const wideClass = isWide ? "dev-test-wide" : "";
   return `
     <div class="dev-test-control-box ${wideClass}">
       <div class="dev-test-label-row">
         <span class="dev-test-label-text">${escapeHtml(label)}</span>
         <div class="dev-test-auto-row">
-          <span class="dev-test-value-box" id="${id}-val">${defaultValue}</span>
+          <span class="dev-test-value-box" id="${id}-val">${value}</span>
           <label class="dev-test-checkbox-box">
-            <input type="checkbox" id="${id}-auto" checked />
+            <input type="checkbox" id="${id}-auto" ${isAuto ? "checked" : ""} />
             <span>Auto</span>
           </label>
         </div>
       </div>
-      <input id="${id}" type="range" min="${min}" max="${max}" value="${defaultValue}" disabled />
+      <input id="${id}" type="range" min="${min}" max="${max}" value="${value}" ${isAuto ? "disabled" : ""} />
     </div>
   `;
 }
@@ -684,12 +765,13 @@ function renderSelectControl(
   isWide = false
 ): string {
   const wideClass = isWide ? "dev-test-wide" : "";
+  const restored = applySelectedToOptions(optionsHtml, devInput[id]);
   return `
     <div class="dev-test-control-box ${wideClass}">
       <div class="dev-test-label-row">
         <span class="dev-test-label-text">${escapeHtml(label)}</span>
       </div>
-      <select id="${id}">${optionsHtml}</select>
+      <select id="${id}">${restored}</select>
     </div>
   `;
 }
