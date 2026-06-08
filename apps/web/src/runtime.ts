@@ -56,6 +56,8 @@ import {
   ownedCollectionTypeCount,
   compareCollectionCards as compareCollectionCardsBySort
 } from "./app/collection.js";
+import { installClickEffect } from "./app/click-effect.js";
+import { playPveTransition } from "./app/transition-video.js";
 import { setAppContext } from "./app/context.js";
 import {
   isHandCardAnimating,
@@ -320,6 +322,7 @@ export function startApp(): void {
   ensureDragLayer();
   installViewportGuards();
   installAudioUnlock();
+  installClickEffect();
   if (devTestModeAvailable && shouldOpenDevTestFromUrl()) view.menuScreen = "test";
   if (devTestModeAvailable) {
     void import("./app/dev-test.js").then((module) => {
@@ -3525,6 +3528,8 @@ function bindPackOpeningActions(): void {
 function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
   if (target === "test" && !devTestModeAvailable) target = "main";
+  // Entering the challenge (theme select) screen plays the LEGACY book-flip intro.
+  if (target === "ai" && view.menuScreen !== "ai") playPveTransition();
   view.menuScreen = target;
   view.avatarPickerOpen = false;
   view.titlePickerOpen = false;

@@ -1,5 +1,32 @@
 /* Main menu */
 
+/* Challenge-mode "book flip" intro — ported from LEGACY #video-overlay.
+   A full-screen video that plays over black, then fades out near the end. */
+.transition-video-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: #000;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 1.2s ease-out, visibility 1.2s;
+}
+
+.transition-video-overlay > video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.transition-video-overlay.video-fade-out {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
 .main-menu {
   display: flex;
   flex-direction: column;

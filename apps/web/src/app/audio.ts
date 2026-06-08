@@ -1,6 +1,6 @@
 import type { GameEvent } from "@twcardgame/shared";
 
-export type SoundCue = "cardPlay" | "cardPlayHeavy" | "cardDraw" | "attack" | "attackHeavy" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip";
+export type SoundCue = "cardPlay" | "cardPlayHeavy" | "cardDraw" | "attack" | "attackHeavy" | "damage" | "heal" | "death" | "turn" | "reject" | "packFlip" | "click";
 
 export type AudioViewState = {
   bgmVolume: number;
@@ -47,7 +47,8 @@ const sfxPaths: Record<SoundCue, string> = {
   death: "/audio/sfx/MionionDeath.mp3",
   turn: "/audio/sfx/heavy_sandstone_click.mp3",
   reject: "/audio/sfx/Retreat.mp3",
-  packFlip: "/audio/sfx/card-draw.mp3"
+  packFlip: "/audio/sfx/card-draw.mp3",
+  click: "/audio/sfx/heavy_sandstone_click.mp3"
 };
 
 let audioUnlocked = false;
