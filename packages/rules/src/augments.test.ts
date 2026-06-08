@@ -377,6 +377,13 @@ describe("augment triggers & meta", () => {
     expect(player.augmentFlags.nextDrawHalfCost).toBe(false);
   });
 
+  it("要拚 grants one extra reroll for the next amplification phase", () => {
+    const state = startInProgress(31);
+    const seat = state.turn.activeSeat;
+    applyAugmentSelection(state, seat, entry("AMP_GO_FOR_BROKE"), []);
+    expect(state.players[seat].augmentFlags.extraAmplificationRerollsNextPhase).toBe(1);
+  });
+
   it("普渡 revives the owner's dead minion once as a 1/1, never twice", () => {
     const state = startInProgress(13);
     const seat = state.turn.activeSeat;
@@ -403,6 +410,81 @@ describe("augment triggers & meta", () => {
     state.augmentTiers = ["加減賺", "卯死"];
     applyAugmentSelection(state, seat, entry("AMP_0050"), []);
     expect(state.augmentTiers[1]).toBe("卯死");
+  });
+});
+
+describe("destroyed-minion cost rebate augment", () => {
+  it("grants the printed cost of any destroyed minion to the augment holder", () => {
+    const state = startInProgress(32);
+    const seat = state.turn.activeSeat;
+    const oppSeat: Seat = seat === "player1" ? "player2" : "player1";
+    const printed = CARD_CATALOG.find((card) => card.type === "MINION" && card.cost > 1);
+    if (!printed || printed.attack === undefined || printed.health === undefined) throw new Error("missing nonzero-cost minion");
+    const player = state.players[seat];
+    player.mana.current = 0;
+    applyAugmentSelection(state, seat, entry("AMP_VENDOR_KICKBACK"), []);
+
+    state.players[oppSeat].board = [
+      makeMinion({
+        instanceId: "rebate-enemy",
+        ownerSeat: oppSeat,
+        cardId: printed.id,
+        name: printed.name,
+        category: printed.category,
+        cost: 0,
+        attack: printed.attack,
+        baseAttack: printed.attack,
+        health: printed.health,
+        currentHealth: 0
+      })
+    ];
+
+    const events: any[] = [];
+    resolveDeaths(state, events, catalogMap);
+
+    expect(player.mana.current).toBe(printed.cost);
+    expect(events.some((event) => event.type === "AUGMENT_TRIGGERED" && event.payload?.augmentId === "AMP_VENDOR_KICKBACK")).toBe(true);
+  });
+
+  it("can pay both players and gives no crystals for a printed 0-cost minion", () => {
+    const state = startInProgress(33);
+    const zero = {
+      id: "TEST_ZERO_MINION",
+      name: "Zero",
+      category: "測試",
+      cost: 0,
+      attack: 1,
+      health: 1,
+      type: "MINION" as const,
+      rarity: "COMMON" as const,
+      description: "",
+      image: "",
+      keywords: {}
+    };
+    const localCatalog = new Map(catalogMap);
+    localCatalog.set(zero.id, zero);
+    state.players.player1.mana.current = 0;
+    state.players.player2.mana.current = 0;
+    applyAugmentSelection(state, "player1", entry("AMP_VENDOR_KICKBACK"), []);
+    applyAugmentSelection(state, "player2", entry("AMP_VENDOR_KICKBACK"), []);
+    state.players.player1.board = [
+      makeMinion({
+        instanceId: "rebate-zero",
+        cardId: zero.id,
+        name: zero.name,
+        category: zero.category,
+        cost: 8,
+        attack: zero.attack,
+        baseAttack: zero.attack,
+        health: zero.health,
+        currentHealth: 0
+      })
+    ];
+
+    resolveDeaths(state, [], localCatalog);
+
+    expect(state.players.player1.mana.current).toBe(0);
+    expect(state.players.player2.mana.current).toBe(0);
   });
 });
 

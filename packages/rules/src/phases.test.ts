@@ -132,14 +132,17 @@ describe("phase pure helpers", () => {
     expect(excluded.options.map((o) => o.id)).not.toContain(a.options[0].id);
   });
 
-  it("offers 0050 only in the first phase, and never when phase 2 is already 卯死", () => {
+  it("offers first-phase-only low-tier augments only when eligible", () => {
     const low = AMPLIFICATION_DB.filter((entry) => entry.tier === "加減賺");
     const counts: Record<string, number> = { 平民: 30 };
     const all = (isFirstPhase: boolean, secondPhaseTier: "加減賺" | "吃紅" | "卯死") =>
       sampleAugmentOptions({ rngState: 5, pool: low, categoryCounts: counts, excludeIds: new Set(), isFirstPhase, secondPhaseTier, count: 99 }).options.map((o) => o.id);
     expect(all(true, "吃紅")).toContain("AMP_0050");
+    expect(all(true, "吃紅")).toContain("AMP_GO_FOR_BROKE");
     expect(all(false, "吃紅")).not.toContain("AMP_0050");
+    expect(all(false, "吃紅")).not.toContain("AMP_GO_FOR_BROKE");
     expect(all(true, "卯死")).not.toContain("AMP_0050");
+    expect(all(true, "卯死")).toContain("AMP_GO_FOR_BROKE");
   });
 
   it("draws three unique vote events, reproducibly per seed", () => {
@@ -168,6 +171,7 @@ describe("amplification phase (turn 6)", () => {
     expect(pub.phase).toBe("AMPLIFICATION_PHASE");
     expect((pub.specialPhase as any)?.amplificationOptions).toBeUndefined();
     expect(pub.specialPhase?.amplificationSelected).toEqual({ player1: false, player2: false });
+    expect(pub.specialPhase?.amplificationRerollRemaining).toEqual({ player1: 1, player2: 1 });
   });
 
   it("rejects normal play/attack/endTurn while the phase is open", () => {
@@ -189,6 +193,75 @@ describe("amplification phase (turn 6)", () => {
     expect(state.players.player1.amplification?.id).toBe(optP1.id);
     expect(state.players.player2.amplification?.id).toBe(optP2.id);
     expect(state.turn.number).toBe(6); // the interrupted turn resumes, not re-run
+  });
+
+  it("rerolls one seat's amplification options once, keeping the same tier and public flag", () => {
+    let state = advanceToTurn(startMatch(131), 6);
+    const beforeP1 = state.specialPhase!.amplificationOptions!.player1.map((option) => option.id);
+    const beforeP2 = state.specialPhase!.amplificationOptions!.player2.map((option) => option.id);
+    const tier = state.specialPhase!.amplificationOptions!.player1[0].tier;
+
+    const result = reduce(state, env("reroll", "player1", { type: "rerollAmplification" }), CARD_CATALOG);
+    state = result.state;
+
+    const afterP1 = state.specialPhase!.amplificationOptions!.player1;
+    expect(result.events.some((event) => event.type === "AMPLIFICATION_REROLLED")).toBe(true);
+    expect(afterP1).toHaveLength(3);
+    expect(afterP1.every((option) => option.tier === tier)).toBe(true);
+    expect(afterP1.map((option) => option.id)).not.toEqual(beforeP1);
+    expect(state.specialPhase!.amplificationOptions!.player2.map((option) => option.id)).toEqual(beforeP2);
+    expect(toPublicState(state).specialPhase?.amplificationRerollUsed).toEqual({ player1: true, player2: false });
+    expect(toPublicState(state).specialPhase?.amplificationRerollRemaining).toEqual({ player1: 0, player2: 1 });
+  });
+
+  it("rejects a second reroll and rejects rerolling after selecting an amplification", () => {
+    let state = advanceToTurn(startMatch(132), 6);
+    state = reduce(state, env("reroll-once", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
+    const second = reduce(state, env("reroll-twice", "player1", { type: "rerollAmplification" }), CARD_CATALOG);
+    expect(second.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
+
+    state = reduce(second.state, env("pick", "player1", { type: "selectAmplification", optionId: second.state.specialPhase!.amplificationOptions!.player1[0].id }), CARD_CATALOG).state;
+    const afterPick = reduce(state, env("reroll-picked", "player1", { type: "rerollAmplification" }), CARD_CATALOG);
+    expect(afterPick.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
+  });
+
+  it("lets 要拚 add one extra reroll to the next amplification phase", () => {
+    let state = advanceToTurn(startMatch(134), 6);
+    state = reduce(
+      state,
+      env("amp-timeout-before-extra", state.turn.activeSeat, { type: "selectAmplification", optionId: "" }, { serverTimeout: true }),
+      CARD_CATALOG
+    ).state;
+    state.players.player1.augmentFlags.extraAmplificationRerollsNextPhase = 1;
+
+    state = advanceToTurn(state, 14);
+    expect(state.specialPhase?.amplificationRerollLimit).toEqual({ player1: 2, player2: 1 });
+    expect(state.players.player1.augmentFlags.extraAmplificationRerollsNextPhase).toBe(0);
+    expect(toPublicState(state).specialPhase?.amplificationRerollRemaining).toEqual({ player1: 2, player2: 1 });
+
+    state = reduce(state, env("go-reroll-1", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
+    expect(toPublicState(state).specialPhase?.amplificationRerollRemaining?.player1).toBe(1);
+
+    state = reduce(state, env("go-reroll-2", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
+    expect(toPublicState(state).specialPhase?.amplificationRerollRemaining?.player1).toBe(0);
+
+    const third = reduce(state, env("go-reroll-3", "player1", { type: "rerollAmplification" }), CARD_CATALOG);
+    expect(third.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
+  });
+
+  it("uses the rerolled options for timeout fallback", () => {
+    let state = advanceToTurn(startMatch(133), 6);
+    state = reduce(state, env("reroll-timeout", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
+    const fallback = state.specialPhase!.amplificationOptions!.player1[0];
+
+    state = reduce(
+      state,
+      env("amp-timeout-reroll", state.turn.activeSeat, { type: "selectAmplification", optionId: "" }, { serverTimeout: true }),
+      CARD_CATALOG
+    ).state;
+
+    expect(state.phase).toBe("NORMAL_PLAY");
+    expect(state.players.player1.amplification?.id).toBe(fallback.id);
   });
 
   it("force-resolves to tier-1 defaults on a server timeout", () => {

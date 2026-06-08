@@ -134,6 +134,10 @@ export class SpecialPhaseSchema extends Schema {
   phaseDeadlineAtMs = 0;
   ampSelectedP1 = false;
   ampSelectedP2 = false;
+  ampRerollUsedP1 = false;
+  ampRerollUsedP2 = false;
+  ampRerollRemainingP1 = 0;
+  ampRerollRemainingP2 = 0;
   voteSubmittedP1 = false;
   voteSubmittedP2 = false;
   voteWeightP1 = 0;
@@ -144,6 +148,10 @@ defineTypes(SpecialPhaseSchema, {
   phaseDeadlineAtMs: "number",
   ampSelectedP1: "boolean",
   ampSelectedP2: "boolean",
+  ampRerollUsedP1: "boolean",
+  ampRerollUsedP2: "boolean",
+  ampRerollRemainingP1: "number",
+  ampRerollRemainingP2: "number",
   voteSubmittedP1: "boolean",
   voteSubmittedP2: "boolean",
   voteWeightP1: "number",
@@ -209,6 +217,10 @@ function syncSpecialPhase(target: SpecialPhaseSchema, sp: SpecialPhaseView | und
   target.phaseDeadlineAtMs = sp?.phaseDeadlineAtMs ?? 0;
   target.ampSelectedP1 = sp?.amplificationSelected?.player1 ?? false;
   target.ampSelectedP2 = sp?.amplificationSelected?.player2 ?? false;
+  target.ampRerollUsedP1 = sp?.amplificationRerollUsed?.player1 ?? false;
+  target.ampRerollUsedP2 = sp?.amplificationRerollUsed?.player2 ?? false;
+  target.ampRerollRemainingP1 = sp?.amplificationRerollRemaining?.player1 ?? 0;
+  target.ampRerollRemainingP2 = sp?.amplificationRerollRemaining?.player2 ?? 0;
   target.voteSubmittedP1 = sp?.voteSubmitted?.player1 ?? false;
   target.voteSubmittedP2 = sp?.voteSubmitted?.player2 ?? false;
   target.voteWeightP1 = sp?.voteWeights?.player1 ?? 0;

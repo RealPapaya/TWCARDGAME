@@ -113,6 +113,10 @@ export interface AugmentFlags {
   bonusCrystalsNextTurnSources: string[];
   /** 大薯買一送一: extra card drawn at the start of each of the next N turns. */
   extraDrawTurnsRemaining: number;
+  /** 要拚: extra rerolls available in the next amplification phase. */
+  extraAmplificationRerollsNextPhase: number;
+  /** 廠商回扣: gain printed-cost crystals whenever any minion is destroyed. */
+  destroyedMinionCostRebate: boolean;
   /** 台雞電OFFER: convert card costs to hero HP payment on the next own turn. */
   payCostWithHealthNextTurn: boolean;
   /** 台雞電OFFER: active for the current own turn only. */
@@ -169,6 +173,9 @@ export interface SpecialPhaseState {
   resumeTurnNumber: number;
   amplificationOptions?: Record<Seat, AmplificationOption[]>;
   amplificationChoice?: Partial<Record<Seat, string>>;
+  amplificationRerollUsed?: Partial<Record<Seat, boolean>>;
+  amplificationRerollLimit?: Partial<Record<Seat, number>>;
+  amplificationRerollCount?: Partial<Record<Seat, number>>;
   voteEvents?: VoteEvent[];
   /** Integer roulette weights (a seat's weight is the OPPONENT's HP). */
   voteWeightsInt?: Record<Seat, number>;

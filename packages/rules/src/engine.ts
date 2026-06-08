@@ -16,6 +16,7 @@ import {
 } from "./effects.js";
 import {
   enterSpecialPhase,
+  handleRerollAmplification,
   handleSelectAmplification,
   handleSubmitVote,
   phaseTriggerForTurn,
@@ -155,6 +156,8 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   if (next.phase !== "NORMAL_PLAY") {
     if (envelope.command.type === "selectAmplification") {
       handleSelectAmplification(next, envelope.seat, envelope.command.optionId, envelope.serverTimeout === true, envelope.nowMs, events);
+    } else if (envelope.command.type === "rerollAmplification") {
+      handleRerollAmplification(next, envelope.seat, events);
     } else if (envelope.command.type === "submitVote") {
       handleSubmitVote(next, envelope.seat, envelope.command.optionIndex, envelope.serverTimeout === true, envelope.nowMs, events, catalog);
     } else {
@@ -163,7 +166,11 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
     return { state: next, events };
   }
 
-  if (envelope.command.type === "selectAmplification" || envelope.command.type === "submitVote") {
+  if (
+    envelope.command.type === "selectAmplification" ||
+    envelope.command.type === "rerollAmplification" ||
+    envelope.command.type === "submitVote"
+  ) {
     reject(next, events, envelope.seat, "現在不是特殊階段。");
     return { state: next, events };
   }

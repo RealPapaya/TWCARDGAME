@@ -305,12 +305,34 @@ export function resolveDeaths(state: MatchState, events: EffectContext["events"]
         player.board.splice(i, 1);
         player.graveyard.push(minionToCard(state, minion));
         addEvent(state, events, "DESTROY", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
+        grantDestroyedMinionCostRebate(state, minion, events, catalog);
         resolveDeathrattle(state, player, minion, events, catalog);
         // 普渡: revive the owner's minion once as a 1/1 token (after the deathrattle).
         tryReviveMinion(state, player, minion, events);
         removed = true;
       }
     }
+  }
+}
+
+function grantDestroyedMinionCostRebate(
+  state: MatchState,
+  minion: RuntimeMinion,
+  events: EffectContext["events"],
+  catalog: Map<string, CardDefinition>
+): void {
+  const originalCost = catalog.get(minion.cardId)?.cost ?? minion.cost;
+  if (originalCost <= 0) return;
+  for (const player of Object.values(state.players)) {
+    if (!player.augmentFlags.destroyedMinionCostRebate) continue;
+    player.mana.current += originalCost;
+    addEvent(
+      state,
+      events,
+      "AUGMENT_TRIGGERED",
+      { augmentId: "AMP_VENDOR_KICKBACK", amount: originalCost, cardId: minion.cardId },
+      player.seat
+    );
   }
 }
 

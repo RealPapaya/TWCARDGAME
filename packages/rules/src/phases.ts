@@ -258,12 +258,20 @@ export function enterSpecialPhase(
   if (phase === "AMPLIFICATION_PHASE") {
     sp.amplificationOptions = { player1: [], player2: [] };
     sp.amplificationChoice = {};
+    sp.amplificationRerollUsed = {};
+    sp.amplificationRerollLimit = {};
+    sp.amplificationRerollCount = {};
     // Both phases share their tier (rolled at match creation); only the per-seat
     // option content differs, weighted by each deck and excluding prior picks.
     const phaseIndex = Math.max(0, AMPLIFICATION_TURNS.indexOf(state.turn.number));
     const tier = state.augmentTiers[phaseIndex] ?? state.augmentTiers[0];
     const pool = AMPLIFICATION_DB.filter((entry) => entry.tier === tier);
     for (const seat of SEATS) {
+      const flags = state.players[seat].augmentFlags;
+      const extraRerolls = Math.max(0, flags.extraAmplificationRerollsNextPhase);
+      sp.amplificationRerollLimit[seat] = 1 + extraRerolls;
+      sp.amplificationRerollCount[seat] = 0;
+      flags.extraAmplificationRerollsNextPhase = 0;
       const excludeIds = new Set(state.players[seat].augments.map((augment) => augment.id));
       const sampled = sampleAugmentOptions({
         rngState: state.private.rngState,
@@ -286,6 +294,83 @@ export function enterSpecialPhase(
 
   state.specialPhase = sp;
   addEvent(state, events, "PHASE_STARTED", { phase, phaseDeadlineAtMs: sp.phaseDeadlineAtMs }, resumeSeat);
+}
+
+/** Replaces one seat's unsubmitted amplification offer once per amplification phase. */
+export function handleRerollAmplification(
+  state: MatchState,
+  seat: Seat,
+  events: GameEvent[]
+): void {
+  const sp = state.specialPhase;
+  if (!sp || sp.phase !== "AMPLIFICATION_PHASE") {
+    rejectPhase(state, events, seat, "No amplification phase is active.");
+    return;
+  }
+  if (sp.amplificationChoice?.[seat] !== undefined) {
+    rejectPhase(state, events, seat, "Amplification is already selected.");
+    return;
+  }
+  const used = sp.amplificationRerollCount?.[seat] ?? (sp.amplificationRerollUsed?.[seat] ? 1 : 0);
+  const limit = sp.amplificationRerollLimit?.[seat] ?? 1;
+  if (used >= limit) {
+    rejectPhase(state, events, seat, "Amplification reroll has already been used.");
+    return;
+  }
+
+  const currentOptions = sp.amplificationOptions?.[seat] ?? [];
+  const phaseIndex = Math.max(0, AMPLIFICATION_TURNS.indexOf(sp.resumeTurnNumber));
+  const tier = currentOptions[0]?.tier ?? state.augmentTiers[phaseIndex] ?? state.augmentTiers[0];
+  const pool = AMPLIFICATION_DB.filter((entry) => entry.tier === tier);
+  const boundIds = new Set(state.players[seat].augments.map((augment) => augment.id));
+  const currentIds = new Set(currentOptions.map((option) => option.id));
+  const preferredExcludeIds = new Set([...boundIds, ...currentIds]);
+  const first = sampleAugmentOptionsForSeat(state, seat, pool, preferredExcludeIds, phaseIndex, 3);
+  let nextOptions = first.options;
+
+  if (nextOptions.length < 3) {
+    const excludeIds = new Set([...boundIds, ...nextOptions.map((option) => option.id)]);
+    const fill = sampleAugmentOptionsForSeat(state, seat, pool, excludeIds, phaseIndex, 3 - nextOptions.length);
+    nextOptions = [...nextOptions, ...fill.options];
+  }
+
+  if (nextOptions.length === 0) {
+    rejectPhase(state, events, seat, "No amplification options are available.");
+    return;
+  }
+
+  if (!sp.amplificationOptions) sp.amplificationOptions = { player1: [], player2: [] };
+  sp.amplificationOptions[seat] = nextOptions;
+  sp.amplificationRerollUsed = { ...sp.amplificationRerollUsed, [seat]: true };
+  sp.amplificationRerollCount = { ...sp.amplificationRerollCount, [seat]: used + 1 };
+  addEvent(
+    state,
+    events,
+    "AMPLIFICATION_REROLLED",
+    { tier, optionIds: nextOptions.map((option) => option.id), rerollsRemaining: Math.max(0, limit - used - 1) },
+    seat
+  );
+}
+
+function sampleAugmentOptionsForSeat(
+  state: MatchState,
+  seat: Seat,
+  pool: readonly AmplificationDbEntry[],
+  excludeIds: ReadonlySet<string>,
+  phaseIndex: number,
+  count: number
+): { options: AmplificationOption[] } {
+  const sampled = sampleAugmentOptions({
+    rngState: state.private.rngState,
+    pool,
+    categoryCounts: state.players[seat].registeredCategoryCounts,
+    excludeIds,
+    isFirstPhase: phaseIndex === 0,
+    secondPhaseTier: state.augmentTiers[1],
+    count
+  });
+  state.private.rngState = sampled.rngState;
+  return { options: sampled.options };
 }
 
 /** Records (or force-defaults) a seat's amplification choice and resolves once both are in. */

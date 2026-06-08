@@ -544,6 +544,7 @@ function requiresActionSeq(commandType: ClientCommandMessage["command"]["type"])
     commandType !== "reconnect" &&
     commandType !== "concede" &&
     commandType !== "selectAmplification" &&
+    commandType !== "rerollAmplification" &&
     commandType !== "submitVote"
   );
 }

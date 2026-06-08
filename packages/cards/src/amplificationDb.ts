@@ -63,6 +63,15 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_RAISE_NEXT_TIER" }
   },
   {
+    id: "AMP_GO_FOR_BROKE",
+    name: "要拚",
+    description: "下一次增幅可以多重抽一次增幅。",
+    tier: "加減賺",
+    factionTags: [],
+    firstPhaseOnly: true,
+    effect: { type: "AUG_EXTRA_AMP_REROLL_NEXT_PHASE", value: 1 }
+  },
+  {
     id: "AMP_MIN_WAGE",
     name: "基本工資調漲",
     description: "費用 1-3 的隨從 攻擊 +2（含之後打出，整局有效）。",
@@ -244,6 +253,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 3 }
   },
   {
+    id: "AMP_VENDOR_KICKBACK",
+    name: "廠商回扣",
+    description: "本場比賽摧毀隨從後，可以立刻獲得該隨從原始費用的水晶。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_DESTROYED_MINION_COST_REBATE" }
+  },
+  {
     id: "AMP_PUDU",
     name: "普渡",
     description: "本場我方隨從死後都會復活一次 但攻擊 / 生命只有 1。",
@@ -304,11 +321,11 @@ export function filterAmplification(
 }
 
 const AUGMENT_EFFECT_TYPES = new Set<string>(SUPPORTED_AUGMENT_EFFECTS);
-const FIRST_PHASE_ONLY_IDS = new Set<string>(["AMP_0050", "AMP_DEFAULT_SETTLEMENT"]);
+const FIRST_PHASE_ONLY_IDS = new Set<string>(["AMP_0050", "AMP_GO_FOR_BROKE", "AMP_DEFAULT_SETTLEMENT"]);
 
 /**
  * Validates the amplification DB: unique ids, valid tiers, supported effect
- * types, `firstPhaseOnly` restricted to the two designed augments, and faction
+ * types, `firstPhaseOnly` restricted to the designed augments, and faction
  * entries carrying a non-empty `factionTags`.
  */
 export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { valid: boolean; errors: string[] } {

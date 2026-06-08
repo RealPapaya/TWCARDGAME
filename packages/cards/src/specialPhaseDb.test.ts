@@ -86,10 +86,11 @@ describe("special-phase databases", () => {
     expect(result.errors.filter((e) => e.includes("AMP_BAD_BOUNCE_BUFF"))).toHaveLength(1);
   });
 
-  it("restricts firstPhaseOnly to the two designed augments", () => {
+  it("restricts firstPhaseOnly to the designed augments", () => {
     expect(AMPLIFICATION_DB.filter((e) => e.firstPhaseOnly).map((e) => e.id).sort()).toEqual([
       "AMP_0050",
-      "AMP_DEFAULT_SETTLEMENT"
+      "AMP_DEFAULT_SETTLEMENT",
+      "AMP_GO_FOR_BROKE"
     ]);
   });
 });

@@ -82,6 +82,14 @@ export function toSpecialPhaseView(state: MatchState): SpecialPhaseView | undefi
       amplificationSelected: {
         player1: sp.amplificationChoice?.player1 !== undefined,
         player2: sp.amplificationChoice?.player2 !== undefined
+      },
+      amplificationRerollUsed: {
+        player1: sp.amplificationRerollUsed?.player1 === true,
+        player2: sp.amplificationRerollUsed?.player2 === true
+      },
+      amplificationRerollRemaining: {
+        player1: Math.max(0, (sp.amplificationRerollLimit?.player1 ?? 1) - (sp.amplificationRerollCount?.player1 ?? 0)),
+        player2: Math.max(0, (sp.amplificationRerollLimit?.player2 ?? 1) - (sp.amplificationRerollCount?.player2 ?? 0))
       }
     };
   }

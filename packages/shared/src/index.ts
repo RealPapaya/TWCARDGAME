@@ -230,6 +230,8 @@ export interface VoteWeights {
 export interface SpecialPhaseView {
   phaseDeadlineAtMs: number;
   amplificationSelected?: Record<Seat, boolean>;
+  amplificationRerollUsed?: Record<Seat, boolean>;
+  amplificationRerollRemaining?: Record<Seat, number>;
   voteEvents?: VoteEvent[];
   voteWeights?: VoteWeights;
   voteSubmitted?: Record<Seat, boolean>;
@@ -310,6 +312,7 @@ export type GameCommand =
   | { type: "concede" }
   | { type: "reconnect"; matchId: string }
   | { type: "selectAmplification"; optionId: string }
+  | { type: "rerollAmplification" }
   | { type: "submitVote"; optionIndex: 0 | 1 | 2 };
 
 export interface ClientCommandMessage {
@@ -351,6 +354,7 @@ export type GameEventType =
   | "PHASE_STARTED"
   | "PHASE_ENDED"
   | "AMPLIFICATION_SELECTED"
+  | "AMPLIFICATION_REROLLED"
   | "AUGMENT_TRIGGERED"
   | "VOTE_CAST"
   | "VOTE_RESOLVED"

@@ -124,6 +124,10 @@ class SpecialPhaseSchema extends Schema {
   phaseDeadlineAtMs = 0;
   ampSelectedP1 = false;
   ampSelectedP2 = false;
+  ampRerollUsedP1 = false;
+  ampRerollUsedP2 = false;
+  ampRerollRemainingP1 = 0;
+  ampRerollRemainingP2 = 0;
   voteSubmittedP1 = false;
   voteSubmittedP2 = false;
   voteWeightP1 = 0;
@@ -134,6 +138,10 @@ defineTypes(SpecialPhaseSchema, {
   phaseDeadlineAtMs: "number",
   ampSelectedP1: "boolean",
   ampSelectedP2: "boolean",
+  ampRerollUsedP1: "boolean",
+  ampRerollUsedP2: "boolean",
+  ampRerollRemainingP1: "number",
+  ampRerollRemainingP2: "number",
   voteSubmittedP1: "boolean",
   voteSubmittedP2: "boolean",
   voteWeightP1: "number",

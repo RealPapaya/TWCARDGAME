@@ -170,6 +170,10 @@ export type ClientViewState = {
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];
+  specialPhasePeek?: boolean;
+  amplificationRerollStage?: "out" | "in";
+  amplificationRerollStartedAtMs?: number;
+  pendingAmplificationOptions?: AmplificationOption[];
   presence: Map<Seat, { connected: boolean; reconnectUntilMs?: number }>;
   rejectedHandIds: Set<string>;
   selectedHandId?: string;

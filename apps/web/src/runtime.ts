@@ -151,6 +151,8 @@ const RESULT_OVERLAY_PAUSE_MS = 400;
 const APP_VERSION = "v1.0.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
+const AMP_REROLL_FLIP_OUT_MS = 260;
+const AMP_REROLL_FLIP_IN_MS = 320;
 
 const BATTLECRY_LOG = true;
 function blog(label: string, data?: Record<string, unknown>): void {
@@ -272,6 +274,7 @@ let turnAnnouncementTimer: number | undefined;
 let turnCountdownTimer: number | undefined;
 let turnCountdownWakeTimer: number | undefined;
 let turnCountdownWakeDeadlineAtMs: number | undefined;
+let amplificationRerollTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 let trainingRewardAnimationTimer: number | undefined;
 const minionDomKeys = new Map<string, string>();
@@ -2211,22 +2214,69 @@ function renderPhaseCountdown(label: string): string {
 }
 
 /** Turn 6/14 deck-amplification chooser — presented mulligan-style with three highlighted picks. */
+function renderSpecialPhasePeekOverlay(kind: "amplification" | "vote"): string {
+  const title = kind === "amplification" ? "增幅選擇中" : "公投事件選擇中";
+  return `
+    <section class="special-peek-overlay" data-testid="${kind === "amplification" ? "amplification" : "voting"}-peek-overlay">
+      <div class="special-peek-toolbar">
+        <span>${title}</span>
+        ${renderPhaseCountdown(kind === "amplification" ? "增幅倒數" : "事件倒數")}
+        <button type="button" class="special-phase-btn primary" data-special-return>返回選項</button>
+      </div>
+    </section>
+  `;
+}
+
+function renderSpecialPhaseActions(opts: {
+  submitted: boolean;
+  canReroll?: boolean;
+  rerollUsed?: boolean;
+  rerollRemaining?: number;
+  rerolling?: boolean;
+}): string {
+  const rerollRemaining = opts.rerollRemaining ?? (opts.rerollUsed ? 0 : 1);
+  const rerollDisabled = !opts.canReroll || opts.submitted || rerollRemaining <= 0 || opts.rerolling;
+  const rerollLabel = opts.rerolling
+    ? "重抽中..."
+    : rerollRemaining <= 0
+      ? "已重抽"
+      : rerollRemaining > 1
+        ? `重抽增幅 x${rerollRemaining}`
+        : "重抽增幅";
+  return `
+    <div class="special-phase-actions">
+      <button type="button" class="special-phase-btn" data-special-peek ${opts.submitted ? "disabled" : ""}>透視</button>
+      ${
+        opts.canReroll !== undefined
+          ? `<button type="button" class="special-phase-btn accent" data-amp-reroll ${rerollDisabled ? "disabled" : ""}>${rerollLabel}</button>`
+          : ""
+      }
+    </div>
+  `;
+}
+
 function renderAmplificationOverlay(): string {
   if (readPhase() !== "AMPLIFICATION_PHASE" || (!view.room && !trainingSession)) return "";
+  if (view.specialPhasePeek) return renderSpecialPhasePeekOverlay("amplification");
   const options = view.amplificationOptions ?? [];
   const mySeat = view.mySeat;
   const sp = view.state?.specialPhase;
   // Use the per-phase "selected" flag, not the persistent bound amplification —
   // the latter stays set from turn 6 and would wrongly hide the turn-14 options.
   const submitted = Boolean(sp && mySeat && (mySeat === "player1" ? sp.ampSelectedP1 : sp.ampSelectedP2)) || options.length === 0;
+  const rerollUsed = Boolean(sp && mySeat && (mySeat === "player1" ? sp.ampRerollUsedP1 : sp.ampRerollUsedP2));
+  const rerollRemaining = sp && mySeat ? (mySeat === "player1" ? sp.ampRerollRemainingP1 : sp.ampRerollRemainingP2) : undefined;
+  const rerolling = Boolean(view.amplificationRerollStage);
+  const contentClass = classNames(["mulligan-content", "amp-content", rerolling && `amp-reroll-${view.amplificationRerollStage}`]);
   return `
     <section id="amplification-modal" class="mulligan-overlay amp-overlay ${submitted ? "submitted" : ""}" data-testid="amplification-overlay">
-      <div class="mulligan-content amp-content">
+      <div class="${contentClass}">
         <h2>政黨增幅</h2>
         <p>${submitted ? "已選擇，等待對手…" : "依你的牌組陣營，選擇一項增幅"}</p>
         ${renderPhaseCountdown("增幅倒數")}
+        ${renderSpecialPhaseActions({ submitted, canReroll: Boolean(view.room), rerollUsed, rerollRemaining, rerolling })}
         <div class="mulligan-card-area amp-card-area">
-          ${options.map((option) => renderAmplificationOption(option, submitted)).join("")}
+          ${options.map((option) => renderAmplificationOption(option, submitted || rerolling)).join("")}
         </div>
       </div>
     </section>
@@ -2252,6 +2302,7 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
 /** Turn 20 inverse-HP referendum ballot — three highlighted events, mulligan-style. */
 function renderVotingOverlay(): string {
   if (readPhase() !== "VOTING_PHASE" || (!view.room && !trainingSession)) return "";
+  if (view.specialPhasePeek) return renderSpecialPhasePeekOverlay("vote");
   const sp = view.state?.specialPhase;
   const events: Array<{ id: string; name: string; options: string[] }> = sp
     ? Array.from(sp.voteEvents ?? []).map((event: any) => ({
@@ -2274,6 +2325,7 @@ function renderVotingOverlay(): string {
           <span class="vote-weight-tag">你的中選率 ${myWeight}%（弱勢族群加成）</span>
         </p>
         ${renderPhaseCountdown("公投倒數")}
+        ${renderSpecialPhaseActions({ submitted })}
         <div class="mulligan-card-area vote-card-area">
           ${events.map((event, index) => renderVoteOption(event, index, submitted)).join("")}
         </div>
@@ -4274,6 +4326,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   view.animationCues = [];
   view.eventStatus = "in_progress";
   view.amplificationOptions = undefined;
+  resetSpecialPhaseUiState();
   view.selectedHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
@@ -4635,6 +4688,8 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
   }
   view.eventStatus = undefined;
   view.publicSync = undefined;
+  view.amplificationOptions = undefined;
+  resetSpecialPhaseUiState();
   view.presence.clear();
   stopOpponentDisconnectTick();
   view.rejectedHandIds.clear();
@@ -4678,8 +4733,7 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
     }
   );
   joined.onMessage("amplificationOptions", (message: { options: AmplificationOption[] }) => {
-    view.amplificationOptions = message.options ?? [];
-    render();
+    handleAmplificationOptionsMessage(message.options ?? []);
   });
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
@@ -4709,6 +4763,48 @@ function handleHandMessage(message: { seat?: Seat; cards: HandCardView[] }): voi
   // seat from it so the board renders from the correct perspective.
   if (message.seat && !view.mySeat) view.mySeat = message.seat;
   handleHandSync(message.cards);
+}
+
+function handleAmplificationOptionsMessage(options: AmplificationOption[]): void {
+  if (view.amplificationRerollStage === "out") {
+    view.pendingAmplificationOptions = options;
+    const startedAt = view.amplificationRerollStartedAtMs ?? performance.now();
+    scheduleApplyAmplificationReroll(Math.max(0, AMP_REROLL_FLIP_OUT_MS - (performance.now() - startedAt)));
+    render();
+    return;
+  }
+  view.amplificationOptions = options;
+  view.pendingAmplificationOptions = undefined;
+  render();
+}
+
+function scheduleApplyAmplificationReroll(delayMs: number): void {
+  if (amplificationRerollTimer !== undefined) window.clearTimeout(amplificationRerollTimer);
+  amplificationRerollTimer = window.setTimeout(() => {
+    amplificationRerollTimer = undefined;
+    if (!view.pendingAmplificationOptions) return;
+    view.amplificationOptions = view.pendingAmplificationOptions;
+    view.pendingAmplificationOptions = undefined;
+    view.amplificationRerollStage = "in";
+    render();
+    amplificationRerollTimer = window.setTimeout(() => {
+      amplificationRerollTimer = undefined;
+      view.amplificationRerollStage = undefined;
+      view.amplificationRerollStartedAtMs = undefined;
+      render();
+    }, AMP_REROLL_FLIP_IN_MS);
+  }, delayMs);
+}
+
+function resetSpecialPhaseUiState(): void {
+  view.specialPhasePeek = false;
+  view.amplificationRerollStage = undefined;
+  view.amplificationRerollStartedAtMs = undefined;
+  view.pendingAmplificationOptions = undefined;
+  if (amplificationRerollTimer !== undefined) {
+    window.clearTimeout(amplificationRerollTimer);
+    amplificationRerollTimer = undefined;
+  }
 }
 
 function handlePresenceMessage(message: { seat: Seat; connected: boolean; reconnectUntilMs?: number }): void {
@@ -5197,6 +5293,31 @@ function bindSelectionActions(): void {
       if (!id) return;
       if (view.mulliganSelection.has(id)) view.mulliganSelection.delete(id);
       else view.mulliganSelection.add(id);
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-special-peek]")) {
+    on(el, "click", "special-phase-peek", () => {
+      view.specialPhasePeek = true;
+      view.selectedAttackerId = undefined;
+      view.selectedHandId = undefined;
+      view.selectedTarget = undefined;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-special-return]")) {
+    on(el, "click", "special-phase-return", () => {
+      view.specialPhasePeek = false;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-amp-reroll]")) {
+    on(el, "click", "reroll-amplification", () => {
+      if (view.amplificationRerollStage) return;
+      view.amplificationRerollStage = "out";
+      view.amplificationRerollStartedAtMs = performance.now();
+      view.pendingAmplificationOptions = undefined;
+      send({ type: "rerollAmplification" });
       render();
     });
   }
@@ -6859,6 +6980,7 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
+    if (view.amplificationRerollStage) resetSpecialPhaseUiState();
     // A rejected battlecry play keeps the card in hand; drop the preview overlay.
     if (view.pendingBattlecry) {
       view.rejectedHandIds.add(view.pendingBattlecry.handInstanceId);
@@ -6879,6 +7001,7 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
   // phase's fresh private offer can't be shadowed by the previous turn's options.
   if (message.some((item) => item.type === "PHASE_ENDED")) {
     view.amplificationOptions = undefined;
+    resetSpecialPhaseUiState();
   }
   const voteResolved = message.find((item) => item.type === "VOTE_RESOLVED");
   if (voteResolved) startVoteRouletteFromEvent(voteResolved);

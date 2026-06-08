@@ -128,6 +128,9 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_RAISE_NEXT_TIER":
       state.augmentTiers[1] = bumpTier(state.augmentTiers[1]);
       break;
+    case "AUG_EXTRA_AMP_REROLL_NEXT_PHASE":
+      flags.extraAmplificationRerollsNextPhase += effect.value ?? 1;
+      break;
     case "AUG_MANA_RAMP_AFTER_TURN":
       if (effect.turnThreshold && effect.manaCap && effect.manaGrowth) {
         flags.manaRamps ??= [];
@@ -186,6 +189,9 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       triggered = true;
       break;
     }
+    case "AUG_DESTROYED_MINION_COST_REBATE":
+      flags.destroyedMinionCostRebate = true;
+      break;
     default:
       break;
   }

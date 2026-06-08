@@ -20,6 +20,8 @@ export function defaultAugmentFlags(): AugmentFlags {
     referendumImmune: false,
     bonusCrystalsNextTurnSources: [],
     extraDrawTurnsRemaining: 0,
+    extraAmplificationRerollsNextPhase: 0,
+    destroyedMinionCostRebate: false,
     payCostWithHealthNextTurn: false,
     payCostWithHealthThisTurn: false,
     manaRamps: [],
