@@ -27,7 +27,6 @@ export interface VoteEventDbEntry {
   apply: EnvironmentDescriptor;
 }
 
-const NOOP: EnvironmentDescriptor = { mode: "IMMEDIATE", effect: { type: "NOOP" } };
 
 /**
  * 【全場公投事件資料庫插槽】
@@ -71,7 +70,27 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     options: ["全場隨從獲得光盾", "全場隨從獲得光盾", "全場隨從獲得光盾"],
     apply: { mode: "IMMEDIATE", effect: { type: "GIVE_DIVINE_SHIELD_ALL_BOARD" } }
   },
-  { id: "VE_MARTIAL_LAW", name: "戒嚴", tierWeight: 20, options: ["效果待補", "效果待補", "效果待補"], apply: NOOP },
+  {
+    id: "VE_PARTY_INFIGHTING",
+    name: "黨內鬥爭",
+    tierWeight: 20,
+    options: ["雙方場上只留下費用最高的隨從，其餘死亡", "雙方場上只留下費用最高的隨從，其餘死亡", "雙方場上只留下費用最高的隨從，其餘死亡"],
+    apply: { mode: "IMMEDIATE", effect: { type: "KEEP_RANDOM_HIGHEST_COST_PER_SIDE" } }
+  },
+  {
+    id: "VE_PARLIAMENT_STAR_BRAWL",
+    name: "議會明星大亂鬥",
+    tierWeight: 20,
+    options: ["場上所有隨從隨機留下一名，其餘死亡", "場上所有隨從隨機留下一名，其餘死亡", "場上所有隨從隨機留下一名，其餘死亡"],
+    apply: { mode: "IMMEDIATE", effect: { type: "KEEP_RANDOM_ONE_BOARD_MINION" } }
+  },
+  {
+    id: "VE_MARTIAL_LAW",
+    name: "戒嚴",
+    tierWeight: 20,
+    options: ["場上隨從全部回到手牌，費用全部改為 10", "場上隨從全部回到手牌，費用全部改為 10", "場上隨從全部回到手牌，費用全部改為 10"],
+    apply: { mode: "IMMEDIATE", effect: { type: "MARTIAL_LAW_BOUNCE_ALL_COST_10" } }
+  },
   {
     id: "VE_GHOST_GATE",
     name: "鬼門開",

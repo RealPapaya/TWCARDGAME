@@ -809,7 +809,18 @@ function handleDiscard(state: MatchState, player: PlayerState, discarded: Runtim
   }
 }
 
-function bounceMinion(state: MatchState, owner: PlayerState, minion: RuntimeMinion, catalog: Map<string, CardDefinition>, events: EffectContext["events"]): void {
+interface BounceMinionOptions {
+  transformReturnedCard?: (card: RuntimeCard, removed: RuntimeMinion) => void;
+}
+
+export function bounceMinion(
+  state: MatchState,
+  owner: PlayerState,
+  minion: RuntimeMinion,
+  catalog: Map<string, CardDefinition>,
+  events: EffectContext["events"],
+  options: BounceMinionOptions = {}
+): void {
   const removed = removeMinion(owner, minion);
   if (!removed) return;
   const original = catalog.get(removed.cardId);
@@ -821,6 +832,7 @@ function bounceMinion(state: MatchState, owner: PlayerState, minion: RuntimeMini
     card.attack = (card.attack ?? 0) + card.hanBounceBonus;
     card.health = (card.health ?? 0) + card.hanBounceBonus;
   }
+  options.transformReturnedCard?.(card, removed);
   if (owner.hand.length < 10) owner.hand.push(card);
   addEvent(state, events, "BOUNCE", { target: removed.instanceId, cardId: removed.cardId }, owner.seat);
 }

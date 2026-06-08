@@ -59,8 +59,8 @@ function graveMinion(seat: Seat, suffix: string): RuntimeCard {
   };
 }
 
-function boardMinion(instanceId: string): RuntimeMinion {
-  return {
+function boardMinion(instanceId: string, overrides: Partial<RuntimeMinion> = {}): RuntimeMinion {
+  const minion: RuntimeMinion = {
     instanceId,
     cardId: MINION_DEF.id,
     ownerSeat: instanceId.startsWith("p2") ? "player2" : "player1",
@@ -83,6 +83,7 @@ function boardMinion(instanceId: string): RuntimeMinion {
     auraTaunt: false,
     tempBuffs: []
   };
+  return { ...minion, ...overrides };
 }
 
 describe("turn-20 vote-event handlers", () => {
@@ -93,6 +94,9 @@ describe("turn-20 vote-event handlers", () => {
       "FULL_HEAL_BOTH_HEROES",
       "GIVE_DIVINE_SHIELD_ALL_BOARD",
       "DESTROY_RIGHTMOST_MINIONS",
+      "KEEP_RANDOM_HIGHEST_COST_PER_SIDE",
+      "KEEP_RANDOM_ONE_BOARD_MINION",
+      "MARTIAL_LAW_BOUNCE_ALL_COST_10",
       "ENV_COST_ZERO"
     ]) {
       expect(effectHandlers[type]).toBeTypeOf("function");
@@ -126,6 +130,101 @@ describe("turn-20 vote-event handlers", () => {
     expect(state.players.player1.board).toHaveLength(0);
     expect(state.players.player2.board).toHaveLength(0);
     expect(context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target)).toEqual(["p2-only"]);
+  });
+
+  it("黨內鬥爭 KEEP_RANDOM_HIGHEST_COST_PER_SIDE keeps one highest-cost minion per side", () => {
+    const state = startMatch(30);
+    state.players.player1.board = [
+      boardMinion("p1-low", { cost: 1 }),
+      boardMinion("p1-high-a", { cost: 5 }),
+      boardMinion("p1-high-b", { cost: 5 })
+    ];
+    state.players.player2.board = [boardMinion("p2-high", { cost: 4 }), boardMinion("p2-low", { cost: 2 })];
+
+    const context = ctx(state);
+    resolveEffect({ type: "KEEP_RANDOM_HIGHEST_COST_PER_SIDE" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    expect(state.players.player1.board).toHaveLength(1);
+    expect(state.players.player1.board[0].cost).toBe(5);
+    expect(["p1-high-a", "p1-high-b"]).toContain(state.players.player1.board[0].instanceId);
+    expect(state.players.player2.board.map((m) => m.instanceId)).toEqual(["p2-high"]);
+    expect(context.events.filter((e) => e.type === "DESTROY")).toHaveLength(3);
+  });
+
+  it("黨內鬥爭 tie choice is deterministic for the same seed", () => {
+    const setup = (state: MatchState) => {
+      state.players.player1.board = [
+        boardMinion("p1-a", { cost: 5 }),
+        boardMinion("p1-b", { cost: 5 }),
+        boardMinion("p1-c", { cost: 1 })
+      ];
+      state.players.player2.board = [];
+    };
+    const a = startMatch(31);
+    const b = startMatch(31);
+    setup(a);
+    setup(b);
+
+    const ca = ctx(a);
+    const cb = ctx(b);
+    resolveEffect({ type: "KEEP_RANDOM_HIGHEST_COST_PER_SIDE" }, ca);
+    resolveEffect({ type: "KEEP_RANDOM_HIGHEST_COST_PER_SIDE" }, cb);
+    resolvePostAction(a, ca.events, CATALOG_MAP);
+    resolvePostAction(b, cb.events, CATALOG_MAP);
+
+    expect(a.players.player1.board.map((m) => m.instanceId)).toEqual(b.players.player1.board.map((m) => m.instanceId));
+  });
+
+  it("議會明星大亂鬥 KEEP_RANDOM_ONE_BOARD_MINION keeps one minion across the whole board", () => {
+    const state = startMatch(32);
+    state.players.player1.board = [boardMinion("p1-a"), boardMinion("p1-b")];
+    state.players.player2.board = [boardMinion("p2-a"), boardMinion("p2-b")];
+
+    const context = ctx(state);
+    resolveEffect({ type: "KEEP_RANDOM_ONE_BOARD_MINION" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    const survivors = [...state.players.player1.board, ...state.players.player2.board];
+    expect(survivors).toHaveLength(1);
+    expect(["p1-a", "p1-b", "p2-a", "p2-b"]).toContain(survivors[0].instanceId);
+    expect(context.events.filter((e) => e.type === "DESTROY")).toHaveLength(3);
+  });
+
+  it("議會明星大亂鬥 skips empty and single-minion boards", () => {
+    const state = startMatch(33);
+    state.players.player1.board = [boardMinion("p1-only")];
+    state.players.player2.board = [];
+
+    const context = ctx(state);
+    resolveEffect({ type: "KEEP_RANDOM_ONE_BOARD_MINION" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    expect(state.players.player1.board.map((m) => m.instanceId)).toEqual(["p1-only"]);
+    expect(context.events.filter((e) => e.type === "DESTROY")).toHaveLength(0);
+  });
+
+  it("戒嚴 MARTIAL_LAW_BOUNCE_ALL_COST_10 bounces board minions at cost 10 and kills overflow", () => {
+    const state = startMatch(34);
+    state.players.player1.hand = Array.from({ length: 9 }, (_, i) => graveMinion("player1", `hand-${i}`));
+    state.players.player1.board = [boardMinion("p1-bounce"), boardMinion("p1-overflow-a"), boardMinion("p1-overflow-b")];
+    state.players.player2.hand = [];
+    state.players.player2.board = [boardMinion("p2-bounce-a", { cost: 2 }), boardMinion("p2-bounce-b", { cost: 4 })];
+    const p1GraveBefore = state.players.player1.graveyard.length;
+
+    const context = ctx(state);
+    resolveEffect({ type: "MARTIAL_LAW_BOUNCE_ALL_COST_10" }, context);
+    resolvePostAction(state, context.events, CATALOG_MAP);
+
+    expect(state.players.player1.board).toHaveLength(0);
+    expect(state.players.player2.board).toHaveLength(0);
+    expect(state.players.player1.hand).toHaveLength(10);
+    expect(state.players.player1.hand.at(-1)?.cost).toBe(10);
+    expect(state.players.player2.hand).toHaveLength(2);
+    expect(state.players.player2.hand.every((card) => card.cost === 10)).toBe(true);
+    expect(state.players.player1.graveyard.length).toBe(p1GraveBefore + 2);
+    expect(context.events.filter((e) => e.type === "BOUNCE")).toHaveLength(3);
+    expect(context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target)).toEqual(["p1-overflow-b", "p1-overflow-a"]);
   });
 
   describe("鬼門開 SUMMON_FROM_GRAVEYARD", () => {

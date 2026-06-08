@@ -2,8 +2,8 @@ import type { CardDefinition, EffectDefinition } from "@twcardgame/cards";
 import { SEATS } from "@twcardgame/shared";
 import { nextInt } from "../rng.js";
 import { addEvent } from "../state.js";
-import type { EffectContext, EffectHandler, MatchState, RuntimeCard } from "../types.js";
-import { healUnit, summonCard } from "./core.js";
+import type { EffectContext, EffectHandler, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
+import { bounceMinion, healUnit, summonCard } from "./core.js";
 import { isEnvironmentActive } from "./environment.js";
 
 /**
@@ -84,6 +84,59 @@ export function destroyRightmostMinions(_effect: EffectDefinition, context: Effe
  * 由 `getCardActualCost` 讀取。gate `turn.number > appliedTurn` 排除公投當下
  * (第 20 回合)，讓效果精準落在下一整輪 (第 21、22 回合，durationTurns 2)。
  */
+/** 黨內鬥爭：雙方各自只保留一隻最高費用隨從；並列最高時隨機保留一隻。 */
+export function keepRandomHighestCostPerSide(_effect: EffectDefinition, context: EffectContext): void {
+  const { state } = context;
+  for (const seat of SEATS) {
+    const board = state.players[seat].board;
+    if (board.length <= 1) continue;
+    const highestCost = Math.max(...board.map((minion) => minion.cost));
+    const candidates = board.filter((minion) => minion.cost === highestCost);
+    let survivor: RuntimeMinion | undefined = candidates[0];
+    if (candidates.length > 1) {
+      const next = nextInt(state.private.rngState, candidates.length);
+      state.private.rngState = next.state;
+      survivor = candidates[next.value];
+    }
+    for (const minion of board) {
+      if (minion.instanceId !== survivor?.instanceId) minion.currentHealth = 0;
+    }
+  }
+}
+
+/** 議會明星大亂鬥：全場所有隨從隨機留下一名，其餘死亡。 */
+export function keepRandomOneBoardMinion(_effect: EffectDefinition, context: EffectContext): void {
+  const { state } = context;
+  const candidates = SEATS.flatMap((seat) => state.players[seat].board);
+  if (candidates.length <= 1) return;
+  const next = nextInt(state.private.rngState, candidates.length);
+  state.private.rngState = next.state;
+  const survivor = candidates[next.value];
+  for (const seat of SEATS) {
+    for (const minion of state.players[seat].board) {
+      if (minion.instanceId !== survivor.instanceId) minion.currentHealth = 0;
+    }
+  }
+}
+
+/** 戒嚴：全場隨從回手並改為 10 費；滿手時該隨從改為死亡結算。 */
+export function martialLawBounceAllCost10(_effect: EffectDefinition, context: EffectContext): void {
+  for (const seat of SEATS) {
+    const player = context.state.players[seat];
+    for (const minion of [...player.board]) {
+      if (player.hand.length >= 10) {
+        minion.currentHealth = 0;
+        continue;
+      }
+      bounceMinion(context.state, player, minion, context.catalog, context.events, {
+        transformReturnedCard: (card) => {
+          card.cost = 10;
+        }
+      });
+    }
+  }
+}
+
 export function environmentForcesZeroCost(state: MatchState): boolean {
   const env = state.currentEnvironment;
   if (!env || env.effect.type !== "ENV_COST_ZERO") return false;
@@ -97,6 +150,9 @@ export const voteEventHandlers: Record<string, EffectHandler> = {
   FULL_HEAL_BOTH_HEROES: fullHealBothHeroes,
   GIVE_DIVINE_SHIELD_ALL_BOARD: giveDivineShieldAllBoard,
   DESTROY_RIGHTMOST_MINIONS: destroyRightmostMinions,
+  KEEP_RANDOM_HIGHEST_COST_PER_SIDE: keepRandomHighestCostPerSide,
+  KEEP_RANDOM_ONE_BOARD_MINION: keepRandomOneBoardMinion,
+  MARTIAL_LAW_BOUNCE_ALL_COST_10: martialLawBounceAllCost10,
   // Passive: the actual zero-cost is applied in getCardActualCost via environmentForcesZeroCost.
   ENV_COST_ZERO: () => {}
 };
