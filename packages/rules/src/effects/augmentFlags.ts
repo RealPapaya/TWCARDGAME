@@ -1,5 +1,5 @@
 import type { Seat } from "@twcardgame/shared";
-import type { AugmentFlags, MatchState, RuntimeCard } from "../types.js";
+import type { AugmentFlags, MatchState, PlayerState, RuntimeCard } from "../types.js";
 
 /**
  * Pure, dependency-light readers for a player's derived augment flags. Kept in
@@ -18,8 +18,38 @@ export function defaultAugmentFlags(): AugmentFlags {
     damageReductionPerInstance: 0,
     reviveOnceAsVanilla: false,
     referendumImmune: false,
-    extraDrawTurnsRemaining: 0
+    extraDrawTurnsRemaining: 0,
+    manaRamps: [],
+    lowHpManaCapUnlocked: false
   };
+}
+
+/** Resolves the active mana cap/growth without stacking multiple ramp speeds. */
+export function augmentManaRamp(state: MatchState, seat: Seat): { cap: number; growth: number; unlockedLowHpCap: boolean } {
+  const player = state.players[seat];
+  const flags = player?.augmentFlags;
+  if (!player || !flags) return { cap: 10, growth: 1, unlockedLowHpCap: false };
+
+  const unlockedLowHpCap = unlockLowHpManaCap(player);
+
+  let cap = flags.lowHpManaCapUnlocked ? flags.lowHpManaCap ?? 10 : 10;
+  let growth = 1;
+  for (const ramp of flags.manaRamps ?? []) {
+    if (state.turn.number < ramp.turnThreshold) continue;
+    cap = Math.max(cap, ramp.cap);
+    growth = Math.max(growth, ramp.growth);
+  }
+  return { cap, growth, unlockedLowHpCap };
+}
+
+/** Latches 壽險理賠 as soon as the hero reaches its configured HP threshold. */
+export function unlockLowHpManaCap(player: PlayerState): boolean {
+  const flags = player.augmentFlags;
+  if (flags.lowHpManaCapUnlocked || flags.lowHpManaCapThreshold === undefined || player.hero.hp > flags.lowHpManaCapThreshold) {
+    return false;
+  }
+  flags.lowHpManaCapUnlocked = true;
+  return true;
 }
 
 /** 違約交割: the seat cannot attack or play cards until its freeze window lapses. */

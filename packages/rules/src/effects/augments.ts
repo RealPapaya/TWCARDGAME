@@ -123,6 +123,25 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_RAISE_NEXT_TIER":
       state.augmentTiers[1] = bumpTier(state.augmentTiers[1]);
       break;
+    case "AUG_MANA_RAMP_AFTER_TURN":
+      if (effect.turnThreshold && effect.manaCap && effect.manaGrowth) {
+        flags.manaRamps ??= [];
+        flags.manaRamps.push({
+          augmentId: entry.id,
+          turnThreshold: effect.turnThreshold,
+          cap: effect.manaCap,
+          growth: effect.manaGrowth
+        });
+      }
+      break;
+    case "AUG_MANA_CAP_LOW_HP":
+      flags.lowHpManaCapThreshold = effect.heroHpThreshold;
+      flags.lowHpManaCap = effect.manaCap;
+      if (effect.heroHpThreshold !== undefined && player.hero.hp <= effect.heroHpThreshold) {
+        flags.lowHpManaCapUnlocked = true;
+        triggered = true;
+      }
+      break;
     default:
       break;
   }

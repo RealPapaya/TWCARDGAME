@@ -32,6 +32,10 @@ export const EffectSchema: z.ZodType<Record<string, unknown>> = z.lazy(() =>
       summonCardId: z.string().optional(),
       crystals: z.number().int().optional(),
       durationTurns: z.number().int().positive().optional(),
+      turnThreshold: z.number().int().positive().optional(),
+      manaCap: z.number().int().positive().optional(),
+      manaGrowth: z.number().int().positive().optional(),
+      heroHpThreshold: z.number().int().positive().optional(),
       effect: EffectSchema.optional()
     })
     .passthrough()

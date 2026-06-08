@@ -14,6 +14,7 @@ import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
 import { applyEnvironmentTick } from "./environment.js";
 import { applyPersistentMinionAugments, applyStartOfTurnAugments, tryReviveMinion } from "./augments.js";
+import { augmentManaRamp, unlockLowHpManaCap } from "./augmentFlags.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
   ADD_CARD_TO_HAND: addCardToHand,
@@ -97,8 +98,12 @@ export function startTurn(state: MatchState, nowMs: number, events: EffectContex
   state.turn.startedAtMs = nowMs;
   state.turn.deadlineAtMs = nowMs + turnTimeLimitMs;
   state.private.turnActionTaken = false;
-  if (player.mana.max < 10) player.mana.max += 1;
+  const manaRamp = augmentManaRamp(state, player.seat);
+  player.mana.max = Math.min(manaRamp.cap, player.mana.max + manaRamp.growth);
   player.mana.current = player.mana.max;
+  if (manaRamp.unlockedLowHpCap) {
+    addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, player.seat);
+  }
   drawCards(state, player, 1, events);
   // Augment start-of-turn grants (消費券3600 deferred crystals, 大薯買一送一 extra
   // draw) and freeze-expiry housekeeping, after the normal refill + draw.
@@ -190,6 +195,9 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
     }
     ref.owner.hero.hp -= dealt;
     addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt }, ref.owner.seat);
+    if (unlockLowHpManaCap(ref.owner)) {
+      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, ref.owner.seat);
+    }
   }
 }
 

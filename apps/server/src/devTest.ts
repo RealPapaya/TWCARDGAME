@@ -169,7 +169,7 @@ function toVoteEvent(id: string): VoteEvent | undefined {
 }
 
 function applyMana(target: { current: number; max: number }, input: DevTestMatchSetup["playerMana"]): void {
-  const max = clampInt(input?.max, 0, 10, 10);
+  const max = clampInt(input?.max, 0, 30, 10);
   target.max = max;
   target.current = clampInt(input?.current, 0, max, max);
 }

@@ -43,6 +43,23 @@ describe("special-phase databases", () => {
     expect(result.errors.some((e) => e.includes("AMP_BAD"))).toBe(true);
   });
 
+  it("validates required mana-ramp effect fields", () => {
+    const bad = [
+      ...AMPLIFICATION_DB,
+      {
+        id: "AMP_BAD_RAMP",
+        name: "x",
+        description: "x",
+        tier: "吃紅" as const,
+        factionTags: [],
+        effect: { type: "AUG_MANA_RAMP_AFTER_TURN", manaCap: 15 }
+      }
+    ];
+    const result = validateAmplificationDb(bad);
+    expect(result.valid).toBe(false);
+    expect(result.errors.filter((e) => e.includes("AMP_BAD_RAMP"))).toHaveLength(2);
+  });
+
   it("restricts firstPhaseOnly to the two designed augments", () => {
     expect(AMPLIFICATION_DB.filter((e) => e.firstPhaseOnly).map((e) => e.id).sort()).toEqual([
       "AMP_0050",

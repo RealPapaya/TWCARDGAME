@@ -34,6 +34,14 @@ export interface EffectDefinition {
   crystals?: number;
   /** Augment durations: turns a deferred/passive augment effect lasts. */
   durationTurns?: number;
+  /** Augment mana ramp: global turn at which the ramp becomes active. */
+  turnThreshold?: number;
+  /** Augment mana ramp: maximum crystal capacity. */
+  manaCap?: number;
+  /** Augment mana ramp: crystals gained on each start turn. */
+  manaGrowth?: number;
+  /** Augment mana ramp: hero HP threshold that permanently unlocks a cap. */
+  heroHpThreshold?: number;
 }
 
 export interface CardKeywords {
@@ -161,5 +169,7 @@ export const SUPPORTED_AUGMENT_EFFECTS = [
   "AUG_PLAYED_MAXHP",
   "AUG_EXTRA_DRAW_TURNS",
   "AUG_REFERENDUM_IMMUNE",
-  "AUG_RAISE_NEXT_TIER"
+  "AUG_RAISE_NEXT_TIER",
+  "AUG_MANA_RAMP_AFTER_TURN",
+  "AUG_MANA_CAP_LOW_HP"
 ] as const;

@@ -55,7 +55,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_0050",
-    name: "0050",
+    name: "蹲得越低",
     description: "下一次增幅的等級提升一階。",
     tier: "加減賺",
     factionTags: [],
@@ -93,6 +93,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     tier: "加減賺",
     factionTags: ["勞工"],
     effect: { type: "AUG_PERSIST_CATEGORY_BUFF", target_category: "勞工", stat: "ALL", value: 1 }
+  },
+  {
+    id: "AMP_LIFE_INSURANCE",
+    name: "壽險理賠",
+    description: "英雄生命降至 5 或以下時，永久解鎖水晶上限 20。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_MANA_CAP_LOW_HP", heroHpThreshold: 5, manaCap: 20 }
   },
 
   // ---- 吃紅（中增幅）------------------------------------------------------
@@ -152,6 +160,22 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     factionTags: ["勞工"],
     effect: { type: "AUG_ADD_CARD_TO_HAND", cardId: "S029", count: 3 }
   },
+  {
+    id: "AMP_BEGGAR_HERO",
+    name: "乞丐超人",
+    description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_COST_MULTIPLIER", value: 7, turns: 8 }
+  },
+  {
+    id: "AMP_DCA",
+    name: "定期定額",
+    description: "第 10 回合起，每回合水晶成長 +2，上限提升至 15。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 10, manaCap: 15, manaGrowth: 2 }
+  },
 
   // ---- 卯死（高增幅）------------------------------------------------------
   {
@@ -180,14 +204,6 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 3 }
   },
   {
-    id: "AMP_BEGGAR_HERO",
-    name: "乞丐超人",
-    description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
-    tier: "卯死",
-    factionTags: [],
-    effect: { type: "AUG_COST_MULTIPLIER", value: 7, turns: 8 }
-  },
-  {
     id: "AMP_PUDU",
     name: "普渡",
     description: "本場我方隨從死後都會復活一次 但攻擊 / 生命只有 1。",
@@ -198,6 +214,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_TW_40000",
     name: "台股四萬點",
+    description: "第 20 回合起，每回合水晶成長 +2，上限提升至 30。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 20, manaCap: 30, manaGrowth: 2 }
+  },
+  {
+    id: "AMP_FIRE_SALE",
+    name: "跳樓大拍賣",
     description: "手上的牌 費用全部歸剩下 1（僅當下手牌）。",
     tier: "卯死",
     factionTags: [],
@@ -241,9 +265,22 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
     if (!tiers.has(entry.tier)) errors.push(`${entry.id}: invalid tier ${entry.tier}`);
     const type = entry.effect?.type;
     if (!type || !AUGMENT_EFFECT_TYPES.has(type)) errors.push(`${entry.id}: unsupported augment effect type ${type ?? "(none)"}`);
+    if (type === "AUG_MANA_RAMP_AFTER_TURN") {
+      if (!positiveInt(entry.effect.turnThreshold)) errors.push(`${entry.id}: mana ramp requires a positive turnThreshold`);
+      if (!positiveInt(entry.effect.manaCap)) errors.push(`${entry.id}: mana ramp requires a positive manaCap`);
+      if (!positiveInt(entry.effect.manaGrowth)) errors.push(`${entry.id}: mana ramp requires a positive manaGrowth`);
+    }
+    if (type === "AUG_MANA_CAP_LOW_HP") {
+      if (!positiveInt(entry.effect.heroHpThreshold)) errors.push(`${entry.id}: low-HP mana cap requires a positive heroHpThreshold`);
+      if (!positiveInt(entry.effect.manaCap)) errors.push(`${entry.id}: low-HP mana cap requires a positive manaCap`);
+    }
     if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
       errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);
     }
   }
   return { valid: errors.length === 0, errors };
+}
+
+function positiveInt(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value > 0;
 }

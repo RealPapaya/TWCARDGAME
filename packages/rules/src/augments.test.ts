@@ -2,7 +2,7 @@ import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type Amplificatio
 import type { CommandEnvelope, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch, reduce } from "./engine.js";
-import { applyAugmentSelection, applyDamage, applyPersistentMinionAugments, drawCards, resolveDeaths, resolveEffect } from "./effects.js";
+import { applyAugmentSelection, applyDamage, applyPersistentMinionAugments, drawCards, resolveDeaths, resolveEffect, startTurn } from "./effects.js";
 import { getCardActualCost } from "./state.js";
 import { legalMoves } from "./legalMoves.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
@@ -97,13 +97,13 @@ describe("augment one-shot grants & hand snapshots", () => {
     expect(state.players[seat].mana.current).toBe(before + 1);
   });
 
-  it("台股四萬點 sets current hand to cost 1 but leaves future draws untouched", () => {
+  it("跳樓大拍賣 sets current hand to cost 1 but leaves future draws untouched", () => {
     const state = startInProgress(2);
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
     const deckCard = player.deck[0];
     const deckPrinted = deckCard.cost;
-    applyAugmentSelection(state, seat, entry("AMP_TW_40000"), []);
+    applyAugmentSelection(state, seat, entry("AMP_FIRE_SALE"), []);
     expect(player.hand.every((card) => getCardActualCost(state, seat, card) <= 1)).toBe(true);
     // A card still in the deck keeps its printed cost (snapshot is one-shot).
     expect(getCardActualCost(state, seat, deckCard)).toBe(deckPrinted);
@@ -205,10 +205,108 @@ describe("augment passive cost readers", () => {
     const state = startInProgress(6);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_BEGGAR_HERO"), []);
+    expect(entry("AMP_BEGGAR_HERO").tier).toBe("吃紅");
     state.turn.number = 8;
     expect(getCardActualCost(state, seat, makeCard({ type: "MINION", cost: 10 }))).toBe(10);
     state.turn.number = 9;
     expect(getCardActualCost(state, seat, makeCard({ type: "MINION", cost: 10 }))).toBe(7);
+  });
+
+  it("台股四萬點 no longer snapshots hand costs", () => {
+    const state = startInProgress(20);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const handCosts = player.hand.map((card) => card.cost);
+    applyAugmentSelection(state, seat, entry("AMP_TW_40000"), []);
+    expect(player.hand.map((card) => card.cost)).toEqual(handCosts);
+  });
+});
+
+describe("augment mana ramp", () => {
+  it("定期定額 starts +2 mana growth on global turn 10 and caps at 15", () => {
+    const state = startInProgress(21);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_DCA"), []);
+
+    player.mana.max = 9;
+    state.turn.number = 8;
+    startTurn(state, 2000, []);
+    expect(state.turn.number).toBe(9);
+    expect(player.mana.max).toBe(10);
+
+    player.mana.max = 9;
+    state.turn.number = 9;
+    startTurn(state, 3000, []);
+    expect(state.turn.number).toBe(10);
+    expect(player.mana.max).toBe(11);
+
+    player.mana.max = 14;
+    state.turn.number = 10;
+    startTurn(state, 4000, []);
+    expect(player.mana.max).toBe(15);
+  });
+
+  it("壽險理賠 permanently unlocks cap 20 once hero HP is <= 5", () => {
+    const state = startInProgress(22);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_LIFE_INSURANCE"), []);
+
+    player.hero.hp = 6;
+    applyDamage(state, { owner: player, kind: "HERO", unit: player.hero }, 1, []);
+    expect(player.augmentFlags.lowHpManaCapUnlocked).toBe(true);
+    player.hero.hp = 30;
+    player.mana.max = 10;
+    state.turn.number = 10;
+    startTurn(state, 2000, []);
+    expect(player.augmentFlags.lowHpManaCapUnlocked).toBe(true);
+    expect(player.mana.max).toBe(11);
+
+    player.mana.max = 19;
+    state.turn.number = 11;
+    startTurn(state, 3000, []);
+    expect(player.mana.max).toBe(20);
+
+    state.turn.number = 12;
+    startTurn(state, 4000, []);
+    expect(player.mana.max).toBe(20);
+  });
+
+  it("台股四萬點 starts +2 mana growth on global turn 20 and caps at 30", () => {
+    const state = startInProgress(23);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_TW_40000"), []);
+
+    player.mana.max = 10;
+    state.turn.number = 18;
+    startTurn(state, 2000, []);
+    expect(state.turn.number).toBe(19);
+    expect(player.mana.max).toBe(10);
+
+    state.turn.number = 19;
+    startTurn(state, 3000, []);
+    expect(state.turn.number).toBe(20);
+    expect(player.mana.max).toBe(12);
+
+    player.mana.max = 29;
+    state.turn.number = 20;
+    startTurn(state, 4000, []);
+    expect(player.mana.max).toBe(30);
+  });
+
+  it("multiple active mana ramps use highest cap and highest growth without stacking growth", () => {
+    const state = startInProgress(24);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_DCA"), []);
+    applyAugmentSelection(state, seat, entry("AMP_TW_40000"), []);
+
+    player.mana.max = 10;
+    state.turn.number = 19;
+    startTurn(state, 2000, []);
+    expect(player.mana.max).toBe(12);
   });
 });
 

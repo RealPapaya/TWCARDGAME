@@ -20,7 +20,9 @@ export {
 export {
   augmentCostMultiplierTenths,
   augmentFlatCostReduction,
+  augmentManaRamp,
   defaultAugmentFlags,
   isFrozen,
-  isReferendumImmune
+  isReferendumImmune,
+  unlockLowHpManaCap
 } from "./effects/augmentFlags.js";
