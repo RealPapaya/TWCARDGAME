@@ -1904,6 +1904,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const domKey = minionDomKey(seat, minion, index);
   const attackLunge = activeAttackLunges.get(minion.instanceId);
   const attackLungeStyle = attackLunge ? ` style="--lunge-dx: ${attackLunge.dx}px; --lunge-dy: ${attackLunge.dy}px;"` : "";
+  const canAttackNow = mine && canUseMinionAsAttacker(minion);
   const hasSuppressedSummonCue = view.animationCues.some(
     (cue) => cue.kind === "summon" && cue.targetKey === targetKey && cue.suppressBoardAnimation && cueIsReady(cue)
   );
@@ -1925,7 +1926,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     minion.taunt && "taunt",
     minion.divineShield && "shielded",
     minion.divineShield && "divine-shield",
-    mine && minion.canAttack && "can-attack",
+    canAttackNow && "can-attack",
     minion.isEnraged && "enraged",
     minion.hasOngoing && "has-ongoing",
     minion.lockedTurns > 0 && "locked",
@@ -1964,7 +1965,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
         <span class="${attackClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "attack" })}"><span>${minion.attack}</span></span>
         <span class="${healthClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "health" })}">${minion.currentHealth}</span>
       </div>
-      <span class="sr-e2e">${minion.canAttack ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
+      <span class="sr-e2e">${canAttackNow ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
     </button>
   `;
 }
@@ -5866,8 +5867,9 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
   const attackerId = sourceEl.dataset.attackerId;
   if (!attackerId) return;
   const minion = findMinion(attackerId);
-  if (!minion?.canAttack) {
-    attachRejectedDrag(event, attackerError(minion) ?? "這名隨從現在不能攻擊。");
+  const reason = attackerError(minion);
+  if (reason) {
+    attachRejectedDrag(event, reason);
     return;
   }
   const startX = event.clientX;
@@ -8272,6 +8274,10 @@ function attackerError(attacker: PublicMinion | undefined): string | undefined {
   if (attacker.sleeping) return "這名隨從剛上場，本回合還不能攻擊。";
   if (!attacker.canAttack) return "這名隨從本回合已經攻擊過了。";
   return undefined;
+}
+
+function canUseMinionAsAttacker(attacker: PublicMinion | undefined): boolean {
+  return !attackerError(attacker);
 }
 
 /** Why a card in my hand cannot be played right now, or undefined if it can. */
