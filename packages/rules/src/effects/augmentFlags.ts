@@ -33,7 +33,7 @@ export function isReferendumImmune(state: MatchState, seat: Seat): boolean {
   return state.players[seat]?.augmentFlags?.referendumImmune === true;
 }
 
-/** 言論自由 / 新青安: flat cost reduction for a specific card, read by `getCardActualCost`. */
+/** 言論自由 / 新青年安心成家貸款: flat cost reduction for a specific card, read by `getCardActualCost`. */
 export function augmentFlatCostReduction(state: MatchState, seat: Seat, card: RuntimeCard): number {
   const flags = state.players[seat]?.augmentFlags;
   if (!flags) return 0;

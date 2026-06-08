@@ -2,7 +2,7 @@ import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type Amplificatio
 import type { CommandEnvelope, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch, reduce } from "./engine.js";
-import { applyAugmentSelection, applyDamage, applyPersistentMinionAugments, drawCards, resolveDeaths } from "./effects.js";
+import { applyAugmentSelection, applyDamage, applyPersistentMinionAugments, drawCards, resolveDeaths, resolveEffect } from "./effects.js";
 import { getCardActualCost } from "./state.js";
 import { legalMoves } from "./legalMoves.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
@@ -117,6 +117,72 @@ describe("augment one-shot grants & hand snapshots", () => {
     const printed = sample.cost;
     applyAugmentSelection(state, seat, entry("AMP_DIVIDEND"), []);
     expect(sample.cost).toBe(Math.max(0, printed - 2));
+  });
+});
+
+describe("betel nut effects", () => {
+  it("adds three S029 cards when the labor mid-tier augment is selected", () => {
+    const state = startInProgress(17);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hand = [];
+    applyAugmentSelection(state, seat, entry("AMP_BETEL_NUT_500"), []);
+    expect(player.hand).toHaveLength(3);
+    expect(player.hand.every((card) => card.cardId === "S029")).toBe(true);
+  });
+
+  it("fully heals and grants health, with an attack bonus for labor minions", () => {
+    const state = startInProgress(18);
+    const seat = state.turn.activeSeat;
+    const minion = makeMinion({ instanceId: "betel-labor", category: "勞工", attack: 2, health: 5, currentHealth: 1 });
+    state.players[seat].board = [minion];
+
+    resolveEffect(
+      {
+        type: "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
+        value: 3,
+        bonus_value: 3,
+        target_category_includes: "勞工"
+      },
+      {
+        state,
+        activeSeat: seat,
+        target: { type: "MINION", side: seat, instanceId: minion.instanceId },
+        events: [],
+        catalog: catalogMap
+      }
+    );
+
+    expect(minion.attack).toBe(5);
+    expect(minion.health).toBe(8);
+    expect(minion.currentHealth).toBe(8);
+  });
+
+  it("does not grant the attack bonus to non-labor minions", () => {
+    const state = startInProgress(19);
+    const seat = state.turn.activeSeat;
+    const minion = makeMinion({ instanceId: "betel-other", category: "學生", attack: 2, health: 5, currentHealth: 1 });
+    state.players[seat].board = [minion];
+
+    resolveEffect(
+      {
+        type: "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
+        value: 3,
+        bonus_value: 3,
+        target_category_includes: "勞工"
+      },
+      {
+        state,
+        activeSeat: seat,
+        target: { type: "MINION", side: seat, instanceId: minion.instanceId },
+        events: [],
+        catalog: catalogMap
+      }
+    );
+
+    expect(minion.attack).toBe(2);
+    expect(minion.health).toBe(8);
+    expect(minion.currentHealth).toBe(8);
   });
 });
 

@@ -84,7 +84,7 @@ export interface RuntimeMinion {
 export interface AugmentFlags {
   /** 言論自由: flat NEWS cost reduction. */
   newsCostReduce: number;
-  /** 新青安: flat 建築 cost reduction. */
+  /** 新青年安心成家貸款: flat 建築 cost reduction. */
   buildingCostReduce: number;
   /** 乞丐超人: cost multiplier in tenths (7 = ×0.7) once past `costMultiplierAfterTurn`. */
   costMultiplierTenths?: number;

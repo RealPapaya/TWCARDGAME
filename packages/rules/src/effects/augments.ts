@@ -1,6 +1,6 @@
-import type { AmplificationDbEntry } from "@twcardgame/cards";
+import { CARD_CATALOG, type AmplificationDbEntry } from "@twcardgame/cards";
 import { AMPLIFICATION_TIERS, type AmplificationTier, type Seat } from "@twcardgame/shared";
-import { addEvent, nextInstanceId } from "../state.js";
+import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
 import { drawCards, updateEnrage } from "./core.js";
 
@@ -57,6 +57,16 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       }
       triggered = true;
       break;
+    case "AUG_ADD_CARD_TO_HAND": {
+      const card = effect.cardId ? CARD_CATALOG.find((candidate) => candidate.id === effect.cardId) : undefined;
+      if (card) {
+        for (let i = 0; i < (effect.count ?? effect.value ?? 1); i++) {
+          if (player.hand.length < 10) player.hand.push(createCardForHand(state, card, seat));
+        }
+        triggered = true;
+      }
+      break;
+    }
     case "AUG_FREEZE":
       player.mana.current += effect.crystals ?? 0;
       flags.frozenUntilTurn = state.turn.number + (effect.durationTurns ?? 0);

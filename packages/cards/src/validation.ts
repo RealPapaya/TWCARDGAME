@@ -115,6 +115,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "EAT_FRIENDLY":
     case "FULL_HEAL":
     case "FULL_HEAL_AND_DRAW":
+    case "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS":
     case "GIVE_DIVINE_SHIELD":
     case "HEAL":
     case "HEAL_CATEGORY_BONUS":
@@ -143,6 +144,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "DAMAGE_SELF":
     case "DRAW":
     case "DRAW_MINION_REDUCE_COST":
+    case "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS":
     case "HEAL":
     case "HEAL_CATEGORY_BONUS":
     case "LOCK_ALL_AND_BUFF_CATEGORY":
@@ -175,6 +177,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "BOUNCE_CATEGORY":
     case "BUFF_STAT_TARGET_CATEGORY_BONUS":
     case "DAMAGE_NON_CATEGORY":
+    case "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS":
     case "HEAL_CATEGORY_BONUS":
       requireAnyString(errors, cardId, label, effect, ["target_category_includes", "target_category"]);
       break;
@@ -203,6 +206,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
       requireNumber(errors, cardId, label, effect, "buff_value");
       break;
     case "SUMMON":
+    case "AUG_ADD_CARD_TO_HAND":
       requireCardId(errors, cardId, label, effect);
       break;
     case "SUMMON_MULTIPLE":

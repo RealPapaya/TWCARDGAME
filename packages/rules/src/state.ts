@@ -163,7 +163,7 @@ export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCa
       }
     }
   }
-  // Augment flat cost reductions (言論自由 新聞 −2 / 新青安 建築 −4).
+  // Augment flat cost reductions (言論自由 新聞 −2 / 新青年安心成家貸款 建築 −4).
   cost -= augmentFlatCostReduction(state, seat, card);
   // Augment cost multiplier (乞丐超人 ×0.7 四捨五入, once past its turn threshold).
   const multiplierTenths = augmentCostMultiplierTenths(state, seat);

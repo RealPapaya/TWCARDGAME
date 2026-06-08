@@ -51,6 +51,7 @@ export const effectHandlers: Record<string, (effect: EffectDefinition, context: 
   EAT_FRIENDLY: eatFriendly,
   FULL_HEAL: fullHeal,
   FULL_HEAL_AND_DRAW: fullHealAndDraw,
+  FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS: fullHealBuffTargetCategoryBonus,
   GIVE_DIVINE_SHIELD: giveDivineShield,
   GIVE_DIVINE_SHIELD_ALL: giveDivineShieldAll,
   GIVE_DIVINE_SHIELD_CATEGORY: giveDivineShieldCategory,
@@ -328,7 +329,11 @@ export function applyNewsPower(effect: EffectDefinition, context: EffectContext)
   if (!effect.type || !context.source || context.source.type !== "NEWS" || typeof effect.value !== "number") return effect;
   const isDamage = effect.type.includes("DAMAGE");
   const isHeal = effect.type.includes("HEAL") || effect.type.includes("RECOVER");
-  const excluded = effect.type.includes("DRAW") || effect.type.includes("COST") || effect.type.includes("REDUCE");
+  const excluded =
+    effect.type.includes("DRAW") ||
+    effect.type.includes("COST") ||
+    effect.type.includes("REDUCE") ||
+    effect.type === "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS";
   if ((!isDamage && !isHeal) || excluded) return effect;
   const bonus = currentNewsPower(context.state, context.activeSeat);
   if (bonus <= 0) return effect;
@@ -426,6 +431,18 @@ export function healAllFriendly(_effect: EffectDefinition, context: EffectContex
 export function fullHealAndDraw(effect: EffectDefinition, context: EffectContext): void {
   fullHeal(effect, context);
   drawCards(context.state, context.state.players[context.activeSeat], 1, context.events);
+}
+
+export function fullHealBuffTargetCategoryBonus(effect: EffectDefinition, context: EffectContext): void {
+  const ref = getTargetUnit(context.state, context.activeSeat, context.target);
+  if (!ref || ref.kind !== "MINION") return;
+  const minion = ref.unit as RuntimeMinion;
+  healUnit(context.state, ref, minion.health, context.events);
+  buffMinion(context.state, ref.owner, minion, "HEALTH", effect.value ?? 0, context.events);
+  const category = effect.target_category_includes ?? effect.target_category;
+  if (category && minion.category.includes(category)) {
+    buffMinion(context.state, ref.owner, minion, "ATTACK", effect.bonus_value ?? 0, context.events);
+  }
 }
 
 export function buffStatTarget(effect: EffectDefinition, context: EffectContext): void {

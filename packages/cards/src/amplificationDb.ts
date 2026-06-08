@@ -138,11 +138,19 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_NEW_HOUSING",
-    name: "新青安",
+    name: "新青年安心成家貸款",
     description: "建築費用永久 -4。",
     tier: "吃紅",
     factionTags: [],
     effect: { type: "AUG_BUILDING_COST", value: 4 }
+  },
+  {
+    id: "AMP_BETEL_NUT_500",
+    name: "林北檳榔擠剛攏哺500啦",
+    description: "獲得 3 張檳榔到手牌。",
+    tier: "吃紅",
+    factionTags: ["勞工"],
+    effect: { type: "AUG_ADD_CARD_TO_HAND", cardId: "S029", count: 3 }
   },
 
   // ---- 卯死（高增幅）------------------------------------------------------
