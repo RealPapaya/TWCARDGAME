@@ -148,7 +148,7 @@ const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 // short settle pause.
 const HERO_SHATTER_MS = 1600;
 const RESULT_OVERLAY_PAUSE_MS = 400;
-const APP_VERSION = "v1.0.0";
+const APP_VERSION = "v1.1.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
 const AMP_REROLL_FLIP_OUT_MS = 260;

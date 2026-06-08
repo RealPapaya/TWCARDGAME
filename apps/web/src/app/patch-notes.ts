@@ -1,7 +1,14 @@
 export type PatchNoteItem = { title: string; desc: string; cardIds?: string[] };
 export type PatchNoteVersion = { version: string; date: string; items: PatchNoteItem[] };
-
 export const PATCH_NOTES: PatchNoteVersion[] = [
+  {
+    version: "v1.1.0", date: "2026-06-08",
+    items: [
+      { title: "[新卡片] 檳榔", desc: "將一名隨從生命全部恢復，並增加3點生命。如果是勞工，再增加3點攻擊。", cardIds: ["S029"] },
+      { title: "[新增增幅] 複數政黨增幅效果與重抽機制", desc: "新增「壽險理賠」、「定期定額」、「台股四萬點」、「跳樓大拍賣」、「一黨獨大」、「台雞電OFFER」、「林北檳榔擠剛攏哺500啦」、「里長的愛心便當」、「捐血送禮券」、「流水席」、「國定假日」、「黨產大補丸」等多張政黨增幅，並重製「蹲得越低」效果，且實作了增幅重抽（Reroll）與相關 UI。" },
+      { title: "[新增事件] 複數公投事件", desc: "新增公投事件「黨內鬥爭」(雙方場上只留下費用最高的隨從)、「議會明星大亂鬥」(隨機留下一名隨從)與「戒嚴」(全場隨從回手牌且費用變為10)。" }
+    ]
+  },
   {
     version: "v1.0.0", date: "2026-05-25",
     items: [

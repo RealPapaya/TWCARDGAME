@@ -1,6 +1,6 @@
 {
   "name": "@twcardgame/server",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "tsx watch --env-file=.env src/index.ts",
