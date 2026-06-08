@@ -82,32 +82,30 @@ export function renderDevTestPanel(busy: boolean): string {
       <div class="dev-test-dashboard">
         <fieldset class="dev-test-panel dev-test-jump-panel">
           <legend>Jump</legend>
-          <select id="dev-test-screen">
-            ${screens.map((screen) => `<option value="${screen}">${screen}</option>`).join("")}
-          </select>
+          ${renderSelectControl("dev-test-screen", "Jump Screen", screens.map((screen) => `<option value="${screen}">${screen}</option>`).join(""))}
           <button id="dev-test-jump" type="button">Jump</button>
         </fieldset>
 
         <fieldset class="dev-test-panel dev-test-match-panel">
           <legend>PvE setup</legend>
           <div class="dev-test-compact-grid">
-            <label><span>Preset</span><select id="dev-test-turn-preset"><option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option></select></label>
-            <label><span>Turn</span><input id="dev-test-turn-number" type="number" min="1" max="999" value="1" /></label>
-            <label><span>Phase</span><select id="dev-test-phase">${devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join("")}</select></label>
-            <label><span>Active</span><select id="dev-test-active-seat"><option value="player1">player1</option><option value="player2">player2</option></select></label>
-            <label><span>Player HP</span><input id="dev-test-player-hp" type="number" min="1" max="99" value="30" /></label>
-            <label><span>Opponent HP</span><input id="dev-test-opponent-hp" type="number" min="1" max="99" value="30" /></label>
-            <label><span>P mana</span><input id="dev-test-player-mana-current" type="number" min="0" max="10" value="10" /></label>
-            <label><span>P max</span><input id="dev-test-player-mana-max" type="number" min="0" max="10" value="10" /></label>
-            <label><span>O mana</span><input id="dev-test-opponent-mana-current" type="number" min="0" max="10" value="10" /></label>
-            <label><span>O max</span><input id="dev-test-opponent-mana-max" type="number" min="0" max="10" value="10" /></label>
-            <label><span>增幅1等級</span><select id="dev-test-amp-tier-turn6">${renderAmplificationTierOptions(AMPLIFICATION_TIERS[0])}</select></label>
-            <label><span>增幅2等級</span><select id="dev-test-amp-tier-turn14">${renderAmplificationTierOptions(AMPLIFICATION_TIERS[1])}</select></label>
-            <label class="dev-test-wide"><span>增幅1內容</span><select id="dev-test-amp-id-turn6">${renderAmplificationOptions(AMPLIFICATION_TIERS[0])}</select></label>
-            <label class="dev-test-wide"><span>增幅2內容</span><select id="dev-test-amp-id-turn14">${renderAmplificationOptions(AMPLIFICATION_TIERS[1])}</select></label>
-            <label class="dev-test-wide"><span>事件</span><select id="dev-test-vote-event">${renderVoteEventOptions()}</select></label>
-            <label class="dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" /> P infinite</label>
-            <label class="dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" /> O infinite</label>
+            ${renderSelectControl("dev-test-turn-preset", "Preset", `<option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option>`)}
+            ${renderSliderControl("dev-test-turn-number", "Turn", 1, 100, 1)}
+            ${renderSelectControl("dev-test-phase", "Phase", devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join(""))}
+            ${renderSelectControl("dev-test-active-seat", "Active", `<option value="player1">player1</option><option value="player2">player2</option>`)}
+            ${renderSliderControl("dev-test-player-hp", "Player HP", 1, 99, 1)}
+            ${renderSliderControl("dev-test-opponent-hp", "Opponent HP", 1, 99, 1)}
+            ${renderSliderControl("dev-test-player-mana-current", "P mana", 0, 10, 1)}
+            ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 10, 1)}
+            ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 10, 1)}
+            ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 10, 1)}
+            ${renderSelectControl("dev-test-amp-tier-turn6", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
+            ${renderSelectControl("dev-test-amp-tier-turn14", "增幅2等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[1]))}
+            ${renderSelectControl("dev-test-amp-id-turn6", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
+            ${renderSelectControl("dev-test-amp-id-turn14", "增幅2內容", renderAmplificationOptions(AMPLIFICATION_TIERS[1]), true)}
+            ${renderSelectControl("dev-test-vote-event", "事件", renderVoteEventOptions(), true)}
+            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" /> <span class="dev-test-label-text">P infinite</span></label>
+            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" /> <span class="dev-test-label-text">O infinite</span></label>
           </div>
           <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
         </fieldset>
@@ -120,20 +118,20 @@ export function renderDevTestPanel(busy: boolean): string {
       <details class="dev-test-reward-details">
         <summary>Reward screen</summary>
         <div class="dev-test-reward-grid">
-          <label><span>Result</span><select id="dev-test-reward-result"><option value="win">win</option><option value="loss">loss</option></select></label>
-          <label><span>Mode</span><select id="dev-test-reward-mode"><option value="pve">pve</option><option value="pvp">pvp</option></select></label>
-          <label><span>Source</span><select id="dev-test-reward-source"><option value="pve_first">pve_first</option><option value="pve_repeat">pve_repeat</option><option value="pvp">pvp</option><option value="none">none</option></select></label>
-          <label><span>XP before</span><input id="dev-test-xp-before" type="number" value="0" /></label>
-          <label><span>XP gained</span><input id="dev-test-xp-gained" type="number" value="100" /></label>
-          <label><span>XP after</span><input id="dev-test-xp-after" type="number" placeholder="auto" /></label>
-          <label><span>Level before</span><input id="dev-test-level-before" type="number" value="1" /></label>
-          <label><span>Level after</span><input id="dev-test-level-after" type="number" placeholder="auto" /></label>
-          <label><span>Level-ups CSV</span><input id="dev-test-level-ups" placeholder="auto, or 2:100,3:100" /></label>
-          <label><span>Gold before</span><input id="dev-test-gold-before" type="number" value="0" /></label>
-          <label><span>Gold gained</span><input id="dev-test-gold-gained" type="number" placeholder="auto" /></label>
-          <label><span>Gold after</span><input id="dev-test-gold-after" type="number" placeholder="auto" /></label>
-          <label><span>First gold</span><input id="dev-test-gold-first" type="number" value="50" /></label>
-          <label><span>Level gold</span><input id="dev-test-gold-level" type="number" placeholder="auto" /></label>
+          ${renderSelectControl("dev-test-reward-result", "Result", `<option value="win">win</option><option value="loss">loss</option>`)}
+          ${renderSelectControl("dev-test-reward-mode", "Mode", `<option value="pve">pve</option><option value="pvp">pvp</option>`)}
+          ${renderSelectControl("dev-test-reward-source", "Source", `<option value="pve_first">pve_first</option><option value="pve_repeat">pve_repeat</option><option value="pvp">pvp</option><option value="none">none</option>`)}
+          ${renderSliderControl("dev-test-xp-before", "XP before", 0, 5000, 1)}
+          ${renderSliderControl("dev-test-xp-gained", "XP gained", 0, 5000, 1)}
+          ${renderAutoSliderControl("dev-test-xp-after", "XP after", 0, 10000, 1)}
+          ${renderSliderControl("dev-test-level-before", "Level before", 1, 100, 1)}
+          ${renderAutoSliderControl("dev-test-level-after", "Level after", 1, 100, 1)}
+          ${renderTextControl("dev-test-level-ups", "Level-ups CSV", "auto, or 2:100,3:100", true)}
+          ${renderSliderControl("dev-test-gold-before", "Gold before", 0, 5000, 1)}
+          ${renderAutoSliderControl("dev-test-gold-gained", "Gold gained", 0, 5000, 1)}
+          ${renderAutoSliderControl("dev-test-gold-after", "Gold after", 0, 10000, 1)}
+          ${renderSliderControl("dev-test-gold-first", "First gold", 0, 1000, 1)}
+          ${renderAutoSliderControl("dev-test-gold-level", "Level gold", 0, 5000, 1)}
           <button id="dev-test-reward" type="button">Show Reward Screen</button>
         </div>
       </details>
@@ -178,6 +176,22 @@ export function bindDevTestActions(opts: {
     const input = event.target instanceof HTMLInputElement ? event.target : undefined;
     if (input?.id === "dev-test-turn-number") setInputValue("dev-test-turn-preset", "custom");
   });
+  opts.on(screen, "input", "dev-test-range-input", (event) => {
+    const input = event.target instanceof HTMLInputElement ? event.target : undefined;
+    if (input && input.type === "range") {
+      const display = document.getElementById(`${input.id}-val`);
+      if (display) display.textContent = input.value;
+      if (input.id === "dev-test-turn-number") setInputValue("dev-test-turn-preset", "custom");
+    }
+  });
+  opts.on(screen, "change", "dev-test-auto-toggle", (event) => {
+    const checkbox = event.target instanceof HTMLInputElement ? event.target : undefined;
+    if (checkbox && checkbox.id.endsWith("-auto")) {
+      const sliderId = checkbox.id.replace("-auto", "");
+      const slider = document.getElementById(sliderId) as HTMLInputElement | null;
+      if (slider) slider.disabled = checkbox.checked;
+    }
+  });
   opts.on(screen, "click", "dev-test-card-selector-click", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : undefined;
     const addButton = target?.closest<HTMLButtonElement>("[data-dev-add-card]");
@@ -206,15 +220,15 @@ function readDevTestMatchSetup(): DevTestMatchSetup {
     handCardIds: [...selectedDevCards.hand],
     playerBoardCardIds: [...selectedDevCards.playerBoard],
     opponentBoardCardIds: [...selectedDevCards.opponentBoard],
-    playerHp: readNumberInput("dev-test-player-hp", 30),
-    opponentHp: readNumberInput("dev-test-opponent-hp", 30),
+    playerHp: readNumberInput("dev-test-player-hp", 1),
+    opponentHp: readNumberInput("dev-test-opponent-hp", 1),
     playerMana: {
-      current: readNumberInput("dev-test-player-mana-current", 10),
-      max: readNumberInput("dev-test-player-mana-max", 10)
+      current: readNumberInput("dev-test-player-mana-current", 1),
+      max: readNumberInput("dev-test-player-mana-max", 1)
     },
     opponentMana: {
-      current: readNumberInput("dev-test-opponent-mana-current", 10),
-      max: readNumberInput("dev-test-opponent-mana-max", 10)
+      current: readNumberInput("dev-test-opponent-mana-current", 1),
+      max: readNumberInput("dev-test-opponent-mana-max", 1)
     },
     infiniteMana: {
       player1: readCheckedInput("dev-test-player-infinite-mana"),
@@ -525,14 +539,14 @@ function readDevTestRewardSummary(aiTheme: AiTheme, aiDifficulty: AiDifficulty):
   const result = readInputValue("dev-test-reward-result") === "loss" ? "loss" : "win";
   const mode = readInputValue("dev-test-reward-mode") === "pvp" ? "pvp" : "pve";
   const sourceInput = readInputValue("dev-test-reward-source");
-  const xpBefore = readNumberInput("dev-test-xp-before", 0);
-  const xpGained = readNumberInput("dev-test-xp-gained", 0);
+  const xpBefore = readNumberInput("dev-test-xp-before", 1);
+  const xpGained = readNumberInput("dev-test-xp-gained", 1);
   const levelBefore = readNumberInput("dev-test-level-before", 1);
   const computedProgress = applyXpAndComputeLevelUps(xpBefore, levelBefore, xpGained);
   const explicitLevelUps = readInputValue("dev-test-level-ups").trim() ? parseDevTestLevelUps() : undefined;
   const levelUps = explicitLevelUps ?? computedProgress.levelUps;
-  const goldBefore = readNumberInput("dev-test-gold-before", 0);
-  const firstVictory = readNumberInput("dev-test-gold-first", 0);
+  const goldBefore = readNumberInput("dev-test-gold-before", 1);
+  const firstVictory = readNumberInput("dev-test-gold-first", 1);
   const levelGold = readOptionalNumberInput("dev-test-gold-level") ?? levelUps.reduce((sum, item) => sum + item.goldAwarded, 0);
   const goldGained = readOptionalNumberInput("dev-test-gold-gained") ?? firstVictory + levelGold;
   return {
@@ -588,6 +602,8 @@ function readNumberInput(id: string, fallback: number): number {
 }
 
 function readOptionalNumberInput(id: string): number | undefined {
+  const autoCheckbox = document.getElementById(`${id}-auto`) as HTMLInputElement | null;
+  if (autoCheckbox && autoCheckbox.checked) return undefined;
   const raw = readInputValue(id).trim();
   if (!raw) return undefined;
   const value = Number.parseInt(raw, 10);
@@ -606,5 +622,91 @@ function readInputValue(id: string): string {
 
 function setInputValue(id: string, value: string): void {
   const element = document.getElementById(id);
-  if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) element.value = value;
+  if (element instanceof HTMLInputElement || element instanceof HTMLSelectElement) {
+    element.value = value;
+    if (element instanceof HTMLInputElement && element.type === "range") {
+      const display = document.getElementById(`${id}-val`);
+      if (display) display.textContent = value;
+    }
+  }
+}
+
+function renderSliderControl(
+  id: string,
+  label: string,
+  min: number,
+  max: number,
+  defaultValue: number,
+  isWide = false
+): string {
+  const wideClass = isWide ? "dev-test-wide" : "";
+  return `
+    <div class="dev-test-control-box ${wideClass}">
+      <div class="dev-test-label-row">
+        <span class="dev-test-label-text">${escapeHtml(label)}</span>
+        <span class="dev-test-value-box" id="${id}-val">${defaultValue}</span>
+      </div>
+      <input id="${id}" type="range" min="${min}" max="${max}" value="${defaultValue}" />
+    </div>
+  `;
+}
+
+function renderAutoSliderControl(
+  id: string,
+  label: string,
+  min: number,
+  max: number,
+  defaultValue: number,
+  isWide = false
+): string {
+  const wideClass = isWide ? "dev-test-wide" : "";
+  return `
+    <div class="dev-test-control-box ${wideClass}">
+      <div class="dev-test-label-row">
+        <span class="dev-test-label-text">${escapeHtml(label)}</span>
+        <div class="dev-test-auto-row">
+          <span class="dev-test-value-box" id="${id}-val">${defaultValue}</span>
+          <label class="dev-test-checkbox-box">
+            <input type="checkbox" id="${id}-auto" checked />
+            <span>Auto</span>
+          </label>
+        </div>
+      </div>
+      <input id="${id}" type="range" min="${min}" max="${max}" value="${defaultValue}" disabled />
+    </div>
+  `;
+}
+
+function renderSelectControl(
+  id: string,
+  label: string,
+  optionsHtml: string,
+  isWide = false
+): string {
+  const wideClass = isWide ? "dev-test-wide" : "";
+  return `
+    <div class="dev-test-control-box ${wideClass}">
+      <div class="dev-test-label-row">
+        <span class="dev-test-label-text">${escapeHtml(label)}</span>
+      </div>
+      <select id="${id}">${optionsHtml}</select>
+    </div>
+  `;
+}
+
+function renderTextControl(
+  id: string,
+  label: string,
+  placeholder: string,
+  isWide = false
+): string {
+  const wideClass = isWide ? "dev-test-wide" : "";
+  return `
+    <div class="dev-test-control-box ${wideClass}">
+      <div class="dev-test-label-row">
+        <span class="dev-test-label-text">${escapeHtml(label)}</span>
+      </div>
+      <input id="${id}" type="text" placeholder="${escapeAttr(placeholder)}" />
+    </div>
+  `;
 }

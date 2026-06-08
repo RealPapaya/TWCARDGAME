@@ -114,16 +114,80 @@
 .dev-test-compact-grid,
 .dev-test-reward-grid {
   display: grid;
-  grid-template-columns: repeat(9, minmax(74px, 1fr));
+  grid-template-columns: repeat(9, minmax(78px, 1fr));
   gap: 6px;
   min-width: 0;
 }
 
-.dev-test-compact-grid label,
-.dev-test-reward-grid label {
-  display: grid;
-  grid-template-rows: auto 28px;
+.dev-test-control-box {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 6px 8px;
+  border: 1px solid rgba(44, 52, 65, 0.18);
+  border-radius: 6px;
+  background: #fdfcf9;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 52px;
+  min-width: 0;
+}
+
+.dev-test-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
+.dev-test-label-text {
+  color: #25313f;
+  font-size: 0.72rem;
+  font-weight: 800;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dev-test-value-box {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid rgba(44, 52, 65, 0.28);
+  border-radius: 4px;
+  background: #25313f;
+  color: #fff;
+  font-family: monospace;
+  font-size: 0.7rem;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.dev-test-auto-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dev-test-checkbox-box {
+  display: flex;
+  align-items: center;
   gap: 2px;
+  cursor: pointer;
+  color: #25313f;
+}
+
+.dev-test-checkbox-box input[type="checkbox"] {
+  width: 12px;
+  height: 12px;
+  min-height: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.dev-test-checkbox-box span {
+  font-size: 0.68rem;
+  font-weight: 800;
 }
 
 .dev-test-wide {
@@ -131,15 +195,64 @@
 }
 
 .dev-test-toggle {
-  grid-template-rows: 1fr !important;
-  grid-template-columns: auto 1fr;
+  flex-direction: row !important;
   align-items: center;
-  justify-content: start;
-  min-height: 28px;
+  justify-content: flex-start;
+  gap: 6px;
+  min-height: 52px;
 }
 
-.dev-test-toggle input {
+.dev-test-toggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
   min-height: auto;
+  margin: 0;
+  cursor: pointer;
+}
+
+.dev-test-control-box input[type="range"] {
+  width: 100%;
+  height: 6px;
+  padding: 0;
+  margin: 4px 0 0 0;
+  background: rgba(44, 52, 65, 0.16);
+  border: none;
+  border-radius: 3px;
+  outline: none;
+  cursor: pointer;
+}
+
+.dev-test-control-box input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #25313f;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.dev-test-control-box input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+.dev-test-control-box input[type="range"]:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.dev-test-control-box select,
+.dev-test-control-box input[type="text"] {
+  width: 100%;
+  height: 24px;
+  min-height: 24px;
+  padding: 2px 6px;
+  border: 1px solid rgba(44, 52, 65, 0.22);
+  border-radius: 4px;
+  background: #fff;
+  color: #1d2430;
+  font-size: 0.72rem;
+  margin-top: 3px;
 }
 
 .dev-test-card-selectors {
