@@ -21,6 +21,7 @@ import {
   phaseTriggerForTurn,
   rollAugmentTiers
 } from "./phases.js";
+import { suppressRuntimeCardMinionEffects } from "./effects/environment.js";
 import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
   activePlayer,
@@ -286,6 +287,7 @@ function playCard(
     return;
   }
   const { card, index } = found;
+  suppressRuntimeCardMinionEffects(state, seat, card);
   if (!canPayCardCost(state, seat, card)) {
     reject(state, events, seat, "魔力不足。");
     return;

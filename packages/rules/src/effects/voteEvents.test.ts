@@ -2,7 +2,19 @@ import { CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcard
 import type { CommandEnvelope, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch } from "../engine.js";
-import { effectHandlers, getCardActualCost, reduce, resolveEffect, resolvePostAction } from "../index.js";
+import {
+  applyEnvironmentTick,
+  createCardForHand,
+  createMinionFromCard,
+  drawCards,
+  effectHandlers,
+  getCardActualCost,
+  reduce,
+  resolveEffect,
+  resolvePostAction,
+  startTurn,
+  updateAuras
+} from "../index.js";
 import type { EffectContext, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 
 function legalDeckIds(): string[] {
@@ -36,6 +48,19 @@ function startMatch(seed: number): MatchState {
 
 const CATALOG_MAP = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const MINION_DEF = CARD_CATALOG.find((card) => card.type === "MINION")!;
+const KEYWORD_MINION_DEF = CARD_CATALOG.find(
+  (card) =>
+    card.type === "MINION" &&
+    Boolean(
+      card.keywords?.battlecry ||
+        card.keywords?.deathrattle ||
+        card.keywords?.ongoing ||
+        card.keywords?.taunt ||
+        card.keywords?.charge ||
+        card.keywords?.divineShield ||
+        card.keywords?.quest
+    )
+)!;
 
 function ctx(state: MatchState): EffectContext {
   return { state, activeSeat: state.turn.activeSeat, events: [], catalog: CATALOG_MAP };
@@ -97,7 +122,9 @@ describe("turn-20 vote-event handlers", () => {
       "KEEP_RANDOM_HIGHEST_COST_PER_SIDE",
       "KEEP_RANDOM_ONE_BOARD_MINION",
       "MARTIAL_LAW_BOUNCE_ALL_COST_10",
-      "ENV_COST_ZERO"
+      "ENV_COST_ZERO",
+      "ENV_TURN_TIME_LIMIT_MS",
+      "ENV_DISABLE_ALL_MINION_EFFECTS"
     ]) {
       expect(effectHandlers[type]).toBeTypeOf("function");
     }
@@ -315,6 +342,143 @@ describe("turn-20 vote-event handlers", () => {
 
     expect(state.players.player1.board.every((m) => m.keywords.divineShield)).toBe(true);
     expect(state.players.player2.board.every((m) => m.keywords.divineShield)).toBe(true);
+  });
+
+  describe("宵禁時間 ENV_TURN_TIME_LIMIT_MS", () => {
+    it("sets non-immune normal turn deadlines to 15 seconds", () => {
+      const state = startMatch(40);
+      state.turn.activeSeat = "player1";
+      state.currentEnvironment = {
+        id: "VE_CURFEW_TIME",
+        name: "宵禁時間",
+        appliedTurn: state.turn.number,
+        effect: { type: "ENV_TURN_TIME_LIMIT_MS", value: 15000 }
+      };
+
+      startTurn(state, 9000, []);
+
+      expect(state.turn.deadlineAtMs).toBe(24000);
+    });
+
+    it("keeps the default turn limit for referendum-immune players", () => {
+      const state = startMatch(41);
+      state.turn.activeSeat = "player2";
+      state.players.player2.augmentFlags.referendumImmune = true;
+      state.currentEnvironment = {
+        id: "VE_CURFEW_TIME",
+        name: "宵禁時間",
+        appliedTurn: state.turn.number,
+        effect: { type: "ENV_TURN_TIME_LIMIT_MS", value: 15000 }
+      };
+
+      startTurn(state, 9000, []);
+
+      expect(state.turn.deadlineAtMs).toBe(59000);
+    });
+  });
+
+  describe("人人平等 ENV_DISABLE_ALL_MINION_EFFECTS", () => {
+    it("clears minion effects from every non-immune zone and removes active aura bonuses", () => {
+      const state = startMatch(42);
+      const source = boardMinion("p1-aura", { keywords: { ongoing: { type: "ADJACENT_BUFF_STATS", value: 2 } } });
+      const target = boardMinion("p1-target", { keywords: { taunt: true } });
+      const targetBaseAttack = target.attack;
+      const targetBaseHealth = target.health;
+      state.players.player1.board = [source, target];
+      state.players.player1.hand = [graveMinion("player1", "hand")];
+      state.players.player1.deck = [graveMinion("player1", "deck")];
+      state.players.player1.graveyard = [graveMinion("player1", "grave")];
+      state.players.player1.hand[0].keywords = { battlecry: { type: "DRAW", value: 1 }, taunt: true };
+      state.players.player1.deck[0].keywords = { deathrattle: { type: "DRAW", value: 1 } };
+      state.players.player1.graveyard[0].keywords = { divineShield: true };
+
+      state.players.player2.augmentFlags.referendumImmune = true;
+      state.players.player2.board = [boardMinion("p2-immune", { keywords: { taunt: true } })];
+      state.players.player2.hand = [graveMinion("player2", "immune-hand")];
+      state.players.player2.hand[0].keywords = { battlecry: { type: "DRAW", value: 1 } };
+
+      updateAuras(state, []);
+      expect(target.attack).toBe(targetBaseAttack + 2);
+      expect(target.health).toBe(targetBaseHealth + 2);
+
+      state.currentEnvironment = {
+        id: "VE_EQUALITY_FOR_ALL",
+        name: "人人平等",
+        appliedTurn: state.turn.number,
+        effect: { type: "ENV_DISABLE_ALL_MINION_EFFECTS" }
+      };
+      applyEnvironmentTick(state, []);
+
+      expect(state.players.player1.board.every((minion) => Object.keys(minion.keywords).length === 0)).toBe(true);
+      expect(state.players.player1.hand[0].keywords).toEqual({});
+      expect(state.players.player1.deck[0].keywords).toEqual({});
+      expect(state.players.player1.graveyard[0].keywords).toEqual({});
+      expect(target.attack).toBe(targetBaseAttack);
+      expect(target.health).toBe(targetBaseHealth);
+      expect(target.auraAttack).toBe(0);
+      expect(target.auraHealth).toBe(0);
+
+      expect(state.players.player2.board[0].keywords.taunt).toBe(true);
+      expect(state.players.player2.hand[0].keywords.battlecry?.type).toBe("DRAW");
+    });
+
+    it("also suppresses future drawn, created, generated, summoned, and played minions", () => {
+      let state = startMatch(43);
+      state.turn.activeSeat = "player1";
+      state.currentEnvironment = {
+        id: "VE_EQUALITY_FOR_ALL",
+        name: "人人平等",
+        appliedTurn: state.turn.number,
+        effect: { type: "ENV_DISABLE_ALL_MINION_EFFECTS" }
+      };
+
+      const deckCard = graveMinion("player1", "future-deck");
+      deckCard.keywords = { battlecry: { type: "DRAW", value: 1 }, taunt: true };
+      state.players.player1.deck = [deckCard];
+      state.players.player1.hand = [];
+      drawCards(state, state.players.player1, 1, []);
+      expect(state.players.player1.hand[0].keywords).toEqual({});
+
+      const created = createCardForHand(state, KEYWORD_MINION_DEF, "player1");
+      expect(created.keywords).toEqual({});
+      const minion = createMinionFromCard(
+        state,
+        {
+          ...created,
+          keywords: { charge: true, taunt: true, battlecry: { type: "DRAW", value: 1 } }
+        },
+        "player1"
+      );
+      expect(minion.keywords).toEqual({});
+      expect(minion.sleeping).toBe(true);
+      expect(minion.canAttack).toBe(false);
+
+      const context = ctx(state);
+      resolveEffect({ type: "ADD_CARD_TO_HAND", cardId: KEYWORD_MINION_DEF.id }, context);
+      expect(state.players.player1.hand.at(-1)?.keywords).toEqual({});
+
+      const boardBeforeSummon = state.players.player1.board.length;
+      resolveEffect({ type: "SUMMON_MULTIPLE", cardId: KEYWORD_MINION_DEF.id, count: 1 }, context);
+      expect(state.players.player1.board).toHaveLength(boardBeforeSummon + 1);
+      expect(state.players.player1.board.at(-1)?.keywords).toEqual({});
+
+      const battlecryCard = graveMinion("player1", "play");
+      battlecryCard.instanceId = "card-equality-play";
+      battlecryCard.cost = 0;
+      battlecryCard.keywords = { battlecry: { type: "DRAW", value: 1 }, taunt: true };
+      state.players.player1.hand = [battlecryCard];
+      state.players.player1.deck = [graveMinion("player1", "would-draw")];
+      state.players.player1.mana = { current: 10, max: 10 };
+
+      state = reduce(
+        state,
+        env("equality-play", "player1", { type: "playCard", handInstanceId: battlecryCard.instanceId }),
+        CARD_CATALOG
+      ).state;
+
+      expect(state.players.player1.hand).toHaveLength(0);
+      expect(state.players.player1.board.at(-1)?.keywords).toEqual({});
+    });
   });
 
   describe("普發現金 ENV_COST_ZERO", () => {

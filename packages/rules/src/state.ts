@@ -9,7 +9,7 @@ import {
   type TargetRef
 } from "@twcardgame/shared";
 import { createRuntimeCard } from "./deck.js";
-import { environmentCostDelta } from "./effects/environment.js";
+import { environmentCostDelta, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
 import {
   augmentCostMultiplierTenths,
@@ -234,6 +234,7 @@ export function createMinionFromCard(state: MatchState, card: RuntimeCard, owner
     hanBounceBonus: card.hanBounceBonus
   };
 
+  suppressRuntimeMinionEffects(state, ownerSeat, minion);
   if (minion.keywords.taunt) minion.keywords.baseTaunt = true;
   if (minion.keywords.charge) {
     minion.sleeping = false;
@@ -244,7 +245,9 @@ export function createMinionFromCard(state: MatchState, card: RuntimeCard, owner
 }
 
 export function createCardForHand(state: MatchState, def: CardDefinition, ownerSeat: Seat): RuntimeCard {
-  return createRuntimeCard(def, ownerSeat, nextInstanceId(state, "card"));
+  const card = createRuntimeCard(def, ownerSeat, nextInstanceId(state, "card"));
+  suppressRuntimeCardMinionEffects(state, ownerSeat, card);
+  return card;
 }
 
 export function findCardInHand(player: PlayerState, handInstanceId: string): { card: RuntimeCard; index: number } | undefined {

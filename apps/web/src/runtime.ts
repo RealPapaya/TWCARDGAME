@@ -1805,13 +1805,11 @@ function renderAmplificationBadge(player: PublicPlayer | undefined): string {
 function renderMana(current: number, max: number, role: "player" | "opponent", seat: Seat): string {
   const activeCount = Math.max(0, Math.min(30, Math.floor(current)));
   const maxCount = Math.max(0, Math.min(30, Math.floor(max)));
-  const displayCount = Math.max(activeCount, maxCount);
-  const rows = displayCount <= 10 ? 1 : displayCount <= 20 ? 2 : 3;
-  const columns = Math.max(1, Math.ceil(displayCount / rows));
+  const rows = maxCount <= 10 ? 1 : maxCount <= 20 ? 2 : 3;
   const layout = rows === 1 ? "single" : rows === 2 ? "double" : "triple";
   const crystals = Array.from({ length: 30 }, (_, index) => {
-    const row = Math.floor(index / columns) + 1;
-    const col = (index % columns) + 1;
+    const row = Math.floor(index / 10) + 1;
+    const col = (index % 10) + 1;
     const stateClass = index < activeCount ? `${role}-crystal active` : index < maxCount ? "spent" : "locked";
     const crystalClass = `mana-crystal ${stateClass} mana-row-${row}`;
     return `<span class="${crystalClass}" style="--mana-row:${row};--mana-col:${col}" aria-hidden="true"></span>`;
@@ -1820,7 +1818,7 @@ function renderMana(current: number, max: number, role: "player" | "opponent", s
   const highlightClass = highlight ? `${highlight} training-highlight-mana` : "";
 
   return `
-    <div class="mana-container frame-style mana-layout-${layout} ${highlightClass}" style="--mana-cols:${columns};--mana-rows:${rows}" data-testid="${role}-mana">
+    <div class="mana-container frame-style mana-layout-${layout} ${highlightClass}" style="--mana-rows:${rows}" data-testid="${role}-mana">
       ${crystals}
       <span class="mana-text">${current}/${max}</span>
     </div>

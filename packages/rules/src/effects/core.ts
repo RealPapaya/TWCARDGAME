@@ -12,7 +12,7 @@ import {
 } from "../state.js";
 import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
-import { applyEnvironmentTick } from "./environment.js";
+import { applyEnvironmentTick, environmentTurnTimeLimitMs, suppressRuntimeCardMinionEffects } from "./environment.js";
 import { applyPersistentMinionAugments, applyStartOfTurnAugments, tryReviveMinion } from "./augments.js";
 import { augmentManaRamp, unlockLowHpManaCap } from "./augmentFlags.js";
 
@@ -92,7 +92,11 @@ export function resolvePostAction(state: MatchState, events: EffectContext["even
 
 export function startTurn(state: MatchState, nowMs: number, events: EffectContext["events"]): void {
   const player = activePlayer(state);
-  const turnTimeLimitMs = turnTimeLimitForPlayer(player, state.private.turnTimeLimitMs);
+  const turnTimeLimitMs = turnTimeLimitForPlayer(
+    player,
+    state.private.turnTimeLimitMs,
+    environmentTurnTimeLimitMs(state, player.seat)
+  );
   state.status = "in_progress";
   state.turn.number += 1;
   state.turn.startedAtMs = nowMs;
@@ -154,6 +158,7 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
     }
     const card = index >= 0 ? player.deck.splice(index, 1)[0] : player.deck.shift();
     if (!card) continue;
+    suppressRuntimeCardMinionEffects(state, player.seat, card);
     // 股東紀念品: the next drawn card is permanently half-costed, then the flag clears.
     if (player.augmentFlags.nextDrawHalfCost) {
       card.cost = Math.floor(card.cost / 2);

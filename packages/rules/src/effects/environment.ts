@@ -1,6 +1,7 @@
 import type { EffectDefinition } from "@twcardgame/cards";
+import { SEATS, type Seat } from "@twcardgame/shared";
 import { addEvent } from "../state.js";
-import type { ActiveEnvironment, EffectContext, EffectHandler, MatchState } from "../types.js";
+import type { ActiveEnvironment, EffectContext, EffectHandler, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 
 /**
  * Global environment effects installed by the turn-20 referendum
@@ -17,6 +18,21 @@ export function environmentCostDelta(state: MatchState): number {
   if (!env || !isEnvironmentActive(state, env)) return 0;
   if (env.effect.type === "ENV_COST_PLUS_CAPPED") return env.effect.value ?? 0;
   return 0;
+}
+
+export function environmentTurnTimeLimitMs(state: MatchState, seat: Seat): number | undefined {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return undefined;
+  if (env.effect.type !== "ENV_TURN_TIME_LIMIT_MS") return undefined;
+  if (state.players[seat].augmentFlags.referendumImmune) return undefined;
+  return env.effect.value;
+}
+
+export function environmentDisablesMinionEffects(state: MatchState, seat: Seat): boolean {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return false;
+  if (env.effect.type !== "ENV_DISABLE_ALL_MINION_EFFECTS") return false;
+  return !state.players[seat].augmentFlags.referendumImmune;
 }
 
 export function isEnvironmentActive(state: MatchState, env: ActiveEnvironment): boolean {
@@ -37,6 +53,7 @@ export function applyEnvironmentTick(state: MatchState, events: EffectContext["e
     return;
   }
   if (env.effect.type === "ENV_SILENCE_ALL") silenceAllMinions(state);
+  if (env.effect.type === "ENV_DISABLE_ALL_MINION_EFFECTS") disableAllMinionEffects(state);
 }
 
 function silenceAllMinions(state: MatchState): void {
@@ -50,9 +67,59 @@ function silenceAllMinions(state: MatchState): void {
   }
 }
 
+function disableAllMinionEffects(state: MatchState): void {
+  for (const seat of SEATS) {
+    if (!environmentDisablesMinionEffects(state, seat)) continue;
+    const player = state.players[seat];
+    for (const card of player.deck) disableCardMinionEffects(card);
+    for (const card of player.hand) disableCardMinionEffects(card);
+    for (const card of player.graveyard) disableCardMinionEffects(card);
+    for (const minion of player.board) disableRuntimeMinionEffects(minion);
+  }
+}
+
+export function suppressRuntimeCardMinionEffects(state: MatchState, seat: Seat, card: RuntimeCard): void {
+  if (!environmentDisablesMinionEffects(state, seat)) return;
+  disableCardMinionEffects(card);
+}
+
+export function suppressRuntimeMinionEffects(state: MatchState, seat: Seat, minion: RuntimeMinion): void {
+  if (!environmentDisablesMinionEffects(state, seat)) return;
+  disableRuntimeMinionEffects(minion);
+}
+
+function disableCardMinionEffects(card: RuntimeCard): void {
+  if (card.type !== "MINION") return;
+  card.keywords = {};
+}
+
+function disableRuntimeMinionEffects(minion: RuntimeMinion): void {
+  if (minion.isEnraged && minion.keywords.enrage?.type === "BUFF_STAT" && minion.keywords.enrage.stat === "ATTACK") {
+    minion.attack -= minion.keywords.enrage.value ?? 0;
+  }
+  for (const buff of minion.tempBuffs) {
+    minion.attack -= buff.attack;
+    minion.health -= buff.health;
+  }
+  minion.attack -= minion.auraAttack;
+  minion.health -= minion.auraHealth;
+  if (minion.currentHealth > minion.health) minion.currentHealth = minion.health;
+  minion.keywords = {};
+  minion.tempBuffs = [];
+  minion.auraAttack = 0;
+  minion.auraHealth = 0;
+  minion.auraTaunt = false;
+  minion.isEnraged = false;
+  delete minion.questTurns;
+  delete minion.deathTimer;
+  delete minion.temporaryUntilTurn;
+}
+
 export const environmentHandlers: Record<string, EffectHandler> = {
   NOOP: () => {},
   // Passive: the penalty is read in getCardActualCost while the environment is active.
   ENV_COST_PLUS_CAPPED: () => {},
-  ENV_SILENCE_ALL: (_effect: EffectDefinition, context: EffectContext) => silenceAllMinions(context.state)
+  ENV_SILENCE_ALL: (_effect: EffectDefinition, context: EffectContext) => silenceAllMinions(context.state),
+  ENV_TURN_TIME_LIMIT_MS: () => {},
+  ENV_DISABLE_ALL_MINION_EFFECTS: (_effect: EffectDefinition, context: EffectContext) => disableAllMinionEffects(context.state)
 };

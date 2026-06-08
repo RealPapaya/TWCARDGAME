@@ -843,10 +843,10 @@
   min-width: 455px;
   min-height: 104px;
   display: grid;
-  grid-template-columns: repeat(var(--mana-cols, 10), minmax(0, 1fr));
+  grid-template-columns: repeat(10, var(--mana-crystal-size, 31px));
   grid-template-rows: repeat(var(--mana-rows, 1), var(--mana-crystal-size, 31px));
   align-content: center;
-  justify-items: center;
+  justify-content: start;
   column-gap: var(--mana-column-gap, 8px);
   row-gap: var(--mana-row-gap, 2px);
   padding: 34px 42px 30px 30px;
@@ -855,7 +855,6 @@
   background: url("/images/ui/mana_frame.webp") center / 100% 100% no-repeat;
   box-shadow: none;
   filter: drop-shadow(0 14px 16px rgba(0, 0, 0, 0.62));
-  overflow: hidden;
 }
 
 .battle-surface .mana-layout-double {
@@ -887,10 +886,6 @@
   transition: opacity 240ms ease, transform 240ms ease, display 240ms allow-discrete;
 }
 
-.battle-surface .mana-layout-double .mana-row-2 {
-  position: relative;
-  left: calc(var(--mana-crystal-size, 23px) * 0.55);
-}
 
 /* Spent crystals shrink + fade out, then collapse to display:none at the end of
    the transition (allow-discrete) so they leave no ghost slot at rest. */

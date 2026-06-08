@@ -118,6 +118,20 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     tierWeight: 30,
     options: ["下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0"],
     apply: { mode: "ENVIRONMENT", durationTurns: 2, effect: { type: "ENV_COST_ZERO" } }
+  },
+  {
+    id: "VE_CURFEW_TIME",
+    name: "宵禁時間",
+    tierWeight: 25,
+    options: ["雙方回合時間永久變為 15 秒", "雙方回合時間永久變為 15 秒", "雙方回合時間永久變為 15 秒"],
+    apply: { mode: "ENVIRONMENT", effect: { type: "ENV_TURN_TIME_LIMIT_MS", value: 15000 } }
+  },
+  {
+    id: "VE_EQUALITY_FOR_ALL",
+    name: "人人平等",
+    tierWeight: 25,
+    options: ["所有隨從效果永久無效", "所有隨從效果永久無效", "所有隨從效果永久無效"],
+    apply: { mode: "ENVIRONMENT", effect: { type: "ENV_DISABLE_ALL_MINION_EFFECTS" } }
   }
 ];
 

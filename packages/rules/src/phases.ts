@@ -18,7 +18,7 @@ import {
   type VoteEventDbEntry
 } from "@twcardgame/cards";
 import { applyAugmentSelection, finishIfHeroDead, resolveEffect, resolvePostAction } from "./effects.js";
-import { applyEnvironmentTick } from "./effects/environment.js";
+import { applyEnvironmentTick, environmentTurnTimeLimitMs } from "./effects/environment.js";
 import { nextInt, normalizeSeed } from "./rng.js";
 import { addEvent } from "./state.js";
 import { turnTimeLimitForPlayer } from "./timing.js";
@@ -368,7 +368,13 @@ function endSpecialPhase(state: MatchState, nowMs: number, phase: string, events
   state.specialPhase = undefined;
   const resumeSeat = state.turn.activeSeat;
   state.turn.startedAtMs = nowMs;
-  state.turn.deadlineAtMs = nowMs + turnTimeLimitForPlayer(state.players[resumeSeat], state.private.turnTimeLimitMs);
+  state.turn.deadlineAtMs =
+    nowMs +
+    turnTimeLimitForPlayer(
+      state.players[resumeSeat],
+      state.private.turnTimeLimitMs,
+      environmentTurnTimeLimitMs(state, resumeSeat)
+    );
   addEvent(state, events, "PHASE_ENDED", { phase });
 }
 
