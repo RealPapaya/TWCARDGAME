@@ -9,7 +9,7 @@ import {
 import { reduce } from "./engine.js";
 import { legalMoves } from "./legalMoves.js";
 import { nextInt } from "./rng.js";
-import { findMinion, getCardActualCost } from "./state.js";
+import { canPayCardCost, findMinion, getCardActualCost } from "./state.js";
 import type { MatchState, RuntimeMinion } from "./types.js";
 
 export interface BotRngState {
@@ -107,7 +107,7 @@ function endTurnScore(state: MatchState, seat: Seat): number {
   // Prefer ending the turn last: penalize while we still have mana that could
   // pay for any card in hand.
   const player = state.players[seat];
-  const playableInHand = player.hand.some((card) => getCardActualCost(state, seat, card) <= player.mana.current);
+  const playableInHand = player.hand.some((card) => canPayCardCost(state, seat, card));
   if (playableInHand) return -50;
   const swingableMinion = player.board.some((m) => !m.sleeping && m.canAttack && m.lockedTurns === 0 && m.attack > 0);
   if (swingableMinion) return -20;

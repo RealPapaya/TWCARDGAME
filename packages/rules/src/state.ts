@@ -11,7 +11,13 @@ import {
 import { createRuntimeCard } from "./deck.js";
 import { environmentCostDelta } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
-import { augmentCostMultiplierTenths, augmentFlatCostReduction, isReferendumImmune } from "./effects/augmentFlags.js";
+import {
+  augmentCostMultiplierTenths,
+  augmentFlatCostReduction,
+  isReferendumImmune,
+  paysCardCostWithHealth,
+  unlockLowHpManaCap
+} from "./effects/augmentFlags.js";
 import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "./types.js";
 
 export function cloneState(state: MatchState): MatchState {
@@ -175,6 +181,27 @@ export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCa
     if (envDelta > 0) cost = Math.min(10, cost + envDelta);
   }
   return Math.max(0, cost);
+}
+
+export function canPayCardCost(state: MatchState, seat: Seat, card: RuntimeCard): boolean {
+  const player = state.players[seat];
+  const cost = getCardActualCost(state, seat, card);
+  return paysCardCostWithHealth(state, seat) ? player.hero.hp >= cost : player.mana.current >= cost;
+}
+
+export function payCardCost(state: MatchState, seat: Seat, card: RuntimeCard, events: GameEvent[]): number {
+  const player = state.players[seat];
+  const cost = getCardActualCost(state, seat, card);
+  if (paysCardCostWithHealth(state, seat)) {
+    if (cost > 0) {
+      player.hero.hp -= cost;
+      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: cost, lifeLoss: true, payment: "HEALTH" }, seat);
+      if (unlockLowHpManaCap(player)) addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, seat);
+    }
+  } else {
+    player.mana.current -= cost;
+  }
+  return cost;
 }
 
 export function createMinionFromCard(state: MatchState, card: RuntimeCard, ownerSeat: Seat): RuntimeMinion {

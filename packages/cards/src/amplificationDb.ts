@@ -102,6 +102,30 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     factionTags: [],
     effect: { type: "AUG_MANA_CAP_LOW_HP", heroHpThreshold: 5, manaCap: 20 }
   },
+  {
+    id: "AMP_VILLAGE_LUNCHBOX",
+    name: "里長的愛心便當",
+    description: "英雄生命上限 +5。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_HERO_MAX_HP", value: 5 }
+  },
+  {
+    id: "AMP_BLOOD_DONATION_VOUCHER",
+    name: "捐血送禮券",
+    description: "英雄生命 -5，下回合獲得 +5 水晶（僅一回合）。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN", health: 5, crystals: 5 }
+  },
+  {
+    id: "AMP_BANQUET",
+    name: "流水席",
+    description: "自己目前場上隨從立刻回到手牌，並且獲得 +1/+1。",
+    tier: "加減賺",
+    factionTags: [],
+    effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 1 }
+  },
 
   // ---- 吃紅（中增幅）------------------------------------------------------
   {
@@ -176,6 +200,22 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     factionTags: [],
     effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 10, manaCap: 15, manaGrowth: 2 }
   },
+  {
+    id: "AMP_PARTY_ASSET_SUPPLEMENT",
+    name: "黨產大補丸",
+    description: "英雄生命上限 +10。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_HERO_MAX_HP", value: 10 }
+  },
+  {
+    id: "AMP_NATIONAL_HOLIDAY",
+    name: "國定假日",
+    description: "自己目前場上隨從立刻回到手牌，並且獲得 +2/+2，費用 -1。",
+    tier: "吃紅",
+    factionTags: [],
+    effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 2, costReduction: 1 }
+  },
 
   // ---- 卯死（高增幅）------------------------------------------------------
   {
@@ -226,6 +266,22 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     tier: "卯死",
     factionTags: [],
     effect: { type: "AUG_HAND_COST_SET", value: 1 }
+  },
+  {
+    id: "AMP_ONE_PARTY_DOMINANCE",
+    name: "一黨獨大",
+    description: "英雄生命上限 +20。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_HERO_MAX_HP", value: 20 }
+  },
+  {
+    id: "AMP_TAIJI_ELECTRIC_OFFER",
+    name: "台雞電OFFER",
+    description: "你的下個回合卡片費用改為血量。",
+    tier: "卯死",
+    factionTags: [],
+    effect: { type: "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN" }
   }
 ];
 
@@ -273,6 +329,19 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
     if (type === "AUG_MANA_CAP_LOW_HP") {
       if (!positiveInt(entry.effect.heroHpThreshold)) errors.push(`${entry.id}: low-HP mana cap requires a positive heroHpThreshold`);
       if (!positiveInt(entry.effect.manaCap)) errors.push(`${entry.id}: low-HP mana cap requires a positive manaCap`);
+    }
+    if (type === "AUG_HERO_MAX_HP") {
+      if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: hero max HP augment requires a positive value`);
+    }
+    if (type === "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN") {
+      if (!positiveInt(entry.effect.health)) errors.push(`${entry.id}: HP-loss crystal augment requires a positive health`);
+      if (!positiveInt(entry.effect.crystals)) errors.push(`${entry.id}: HP-loss crystal augment requires positive crystals`);
+    }
+    if (type === "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF") {
+      if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: bounce-buff augment requires a positive value`);
+      if (entry.effect.costReduction !== undefined && !positiveInt(entry.effect.costReduction)) {
+        errors.push(`${entry.id}: bounce-buff augment costReduction must be a positive integer when present`);
+      }
     }
     if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
       errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);

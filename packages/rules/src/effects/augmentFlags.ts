@@ -18,7 +18,10 @@ export function defaultAugmentFlags(): AugmentFlags {
     damageReductionPerInstance: 0,
     reviveOnceAsVanilla: false,
     referendumImmune: false,
+    bonusCrystalsNextTurnSources: [],
     extraDrawTurnsRemaining: 0,
+    payCostWithHealthNextTurn: false,
+    payCostWithHealthThisTurn: false,
     manaRamps: [],
     lowHpManaCapUnlocked: false
   };
@@ -78,4 +81,9 @@ export function augmentCostMultiplierTenths(state: MatchState, seat: Seat): numb
   const flags = state.players[seat]?.augmentFlags;
   if (!flags || flags.costMultiplierTenths === undefined || flags.costMultiplierAfterTurn === undefined) return undefined;
   return state.turn.number > flags.costMultiplierAfterTurn ? flags.costMultiplierTenths : undefined;
+}
+
+/** 台雞電OFFER: this turn's card costs are paid with hero HP instead of mana. */
+export function paysCardCostWithHealth(state: MatchState, seat: Seat): boolean {
+  return state.players[seat]?.augmentFlags?.payCostWithHealthThisTurn === true;
 }

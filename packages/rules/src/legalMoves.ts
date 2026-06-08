@@ -1,6 +1,6 @@
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
 import { isFrozen } from "./effects/augmentFlags.js";
-import { getCardActualCost } from "./state.js";
+import { canPayCardCost } from "./state.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
 
 /**
@@ -66,8 +66,7 @@ function legalPlays(state: MatchState, seat: Seat): GameCommand[] {
   const player = state.players[seat];
   const result: GameCommand[] = [];
   for (const card of player.hand) {
-    const cost = getCardActualCost(state, seat, card);
-    if (player.mana.current < cost) continue;
+    if (!canPayCardCost(state, seat, card)) continue;
     if (card.type === "MINION" && player.board.length >= 7) continue;
     if (!hasEnoughOtherCardsForDiscard(card, player.hand.length)) continue;
 

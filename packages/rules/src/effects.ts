@@ -24,5 +24,6 @@ export {
   defaultAugmentFlags,
   isFrozen,
   isReferendumImmune,
+  paysCardCostWithHealth,
   unlockLowHpManaCap
 } from "./effects/augmentFlags.js";

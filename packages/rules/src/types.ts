@@ -109,8 +109,14 @@ export interface AugmentFlags {
   frozenUntilTurn?: number;
   /** 消費券3600: crystals granted at the start of the player's next turn (one-shot). */
   bonusCrystalsNextTurn?: number;
+  /** Augment ids contributing to the next-turn crystal grant. */
+  bonusCrystalsNextTurnSources: string[];
   /** 大薯買一送一: extra card drawn at the start of each of the next N turns. */
   extraDrawTurnsRemaining: number;
+  /** 台雞電OFFER: convert card costs to hero HP payment on the next own turn. */
+  payCostWithHealthNextTurn: boolean;
+  /** 台雞電OFFER: active for the current own turn only. */
+  payCostWithHealthThisTurn: boolean;
   /** Turn-gated mana ramps. Active ramps combine by highest cap and highest growth. */
   manaRamps: Array<{ augmentId: string; turnThreshold: number; cap: number; growth: number }>;
   /** 壽險理賠: HP threshold and cap, latched permanently by `lowHpManaCapUnlocked`. */

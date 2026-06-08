@@ -142,6 +142,7 @@ export function processEndOfTurn(state: MatchState, events: EffectContext["event
     }
   }
   cleanupTemporaryBuffs(state);
+  activePlayer(state).augmentFlags.payCostWithHealthThisTurn = false;
   resolvePostAction(state, events, catalog);
 }
 

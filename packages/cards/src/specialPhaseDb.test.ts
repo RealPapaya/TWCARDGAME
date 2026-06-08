@@ -60,6 +60,32 @@ describe("special-phase databases", () => {
     expect(result.errors.filter((e) => e.includes("AMP_BAD_RAMP"))).toHaveLength(2);
   });
 
+  it("validates required fields for the new augment effects", () => {
+    const bad = [
+      ...AMPLIFICATION_DB,
+      {
+        id: "AMP_BAD_HP_LOSS",
+        name: "x",
+        description: "x",
+        tier: "加減賺" as const,
+        factionTags: [],
+        effect: { type: "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN" }
+      },
+      {
+        id: "AMP_BAD_BOUNCE_BUFF",
+        name: "x",
+        description: "x",
+        tier: "吃紅" as const,
+        factionTags: [],
+        effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF" }
+      }
+    ];
+    const result = validateAmplificationDb(bad);
+    expect(result.valid).toBe(false);
+    expect(result.errors.filter((e) => e.includes("AMP_BAD_HP_LOSS"))).toHaveLength(2);
+    expect(result.errors.filter((e) => e.includes("AMP_BAD_BOUNCE_BUFF"))).toHaveLength(1);
+  });
+
   it("restricts firstPhaseOnly to the two designed augments", () => {
     expect(AMPLIFICATION_DB.filter((e) => e.firstPhaseOnly).map((e) => e.id).sort()).toEqual([
       "AMP_0050",

@@ -406,6 +406,149 @@ describe("augment triggers & meta", () => {
   });
 });
 
+describe("new hero and resource augments", () => {
+  it("raises hero max HP without healing current HP", () => {
+    const state = startInProgress(25);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hero.hp = 12;
+    const initialMax = player.hero.maxHp;
+
+    applyAugmentSelection(state, seat, entry("AMP_VILLAGE_LUNCHBOX"), []);
+    applyAugmentSelection(state, seat, entry("AMP_PARTY_ASSET_SUPPLEMENT"), []);
+    applyAugmentSelection(state, seat, entry("AMP_ONE_PARTY_DOMINANCE"), []);
+
+    expect(player.hero.maxHp).toBe(initialMax + 35);
+    expect(player.hero.hp).toBe(12);
+  });
+
+  it("loses 5 HP now and grants 5 current crystals at the start of the next own turn", () => {
+    const state = startInProgress(26);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hero.hp = 20;
+    player.deck = [];
+    player.mana.max = 4;
+    player.mana.current = 0;
+
+    applyAugmentSelection(state, seat, entry("AMP_BLOOD_DONATION_VOUCHER"), []);
+    expect(player.hero.hp).toBe(15);
+    expect(player.augmentFlags.bonusCrystalsNextTurn).toBe(5);
+
+    startTurn(state, 2000, []);
+    expect(player.mana.max).toBe(5);
+    expect(player.mana.current).toBe(10);
+    expect(player.augmentFlags.bonusCrystalsNextTurn).toBeUndefined();
+  });
+
+  it("pays card costs with HP on the next own turn and can pay lethal HP", () => {
+    const state = startInProgress(27);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hand = [makeCard({ instanceId: "health-pay-lethal", cost: 3, keywords: {} })];
+    player.deck = [];
+    player.hero.hp = 3;
+    player.mana.max = 0;
+    player.mana.current = 0;
+
+    applyAugmentSelection(state, seat, entry("AMP_TAIJI_ELECTRIC_OFFER"), []);
+    expect(legalMoves(state, seat).some((move) => move.type === "playCard")).toBe(false);
+
+    startTurn(state, 2000, []);
+    expect(player.augmentFlags.payCostWithHealthThisTurn).toBe(true);
+    expect(legalMoves(state, seat).some((move) => move.type === "playCard")).toBe(true);
+
+    const played = reduce(state, env(seat, { type: "playCard", handInstanceId: "health-pay-lethal" }), CARD_CATALOG).state;
+    expect(played.players[seat].hero.hp).toBe(0);
+    expect(played.players[seat].mana.current).toBe(1);
+    expect(played.status).toBe("finished");
+  });
+
+  it("clears HP payment when the affected turn ends", () => {
+    const state = startInProgress(28);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hand = [makeCard({ instanceId: "health-pay-once", cost: 3, keywords: {} })];
+    player.deck = [];
+    player.hero.hp = 10;
+    player.mana.max = 0;
+    player.mana.current = 0;
+
+    applyAugmentSelection(state, seat, entry("AMP_TAIJI_ELECTRIC_OFFER"), []);
+    startTurn(state, 2000, []);
+    const played = reduce(state, env(seat, { type: "playCard", handInstanceId: "health-pay-once" }), CARD_CATALOG).state;
+    expect(played.players[seat].augmentFlags.payCostWithHealthThisTurn).toBe(true);
+
+    const ended = reduce(played, env(seat, { type: "endTurn" }), CARD_CATALOG).state;
+    expect(ended.players[seat].augmentFlags.payCostWithHealthThisTurn).toBe(false);
+  });
+});
+
+describe("new bounce-buff augments", () => {
+  it("流水席 stacks its +1/+1 separately from the card's existing bounce bonus", () => {
+    const state = startInProgress(29);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const original = CARD_CATALOG.find((card) => card.id === "TW032");
+    if (!original || original.type !== "MINION") throw new Error("missing TW032");
+    player.hand = [];
+    player.board = [
+      makeMinion({
+        instanceId: "banquet-bounce",
+        cardId: original.id,
+        name: original.name,
+        category: original.category,
+        cost: original.cost,
+        attack: original.attack,
+        baseAttack: original.attack,
+        health: original.health,
+        currentHealth: original.health,
+        bounce_bonus: original.bounce_bonus
+      })
+    ];
+
+    applyAugmentSelection(state, seat, entry("AMP_BANQUET"), []);
+
+    expect(player.board).toHaveLength(0);
+    expect(player.hand).toHaveLength(1);
+    expect(player.hand[0].attack).toBe((original.attack ?? 0) + (original.bounce_bonus ?? 0) + 1);
+    expect(player.hand[0].health).toBe((original.health ?? 0) + (original.bounce_bonus ?? 0) + 1);
+    expect(player.hand[0].cost).toBe(original.cost);
+  });
+
+  it("國定假日 stacks +2/+2 after bounce bonus and reduces returned cost by 1", () => {
+    const state = startInProgress(30);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const original = CARD_CATALOG.find((card) => card.id === "TW032");
+    if (!original || original.type !== "MINION") throw new Error("missing TW032");
+    player.hand = [];
+    player.board = [
+      makeMinion({
+        instanceId: "holiday-bounce",
+        cardId: original.id,
+        name: original.name,
+        category: original.category,
+        cost: original.cost,
+        attack: original.attack,
+        baseAttack: original.attack,
+        health: original.health,
+        currentHealth: original.health,
+        bounce_bonus: original.bounce_bonus
+      })
+    ];
+
+    applyAugmentSelection(state, seat, entry("AMP_NATIONAL_HOLIDAY"), []);
+
+    expect(player.board).toHaveLength(0);
+    expect(player.hand).toHaveLength(1);
+    expect(player.hand[0].attack).toBe((original.attack ?? 0) + (original.bounce_bonus ?? 0) + 2);
+    expect(player.hand[0].health).toBe((original.health ?? 0) + (original.bounce_bonus ?? 0) + 2);
+    expect(player.hand[0].cost).toBe(Math.max(0, original.cost - 1));
+    expect(player.hand[0].isReduced).toBe(true);
+  });
+});
+
 describe("違約交割 freeze", () => {
   it("grants 10 crystals and limits the frozen seat to ending its turn", () => {
     const state = startInProgress(15);

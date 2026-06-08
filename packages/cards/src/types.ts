@@ -32,6 +32,10 @@ export interface EffectDefinition {
   effect?: EffectDefinition;
   /** Augment grants: crystals awarded (now or deferred). */
   crystals?: number;
+  /** Augment health payment/loss or max-health value. */
+  health?: number;
+  /** Augment returned-card cost reduction. */
+  costReduction?: number;
   /** Augment durations: turns a deferred/passive augment effect lasts. */
   durationTurns?: number;
   /** Augment mana ramp: global turn at which the ramp becomes active. */
@@ -171,5 +175,9 @@ export const SUPPORTED_AUGMENT_EFFECTS = [
   "AUG_REFERENDUM_IMMUNE",
   "AUG_RAISE_NEXT_TIER",
   "AUG_MANA_RAMP_AFTER_TURN",
-  "AUG_MANA_CAP_LOW_HP"
+  "AUG_MANA_CAP_LOW_HP",
+  "AUG_HERO_MAX_HP",
+  "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN",
+  "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN",
+  "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF"
 ] as const;

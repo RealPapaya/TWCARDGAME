@@ -17,7 +17,7 @@ import {
   type EnvironmentDescriptor,
   type VoteEventDbEntry
 } from "@twcardgame/cards";
-import { applyAugmentSelection, resolveEffect, resolvePostAction } from "./effects.js";
+import { applyAugmentSelection, finishIfHeroDead, resolveEffect, resolvePostAction } from "./effects.js";
 import { applyEnvironmentTick } from "./effects/environment.js";
 import { nextInt, normalizeSeed } from "./rng.js";
 import { addEvent } from "./state.js";
@@ -354,6 +354,7 @@ function resolveAmplificationPhase(state: MatchState, nowMs: number, events: Gam
     const entry = AMPLIFICATION_DB.find((e) => e.id === option.id);
     if (entry) applyAugmentSelection(state, seat, entry, events);
   }
+  finishIfHeroDead(state, events);
   endSpecialPhase(state, nowMs, "AMPLIFICATION_PHASE", events);
 }
 

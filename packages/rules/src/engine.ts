@@ -25,14 +25,15 @@ import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
   activePlayer,
   addEvent,
+  canPayCardCost,
   cloneState,
   createMinionFromCard,
   findCardInHand,
   findMinion,
-  getCardActualCost,
   getTargetUnit,
   nextInstanceId,
   opponentPlayer,
+  payCardCost,
   toHandView,
   toPublicState
 } from "./state.js";
@@ -285,8 +286,7 @@ function playCard(
     return;
   }
   const { card, index } = found;
-  const actualCost = getCardActualCost(state, seat, card);
-  if (player.mana.current < actualCost) {
+  if (!canPayCardCost(state, seat, card)) {
     reject(state, events, seat, "魔力不足。");
     return;
   }
@@ -306,7 +306,7 @@ function playCard(
     }
   }
 
-  player.mana.current -= actualCost;
+  payCardCost(state, seat, card, events);
   player.hand.splice(index, 1);
   addEvent(state, events, "CARD_PLAYED", { cardId: card.cardId, handInstanceId }, seat);
 

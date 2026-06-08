@@ -2,7 +2,8 @@ import { CARD_CATALOG, type AmplificationDbEntry } from "@twcardgame/cards";
 import { AMPLIFICATION_TIERS, type AmplificationTier, type Seat } from "@twcardgame/shared";
 import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
-import { drawCards, updateEnrage } from "./core.js";
+import { bounceMinion, drawCards, updateEnrage } from "./core.js";
+import { unlockLowHpManaCap } from "./augmentFlags.js";
 
 /**
  * 【動態增幅 — 集中解析模組】
@@ -14,6 +15,8 @@ import { drawCards, updateEnrage } from "./core.js";
  */
 
 type Events = EffectContext["events"];
+
+const CATALOG_MAP = new Map(CARD_CATALOG.map((card) => [card.id, card]));
 
 /** Raises a tier one step (加減賺→吃紅→卯死), capped at 卯死. Used by 0050. */
 export function bumpTier(tier: AmplificationTier): AmplificationTier {
@@ -39,6 +42,8 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       break;
     case "AUG_GRANT_CRYSTALS_NEXT_TURN":
       flags.bonusCrystalsNextTurn = (flags.bonusCrystalsNextTurn ?? 0) + (effect.crystals ?? 0);
+      flags.bonusCrystalsNextTurnSources ??= [];
+      flags.bonusCrystalsNextTurnSources.push(entry.id);
       break;
     case "AUG_NEXT_DRAW_HALF":
       flags.nextDrawHalfCost = true;
@@ -142,6 +147,45 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
         triggered = true;
       }
       break;
+    case "AUG_HERO_MAX_HP":
+      player.hero.maxHp += effect.value ?? 0;
+      triggered = true;
+      break;
+    case "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN":
+      flags.payCostWithHealthNextTurn = true;
+      break;
+    case "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN": {
+      const health = effect.health ?? effect.value ?? 0;
+      player.hero.hp -= health;
+      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: health, lifeLoss: true }, seat);
+      if (unlockLowHpManaCap(player)) {
+        addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, seat);
+      }
+      flags.bonusCrystalsNextTurn = (flags.bonusCrystalsNextTurn ?? 0) + (effect.crystals ?? 0);
+      flags.bonusCrystalsNextTurnSources ??= [];
+      flags.bonusCrystalsNextTurnSources.push(entry.id);
+      triggered = true;
+      break;
+    }
+    case "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF": {
+      const value = effect.value ?? 0;
+      const costReduction = effect.costReduction ?? 0;
+      for (const minion of [...player.board]) {
+        bounceMinion(state, player, minion, CATALOG_MAP, events, {
+          transformReturnedCard: (card) => {
+            card.attack = (card.attack ?? 0) + value;
+            card.health = (card.health ?? 0) + value;
+            if (costReduction > 0) {
+              const old = card.cost;
+              card.cost = Math.max(0, card.cost - costReduction);
+              if (card.cost !== old) card.isReduced = true;
+            }
+          }
+        });
+      }
+      triggered = true;
+      break;
+    }
     default:
       break;
   }
@@ -190,7 +234,15 @@ export function applyStartOfTurnAugments(state: MatchState, player: PlayerState,
   if (flags.bonusCrystalsNextTurn && flags.bonusCrystalsNextTurn > 0) {
     player.mana.current += flags.bonusCrystalsNextTurn;
     flags.bonusCrystalsNextTurn = undefined;
-    addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_VOUCHER_3600" }, player.seat);
+    const sources = flags.bonusCrystalsNextTurnSources?.length ? flags.bonusCrystalsNextTurnSources : ["AMP_VOUCHER_3600"];
+    for (const augmentId of sources) addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId }, player.seat);
+    flags.bonusCrystalsNextTurnSources = [];
+  }
+
+  if (flags.payCostWithHealthNextTurn) {
+    flags.payCostWithHealthNextTurn = false;
+    flags.payCostWithHealthThisTurn = true;
+    addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAIJI_ELECTRIC_OFFER" }, player.seat);
   }
 
   if (flags.extraDrawTurnsRemaining > 0) {
