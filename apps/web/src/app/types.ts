@@ -134,6 +134,10 @@ export type AnimationCue = {
    */
   playAttack?: number;
   playHealth?: number;
+  playEffectValue?: number;
+  playBaseEffectValue?: number;
+  playEffectBonusValue?: number;
+  playBaseEffectBonusValue?: number;
   attackerInstanceId?: string;
   amount?: number;
   delayMs?: number;
@@ -290,6 +294,10 @@ export type ResolvedCardView = {
   baseAttack?: number;
   health?: number;
   baseHealth?: number;
+  effectValue?: number;
+  baseEffectValue?: number;
+  effectBonusValue?: number;
+  baseEffectBonusValue?: number;
 };
 
 export type ProfileRow = {

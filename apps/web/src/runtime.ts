@@ -1927,6 +1927,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     minion.divineShield && "divine-shield",
     mine && minion.canAttack && "can-attack",
     minion.isEnraged && "enraged",
+    minion.hasOngoing && "has-ongoing",
     minion.lockedTurns > 0 && "locked",
     attackLunge && "lunging",
     selectedMinionClass(minion.instanceId, target),
@@ -1956,6 +1957,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
       aria-pressed="${view.selectedAttackerId === minion.instanceId || sameTarget(view.selectedTarget, target) ? "true" : "false"}"
     >
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
+      ${minion.hasOngoing ? `<span class="ongoing-aura" aria-hidden="true"><i></i><i></i></span>` : ""}
       ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
       <div class="minion-stats">
@@ -2016,13 +2018,33 @@ function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): st
     <strong class="card-title">${escapeHtml(card.name)}</strong>
     <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" draggable="false" />
     <span class="card-category">${escapeHtml(card.category)}</span>
-    <span class="card-desc">${escapeHtml(card.description)}</span>
+    <span class="card-desc">${renderCardDescription(card)}</span>
     ${
       card.type === "MINION"
         ? `<span class="minion-stats"><span class="${attackClass}"><span>${card.attack ?? 0}</span></span><span class="${healthClass}">${card.health ?? 0}</span></span>`
         : ""
     }
   `;
+}
+
+function renderCardDescription(card: ResolvedCardView): string {
+  const replacements = [
+    { base: card.baseEffectValue, value: card.effectValue },
+    { base: card.baseEffectBonusValue, value: card.effectBonusValue }
+  ].filter((item): item is { base: number; value: number } =>
+    typeof item.base === "number" && typeof item.value === "number" && item.value !== item.base
+  );
+  if (replacements.length === 0) return escapeHtml(card.description);
+
+  const pending = [...replacements];
+  return card.description.split(/(\d+)/g).map((part) => {
+    if (!/^\d+$/.test(part)) return escapeHtml(part);
+    const numeric = Number(part);
+    const index = pending.findIndex((item) => item.base === numeric);
+    if (index < 0) return escapeHtml(part);
+    const [replacement] = pending.splice(index, 1);
+    return `<span class="effect-value-buffed">${replacement.value}</span>`;
+  }).join("");
 }
 
 function valueDeltaClass(value: number | undefined, base: number | undefined): string {
@@ -2049,6 +2071,34 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
     health: card.health,
     baseHealth: card.health
   };
+}
+
+function applyVisibleNewsPowerPreview(card: CardDefinition, resolved: ResolvedCardView, seat: Seat | undefined): void {
+  const effect = card.keywords?.battlecry;
+  if (card.type !== "NEWS" || !effect?.type || typeof effect.value !== "number" || !seat) return;
+  const isDamage = effect.type.includes("DAMAGE");
+  const isHeal = effect.type.includes("HEAL") || effect.type.includes("RECOVER");
+  const excluded =
+    effect.type.includes("DRAW") ||
+    effect.type.includes("COST") ||
+    effect.type.includes("REDUCE") ||
+    effect.type === "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS";
+  if ((!isDamage && !isHeal) || excluded) return;
+  const bonus = visibleNewsPowerForSeat(seat);
+  if (bonus <= 0) return;
+  resolved.baseEffectValue = effect.value;
+  resolved.effectValue = effect.value + bonus;
+  if (typeof effect.bonus_value === "number") {
+    resolved.baseEffectBonusValue = effect.bonus_value;
+    resolved.effectBonusValue = effect.bonus_value + bonus;
+  }
+}
+
+function visibleNewsPowerForSeat(seat: Seat): number {
+  const player = readPlayer(seat);
+  return Array.from(player?.board ?? []).reduce((sum, minion) => {
+    return sum + (cardCatalog.get(minion.cardId)?.keywords?.newsPower ?? 0);
+  }, 0);
 }
 
 function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, myPlayer?: PublicPlayer): string {
@@ -5698,7 +5748,9 @@ function playBattlecryLandAnimation(cardId: string, onLanded: () => void): void 
   const overlay = ensureCardPlayOverlay();
   const el = document.createElement("div");
   el.className = "event-card-preview card from-player";
-  el.innerHTML = renderCardFace(resolveCatalogCard(card, `battlecry-${cardId}`), "mulligan");
+  const resolved = resolveCatalogCard(card, `battlecry-${cardId}`);
+  applyVisibleNewsPowerPreview(card, resolved, view.mySeat);
+  el.innerHTML = renderCardFace(resolved, "mulligan");
   overlay.appendChild(el);
   battlecryLandEl = el;
   battlecryLandTimers.push(window.setTimeout(() => el.classList.add("card-play-slam"), 800));
@@ -7544,8 +7596,13 @@ function playNextCardPlayCue(): void {
   // A buffed play (e.g. a bounced 韓國瑜) carries its boosted stats on the cue so
   // the focus-zoom shows a green 4/4; without them we render the catalog base.
   const resolvedPlay = resolveCatalogCard(card, cue.id);
+  applyVisibleNewsPowerPreview(card, resolvedPlay, cue.seat);
   if (typeof cue.playAttack === "number") resolvedPlay.attack = cue.playAttack;
   if (typeof cue.playHealth === "number") resolvedPlay.health = cue.playHealth;
+  if (typeof cue.playEffectValue === "number") resolvedPlay.effectValue = cue.playEffectValue;
+  if (typeof cue.playBaseEffectValue === "number") resolvedPlay.baseEffectValue = cue.playBaseEffectValue;
+  if (typeof cue.playEffectBonusValue === "number") resolvedPlay.effectBonusValue = cue.playEffectBonusValue;
+  if (typeof cue.playBaseEffectBonusValue === "number") resolvedPlay.baseEffectBonusValue = cue.playBaseEffectBonusValue;
   el.innerHTML = renderCardFace(resolvedPlay, "mulligan");
   overlay.appendChild(el);
   // Two phases mirror LEGACY showCardPlayPreview: a 0.8s entrance + hold, then
@@ -7861,6 +7918,10 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
       cardId: playedCardId,
       playAttack: typeof payload.attack === "number" ? payload.attack : undefined,
       playHealth: typeof payload.health === "number" ? payload.health : undefined,
+      playEffectValue: typeof payload.effectValue === "number" ? payload.effectValue : undefined,
+      playBaseEffectValue: typeof payload.baseEffectValue === "number" ? payload.baseEffectValue : undefined,
+      playEffectBonusValue: typeof payload.effectBonusValue === "number" ? payload.effectBonusValue : undefined,
+      playBaseEffectBonusValue: typeof payload.baseEffectBonusValue === "number" ? payload.baseEffectBonusValue : undefined,
       targetKey: findLandingTargetKey(events, index, event.seat, playedCardId)
     };
   }

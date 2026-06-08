@@ -7,6 +7,7 @@ import {
   drawCards,
   finishIfHeroDead,
   handlePlayNews,
+  applyNewsPower,
   applyDamage,
   isFrozen,
   processEndOfTurn,
@@ -39,6 +40,7 @@ import {
   toHandView,
   toPublicState
 } from "./state.js";
+import { effectNeedsTarget, targetTypesForRule } from "./targeting.js";
 import { DEFAULT_MULLIGAN_TIME_LIMIT_MS, DEFAULT_TURN_TIME_LIMIT_MS, SHORT_TURN_TIME_LIMIT_MS } from "./timing.js";
 import type { CreateMatchInput, MatchState, PlayerSetup, PlayerState, RulesResult } from "./types.js";
 
@@ -261,10 +263,14 @@ function submitMulligan(
 
 function validatePlayTarget(state: MatchState, seat: Seat, battlecry: EffectDefinition, target: TargetRef | undefined): string | null {
   const rule = battlecry.target;
-  if (!rule) return null;
+  if (!effectNeedsTarget(battlecry) || !rule) return null;
   if (!target) return "這張牌需要選擇目標。";
-  if (rule.type === "MINION" && target.type !== "MINION") return "這個目標不是隨從。";
-  if (rule.type === "HERO" && target.type !== "HERO") return "這個目標不是英雄。";
+  const expectedTypes = targetTypesForRule(rule.type);
+  if (!expectedTypes.includes(target.type)) {
+    if (rule.type === "MINION") return "這個目標不是隨從。";
+    if (rule.type === "HERO") return "這個目標不是英雄。";
+    return "這個目標類型不正確。";
+  }
   const expectedSide = rule.side === "ENEMY" ? opponentOf(seat) : rule.side === "FRIENDLY" ? seat : null;
   if (expectedSide && target.side !== expectedSide) return rule.side === "ENEMY" ? "這個目標不是敵軍。" : "這個目標不是友軍。";
   if (target.type === "MINION") {
@@ -315,9 +321,22 @@ function playCard(
     }
   }
 
+  const playPayload: Record<string, unknown> = { cardId: card.cardId, handInstanceId };
+  if (card.type === "NEWS" && card.keywords.battlecry) {
+    const effective = applyNewsPower(card.keywords.battlecry, { state, activeSeat: seat, source: card, target, events, catalog });
+    if (typeof card.keywords.battlecry.value === "number" && effective.value !== card.keywords.battlecry.value) {
+      playPayload.baseEffectValue = card.keywords.battlecry.value;
+      playPayload.effectValue = effective.value;
+    }
+    if (typeof card.keywords.battlecry.bonus_value === "number" && effective.bonus_value !== card.keywords.battlecry.bonus_value) {
+      playPayload.baseEffectBonusValue = card.keywords.battlecry.bonus_value;
+      playPayload.effectBonusValue = effective.bonus_value;
+    }
+  }
+
   payCardCost(state, seat, card, events);
   player.hand.splice(index, 1);
-  addEvent(state, events, "CARD_PLAYED", { cardId: card.cardId, handInstanceId }, seat);
+  addEvent(state, events, "CARD_PLAYED", playPayload, seat);
 
   if (card.type === "MINION") {
     const minion = createMinionFromCard(state, card, seat);

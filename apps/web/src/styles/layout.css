@@ -810,6 +810,12 @@ body.hand-dragging .hand-row .card {
   overflow: hidden;
 }
 
+.effect-value-buffed {
+  color: #55ff6a;
+  font-weight: 900;
+  text-shadow: 1px 1px 2px #000, 0 0 8px rgba(85, 255, 106, 0.65);
+}
+
 .card .minion-stats,
 .minion .minion-stats {
   position: absolute;
@@ -996,6 +1002,56 @@ body.hand-dragging .hand-row .card {
 
 .minion.enraged .stat-atk {
   filter: drop-shadow(0 0 8px #ff4b2b);
+}
+
+/* Persistent (ongoing) effect aura: two light points orbiting the card. Echoes the
+   tutorial highlight's orbiting glow but reads as a steady "this effect is live" mark.
+   The element is only rendered while the minion's ongoing keyword is active, so when the
+   effect is silenced/cancelled the server clears hasOngoing and the dots disappear. */
+.minion .ongoing-aura {
+  position: absolute;
+  inset: -7px;
+  z-index: 6;
+  pointer-events: none;
+  animation: ongoing-aura-orbit 3.6s linear infinite;
+}
+
+.minion .ongoing-aura i {
+  position: absolute;
+  left: 50%;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0 32%, rgba(120, 220, 255, 0.95) 56%, rgba(120, 220, 255, 0) 78%);
+  box-shadow: 0 0 8px 2px rgba(120, 220, 255, 0.85), 0 0 16px 5px rgba(70, 175, 255, 0.5);
+  animation: ongoing-aura-pulse 1.7s ease-in-out infinite;
+}
+
+.minion .ongoing-aura i:first-child {
+  top: -4px;
+}
+
+.minion .ongoing-aura i:last-child {
+  bottom: -4px;
+  animation-delay: 0.85s;
+}
+
+@keyframes ongoing-aura-orbit {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes ongoing-aura-pulse {
+  0%, 100% {
+    opacity: 0.6;
+    transform: scale(0.82);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.18);
+  }
 }
 
 .hero.taking-damage {

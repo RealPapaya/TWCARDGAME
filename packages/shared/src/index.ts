@@ -178,6 +178,8 @@ export interface PublicMinion {
   isEnraged: boolean;
   questTurns?: number;
   temporaryUntilTurn?: number;
+  /** True while a persistent (ongoing) effect is active; false once silenced/disabled. */
+  hasOngoing?: boolean;
 }
 
 // --- Special phases: turn 6/14 deck amplification & turn 20 inverse-HP voting ---

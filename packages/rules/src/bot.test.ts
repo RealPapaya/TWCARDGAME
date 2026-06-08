@@ -1,11 +1,12 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch } from "./engine.js";
+import { createRuntimeCard } from "./deck.js";
 import { reduce } from "./engine.js";
 import { legalMoves } from "./legalMoves.js";
 import { decide } from "./bot.js";
-import { getCardActualCost } from "./state.js";
-import type { MatchState } from "./types.js";
+import { createMinionFromCard, getCardActualCost, nextInstanceId, toHandView } from "./state.js";
+import type { MatchState, RuntimeMinion } from "./types.js";
 
 function legalDeckIds(): string[] {
   return CARD_CATALOG.filter((card) => card.rarity !== "LEGENDARY" && card.collectible !== false)
@@ -75,7 +76,58 @@ describe("legalMoves", () => {
     const mulliganMoves = moves.filter((m) => m.type === "submitMulligan");
     expect(mulliganMoves.length).toBe(2);
   });
+
+  it("plays 查水表 without requiring a target", () => {
+    const state = startedMatch(606);
+    const seat = state.turn.activeSeat;
+    const enemy = seat === "player1" ? "player2" : "player1";
+    const checkWater = CARD_CATALOG.find((card) => card.id === "S019")!;
+    const targetDef = CARD_CATALOG.find((card) => card.type === "MINION" && card.collectible !== false)!;
+    const enemyMinion = createMinionFromCard(state, createRuntimeCard(targetDef, enemy, nextInstanceId(state, "card")), enemy);
+    enemyMinion.health = 5;
+    enemyMinion.currentHealth = 5;
+    state.players[enemy].board = [readyMinion(enemyMinion)];
+    state.players[seat].mana = { current: 3, max: 3 };
+    state.players[seat].hand = [createRuntimeCard(checkWater, seat, nextInstanceId(state, "card"))];
+
+    expect(toHandView(state, seat)[0]?.needsTarget).toBe(false);
+    const move = legalMoves(state, seat).find((candidate) =>
+      candidate.type === "playCard" && candidate.handInstanceId === state.players[seat].hand[0]!.instanceId
+    );
+    expect(move).toEqual({ type: "playCard", handInstanceId: state.players[seat].hand[0]!.instanceId });
+
+    const result = reduce(state, { commandId: "check-water-no-target", seat, nowMs: 2000, command: move! }, CARD_CATALOG);
+    expect(result.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(false);
+    expect(result.state.players[enemy].board[0]?.currentHealth).toBe(3);
+  });
+
+  it("enumerates target.type ALL battlecries with explicit hero or minion targets", () => {
+    const state = startedMatch(607);
+    const seat = state.turn.activeSeat;
+    const enemy = seat === "player1" ? "player2" : "player1";
+    const purge = CARD_CATALOG.find((card) => card.id === "S020")!;
+    const targetDef = CARD_CATALOG.find((card) => card.type === "MINION" && card.collectible !== false)!;
+    const enemyMinion = createMinionFromCard(state, createRuntimeCard(targetDef, enemy, nextInstanceId(state, "card")), enemy);
+    state.players[enemy].board = [readyMinion(enemyMinion)];
+    state.players[seat].mana = { current: 5, max: 5 };
+    state.players[seat].hand = [createRuntimeCard(purge, seat, nextInstanceId(state, "card"))];
+
+    const plays = legalMoves(state, seat).filter((candidate) =>
+      candidate.type === "playCard" && candidate.handInstanceId === state.players[seat].hand[0]!.instanceId
+    );
+
+    expect(toHandView(state, seat)[0]?.needsTarget).toBe(true);
+    expect(plays).toContainEqual({ type: "playCard", handInstanceId: state.players[seat].hand[0]!.instanceId, target: { type: "HERO", side: enemy } });
+    expect(plays).toContainEqual({ type: "playCard", handInstanceId: state.players[seat].hand[0]!.instanceId, target: { type: "MINION", side: enemy, instanceId: enemyMinion.instanceId } });
+    expect(plays.some((candidate) => candidate.type === "playCard" && !candidate.target)).toBe(false);
+  });
 });
+
+function readyMinion(minion: RuntimeMinion): RuntimeMinion {
+  minion.sleeping = false;
+  minion.canAttack = true;
+  return minion;
+}
 
 describe("bot.decide", () => {
   it("returns deterministic moves for difficulty=easy with a fixed RNG seed", () => {

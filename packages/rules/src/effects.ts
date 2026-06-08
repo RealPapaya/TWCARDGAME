@@ -1,6 +1,7 @@
 export { effectHandlers, resolveEffect } from "./effects/registry.js";
 export {
   applyDamage,
+  applyNewsPower,
   drawCards,
   finishIfHeroDead,
   handlePlayNews,

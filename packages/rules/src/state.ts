@@ -11,6 +11,7 @@ import {
 import { createRuntimeCard } from "./deck.js";
 import { environmentCostDelta, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
+import { effectNeedsTarget } from "./targeting.js";
 import {
   augmentCostMultiplierTenths,
   augmentFlatCostReduction,
@@ -150,7 +151,11 @@ export function toPublicMinion(minion: RuntimeMinion) {
     canAttack: minion.canAttack,
     isEnraged: minion.isEnraged,
     questTurns: minion.questTurns,
-    temporaryUntilTurn: minion.temporaryUntilTurn
+    temporaryUntilTurn: minion.temporaryUntilTurn,
+    // True only while a persistent (ongoing) effect is live. Silence / environment
+    // effect-disabling clears `keywords`, so this drops to false and the client's
+    // aura visual disappears in lockstep with the mechanic.
+    hasOngoing: !!minion.keywords.ongoing
   };
 }
 
@@ -162,7 +167,7 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
     type: card.type,
     attack: card.attack,
     health: card.health,
-    needsTarget: Boolean(card.keywords.battlecry?.target)
+    needsTarget: effectNeedsTarget(card.keywords.battlecry)
   }));
 }
 

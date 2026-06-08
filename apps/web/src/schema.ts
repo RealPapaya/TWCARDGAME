@@ -51,6 +51,7 @@ class PublicMinionSchema extends Schema {
   isEnraged = false;
   questTurns = -1;
   temporaryUntilTurn = -1;
+  hasOngoing = false;
 }
 defineTypes(PublicMinionSchema, {
   instanceId: "string",
@@ -70,6 +71,7 @@ defineTypes(PublicMinionSchema, {
   isEnraged: "boolean",
   questTurns: "number",
   temporaryUntilTurn: "number",
+  hasOngoing: "boolean",
 });
 
 class PublicPlayerSchema extends Schema {

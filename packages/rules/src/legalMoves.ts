@@ -1,6 +1,7 @@
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
 import { isFrozen } from "./effects/augmentFlags.js";
 import { canPayCardCost } from "./state.js";
+import { effectNeedsTarget, targetTypesForRule } from "./targeting.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
 
 /**
@@ -72,12 +73,12 @@ function legalPlays(state: MatchState, seat: Seat): GameCommand[] {
 
     const battlecry = card.keywords.battlecry;
     const rule = battlecry?.target;
-    if (!battlecry || !rule || !rule.type || rule.type === "ALL") {
+    if (!effectNeedsTarget(battlecry)) {
       result.push({ type: "playCard", handInstanceId: card.instanceId });
       continue;
     }
 
-    for (const target of enumerateBattlecryTargets(state, seat, rule.type, rule.side)) {
+    for (const target of enumerateBattlecryTargets(state, seat, rule?.type, rule?.side)) {
       result.push({ type: "playCard", handInstanceId: card.instanceId, target });
     }
   }
@@ -94,10 +95,11 @@ function hasEnoughOtherCardsForDiscard(card: RuntimeCard, handLength: number): b
 function enumerateBattlecryTargets(
   state: MatchState,
   seat: Seat,
-  type: "MINION" | "HERO",
+  type: "MINION" | "HERO" | "ALL" | undefined,
   side: "ENEMY" | "FRIENDLY" | "ALL" | undefined
 ): TargetRef[] {
   const targets: TargetRef[] = [];
+  const types = targetTypesForRule(type);
   const sides: Seat[] = side === "ENEMY"
     ? [opponentOf(seat)]
     : side === "FRIENDLY"
@@ -105,9 +107,10 @@ function enumerateBattlecryTargets(
       : [seat, opponentOf(seat)];
 
   for (const targetSeat of sides) {
-    if (type === "HERO") {
+    if (types.includes("HERO")) {
       targets.push({ type: "HERO", side: targetSeat });
-    } else {
+    }
+    if (types.includes("MINION")) {
       for (const minion of state.players[targetSeat].board) {
         targets.push({ type: "MINION", side: targetSeat, instanceId: minion.instanceId });
       }

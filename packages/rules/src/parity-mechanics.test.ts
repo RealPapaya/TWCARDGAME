@@ -357,10 +357,20 @@ describe("phase 2 parity mechanics", () => {
     const healTarget = placeMinion(state, seat, "TW045", { health: 20, currentHealth: 1 });
     placeMinion(state, seat, "TW046");
 
-    const afterDamage = playCard(state, "S006", { type: "HERO", side: foe }, "news-power-damage").state;
+    const damageResult = playCard(state, "S006", { type: "HERO", side: foe }, "news-power-damage");
+    const damagePlayEvent = damageResult.events.find((event) => event.type === "CARD_PLAYED");
+    expect(damagePlayEvent?.payload?.baseEffectValue).toBe(3);
+    expect(damagePlayEvent?.payload?.effectValue).toBe(11);
+    const afterDamage = damageResult.state;
     expect(afterDamage.players[foe].hero.hp).toBe(19);
 
-    const afterHeal = playCard(afterDamage, "S011", { type: "MINION", side: seat, instanceId: healTarget.instanceId }, "news-power-heal").state;
+    const healResult = playCard(afterDamage, "S011", { type: "MINION", side: seat, instanceId: healTarget.instanceId }, "news-power-heal");
+    const healPlayEvent = healResult.events.find((event) => event.type === "CARD_PLAYED");
+    expect(healPlayEvent?.payload?.baseEffectValue).toBe(1);
+    expect(healPlayEvent?.payload?.effectValue).toBe(9);
+    expect(healPlayEvent?.payload?.baseEffectBonusValue).toBe(2);
+    expect(healPlayEvent?.payload?.effectBonusValue).toBe(10);
+    const afterHeal = healResult.state;
     const healed = afterHeal.players[seat].board.find((minion) => minion.instanceId === healTarget.instanceId)!;
     expect(healed.currentHealth).toBe(11);
 

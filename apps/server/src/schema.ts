@@ -46,6 +46,7 @@ export class PublicMinionSchema extends Schema {
   isEnraged = false;
   questTurns = -1;
   temporaryUntilTurn = -1;
+  hasOngoing = false;
 }
 defineTypes(PublicMinionSchema, {
   instanceId: "string",
@@ -64,7 +65,8 @@ defineTypes(PublicMinionSchema, {
   canAttack: "boolean",
   isEnraged: "boolean",
   questTurns: "number",
-  temporaryUntilTurn: "number"
+  temporaryUntilTurn: "number",
+  hasOngoing: "boolean"
 });
 
 export class AugmentSchema extends Schema {
@@ -294,4 +296,5 @@ function copyMinionSchema(target: PublicMinionSchema, minion: PublicMinion | Pub
   target.isEnraged = minion.isEnraged;
   target.questTurns = minion.questTurns ?? -1;
   target.temporaryUntilTurn = minion.temporaryUntilTurn ?? -1;
+  target.hasOngoing = minion.hasOngoing ?? false;
 }
