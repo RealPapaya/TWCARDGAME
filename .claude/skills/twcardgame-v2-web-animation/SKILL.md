@@ -66,6 +66,42 @@ A body-level imperative element is never in the render tree, so morph cannot
 reset it. That is why the flying knife had to move from declarative to imperative
 (see case study).
 
+### Unit flash and its overlay must fire in lock-step (both sides identical)
+
+Most in-place effects are **two coupled pieces**: a **unit-flash class** on the
+minion/hero (`.receiving-heal` → `heal-flash`, `.receiving-buff`, `.taking-damage`,
+`.shield-popping`, `.locked-fx`, `.receiving-bounce`) **and** a **burst overlay** in
+`.event-layer` (`.heal-burst`, `.float-number`, `.buff-burst`, `.shield-shatter`,
+`.lock-clamp`, `.bounce-burst`, `.effect-strike`). They must appear **together**.
+
+The trap: the flash class is applied via `hasCue(targetKey, kind)`, which is gated by
+`cueIsReady(cue)` and the keyframes carry **no** `animation-delay` — so the flash
+fires at `readyAtMs`. If the overlay instead animates via `animation-delay:
+var(--cue-delay)`, the morph reset above keeps restarting its countdown, so the
+overlay **trails the flash by the play delay**. This is worst on the **opponent's
+view**, where the card-play preview holds `publicSync` longer → more morph passes →
+bigger drift. (Original report: enemy-side heal showed the green frame before the
+green "+".)
+
+**Rule: an in-place burst overlay must use the same ready gate as its flash, not a
+CSS delay.** Concretely, in `renderEventCue`:
+
+- `if (!cue.targetKey || !cueIsReady(cue)) return "";` — don't render the overlay
+  until the cue is ready (so it can't appear before the flash).
+- Style it with `inPlaceBurstStyle(cue)` (= `cueStyleAttr` with `delayMs` forced to
+  0), **not** the raw `cueStyle` — animate delay-free so it fires the instant it
+  renders, i.e. the same render that applies the flash class.
+
+This is safe because **every path that sets `delayMs` also sets `readyAtMs`** (see
+`applyPostPlayEffectDelays`, `applyPostAttackEffectDelays`,
+`applyPostQuestEffectDelays`, the VOTE_REVEAL hold, `scheduleAugmentGlowReveal`), so
+the ready gate already encodes the intended delay. And because the overlay HTML is
+deterministic (seeded by `cue.id`), once ready morph leaves it untouched — no
+restart. `renderAoeHealPluses` was the original instance of this pattern; `heal`,
+`damage`/`effectStrike`, `buff`, `shieldPop`, `lock`, and `bounce` now all follow it.
+When you add a new in-place effect, do the same — never pair a `cueIsReady`-gated
+flash with a `--cue-delay` overlay.
+
 ## publicSync hold / flush — board state is deferred behind motion
 
 `publicSync` is **stashed**, not applied immediately, so an attack or effect can

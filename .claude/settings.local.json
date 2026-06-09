@@ -50,7 +50,8 @@
       "Bash(SETTLE=1000 node .tmp-repro-aura-death.mjs)",
       "Bash(SETTLE=1600 node .tmp-repro-aura-death.mjs)",
       "Bash(sed -n '1,5p')",
-      "Bash(sed -n '365,470p' LEGACY/js/ui/app.js)"
+      "Bash(sed -n '365,470p' LEGACY/js/ui/app.js)",
+      "Bash(npx tsc *)"
     ],
     "additionalDirectories": [
       "\\tmp"

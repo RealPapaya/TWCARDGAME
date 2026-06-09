@@ -2589,19 +2589,22 @@ function renderEventCue(cue: AnimationCue): string {
     return "";
   }
   if (cue.kind === "buff") {
-    if (!cue.targetKey) return "";
+    if (!cue.targetKey || !cueIsReady(cue)) return "";
+    const burstStyle = inPlaceBurstStyle(cue);
     const sparks = particleSpread(cue.id, cue.scope === "aoe" ? 4 : 7);
-    return `<div class="buff-burst${cue.scope === "aoe" ? " aoe" : ""}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="buff-burst">${sparks}</div>`;
+    return `<div class="buff-burst${cue.scope === "aoe" ? " aoe" : ""}"${burstStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="buff-burst">${sparks}</div>`;
   }
   if (cue.kind === "shieldPop") {
-    if (!cue.targetKey) return "";
+    if (!cue.targetKey || !cueIsReady(cue)) return "";
+    const burstStyle = inPlaceBurstStyle(cue);
     const shards = particleSpread(cue.id, 7);
-    return `<div class="shield-shatter"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="shield-shatter"><span class="shield-shatter-ring"></span>${shards}</div>`;
+    return `<div class="shield-shatter"${burstStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="shield-shatter"><span class="shield-shatter-ring"></span>${shards}</div>`;
   }
   if (cue.kind === "lock") {
-    if (!cue.targetKey) return "";
+    if (!cue.targetKey || !cueIsReady(cue)) return "";
+    const burstStyle = inPlaceBurstStyle(cue);
     const shards = particleSpread(cue.id, 6);
-    return `<div class="lock-clamp"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="lock-clamp"><span class="lock-clamp-ring"></span>${shards}</div>`;
+    return `<div class="lock-clamp"${burstStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="lock-clamp"><span class="lock-clamp-ring"></span>${shards}</div>`;
   }
   if (cue.kind === "deathrattle") {
     // Rendered imperatively by applyDeathrattlePlume — the dead minion's DOM is
@@ -2615,37 +2618,28 @@ function renderEventCue(cue: AnimationCue): string {
     return `<div class="aoe-sweep aoe-sweep-${variant}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="aoe-sweep"><span class="aoe-sweep-wave"></span><span class="aoe-sweep-glow"></span>${healPluses}</div>`;
   }
   if (cue.kind === "bounce") {
-    if (!cue.targetKey) return "";
-    return `<div class="bounce-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="bounce-burst"><span></span><span></span><span></span></div>`;
+    if (!cue.targetKey || !cueIsReady(cue)) return "";
+    const burstStyle = inPlaceBurstStyle(cue);
+    return `<div class="bounce-burst"${burstStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="bounce-burst"><span></span><span></span><span></span></div>`;
   }
   if (cue.kind === "damage" || cue.kind === "heal" || cue.kind === "effectStrike") {
-    if (!cue.targetKey) return "";
+    if (!cue.targetKey || !cueIsReady(cue)) return "";
+    // The unit flash (.taking-damage / .receiving-heal) is gated by cueIsReady with
+    // no CSS delay, so it fires at readyAtMs. Animate the number + burst delay-free
+    // off the same ready gate (see inPlaceBurstStyle) so they fire on the same render
+    // — otherwise --cue-delay gets reset by morph re-renders and the digits trail the
+    // flash by the play delay, worst on the opponent's view.
+    const burstStyle = inPlaceBurstStyle(cue);
     const isHeal = cue.kind === "heal";
-    if (isHeal) {
-      // The green frame (.receiving-heal → heal-flash) is gated by cueIsReady and
-      // has no animation-delay, so it fires at readyAtMs. The green "+" used to be
-      // animated via --cue-delay, but morph re-renders (publicSync held during a
-      // card play, worst on the enemy's view) keep resetting that countdown — so
-      // the "+" trailed the frame by the play delay. Mirror the AOE-pluses fix:
-      // hold the heal visuals until the cue is ready, then animate immediately
-      // (delay-free) so the frame and the "+" fire on the same render.
-      if (!cueIsReady(cue)) return "";
-      const readyStyle = cueStyleAttr({ ...cue, delayMs: 0 });
-      const number = cue.amount !== undefined
-        ? `<div class="float-number heal"${readyStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">+${cue.amount}</div>`
-        : "";
-      const burst = renderHealBurst(cue, readyStyle);
-      return `${burst}${number}`;
-    }
-    const sign = "-";
-    // The readable -N stays (it is data, not decoration); the particles wrap it.
-    // Combat "damage" keeps just the number + the taking-damage shake.
+    const sign = isHeal ? "+" : "-";
+    // The readable -N / +N stays (it is data, not decoration); the particles wrap it.
     const number = cue.amount !== undefined
-      ? `<div class="float-number damage"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`
+      ? `<div class="float-number ${isHeal ? "heal" : "damage"}"${burstStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`
       : "";
-    // Every damage gets an impact burst: combat damage a red spark, effect /
-    // spell damage the magenta strike.
-    const burst = renderEffectStrike(cue, cueStyle, cue.kind === "effectStrike" ? "effect" : "combat");
+    // Heal keeps its green motes; combat damage a red spark, effect / spell damage the magenta strike.
+    const burst = isHeal
+      ? renderHealBurst(cue, burstStyle)
+      : renderEffectStrike(cue, burstStyle, cue.kind === "effectStrike" ? "effect" : "combat");
     return `${burst}${number}`;
   }
   if (cue.kind === "destroy") {
@@ -2735,6 +2729,25 @@ function cueStyleAttr(cue: AnimationCue): string {
     styles.push(`left:${Math.round(cue.anchorX)}px`, `top:${Math.round(cue.anchorY)}px`);
   }
   return styles.length > 0 ? ` style="${styles.join(";")}"` : "";
+}
+
+/**
+ * Style for an in-place burst overlay (heal/buff/shieldPop/lock/bounce + the damage
+ * number and effect-strike core). Each pairs with a unit-flash class
+ * (`.receiving-heal`, `.receiving-buff`, `.taking-damage`, …) that is gated by
+ * `cueIsReady` and carries NO CSS delay, so the flash fires at `readyAtMs`. If the
+ * overlay animates via `--cue-delay` instead, morph re-renders (publicSync held
+ * during a play — worst on the opponent's view, where the play preview holds longer)
+ * keep resetting that countdown and the burst trails the flash by the play delay.
+ *
+ * Fix: gate the overlay on `cueIsReady` (callers `return ""` until ready) and animate
+ * it delay-free, so flash + burst fire on the same render and look identical on both
+ * sides. Safe because every path that sets `delayMs` also sets `readyAtMs`, so the
+ * ready gate already encodes the intended delay; and the overlay HTML is deterministic
+ * (seeded by `cue.id`), so once ready, morph leaves it untouched (no restart).
+ */
+function inPlaceBurstStyle(cue: AnimationCue): string {
+  return cueStyleAttr({ ...cue, delayMs: 0 });
 }
 
 function particleSpread(seed: string, count = 8): string {
