@@ -4581,6 +4581,9 @@ async function startDevTestPveMatch(devTest: DevTestMatchSetup): Promise<void> {
   if (!devTestModeAvailable || view.joining || view.room) return;
   const unknown = [
     ...(devTest.handCardIds ?? []),
+    ...(devTest.opponentHandCardIds ?? []),
+    ...(devTest.playerDeckCardIds ?? []),
+    ...(devTest.opponentDeckCardIds ?? []),
     ...(devTest.playerBoardCardIds ?? []),
     ...(devTest.opponentBoardCardIds ?? [])
   ].filter((id) => !cardCatalog.has(id));

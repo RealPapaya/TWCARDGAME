@@ -27,6 +27,9 @@ export interface AiThemeDefinition {
 
 export interface DevTestMatchSetup {
   handCardIds?: string[];
+  opponentHandCardIds?: string[];
+  playerDeckCardIds?: string[];
+  opponentDeckCardIds?: string[];
   playerBoardCardIds?: string[];
   opponentBoardCardIds?: string[];
   playerHp?: number;

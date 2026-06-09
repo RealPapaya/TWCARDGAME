@@ -66,6 +66,18 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
     const def = catalog.get(cardId)!;
     player.hand.push(createCardForHand(state, def, "player1"));
   }
+  for (const cardId of setup.opponentHandCardIds ?? []) {
+    const def = catalog.get(cardId)!;
+    opponent.hand.push(createCardForHand(state, def, "player2"));
+  }
+  for (const cardId of setup.playerDeckCardIds ?? []) {
+    const def = catalog.get(cardId)!;
+    player.deck.push(createCardForHand(state, def, "player1"));
+  }
+  for (const cardId of setup.opponentDeckCardIds ?? []) {
+    const def = catalog.get(cardId)!;
+    opponent.deck.push(createCardForHand(state, def, "player2"));
+  }
   addBoardMinions(state, "player1", setup.playerBoardCardIds ?? [], activeSeat);
   addBoardMinions(state, "player2", setup.opponentBoardCardIds ?? [], activeSeat);
   enterRequestedPhase(state, setup, nowMs, events);
@@ -73,6 +85,9 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
 
 function validateSetup(setup: DevTestMatchSetup): void {
   validateCards(setup.handCardIds ?? [], "hand", 10, false);
+  validateCards(setup.opponentHandCardIds ?? [], "opponent hand", 10, false);
+  validateCards(setup.playerDeckCardIds ?? [], "player deck", 60, false);
+  validateCards(setup.opponentDeckCardIds ?? [], "opponent deck", 60, false);
   validateCards(setup.playerBoardCardIds ?? [], "player board", 7, true);
   validateCards(setup.opponentBoardCardIds ?? [], "opponent board", 7, true);
   validateAmplifications(setup.amplificationIds);

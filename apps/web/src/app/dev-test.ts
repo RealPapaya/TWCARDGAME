@@ -22,7 +22,7 @@ type OnBinder = <T extends EventTarget>(
   options?: AddEventListenerOptions
 ) => void;
 
-type DevCardSlot = "hand" | "playerBoard" | "opponentBoard";
+type DevCardSlot = "hand" | "opponentHand" | "playerDeck" | "opponentDeck" | "playerBoard" | "opponentBoard";
 type DevAmplificationSlot = "turn6" | "turn14";
 
 type DevCardSlotConfig = {
@@ -35,11 +35,32 @@ type DevCardSlotConfig = {
 
 const devCardSlots: Record<DevCardSlot, DevCardSlotConfig> = {
   hand: {
-    title: "Hand cards",
-    searchLabel: "Search cards to add to hand",
+    title: "Player hand",
+    searchLabel: "Search cards to add to player hand",
     max: 10,
     minionOnly: false,
-    emptyText: "No hand cards selected."
+    emptyText: "No player hand cards selected."
+  },
+  opponentHand: {
+    title: "Opponent hand",
+    searchLabel: "Search cards to add to opponent hand",
+    max: 10,
+    minionOnly: false,
+    emptyText: "No opponent hand cards selected."
+  },
+  playerDeck: {
+    title: "Player deck",
+    searchLabel: "Search cards to add to player deck",
+    max: 60,
+    minionOnly: false,
+    emptyText: "No player deck cards selected."
+  },
+  opponentDeck: {
+    title: "Opponent deck",
+    searchLabel: "Search cards to add to opponent deck",
+    max: 60,
+    minionOnly: false,
+    emptyText: "No opponent deck cards selected."
   },
   playerBoard: {
     title: "Player board",
@@ -57,9 +78,12 @@ const devCardSlots: Record<DevCardSlot, DevCardSlotConfig> = {
   }
 };
 
-const devCardSlotOrder: DevCardSlot[] = ["hand", "playerBoard", "opponentBoard"];
+const devCardSlotOrder: DevCardSlot[] = ["hand", "opponentHand", "playerDeck", "opponentDeck", "playerBoard", "opponentBoard"];
 const selectedDevCards: Record<DevCardSlot, string[]> = {
   hand: [],
+  opponentHand: [],
+  playerDeck: [],
+  opponentDeck: [],
   playerBoard: [],
   opponentBoard: []
 };
@@ -73,6 +97,8 @@ const devPhaseOptions: Array<{ value: Phase; label: string }> = [
 const DEV_SETTINGS_KEY = "twcardgame.devtest.v1";
 const devInput: Record<string, string> = {};
 const devChecked: Record<string, boolean> = {};
+
+let activeTargetSlot: DevCardSlot = "hand";
 
 try {
   const raw = typeof window !== "undefined" ? window.localStorage?.getItem(DEV_SETTINGS_KEY) : null;
@@ -99,6 +125,9 @@ function persistDevSettings(): void {
       checked: devChecked,
       cards: {
         hand: [...selectedDevCards.hand],
+        opponentHand: [...selectedDevCards.opponentHand],
+        playerDeck: [...selectedDevCards.playerDeck],
+        opponentDeck: [...selectedDevCards.opponentDeck],
         playerBoard: [...selectedDevCards.playerBoard],
         opponentBoard: [...selectedDevCards.opponentBoard]
       }
@@ -133,61 +162,89 @@ export function renderDevTestPanel(busy: boolean): string {
       </div>
 
       <div class="dev-test-dashboard">
-        <fieldset class="dev-test-panel dev-test-jump-panel">
-          <legend>Jump</legend>
-          ${renderSelectControl("dev-test-screen", "Jump Screen", screens.map((screen) => `<option value="${screen}">${screen}</option>`).join(""))}
-          <button id="dev-test-jump" type="button">Jump</button>
-        </fieldset>
+        <!-- LEFT COLUMN: CONTROLS & FILTERS -->
+        <div class="dev-test-col dev-test-left-col">
+          
 
-        <fieldset class="dev-test-panel dev-test-match-panel">
-          <legend>PvE setup</legend>
-          <div class="dev-test-compact-grid">
-            ${renderSelectControl("dev-test-turn-preset", "Preset", `<option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option>`)}
-            ${renderSliderControl("dev-test-turn-number", "Turn", 1, 100, 1)}
-            ${renderSelectControl("dev-test-phase", "Phase", devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join(""))}
-            ${renderSelectControl("dev-test-active-seat", "Active", `<option value="player1">player1</option><option value="player2">player2</option>`)}
-            ${renderSliderControl("dev-test-player-hp", "Player HP", 1, 99, 1)}
-            ${renderSliderControl("dev-test-opponent-hp", "Opponent HP", 1, 99, 1)}
-            ${renderSliderControl("dev-test-player-mana-current", "P mana", 0, 30, 1)}
-            ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 30, 1)}
-            ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 30, 1)}
-            ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 30, 1)}
-            ${renderSelectControl("dev-test-amp-tier-turn6", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
-            ${renderSelectControl("dev-test-amp-tier-turn14", "增幅2等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[1]))}
-            ${renderSelectControl("dev-test-amp-id-turn6", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
-            ${renderSelectControl("dev-test-amp-id-turn14", "增幅2內容", renderAmplificationOptions(AMPLIFICATION_TIERS[1]), true)}
-            ${renderSelectControl("dev-test-vote-event", "事件", renderVoteEventOptions(), true)}
-            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" ${sc("dev-test-player-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">P infinite</span></label>
-            <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" ${sc("dev-test-opponent-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">O infinite</span></label>
+          <div class="dev-test-panel dev-test-match-panel">
+            <h3 class="dev-test-panel-title">PvE Setup</h3>
+            <div class="dev-test-compact-grid">
+              ${renderSelectControl("dev-test-turn-preset", "Preset", `<option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option>`)}
+              ${renderSliderControl("dev-test-turn-number", "Turn", 1, 100, 1)}
+              ${renderSelectControl("dev-test-phase", "Phase", devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join(""))}
+              ${renderSelectControl("dev-test-active-seat", "Active", `<option value="player1">player1</option><option value="player2">player2</option>`)}
+              ${renderSliderControl("dev-test-player-hp", "Player HP", 1, 99, 1)}
+              ${renderSliderControl("dev-test-opponent-hp", "Opponent HP", 1, 99, 1)}
+              ${renderSliderControl("dev-test-player-mana-current", "P mana", 0, 30, 1)}
+              ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 30, 1)}
+              ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 30, 1)}
+              ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 30, 1)}
+              ${renderSelectControl("dev-test-amp-tier-turn6", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
+              ${renderSelectControl("dev-test-amp-tier-turn14", "增幅2等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[1]))}
+              ${renderSelectControl("dev-test-amp-id-turn6", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
+              ${renderSelectControl("dev-test-amp-id-turn14", "增幅2內容", renderAmplificationOptions(AMPLIFICATION_TIERS[1]), true)}
+              ${renderSelectControl("dev-test-vote-event", "事件", renderVoteEventOptions(), true)}
+              <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" ${sc("dev-test-player-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">P infinite</span></label>
+              <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-opponent-infinite-mana" type="checkbox" ${sc("dev-test-opponent-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">O infinite</span></label>
+            </div>
+            <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
           </div>
-          <button id="dev-test-start-pve" type="button" ${busy ? "disabled" : ""}>Start PvE Test Match</button>
-        </fieldset>
-      </div>
 
-      <div class="dev-test-card-selectors">
-        ${devCardSlotOrder.map(renderDevCardSelector).join("")}
-      </div>
+          <div class="dev-test-panel dev-test-filters-panel">
+            <h3 class="dev-test-panel-title">Card Search Filters</h3>
+            ${renderSelectControl("dev-test-target-slot-global", "Target Slot", devCardSlotOrder.map(s => `<option value="${s}" ${s === activeTargetSlot ? "selected" : ""}>${devCardSlots[s].title}</option>`).join(""))}
+            ${renderSelectControl("dev-test-type-global", "Type", `<option value="all">All</option><option value="MINION">MINION</option><option value="NEWS">NEWS</option>`)}
+            ${renderSelectControl("dev-test-category-global", "Category", `<option value="all">All</option>${devCardCategoriesGlobal().map(c => `<option value="${escapeAttr(c)}">${escapeHtml(c)}</option>`).join("")}`)}
+            ${renderSelectControl("dev-test-rarity-global", "Rarity", `<option value="all">All</option>${devCardRarities.map(r => `<option value="${r}">${r}</option>`).join("")}`)}
+            ${renderSelectControl("dev-test-cost-global", "Cost", `<option value="all">All</option><option value="0-2">0-2</option><option value="3-5">3-5</option><option value="6-10">6+</option>`)}
+          </div>
 
-      <details class="dev-test-reward-details">
-        <summary>Reward screen</summary>
-        <div class="dev-test-reward-grid">
-          ${renderSelectControl("dev-test-reward-result", "Result", `<option value="win">win</option><option value="loss">loss</option>`)}
-          ${renderSelectControl("dev-test-reward-mode", "Mode", `<option value="pve">pve</option><option value="pvp">pvp</option>`)}
-          ${renderSelectControl("dev-test-reward-source", "Source", `<option value="pve_first">pve_first</option><option value="pve_repeat">pve_repeat</option><option value="pvp">pvp</option><option value="none">none</option>`)}
-          ${renderSliderControl("dev-test-xp-before", "XP before", 0, 5000, 1)}
-          ${renderSliderControl("dev-test-xp-gained", "XP gained", 0, 5000, 1)}
-          ${renderAutoSliderControl("dev-test-xp-after", "XP after", 0, 10000, 1)}
-          ${renderSliderControl("dev-test-level-before", "Level before", 1, 100, 1)}
-          ${renderAutoSliderControl("dev-test-level-after", "Level after", 1, 100, 1)}
-          ${renderTextControl("dev-test-level-ups", "Level-ups CSV", "auto, or 2:100,3:100", true)}
-          ${renderSliderControl("dev-test-gold-before", "Gold before", 0, 5000, 1)}
-          ${renderAutoSliderControl("dev-test-gold-gained", "Gold gained", 0, 5000, 1)}
-          ${renderAutoSliderControl("dev-test-gold-after", "Gold after", 0, 10000, 1)}
-          ${renderSliderControl("dev-test-gold-first", "First gold", 0, 1000, 1)}
-          ${renderAutoSliderControl("dev-test-gold-level", "Level gold", 0, 5000, 1)}
-          <button id="dev-test-reward" type="button">Show Reward Screen</button>
+          <details class="dev-test-reward-details">
+            <summary>Reward screen</summary>
+            <div class="dev-test-reward-grid">
+              ${renderSelectControl("dev-test-reward-result", "Result", `<option value="win">win</option><option value="loss">loss</option>`)}
+              ${renderSelectControl("dev-test-reward-mode", "Mode", `<option value="pve">pve</option><option value="pvp">pvp</option>`)}
+              ${renderSelectControl("dev-test-reward-source", "Source", `<option value="pve_first">pve_first</option><option value="pve_repeat">pve_repeat</option><option value="pvp">pvp</option><option value="none">none</option>`)}
+              ${renderSliderControl("dev-test-xp-before", "XP before", 0, 5000, 1)}
+              ${renderSliderControl("dev-test-xp-gained", "XP gained", 0, 5000, 1)}
+              ${renderAutoSliderControl("dev-test-xp-after", "XP after", 0, 10000, 1)}
+              ${renderSliderControl("dev-test-level-before", "Level before", 1, 100, 1)}
+              ${renderAutoSliderControl("dev-test-level-after", "Level after", 1, 100, 1)}
+              ${renderTextControl("dev-test-level-ups", "Level-ups CSV", "auto, or 2:100,3:100", true)}
+              ${renderSliderControl("dev-test-gold-before", "Gold before", 0, 5000, 1)}
+              ${renderAutoSliderControl("dev-test-gold-gained", "Gold gained", 0, 5000, 1)}
+              ${renderAutoSliderControl("dev-test-gold-after", "Gold after", 0, 10000, 1)}
+              ${renderSliderControl("dev-test-gold-first", "First gold", 0, 1000, 1)}
+              ${renderAutoSliderControl("dev-test-gold-level", "Level gold", 0, 5000, 1)}
+              <button id="dev-test-reward" type="button">Show Reward Screen</button>
+            </div>
+          </details>
         </div>
-      </details>
+
+        <!-- MIDDLE COLUMN: CARD CATALOG SEARCH -->
+        <div class="dev-test-col dev-test-mid-col">
+          <div class="dev-card-catalog-search">
+            <label class="dev-card-search-label" for="dev-test-search-global">
+              <span>Search Card Database</span>
+              <input id="dev-test-search-global" type="search" autocomplete="off" placeholder="Name, ID, category" />
+            </label>
+            <div id="dev-test-result-summary-global" class="dev-card-result-summary">
+              Loading cards...
+            </div>
+          </div>
+          <div id="dev-test-results-global" class="dev-card-results">
+            <!-- filled dynamically -->
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN: PREVIEW SETUP -->
+        <div class="dev-test-col dev-test-right-col">
+          <h3>預覽設計 (Preview Setup)</h3>
+          <div class="dev-test-preview-slots">
+            ${devCardSlotOrder.map(renderDevCardPreviewSlot).join("")}
+          </div>
+        </div>
+      </div>
     </section>
   `;
 }
@@ -200,24 +257,34 @@ export function bindDevTestActions(opts: {
   getAiTheme: () => AiTheme;
   getAiDifficulty: () => AiDifficulty;
 }): void {
-  opts.on(document.querySelector<HTMLButtonElement>("#dev-test-jump"), "click", "dev-test-jump", () => {
-    const target = document.querySelector<HTMLSelectElement>("#dev-test-screen")?.value as MenuScreen | undefined;
-    if (target) opts.jump(target);
-  });
+  // Initialize UI list
+  setTimeout(() => updateDevTestUi(), 0);
+
+  
   opts.on(document.querySelector<HTMLButtonElement>("#dev-test-start-pve"), "click", "dev-test-start-pve", () => {
     opts.startPve(readDevTestMatchSetup());
   });
+
   const screen = document.querySelector<HTMLElement>(".dev-test-screen");
-  opts.on(screen, "input", "dev-test-card-search", (event) => {
+
+  // Global search input
+  opts.on(screen, "input", "dev-test-card-search-global", (event) => {
     const input = event.target instanceof HTMLInputElement ? event.target : undefined;
-    const slot = parseDevCardSlot(input?.dataset.devCardSearch);
-    if (slot) updateDevCardSelector(slot);
+    if (input?.id === "dev-test-search-global") updateDevTestUi();
   });
-  opts.on(screen, "change", "dev-test-card-filter", (event) => {
+
+  // Global filters
+  opts.on(screen, "change", "dev-test-card-filter-global", (event) => {
     const select = event.target instanceof HTMLSelectElement ? event.target : undefined;
-    const slot = parseDevCardSlot(select?.dataset.devCardFilter);
-    if (slot) updateDevCardSelector(slot);
+    if (select && select.id.startsWith("dev-test-") && select.id.endsWith("-global")) {
+      if (select.id === "dev-test-target-slot-global") {
+        const slot = parseDevCardSlot(select.value);
+        if (slot) activeTargetSlot = slot;
+      }
+      updateDevTestUi();
+    }
   });
+
   opts.on(screen, "change", "dev-test-flow-controls", (event) => {
     const select = event.target instanceof HTMLSelectElement ? event.target : undefined;
     if (select?.id === "dev-test-turn-preset") applyDevTurnPreset(select.value);
@@ -245,22 +312,40 @@ export function bindDevTestActions(opts: {
       if (slider) slider.disabled = checkbox.checked;
     }
   });
+
   opts.on(screen, "click", "dev-test-card-selector-click", (event) => {
     const target = event.target instanceof HTMLElement ? event.target : undefined;
-    const addButton = target?.closest<HTMLButtonElement>("[data-dev-add-card]");
+    
+    // Add card globally to the active slot
+    const addButton = target?.closest<HTMLButtonElement>("[data-dev-add-card-global]");
     if (addButton) {
-      const slot = parseDevCardSlot(addButton.dataset.devSlot);
-      const cardId = addButton.dataset.devAddCard;
-      if (slot && cardId) addDevCard(slot, cardId);
+      const cardId = addButton.dataset.devAddCardGlobal;
+      if (cardId) addDevCard(activeTargetSlot, cardId);
       return;
     }
+
+    // Remove card from a slot
     const removeButton = target?.closest<HTMLButtonElement>("[data-dev-remove-card]");
     if (removeButton) {
       const slot = parseDevCardSlot(removeButton.dataset.devSlot);
       const index = Number.parseInt(removeButton.dataset.devRemoveCard ?? "", 10);
       if (slot && Number.isFinite(index)) removeDevCard(slot, index);
+      return;
+    }
+
+    // Switch active target slot by clicking slot block on the right
+    const slotSection = target?.closest<HTMLElement>("[data-dev-card-selector]");
+    if (slotSection) {
+      const slot = parseDevCardSlot(slotSection.dataset.devCardSelector);
+      if (slot && slot !== activeTargetSlot) {
+        activeTargetSlot = slot;
+        const selectGlobal = document.getElementById("dev-test-target-slot-global") as HTMLSelectElement | null;
+        if (selectGlobal) selectGlobal.value = slot;
+        updateDevTestUi();
+      }
     }
   });
+
   opts.on(document.querySelector<HTMLButtonElement>("#dev-test-reward"), "click", "dev-test-reward", () => {
     opts.showReward(readDevTestRewardSummary(opts.getAiTheme(), opts.getAiDifficulty()));
   });
@@ -292,6 +377,9 @@ function readDevTestMatchSetup(): DevTestMatchSetup {
   const phase = readDevTestPhase();
   return {
     handCardIds: [...selectedDevCards.hand],
+    opponentHandCardIds: [...selectedDevCards.opponentHand],
+    playerDeckCardIds: [...selectedDevCards.playerDeck],
+    opponentDeckCardIds: [...selectedDevCards.opponentDeck],
     playerBoardCardIds: [...selectedDevCards.playerBoard],
     opponentBoardCardIds: [...selectedDevCards.opponentBoard],
     playerHp: readNumberInput("dev-test-player-hp", 1),
@@ -350,77 +438,19 @@ function renderVoteEventOptions(selectedId?: string): string {
     .join("");
 }
 
-function renderDevCardSelector(slot: DevCardSlot): string {
+function renderDevCardPreviewSlot(slot: DevCardSlot): string {
   const config = devCardSlots[slot];
+  const isActive = slot === activeTargetSlot ? "active" : "";
   return `
-    <section class="dev-card-selector" data-dev-card-selector="${slot}">
-      <div class="dev-card-selector-header">
-        <h3>${escapeHtml(config.title)}</h3>
+    <section class="dev-preview-slot ${isActive}" data-dev-card-selector="${slot}">
+      <div class="dev-preview-slot-header">
+        <h4>${escapeHtml(config.title)}</h4>
         <span id="dev-test-count-${slot}" class="dev-card-count">${selectedDevCards[slot].length}/${config.max}</span>
-      </div>
-      <label class="dev-card-search-label" for="dev-test-search-${slot}">
-        <span>${escapeHtml(config.searchLabel)}</span>
-        <input id="dev-test-search-${slot}" data-dev-card-search="${slot}" type="search" autocomplete="off" placeholder="Name, ID, category" />
-      </label>
-      <div class="dev-card-filters">
-        ${renderDevCardTypeFilter(slot)}
-        <label>
-          <span>Category</span>
-          <select id="dev-test-category-${slot}" data-dev-card-filter="${slot}">
-            <option value="all">All</option>
-            ${devCardCategories(slot).map((category) => `<option value="${escapeAttr(category)}">${escapeHtml(category)}</option>`).join("")}
-          </select>
-        </label>
-        <label>
-          <span>Rarity</span>
-          <select id="dev-test-rarity-${slot}" data-dev-card-filter="${slot}">
-            <option value="all">All</option>
-            ${devCardRarities.map((rarity) => `<option value="${rarity}">${rarity}</option>`).join("")}
-          </select>
-        </label>
-        <label>
-          <span>Cost</span>
-          <select id="dev-test-cost-${slot}" data-dev-card-filter="${slot}">
-            <option value="all">All</option>
-            <option value="0-2">0-2</option>
-            <option value="3-5">3-5</option>
-            <option value="6-10">6+</option>
-          </select>
-        </label>
       </div>
       <div id="dev-test-selected-${slot}" class="dev-selected-cards">
         ${renderSelectedDevCards(slot)}
       </div>
-      <div id="dev-test-result-summary-${slot}" class="dev-card-result-summary">
-        ${renderDevCardResultSummary(slot, "")}
-      </div>
-      <div id="dev-test-results-${slot}" class="dev-card-results">
-        ${renderDevCardResults(slot)}
-      </div>
     </section>
-  `;
-}
-
-function renderDevCardTypeFilter(slot: DevCardSlot): string {
-  if (devCardSlots[slot].minionOnly) {
-    return `
-      <label>
-        <span>Type</span>
-        <select id="dev-test-type-${slot}" data-dev-card-filter="${slot}" disabled>
-          <option value="MINION">MINION</option>
-        </select>
-      </label>
-    `;
-  }
-  return `
-    <label>
-      <span>Type</span>
-      <select id="dev-test-type-${slot}" data-dev-card-filter="${slot}">
-        <option value="all">All</option>
-        <option value="MINION">MINION</option>
-        <option value="NEWS">NEWS</option>
-      </select>
-    </label>
   `;
 }
 
@@ -441,43 +471,30 @@ function renderSelectedDevCards(slot: DevCardSlot): string {
     .join("");
 }
 
-function renderDevCardResultSummary(slot: DevCardSlot, query: string): string {
-  const total = filteredDevCards(slot, query).length;
-  return `${total} matching cards`;
-}
-
-function renderDevCardResults(slot: DevCardSlot): string {
-  const config = devCardSlots[slot];
-  const full = selectedDevCards[slot].length >= config.max;
-  const query = readInputValue(`dev-test-search-${slot}`);
-  const cards = filteredDevCards(slot, query);
-  if (cards.length === 0) return `<p class="dev-card-empty">No matching cards.</p>`;
-  return cards.map((card) => renderDevCardResult(slot, card, full)).join("");
-}
-
-function renderDevCardResult(slot: DevCardSlot, card: CardDefinition, full: boolean): string {
+function renderDevCardResultGlobal(card: CardDefinition, full: boolean): string {
   const addDisabled = full ? "disabled" : "";
   return `
-    <article class="dev-card-result" data-dom-key="dev-card-result-${slot}-${escapeAttr(card.id)}">
+    <article class="dev-card-result" data-dom-key="dev-card-result-global-${escapeAttr(card.id)}">
       <img src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" />
       <div class="dev-card-result-body">
         <strong>${escapeHtml(card.name)}</strong>
         <span>${escapeHtml(card.id)} - ${escapeHtml(card.type)} - ${escapeHtml(card.category)}</span>
       </div>
       <span class="dev-card-cost">${card.cost}</span>
-      <button type="button" data-dev-slot="${slot}" data-dev-add-card="${escapeAttr(card.id)}" ${addDisabled}>Add</button>
+      <button type="button" data-dev-add-card-global="${escapeAttr(card.id)}" ${addDisabled}>Add</button>
     </article>
   `;
 }
 
-function filteredDevCards(slot: DevCardSlot, query: string): CardDefinition[] {
+function filteredDevCards(query: string): CardDefinition[] {
   const normalized = query.trim().toLowerCase();
-  const type = readInputValue(`dev-test-type-${slot}`) || (devCardSlots[slot].minionOnly ? "MINION" : "all");
-  const category = readInputValue(`dev-test-category-${slot}`) || "all";
-  const rarity = readInputValue(`dev-test-rarity-${slot}`) || "all";
-  const costRange = readInputValue(`dev-test-cost-${slot}`) || "all";
+  const type = readInputValue("dev-test-type-global") || "all";
+  const category = readInputValue("dev-test-category-global") || "all";
+  const rarity = readInputValue("dev-test-rarity-global") || "all";
+  const costRange = readInputValue("dev-test-cost-global") || "all";
+  const minionOnly = devCardSlots[activeTargetSlot].minionOnly;
   return CARD_CATALOG
-    .filter((card) => !devCardSlots[slot].minionOnly || card.type === "MINION")
+    .filter((card) => !minionOnly || card.type === "MINION")
     .filter((card) => type === "all" || card.type === type)
     .filter((card) => category === "all" || card.category === category)
     .filter((card) => rarity === "all" || card.rarity === rarity)
@@ -489,11 +506,8 @@ function filteredDevCards(slot: DevCardSlot, query: string): CardDefinition[] {
     .sort(compareDevCards);
 }
 
-function devCardCategories(slot: DevCardSlot): string[] {
-  return [...new Set(CARD_CATALOG
-    .filter((card) => !devCardSlots[slot].minionOnly || card.type === "MINION")
-    .map((card) => card.category))]
-    .sort((a, b) => a.localeCompare(b));
+function devCardCategoriesGlobal(): string[] {
+  return [...new Set(CARD_CATALOG.map((card) => card.category))].sort((a, b) => a.localeCompare(b));
 }
 
 function costMatches(cost: number, range: string): boolean {
@@ -514,27 +528,57 @@ function addDevCard(slot: DevCardSlot, cardId: string): void {
   if (config.minionOnly && card.type !== "MINION") return;
   if (selectedDevCards[slot].length >= config.max) return;
   selectedDevCards[slot].push(cardId);
-  updateDevCardSelector(slot);
+  updateDevTestUi();
   persistDevSettings();
 }
 
 function removeDevCard(slot: DevCardSlot, index: number): void {
   if (index < 0 || index >= selectedDevCards[slot].length) return;
   selectedDevCards[slot].splice(index, 1);
-  updateDevCardSelector(slot);
+  updateDevTestUi();
   persistDevSettings();
 }
 
-function updateDevCardSelector(slot: DevCardSlot): void {
-  const search = document.querySelector<HTMLInputElement>(`#dev-test-search-${slot}`)?.value ?? "";
-  const selected = document.querySelector<HTMLElement>(`#dev-test-selected-${slot}`);
-  const results = document.querySelector<HTMLElement>(`#dev-test-results-${slot}`);
-  const summary = document.querySelector<HTMLElement>(`#dev-test-result-summary-${slot}`);
-  const count = document.querySelector<HTMLElement>(`#dev-test-count-${slot}`);
-  if (selected) selected.innerHTML = renderSelectedDevCards(slot);
-  if (summary) summary.textContent = renderDevCardResultSummary(slot, search);
-  if (results) results.innerHTML = renderDevCardResults(slot);
-  if (count) count.textContent = `${selectedDevCards[slot].length}/${devCardSlots[slot].max}`;
+function updateDevTestUi(): void {
+  const query = readInputValue("dev-test-search-global");
+  const results = document.getElementById("dev-test-results-global");
+  const summary = document.getElementById("dev-test-result-summary-global");
+  
+  if (results) {
+    const cards = filteredDevCards(query);
+    const full = selectedDevCards[activeTargetSlot].length >= devCardSlots[activeTargetSlot].max;
+    if (cards.length === 0) {
+      results.innerHTML = `<p class="dev-card-empty">No matching cards.</p>`;
+    } else {
+      results.innerHTML = cards.map((card) => renderDevCardResultGlobal(card, full)).join("");
+    }
+  }
+
+  if (summary) {
+    const total = filteredDevCards(query).length;
+    summary.textContent = `${total} matching cards for ${devCardSlots[activeTargetSlot].title}`;
+  }
+
+  // Update preview slots lists on the right
+  for (const slot of devCardSlotOrder) {
+    const container = document.getElementById(`dev-test-selected-${slot}`);
+    const countEl = document.getElementById(`dev-test-count-${slot}`);
+    const slotSection = document.querySelector(`[data-dev-card-selector="${slot}"]`);
+
+    if (container) {
+      container.innerHTML = renderSelectedDevCards(slot);
+    }
+    if (countEl) {
+      countEl.textContent = `${selectedDevCards[slot].length}/${devCardSlots[slot].max}`;
+    }
+    if (slotSection) {
+      if (slot === activeTargetSlot) {
+        slotSection.classList.add("active");
+      } else {
+        slotSection.classList.remove("active");
+      }
+    }
+  }
 }
 
 function parseDevCardSlot(value: string | undefined): DevCardSlot | undefined {

@@ -32,11 +32,17 @@ describe("developer test mode helpers", () => {
 
   it("applies exact hand, board, HP, mana, and turn setup", () => {
     const handIds = CARD_CATALOG.slice(0, 2).map((card) => card.id);
+    const opponentHandIds = CARD_CATALOG.slice(2, 4).map((card) => card.id);
+    const playerDeckIds = CARD_CATALOG.slice(4, 6).map((card) => card.id);
+    const opponentDeckIds = CARD_CATALOG.slice(6, 8).map((card) => card.id);
     const minionIds = CARD_CATALOG.filter((card) => card.type === "MINION").slice(0, 2).map((card) => card.id);
     const state = createMatch();
 
     applyDevTestMatchSetup(state, {
       handCardIds: handIds,
+      opponentHandCardIds: opponentHandIds,
+      playerDeckCardIds: playerDeckIds,
+      opponentDeckCardIds: opponentDeckIds,
       playerBoardCardIds: [minionIds[0]],
       opponentBoardCardIds: [minionIds[1]],
       playerHp: 12,
@@ -49,7 +55,9 @@ describe("developer test mode helpers", () => {
 
     expect(state.status).toBe("in_progress");
     expect(state.players.player1.hand.map((card) => card.cardId)).toEqual(handIds);
-    expect(state.players.player1.deck).toEqual([]);
+    expect(state.players.player2.hand.map((card) => card.cardId)).toEqual(opponentHandIds);
+    expect(state.players.player1.deck.map((card) => card.cardId)).toEqual(playerDeckIds);
+    expect(state.players.player2.deck.map((card) => card.cardId)).toEqual(opponentDeckIds);
     expect(state.players.player1.board.map((card) => card.cardId)).toEqual([minionIds[0]]);
     expect(state.players.player2.board.map((card) => card.cardId)).toEqual([minionIds[1]]);
     expect(state.players.player1.hero.hp).toBe(12);

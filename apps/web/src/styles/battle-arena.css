@@ -1137,12 +1137,13 @@
      60px per-card step; `opponentFanStyle` supplies `--squeeze` (1 when <= 5
      cards, 5 / count above that) and the margin is solved back from it. */
   margin: 0 calc((var(--squeeze, 1) * 60px - 80px) / 2);
-  /* 180deg flips the card upside-down (opponent perspective); subtracting --rot
-     mirrors the fan direction so left cards lean left and right cards lean right
-     as seen by the player. Pivot above the card + negative --y on edge cards
-     produces a gentle ∪ arc with the opening facing upward. */
-  transform: rotate(calc(180deg - var(--rot, 0deg))) translateY(var(--y, 0px));
-  transform-origin: center -120%;
+  /* translateY first (parent-space, so negative y = up on screen), then rotate
+     in place around the card's own centre. 180deg flips each card upside-down;
+     subtracting --rot mirrors the fan so left cards lean left and right cards
+     lean right as seen by the player. Negative --y on edge cards produces a
+     gentle ∪ arc with the opening facing upward. */
+  transform: translateY(var(--y, 0px)) rotate(calc(180deg - var(--rot, 0deg)));
+  transform-origin: center center;
   pointer-events: none;
 }
 
