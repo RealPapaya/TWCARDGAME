@@ -1771,6 +1771,44 @@ body.hand-dragging .hand-row .card {
   100% { transform: scale(3.2); opacity: 0; }
 }
 
+/* Card/minion-sized ring (width/height set inline from the node rect) spawned over
+ * an augment-affected card or unit so the player sees what the 增幅 changed. */
+.augment-glow-fx.is-unit {
+  margin: 0;
+  border-radius: 14px;
+  background: radial-gradient(closest-side, rgba(255, 245, 190, 0.7) 0%, rgba(255, 215, 120, 0.45) 55%, rgba(255, 215, 120, 0) 80%);
+  transform: translate(-50%, -50%);
+  animation: augment-unit-glow-ring 0.74s ease-out forwards;
+}
+@keyframes augment-unit-glow-ring {
+  0% { transform: translate(-50%, -50%) scale(0.82); opacity: 0; }
+  25% { opacity: 0.9; }
+  100% { transform: translate(-50%, -50%) scale(1.55); opacity: 0; }
+}
+
+/* Direct flash on the affected card/unit node itself. Box-shadow + brightness
+ * only (no transform) so it never fights attack lunges or the cost diamond's
+ * rotate. */
+.augment-affected-glow {
+  animation: augment-affected 0.74s ease-out;
+}
+@keyframes augment-affected {
+  0% { box-shadow: 0 0 0 0 rgba(255, 240, 170, 0); filter: brightness(1); }
+  35% { box-shadow: 0 0 18px 7px rgba(255, 235, 150, 0.95); filter: brightness(1.25); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 240, 170, 0); filter: brightness(1); }
+}
+
+/* One-shot pop on a cost/stat number the moment it changes from an augment, so the
+ * drop reads as caused by the glow. Filter-only to coexist with the rotated cost. */
+.value-just-changed {
+  animation: value-pop 0.6s ease-out;
+}
+@keyframes value-pop {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.95) drop-shadow(0 0 7px rgba(120, 255, 140, 0.95)); }
+  100% { filter: brightness(1); }
+}
+
 .mulligan-replace-tag {
   position: absolute;
   left: 50%;

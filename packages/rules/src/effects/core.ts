@@ -164,7 +164,7 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
       card.cost = Math.floor(card.cost / 2);
       card.isReduced = true;
       player.augmentFlags.nextDrawHalfCost = false;
-      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_SHAREHOLDER_GIFT" }, player.seat);
+      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_SHAREHOLDER_GIFT", cards: [card.instanceId] }, player.seat);
     }
     if (reduction > 0) {
       card.cost = Math.max(0, card.cost - reduction);

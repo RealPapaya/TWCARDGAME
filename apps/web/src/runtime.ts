@@ -66,7 +66,7 @@ import {
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
-import { playVoteRoulette, resetVoteRoulette, VOTE_ROULETTE_TOTAL_MS, type VoteRouletteChoice } from "./app/vote-roulette.js";
+import { playVoteRoulette, resetVoteRoulette, voteRouletteActive, VOTE_REVEAL_HOLD_MS, VOTE_ROULETTE_TOTAL_MS, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
 import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
@@ -2014,11 +2014,19 @@ function battlecryReplacementIndex(
 }
 
 function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): string {
-  const costClass = classNames(["card-cost", trainingHighlightClass({ type: "cardCost", instanceId: card.instanceId }), valueDeltaClass(card.cost, card.baseCost)]);
+  // While an augment glow is pending for this freshly-changed card, show its base
+  // cost (suppressing the discount tint) so the reveal drops it on the glow beat.
+  const holdBaseCost = augmentHoldBaseCostIds.has(card.instanceId) && typeof card.baseCost === "number";
+  const shownCost = holdBaseCost ? (card.baseCost as number) : card.cost;
+  const costClass = classNames([
+    "card-cost",
+    trainingHighlightClass({ type: "cardCost", instanceId: card.instanceId }),
+    holdBaseCost ? "" : valueDeltaClass(card.cost, card.baseCost)
+  ]);
   const attackClass = classNames(["stat-atk", valueDeltaClass(card.attack, card.baseAttack)]);
   const healthClass = classNames(["stat-hp", valueDeltaClass(card.health, card.baseHealth)]);
   return `
-    <span class="${costClass}"><span>${card.cost}</span></span>
+    <span class="${costClass}"><span>${shownCost}</span></span>
     <strong class="card-title">${escapeHtml(card.name)}</strong>
     <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" draggable="false" />
     <span class="card-category">${escapeHtml(card.category)}</span>
@@ -6641,8 +6649,14 @@ function activeTurnAnnouncement(): ClientViewState["turnAnnouncement"] | undefin
 }
 
 function isBattleActionLocked(): boolean {
-  // Regular play/attack/endTurn are suspended while a special phase is open.
-  return readPhase() !== "NORMAL_PLAY" || Boolean(activeTurnAnnouncement()) || trainingBlocksBattle(trainingSession);
+  // Regular play/attack/endTurn are suspended while a special phase is open, or
+  // briefly while a mid-turn augment glow is revealing its value change.
+  return (
+    readPhase() !== "NORMAL_PLAY" ||
+    Boolean(activeTurnAnnouncement()) ||
+    performance.now() < augmentGlowLockUntilMs ||
+    trainingBlocksBattle(trainingSession)
+  );
 }
 
 function maybeShowTurnAnnouncement(events: GameEvent[]): void {
@@ -7281,6 +7295,24 @@ let pendingHandSyncSuppressNewIds = false;
 let pendingHandSyncPreserveCardIds: string[] = [];
 let pendingHandSyncOmitIds = new Set<string>();
 
+/** Lead before an augment glow fires for an already-visible card/unit, so its
+ * PRE-effect value shows first, then the glow lands. */
+const AUGMENT_GLOW_LEAD_MS = 220;
+/** Longer lead when the affected card is freshly drawn this batch (e.g. 股東紀念品):
+ * wait for the ~850ms draw flight to land so the card is on screen at base cost
+ * before it glows and drops. */
+const AUGMENT_GLOW_DRAW_LEAD_MS = 950;
+/** Time from the glow firing to the value reveal (cost drop / stat change),
+ * roughly the 720ms glow keyframe + settle, so the number changes as it fades. */
+const AUGMENT_GLOW_REVEAL_DELAY_MS = 680;
+/** Battle input is locked until this time while an augment glow is mid-sequence
+ * (mid-turn augments aren't already covered by the special-phase lock). */
+let augmentGlowLockUntilMs = 0;
+/** Own-hand card instanceIds to render at their base cost (suppressing the
+ * discount) until the augment glow reveal lands — 股東紀念品's "show original
+ * cost → glow → cost drops" beat. Cleared by `applyAugmentGlow`'s reveal timer. */
+const augmentHoldBaseCostIds = new Set<string>();
+
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
 }
@@ -7301,6 +7333,13 @@ function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): vo
   if (!hasPendingSync) return;
   if (attackBusy) {
     blog("flush skip", { reason: "attack-busy" });
+    return;
+  }
+  if (voteRouletteActive()) {
+    // Hold the post-vote board state (e.g. 高雄氣爆 deaths) until the roulette
+    // reveals the winner; the flag clears synchronously inside reveal().
+    blog("flush skip", { reason: "vote-roulette-busy" });
+    schedulePendingPublicSyncFlush(120, opts);
     return;
   }
   if (!opts.ignoreCardPlayBusy && cardPlayBusy) {
@@ -7565,6 +7604,8 @@ function resetCardPlayCues(): void {
   cardPlayCueActive = false;
   pendingPublicSync = undefined;
   pendingPublicSyncHoldUntilMs = 0;
+  augmentGlowLockUntilMs = 0;
+  augmentHoldBaseCostIds.clear();
   clearPendingHandSyncHold();
   if (pendingPublicSyncFlushTimer !== undefined) {
     window.clearTimeout(pendingPublicSyncFlushTimer);
@@ -7639,6 +7680,16 @@ function consumeSuppressedPlayCue(cue: AnimationCue): boolean {
   return true;
 }
 
+/** Cue kinds whose board effect is deferred until a referendum roulette reveals
+ * its winner, so the result isn't shown before the decision (Part A). */
+const DEFERRED_VOTE_CUE_KINDS = new Set<AnimationCue["kind"]>([
+  "destroy",
+  "deathrattle",
+  "damage",
+  "effectStrike",
+  "aoeSweep"
+]);
+
 function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   blog("events received", { types: events.map((e) => e.type) });
   // Single vs whole-board (全場) is a presentation concern, so it is decided
@@ -7663,6 +7714,28 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   // consumes local targeted-battlecry echoes that already animated before send.
   const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues, multiHitSeqs));
   if (cues.length === 0) return [];
+  // Part A: when a turn-20 referendum is resolving, hold the public sync and push
+  // the board-effect cues out until the roulette reveals the winner, so e.g.
+  // 高雄氣爆 only kills minions after the decision is shown. Guarded by the same
+  // both-ballots check startVoteRouletteFromEvent uses (~7089), so replays without
+  // an overlay aren't needlessly delayed.
+  const voteChoices = events.find((e) => e.type === "VOTE_RESOLVED")?.payload?.choices as
+    | { player1?: unknown; player2?: unknown }
+    | undefined;
+  if (voteChoices?.player1 && voteChoices?.player2) {
+    holdPendingPublicSyncFor(VOTE_REVEAL_HOLD_MS);
+    const readyAt = performance.now() + VOTE_REVEAL_HOLD_MS;
+    for (const cue of cues) {
+      if (DEFERRED_VOTE_CUE_KINDS.has(cue.kind)) {
+        cue.delayMs = Math.max(cue.delayMs ?? 0, VOTE_REVEAL_HOLD_MS);
+        cue.readyAtMs = readyAt;
+      }
+    }
+  }
+  // Part B: for augment glows that change a visible value (cost / stats / a new
+  // card), keep the PRE-effect value on screen, fire the glow a beat later, and
+  // hold the value reveal until the glow lands. Lock battle input meanwhile.
+  scheduleAugmentGlowReveal(cues);
   blog("events cues", {
     cues: cues.map((c) => ({ kind: c.kind, delayMs: c.delayMs, targetKey: c.targetKey, cardId: c.cardId }))
   });
@@ -7694,6 +7767,42 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     }, lifetime + (cue.delayMs ?? 0));
   }
   return cues;
+}
+
+/**
+ * Sequences the 增幅 value reveal (Part B). For each augmentGlow cue that carries
+ * affected cards/units, delays the glow by a lead so the pre-effect value shows
+ * first, holds the public/hand sync so the new value lands as the glow fades, and
+ * locks battle input for the window. Augments with no visible target stay
+ * dot-only (no hold, no lock).
+ */
+function scheduleAugmentGlowReveal(cues: AnimationCue[]): void {
+  const now = performance.now();
+  for (const cue of cues) {
+    if (cue.kind !== "augmentGlow") continue;
+    const targets = cue.augmentTargets ?? [];
+    const myCards = cue.seat === view.mySeat ? cue.augmentCards ?? [] : [];
+    if (targets.length === 0 && myCards.length === 0) continue;
+
+    // Freshly-drawn cards need a longer lead so the ~850ms draw flight lands first.
+    const hasFreshDraw = myCards.some((id) => !view.hand.some((card) => card.instanceId === id));
+    const lead = hasFreshDraw ? AUGMENT_GLOW_DRAW_LEAD_MS : AUGMENT_GLOW_LEAD_MS;
+    const revealAtMs = lead + AUGMENT_GLOW_REVEAL_DELAY_MS;
+
+    cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + lead);
+    cue.delayMs = Math.max(cue.delayMs ?? 0, lead);
+
+    // Board stat changes ride the public sync — hold it so the minion shows its
+    // pre-effect stats until the glow reveal flushes it.
+    if (targets.length > 0) holdPendingPublicSyncFor(revealAtMs);
+
+    // Cost changes (fresh draws like 股東紀念品, or whole-hand discounts) show the
+    // base cost via the render override until the reveal clears it — simpler and
+    // race-free vs. holding the whole hand sync (which would also hide new cards).
+    for (const id of myCards) augmentHoldBaseCostIds.add(id);
+
+    augmentGlowLockUntilMs = Math.max(augmentGlowLockUntilMs, now + revealAtMs);
+  }
 }
 
 function appendKoSoloHealCue(cues: AnimationCue[], events: GameEvent[]): AoeCluster | undefined {
@@ -7939,8 +8048,20 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
   if (event.type === "AUGMENT_TRIGGERED") {
     // The augment indicator pulse is applied imperatively (applyAugmentGlow) off
     // the owner's seat; cardId carries the augment id so the right dot lights up.
+    // targets/cards (optional, additive) carry the board minion / hand card
+    // instanceIds the 增幅 changed, so the glow also lands on them (Part B).
     const augmentId = typeof payload.augmentId === "string" ? payload.augmentId : undefined;
-    return { id, kind: "augmentGlow", text: "", seat: event.seat, cardId: augmentId };
+    const stringList = (value: unknown): string[] =>
+      Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+    return {
+      id,
+      kind: "augmentGlow",
+      text: "",
+      seat: event.seat,
+      cardId: augmentId,
+      augmentTargets: stringList(payload.targets),
+      augmentCards: stringList(payload.cards)
+    };
   }
   if (event.type === "ATTACK") {
     const attackerInstanceId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
@@ -8719,11 +8840,41 @@ const appliedAugmentGlow = new Set<string>();
 function applyAugmentGlow(cue: AnimationCue): void {
   if (appliedAugmentGlow.has(cue.id)) return;
   const dots = Array.from(document.querySelectorAll<HTMLElement>(`[data-seat="${cue.seat}"] .hero-augment-dot`));
-  if (dots.length === 0) return;
+  const targetIds = cue.augmentTargets ?? [];
+  const cardIds = cue.seat === view.mySeat ? cue.augmentCards ?? [] : [];
+  if (dots.length === 0 && targetIds.length === 0 && cardIds.length === 0) return;
   appliedAugmentGlow.add(cue.id);
+
+  // Hero indicator dot(s): a specific augment id lights its matching dot; a
+  // general/persist trigger pulses all of the seat's dots.
   const matched = cue.cardId ? dots.filter((dot) => dot.dataset.augmentId === cue.cardId) : [];
-  const targets = matched.length > 0 ? matched : dots;
-  for (const dot of targets) spawnAugmentGlow(dot);
+  const dotTargets = matched.length > 0 ? matched : dots;
+  for (const dot of dotTargets) spawnAugmentGlow(dot);
+
+  // Affected board units and own-hand cards also glow so the player sees what
+  // the 增幅 changed (Part B).
+  for (const id of targetIds) {
+    const el = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(id)}"]`);
+    if (el) spawnUnitAugmentGlow(el);
+  }
+  for (const id of cardIds) {
+    const el = document.querySelector<HTMLElement>(`[data-hand-id="${cssEscape(id)}"]`);
+    if (el) spawnUnitAugmentGlow(el);
+  }
+
+  // After the glow lands, drop any base-cost hold and pop the now-revealed value
+  // (cost / stats), so the number visibly changes BECAUSE of the glow.
+  if (targetIds.length > 0 || cardIds.length > 0) {
+    window.setTimeout(() => {
+      for (const id of cardIds) augmentHoldBaseCostIds.delete(id);
+      // Force the held board sync through first so stats are current, then drop
+      // the cost override and pop the revealed numbers.
+      if (targetIds.length > 0) applyPendingPublicSyncNow();
+      renderNow();
+      popAugmentValues(targetIds, cardIds);
+    }, AUGMENT_GLOW_REVEAL_DELAY_MS);
+  }
+
   window.setTimeout(() => appliedAugmentGlow.delete(cue.id), 1200);
 }
 
@@ -8740,6 +8891,47 @@ function spawnAugmentGlow(dot: HTMLElement): void {
   glow.style.top = `${rect.top + rect.height / 2}px`;
   document.body.appendChild(glow);
   window.setTimeout(() => glow.remove(), 720);
+}
+
+/**
+ * Spawns a body-level ring sized to a card/minion node (so it survives the morph
+ * re-render) plus a direct inline glow on the node itself. Used for the
+ * affected-unit/card augment flash (NOT a CSS-`animation-delay` class, which the
+ * morph render would reset — see web-animation skill).
+ */
+function spawnUnitAugmentGlow(el: HTMLElement): void {
+  const rect = el.getBoundingClientRect();
+  if (rect.width === 0 && rect.height === 0) return;
+  const glow = document.createElement("div");
+  glow.className = "augment-glow-fx is-unit";
+  glow.style.left = `${rect.left + rect.width / 2}px`;
+  glow.style.top = `${rect.top + rect.height / 2}px`;
+  glow.style.width = `${Math.round(rect.width)}px`;
+  glow.style.height = `${Math.round(rect.height)}px`;
+  document.body.appendChild(glow);
+  window.setTimeout(() => glow.remove(), 760);
+  el.classList.add("augment-affected-glow");
+  window.setTimeout(() => el.classList.remove("augment-affected-glow"), 760);
+}
+
+/** Adds a one-shot "pop" to the just-revealed cost/stat numbers of affected nodes. */
+function popAugmentValues(targetIds: readonly string[], cardIds: readonly string[]): void {
+  const pop = (el: Element | null): void => {
+    if (!(el instanceof HTMLElement)) return;
+    el.classList.remove("value-just-changed");
+    void el.offsetWidth;
+    el.classList.add("value-just-changed");
+    window.setTimeout(() => el.classList.remove("value-just-changed"), 600);
+  };
+  for (const id of targetIds) {
+    const node = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(id)}"]`);
+    pop(node?.querySelector(".stat-atk") ?? null);
+    pop(node?.querySelector(".stat-hp") ?? null);
+  }
+  for (const id of cardIds) {
+    const node = document.querySelector<HTMLElement>(`[data-hand-id="${cssEscape(id)}"]`);
+    pop(node?.querySelector(".card-cost") ?? null);
+  }
 }
 
 function cardName(cardId: string | undefined): string | undefined {

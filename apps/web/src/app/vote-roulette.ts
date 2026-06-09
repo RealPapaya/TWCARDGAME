@@ -43,6 +43,19 @@ const FADE_OUT_MS = 280;
  * need to wait for it to clear (e.g. holding an event-notice toast). */
 export const VOTE_ROULETTE_TOTAL_MS = SPIN_MS + REVEAL_HOLD_MS + FADE_OUT_MS;
 
+/** Time from overlay open until the winner is revealed (`reveal()` fires). The
+ * runtime holds the public sync / death cues for this long so the board effect
+ * (e.g. 高雄氣爆 destroying minions) only lands AFTER the roulette decides. */
+export const VOTE_REVEAL_HOLD_MS = SPIN_MS;
+
+/** True while a roulette overlay is spinning, before the winner is revealed.
+ * The runtime gates `flushPendingPublicSync` on this so the effect stays hidden
+ * until the decision is shown. Cleared synchronously inside `reveal()`. */
+let rouletteSpinning = false;
+export function voteRouletteActive(): boolean {
+  return rouletteSpinning;
+}
+
 interface Slot {
   choice: VoteRouletteChoice;
   seats: Seat[];
@@ -55,6 +68,7 @@ let activeResolve: (() => void) | undefined;
 
 /** Tears down any in-flight roulette. Call on match start / teardown. */
 export function resetVoteRoulette(): void {
+  rouletteSpinning = false;
   token += 1;
   for (const t of timers) window.clearTimeout(t);
   timers = [];
@@ -71,6 +85,7 @@ export function resetVoteRoulette(): void {
  */
 export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
   resetVoteRoulette();
+  rouletteSpinning = true;
   const myToken = (token += 1);
 
   const slots = buildSlots(data);
@@ -113,6 +128,9 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
 
     const reveal = (): void => {
       if (myToken !== token) return;
+      // Winner is now shown — release the held public sync / death cues so the
+      // board effect lands on this beat, not under the spin.
+      rouletteSpinning = false;
       for (const el of cardEls) el.classList.remove("is-drawing");
       cardEls[winnerSlot]?.classList.add("is-winner");
       if (titleEl) {

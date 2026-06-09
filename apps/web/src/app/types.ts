@@ -142,6 +142,10 @@ export type AnimationCue = {
   amount?: number;
   delayMs?: number;
   readyAtMs?: number;
+  /** Board minion instanceIds an `augmentGlow` should light up (units the 增幅 changed). */
+  augmentTargets?: string[];
+  /** Own-hand card instanceIds an `augmentGlow` should light up (cards the 增幅 changed). */
+  augmentCards?: string[];
   suppressBoardAnimation?: boolean;
   anchorX?: number;
   anchorY?: number;

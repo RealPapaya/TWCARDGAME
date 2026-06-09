@@ -35,6 +35,11 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
   const flags = player.augmentFlags;
   const effect = entry.effect;
   let triggered = false;
+  // Hand-card / board-minion instanceIds the client should glow when this augment
+  // fires, so the player sees which cards/units the 增幅 changed (Part B). Left
+  // empty for purely invisible effects (crystals / flags) → dot-only glow.
+  const glowCards: string[] = [];
+  const glowTargets: string[] = [];
 
   switch (effect.type) {
     case "AUG_GRANT_CRYSTALS":
@@ -55,6 +60,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       for (const card of player.hand) {
         card.cost = Math.max(0, effect.value ?? 1);
         card.isReduced = true;
+        glowCards.push(card.instanceId);
       }
       triggered = true;
       break;
@@ -62,6 +68,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       for (const card of player.hand) {
         card.cost = Math.max(0, card.cost - (effect.value ?? 0));
         card.isReduced = true;
+        glowCards.push(card.instanceId);
       }
       triggered = true;
       break;
@@ -69,7 +76,11 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       const card = effect.cardId ? CARD_CATALOG.find((candidate) => candidate.id === effect.cardId) : undefined;
       if (card) {
         for (let i = 0; i < (effect.count ?? effect.value ?? 1); i++) {
-          if (player.hand.length < 10) player.hand.push(createCardForHand(state, card, seat));
+          if (player.hand.length < 10) {
+            const added = createCardForHand(state, card, seat);
+            player.hand.push(added);
+            glowCards.push(added.instanceId);
+          }
         }
         triggered = true;
       }
@@ -89,14 +100,20 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_DOUBLE_CATEGORY":
       flags.doubleCategory = effect.target_category;
       for (const minion of player.board) {
-        if (minion.category === effect.target_category) doubleMinion(minion);
+        if (minion.category === effect.target_category) {
+          doubleMinion(minion);
+          glowTargets.push(minion.instanceId);
+        }
       }
       triggered = true;
       break;
     case "AUG_PERSIST_LOWCOST_ATTACK":
       flags.lowCostMinionAttackBuff += effect.value ?? 0;
       for (const minion of player.board) {
-        if (minion.cost >= 1 && minion.cost <= 3) addStats(minion, effect.value ?? 0, 0);
+        if (minion.cost >= 1 && minion.cost <= 3) {
+          addStats(minion, effect.value ?? 0, 0);
+          glowTargets.push(minion.instanceId);
+        }
       }
       triggered = true;
       break;
@@ -104,7 +121,10 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       const value = effect.value ?? 0;
       flags.categoryBuff = { category: effect.target_category ?? "", value };
       for (const minion of player.board) {
-        if (minion.category === effect.target_category) addStats(minion, value, value);
+        if (minion.category === effect.target_category) {
+          addStats(minion, value, value);
+          glowTargets.push(minion.instanceId);
+        }
       }
       triggered = true;
       break;
@@ -199,7 +219,28 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       break;
   }
 
-  if (triggered) addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: entry.id }, seat);
+  if (triggered) {
+    addEvent(
+      state,
+      events,
+      "AUGMENT_TRIGGERED",
+      glowCardsOrTargetsPayload(entry.id, glowCards, glowTargets),
+      seat
+    );
+  }
+}
+
+/** Builds the AUGMENT_TRIGGERED payload, omitting empty target/card arrays so the
+ * event stays minimal (and old replays without these fields stay compatible). */
+function glowCardsOrTargetsPayload(
+  augmentId: string,
+  cards: readonly string[],
+  targets: readonly string[]
+): Record<string, unknown> {
+  const payload: Record<string, unknown> = { augmentId };
+  if (cards.length > 0) payload.cards = [...cards];
+  if (targets.length > 0) payload.targets = [...targets];
+  return payload;
 }
 
 /**
@@ -229,7 +270,9 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
     changed = true;
   }
 
-  if (changed) addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: `persist:${seat}` }, seat);
+  if (changed) {
+    addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: `persist:${seat}`, targets: [minion.instanceId] }, seat);
+  }
 }
 
 /**
@@ -303,7 +346,7 @@ export function tryReviveMinion(state: MatchState, player: PlayerState, deadMini
   };
   player.board.push(token);
   addEvent(state, events, "MINION_SUMMONED", { target: token.instanceId, cardId: token.cardId }, player.seat);
-  addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_PUDU" }, player.seat);
+  addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_PUDU", targets: [token.instanceId] }, player.seat);
 }
 
 /** Mirrors core `buffMinion`: adds to attack/health/currentHealth directly (aura diffs are preserved). */
