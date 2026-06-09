@@ -212,15 +212,28 @@ describe("faction nuclear augments", () => {
     expect(state.players[foe].board.filter((minion) => minion.cardId === "TW077")).toHaveLength(1);
   });
 
-  it("九二共識 permanently reduces current and future KMT politician costs, stacking to zero", () => {
+  it("九二共識 reduces KMT politician costs and shuffles them into deck after death", () => {
     const state = startInProgress(804);
     const seat = state.turn.activeSeat;
+    const player = state.players[seat];
     const kmt = makeCard({ type: "MINION", category: "國民黨政治人物", cost: 1, attack: 1, health: 1 });
 
     applyAugmentSelection(state, seat, entry("AMP_1992_CONSENSUS"), []);
     expect(getCardActualCost(state, seat, kmt)).toBe(0);
     applyAugmentSelection(state, seat, entry("AMP_1992_CONSENSUS"), []);
     expect(getCardActualCost(state, seat, kmt)).toBe(0);
+    expect(entry("AMP_1992_CONSENSUS").description).toContain("遺志：回到牌組堆");
+
+    const beforeDeck = player.deck.length;
+    player.board.push(makeMinion({
+      cardId: "TW030",
+      ownerSeat: seat,
+      category: "國民黨政治人物",
+      currentHealth: 0
+    }));
+    resolveDeaths(state, [], catalogMap);
+    expect(player.deck).toHaveLength(beforeDeck + 1);
+    expect(player.graveyard.some((card) => card.cardId === "TW030")).toBe(false);
   });
 });
 
@@ -496,14 +509,15 @@ describe("augment combat / persistent effects", () => {
     expect(minion.currentHealth).toBe(3);
   });
 
-  it("島嶼天光 doubles 民進黨政治人物 minions' attack and health", () => {
+  it("島嶼天光 doubles only 民進黨政治人物 minions' health", () => {
     const state = startInProgress(11);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_ISLAND_DAWN"), []);
     const dpp = makeMinion({ category: "民進黨政治人物", attack: 4, health: 6, currentHealth: 6 });
     applyPersistentMinionAugments(state, seat, dpp, []);
-    expect(dpp.attack).toBe(8);
+    expect(dpp.attack).toBe(4);
     expect(dpp.health).toBe(12);
+    expect(entry("AMP_ISLAND_DAWN").description).not.toContain("攻擊");
   });
 });
 
@@ -553,6 +567,126 @@ describe("augment triggers & meta", () => {
     state.augmentTiers = ["加減賺", "卯死"];
     applyAugmentSelection(state, seat, entry("AMP_0050"), []);
     expect(state.augmentTiers[1]).toBe("卯死");
+  });
+});
+
+describe("TPP amplifications", () => {
+  it("政壇三腳督 draws the first TPP politician in deck order and does nothing without one", () => {
+    const state = startInProgress(901);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const first = makeCard({ instanceId: "other", category: "新聞" });
+    const tpp = makeCard({ instanceId: "tpp", type: "MINION", category: "民眾黨政治人物" });
+    player.deck = [first, tpp];
+    player.hand = [];
+
+    applyAugmentSelection(state, seat, entry("AMP_THREE_WAY_RACE"), []);
+    expect(player.hand.map((card) => card.instanceId)).toEqual(["tpp"]);
+    expect(player.deck.map((card) => card.instanceId)).toEqual(["other"]);
+
+    player.hand = [];
+    applyAugmentSelection(state, seat, entry("AMP_THREE_WAY_RACE"), []);
+    expect(player.hand).toHaveLength(0);
+    expect(player.deck.map((card) => card.instanceId)).toEqual(["other"]);
+
+    player.hand = Array.from({ length: 10 }, (_, index) => makeCard({ instanceId: `hand-${index}` }));
+    player.deck = [makeCard({ instanceId: "burn-tpp", type: "MINION", category: "民眾黨政治人物" })];
+    applyAugmentSelection(state, seat, entry("AMP_THREE_WAY_RACE"), []);
+    expect(player.hand).toHaveLength(10);
+    expect(player.graveyard.some((card) => card.instanceId === "burn-tpp")).toBe(true);
+  });
+
+  it("垃圾不分藍綠 grants immediate shields and attack, then triggers on every shield grant", () => {
+    const state = startInProgress(902);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const tpp = makeMinion({ instanceId: "tpp", category: "民眾黨政治人物", attack: 2 });
+    const other = makeMinion({ instanceId: "other", category: "國民黨政治人物", attack: 2 });
+    player.board = [tpp, other];
+
+    applyAugmentSelection(state, seat, entry("AMP_GARBAGE_NO_BLUE_GREEN"), []);
+    expect(tpp.keywords.divineShield).toBe(true);
+    expect(tpp.attack).toBe(5);
+    expect(other.keywords.divineShield).toBeUndefined();
+    expect(other.attack).toBe(2);
+
+    resolveEffect(
+      { type: "GIVE_DIVINE_SHIELD_ALL" },
+      { state, activeSeat: seat, events: [], catalog: catalogMap }
+    );
+    expect(tpp.attack).toBe(8);
+    expect(other.attack).toBe(2);
+
+    const foe = state.players[seat === "player1" ? "player2" : "player1"];
+    const foeTpp = makeMinion({ instanceId: "foe-tpp", ownerSeat: foe.seat, category: "民眾黨政治人物", attack: 2 });
+    foe.board = [foeTpp];
+    resolveEffect(
+      { type: "GIVE_DIVINE_SHIELD_ALL_BOARD" },
+      { state, activeSeat: seat, events: [], catalog: catalogMap }
+    );
+    expect(tpp.attack).toBe(11);
+    expect(foeTpp.keywords.divineShield).toBe(true);
+    expect(foeTpp.attack).toBe(2);
+  });
+
+  it("垃圾不分藍綠 triggers for natural shield on entry and stacks across copies", () => {
+    const state = startInProgress(903);
+    const seat = state.turn.activeSeat;
+    applyAugmentSelection(state, seat, entry("AMP_GARBAGE_NO_BLUE_GREEN"), []);
+    applyAugmentSelection(state, seat, entry("AMP_GARBAGE_NO_BLUE_GREEN"), []);
+    const minion = makeMinion({
+      instanceId: "natural-shield",
+      category: "民眾黨政治人物",
+      attack: 1,
+      keywords: { divineShield: true }
+    });
+
+    applyMinionSummonedAugments(state, seat, minion, []);
+    expect(minion.attack).toBe(7);
+  });
+
+  it("把國家還給你們 heals surviving death-time neighbors and preserves native deathrattle", () => {
+    const state = startInProgress(904);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_RETURN_COUNTRY_TO_YOU"), []);
+    const left = makeMinion({ instanceId: "left", health: 5, currentHealth: 1 });
+    const dead = makeMinion({
+      instanceId: "dead",
+      category: "民眾黨政治人物",
+      currentHealth: 0,
+      keywords: { deathrattle: { type: "DRAW", value: 1 } }
+    });
+    const right = makeMinion({ instanceId: "right", health: 5, currentHealth: 2 });
+    player.board = [left, dead, right];
+    const handBefore = player.hand.length;
+
+    resolveDeaths(state, [], catalogMap);
+    expect(left.currentHealth).toBe(3);
+    expect(right.currentHealth).toBe(4);
+    expect(player.hand).toHaveLength(handBefore + 1);
+  });
+
+  it("把國家還給你們 heals only an existing edge neighbor and ignores other categories", () => {
+    const state = startInProgress(905);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    applyAugmentSelection(state, seat, entry("AMP_RETURN_COUNTRY_TO_YOU"), []);
+    applyAugmentSelection(state, seat, entry("AMP_RETURN_COUNTRY_TO_YOU"), []);
+    const neighbor = makeMinion({ instanceId: "neighbor", health: 6, currentHealth: 1 });
+    player.board = [
+      makeMinion({ instanceId: "dead-edge", category: "民眾黨政治人物", currentHealth: 0 }),
+      neighbor
+    ];
+    resolveDeaths(state, [], catalogMap);
+    expect(neighbor.currentHealth).toBe(5);
+
+    player.board = [
+      makeMinion({ instanceId: "dead-other", category: "國民黨政治人物", currentHealth: 0 }),
+      neighbor
+    ];
+    resolveDeaths(state, [], catalogMap);
+    expect(neighbor.currentHealth).toBe(5);
   });
 });
 

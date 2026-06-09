@@ -101,6 +101,12 @@ export interface AugmentFlags {
   doubleCategory?: string;
   /** Permanent flat cost reductions keyed by card category. */
   categoryCostReductions?: Array<{ category: string; value: number }>;
+  /** Categories whose minions are shuffled into their owner's deck after death. */
+  shuffleIntoDeckOnDeathCategories?: string[];
+  /** Heal granted to the surviving, death-time neighbors of a dying category minion. */
+  categoryDeathrattleAdjacentHeals?: Array<{ augmentId: string; category: string; value: number }>;
+  /** Attack granted whenever a category minion gains or enters play with divine shield. */
+  categoryDivineShieldAttackBuffs?: Array<{ augmentId: string; category: string; value: number }>;
   /** Summon-trigger augments that place cards on the opponent's board. */
   summonEnemyOnCategory?: Array<{ augmentId: string; category: string; cardId: string; count: number }>;
   /** 減稅: hero takes this much less from every damage instance. */

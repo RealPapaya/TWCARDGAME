@@ -72,6 +72,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_EXTRA_AMP_REROLL_NEXT_PHASE", value: 1 }
   },
   {
+    id: "AMP_THREE_WAY_RACE",
+    name: "政壇三腳督",
+    description: "從牌組抽一張民眾黨政治人物。",
+    tier: "加減賺",
+    factionTags: ["民眾黨政治人物"],
+    effect: { type: "AUG_DRAW_CATEGORY", target_category: "民眾黨政治人物", value: 1 }
+  },
+  {
     id: "AMP_MIN_WAGE",
     name: "基本工資調漲",
     description: "費用 1-3 的隨從 攻擊 +2（含之後打出，整局有效）。",
@@ -254,12 +262,24 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     factionTags: ["國民黨政治人物"],
     effect: { type: "AUG_SUMMON_CARD", cardId: "TW063", count: 4, target: { side: "FRIENDLY" } }
   },
+  {
+    id: "AMP_RETURN_COUNTRY_TO_YOU",
+    name: "把國家還給你們",
+    description: "整局我方民眾黨政治人物死亡時，治療死亡當下兩側仍存活隨從 2 點生命。",
+    tier: "穩穩仔賺",
+    factionTags: ["民眾黨政治人物"],
+    effect: {
+      type: "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL",
+      target_category: "民眾黨政治人物",
+      value: 2
+    }
+  },
 
   // ---- 卯死（高增幅）------------------------------------------------------
   {
     id: "AMP_ISLAND_DAWN",
     name: "島嶼天光",
-    description: "天色漸漸光 — 所有民進黨政治人物在此局生命及攻擊變成兩倍。",
+    description: "天色漸漸光 — 所有民進黨政治人物在此局生命變成兩倍。",
     tier: "卯死",
     factionTags: ["民進黨政治人物"],
     effect: { type: "AUG_DOUBLE_CATEGORY", target_category: "民進黨政治人物" }
@@ -332,10 +352,27 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_1992_CONSENSUS",
     name: "九二共識",
-    description: "所有國民黨政治人物費用永久 -1。",
+    description: "所有國民黨政治人物費用永久 -1，並獲得「遺志：回到牌組堆」。",
     tier: "卯死",
     factionTags: ["國民黨政治人物"],
-    effect: { type: "AUG_CATEGORY_COST_REDUCTION", target_category: "國民黨政治人物", value: 1 }
+    effect: {
+      type: "AUG_CATEGORY_COST_REDUCTION",
+      target_category: "國民黨政治人物",
+      value: 1,
+      keyword: "SHUFFLE_SELF_INTO_DECK"
+    }
+  },
+  {
+    id: "AMP_GARBAGE_NO_BLUE_GREEN",
+    name: "垃圾不分藍綠",
+    description: "立即賦予我方民眾黨政治人物光盾；整局每當我方民眾黨政治人物獲得光盾或帶著天生光盾上場時，攻擊 +3。",
+    tier: "卯死",
+    factionTags: ["民眾黨政治人物"],
+    effect: {
+      type: "AUG_CATEGORY_DIVINE_SHIELD_ATTACK",
+      target_category: "民眾黨政治人物",
+      value: 3
+    }
   }
 ];
 
@@ -412,6 +449,17 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
     if (type === "AUG_CATEGORY_COST_REDUCTION") {
       if (!entry.effect.target_category) errors.push(`${entry.id}: category-cost augment requires target_category`);
       if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: category-cost augment requires a positive value`);
+      if (entry.effect.keyword !== undefined && entry.effect.keyword !== "SHUFFLE_SELF_INTO_DECK") {
+        errors.push(`${entry.id}: unsupported category-cost augment keyword ${entry.effect.keyword}`);
+      }
+    }
+    if (
+      type === "AUG_DRAW_CATEGORY" ||
+      type === "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL" ||
+      type === "AUG_CATEGORY_DIVINE_SHIELD_ATTACK"
+    ) {
+      if (!entry.effect.target_category) errors.push(`${entry.id}: category augment requires target_category`);
+      if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: category augment requires a positive value`);
     }
     if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
       errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);

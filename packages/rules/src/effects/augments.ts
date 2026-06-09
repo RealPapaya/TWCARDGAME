@@ -2,7 +2,7 @@ import { CARD_CATALOG, type AmplificationDbEntry } from "@twcardgame/cards";
 import { AMPLIFICATION_TIERS, opponentOf, type AmplificationTier, type Seat } from "@twcardgame/shared";
 import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
-import { bounceMinion, drawCards, summonCard, updateEnrage } from "./core.js";
+import { bounceMinion, drawCards, grantDivineShield, summonCard, updateEnrage } from "./core.js";
 import { boardLimit } from "./environment.js";
 import { unlockLowHpManaCap } from "./augmentFlags.js";
 
@@ -101,7 +101,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       flags.doubleCategory = effect.target_category;
       for (const minion of player.board) {
         if (minion.category === effect.target_category) {
-          doubleMinion(minion);
+          doubleMinionHealth(minion);
           glowTargets.push(minion.instanceId);
         }
       }
@@ -240,6 +240,45 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       if (effect.target_category && (effect.value ?? 0) > 0) {
         flags.categoryCostReductions ??= [];
         flags.categoryCostReductions.push({ category: effect.target_category, value: effect.value ?? 0 });
+        if (effect.keyword === "SHUFFLE_SELF_INTO_DECK") {
+          flags.shuffleIntoDeckOnDeathCategories ??= [];
+          flags.shuffleIntoDeckOnDeathCategories.push(effect.target_category);
+        }
+      }
+      break;
+    case "AUG_DRAW_CATEGORY": {
+      for (let i = 0; i < (effect.value ?? 1); i++) {
+        const index = player.deck.findIndex((card) => card.category === effect.target_category);
+        if (index < 0) break;
+        drawCards(state, player, 1, events, index);
+        triggered = true;
+      }
+      break;
+    }
+    case "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL":
+      if (effect.target_category && (effect.value ?? 0) > 0) {
+        flags.categoryDeathrattleAdjacentHeals ??= [];
+        flags.categoryDeathrattleAdjacentHeals.push({
+          augmentId: entry.id,
+          category: effect.target_category,
+          value: effect.value ?? 0
+        });
+      }
+      break;
+    case "AUG_CATEGORY_DIVINE_SHIELD_ATTACK":
+      if (effect.target_category && (effect.value ?? 0) > 0) {
+        flags.categoryDivineShieldAttackBuffs ??= [];
+        flags.categoryDivineShieldAttackBuffs.push({
+          augmentId: entry.id,
+          category: effect.target_category,
+          value: effect.value ?? 0
+        });
+        for (const minion of player.board) {
+          if (minion.category !== effect.target_category) continue;
+          grantDivineShield(state, player, minion, events);
+          glowTargets.push(minion.instanceId);
+        }
+        triggered = true;
       }
       break;
     default:
@@ -293,7 +332,7 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
     changed = true;
   }
   if (flags.doubleCategory && minion.category === flags.doubleCategory) {
-    doubleMinion(minion);
+    doubleMinionHealth(minion);
     changed = true;
   }
 
@@ -306,6 +345,7 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
 export function applyMinionSummonedAugments(state: MatchState, seat: Seat, minion: RuntimeMinion, events: Events): void {
   const flags = state.players[seat]?.augmentFlags;
   if (!flags) return;
+  if (minion.keywords.divineShield) applyDivineShieldAttackAugments(state, state.players[seat], minion, events);
   for (const trigger of flags.summonEnemyOnCategory ?? []) {
     if (minion.category !== trigger.category) continue;
     const card = CATALOG_MAP.get(trigger.cardId);
@@ -316,6 +356,24 @@ export function applyMinionSummonedAugments(state: MatchState, seat: Seat, minio
     if (enemy.board.length > before) {
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: trigger.augmentId }, seat);
     }
+  }
+}
+
+/** Applies attack buffs that trigger whenever a minion receives divine shield. */
+export function applyDivineShieldAttackAugments(
+  state: MatchState,
+  player: PlayerState,
+  minion: RuntimeMinion,
+  events: Events
+): void {
+  const buffs = (player.augmentFlags.categoryDivineShieldAttackBuffs ?? []).filter(
+    (buff) => minion.category === buff.category
+  );
+  const value = buffs.reduce((sum, buff) => sum + buff.value, 0);
+  if (value <= 0) return;
+  addStats(minion, value, 0);
+  for (const buff of buffs) {
+    addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: buff.augmentId, targets: [minion.instanceId] }, player.seat);
   }
 }
 
@@ -405,8 +463,7 @@ function addStats(minion: RuntimeMinion, attack: number, health: number): void {
   updateEnrage(minion);
 }
 
-function doubleMinion(minion: RuntimeMinion): void {
-  minion.attack += minion.attack;
+function doubleMinionHealth(minion: RuntimeMinion): void {
   minion.health += minion.health;
   minion.currentHealth += minion.currentHealth;
   updateEnrage(minion);

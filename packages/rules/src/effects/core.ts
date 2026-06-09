@@ -14,6 +14,7 @@ import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
 import { applyEnvironmentTick, boardLimit, environmentTurnTimeLimitMs, suppressRuntimeCardMinionEffects } from "./environment.js";
 import {
+  applyDivineShieldAttackAugments,
   applyMinionSummonedAugments,
   applyPersistentMinionAugments,
   applyStartOfTurnAugments,
@@ -307,11 +308,21 @@ export function resolveDeaths(state: MatchState, events: EffectContext["events"]
       for (let i = player.board.length - 1; i >= 0; i--) {
         const minion = player.board[i];
         if (minion.currentHealth > 0) continue;
+        const deathTimeNeighbors = [player.board[i - 1], player.board[i + 1]].filter(
+          (neighbor): neighbor is RuntimeMinion => neighbor !== undefined
+        );
         player.board.splice(i, 1);
         player.graveyard.push(minionToCard(state, minion));
         addEvent(state, events, "DESTROY", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
         grantDestroyedMinionCostRebate(state, minion, events, catalog);
         resolveDeathrattle(state, player, minion, events, catalog);
+        healDeathTimeNeighborsFromAugments(state, player, minion, deathTimeNeighbors, events);
+        if (
+          minion.keywords.deathrattle?.type !== "SHUFFLE_SELF_INTO_DECK" &&
+          player.augmentFlags.shuffleIntoDeckOnDeathCategories?.includes(minion.category)
+        ) {
+          shuffleDeadMinionIntoDeck(state, player, minion, catalog);
+        }
         // 普渡: revive the owner's minion once as a 1/1 token (after the deathrattle).
         tryReviveMinion(state, player, minion, events);
         removed = true;
@@ -545,15 +556,13 @@ export function buffAdjacent(effect: EffectDefinition, context: EffectContext): 
 export function giveDivineShield(effect: EffectDefinition, context: EffectContext): void {
   const ref = getTargetUnit(context.state, context.activeSeat, context.target);
   if (!ref || ref.kind !== "MINION") return;
-  (ref.unit as RuntimeMinion).keywords.divineShield = true;
-  addEvent(context.state, context.events, "BUFF", { target: (ref.unit as RuntimeMinion).instanceId, shield: true }, ref.owner.seat);
+  grantDivineShield(context.state, ref.owner, ref.unit as RuntimeMinion, context.events);
 }
 
 export function giveDivineShieldAll(_effect: EffectDefinition, context: EffectContext): void {
   const player = context.state.players[context.activeSeat];
   for (const minion of player.board) {
-    minion.keywords.divineShield = true;
-    addEvent(context.state, context.events, "BUFF", { target: minion.instanceId, shield: true }, player.seat);
+    grantDivineShield(context.state, player, minion, context.events);
   }
 }
 
@@ -561,10 +570,21 @@ export function giveDivineShieldCategory(effect: EffectDefinition, context: Effe
   const player = context.state.players[context.activeSeat];
   for (const minion of player.board) {
     if (minion.category === effect.target_category) {
-      minion.keywords.divineShield = true;
-      addEvent(context.state, context.events, "BUFF", { target: minion.instanceId, shield: true }, player.seat);
+      grantDivineShield(context.state, player, minion, context.events);
     }
   }
+}
+
+/** Grants divine shield and resolves augments even when the minion was already shielded. */
+export function grantDivineShield(
+  state: MatchState,
+  player: PlayerState,
+  minion: RuntimeMinion,
+  events: EffectContext["events"]
+): void {
+  minion.keywords.divineShield = true;
+  addEvent(state, events, "BUFF", { target: minion.instanceId, shield: true }, player.seat);
+  applyDivineShieldAttackAugments(state, player, minion, events);
 }
 
 export function giveKeywordAdjacent(effect: EffectDefinition, context: EffectContext): void {
@@ -856,21 +876,58 @@ function resolveDeathrattle(
     applyDamage(state, { owner: player, kind: "HERO", unit: player.hero }, deathrattle.value ?? 0, events);
   }
   if (deathrattle.type === "SHUFFLE_SELF_INTO_DECK") {
-    let graveyardIndex = -1;
-    for (let i = player.graveyard.length - 1; i >= 0; i--) {
-      if (player.graveyard[i].cardId === deadMinion.cardId) {
-        graveyardIndex = i;
-        break;
-      }
-    }
-    const graveyardCard = graveyardIndex >= 0 ? player.graveyard.splice(graveyardIndex, 1)[0] : undefined;
-    const original = catalog.get(deadMinion.cardId);
-    const card = original ? createCardForHand(state, original, player.seat) : graveyardCard;
-    if (card) {
-      player.deck.push(card);
-      state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+    shuffleDeadMinionIntoDeck(state, player, deadMinion, catalog);
+  }
+}
+
+function healDeathTimeNeighborsFromAugments(
+  state: MatchState,
+  player: PlayerState,
+  deadMinion: RuntimeMinion,
+  neighbors: readonly RuntimeMinion[],
+  events: EffectContext["events"]
+): void {
+  const heals = (player.augmentFlags.categoryDeathrattleAdjacentHeals ?? []).filter(
+    (heal) => deadMinion.category === heal.category
+  );
+  const value = heals.reduce((sum, heal) => sum + heal.value, 0);
+  if (value <= 0) return;
+  const surviving = neighbors.filter((neighbor) => neighbor.currentHealth > 0 && player.board.includes(neighbor));
+  for (const neighbor of surviving) {
+    healUnit(state, { owner: player, kind: "MINION", unit: neighbor }, value, events);
+  }
+  if (surviving.length > 0) {
+    for (const heal of heals) {
+      addEvent(
+        state,
+        events,
+        "AUGMENT_TRIGGERED",
+        { augmentId: heal.augmentId, targets: surviving.map((neighbor) => neighbor.instanceId) },
+        player.seat
+      );
     }
   }
+}
+
+function shuffleDeadMinionIntoDeck(
+  state: MatchState,
+  player: PlayerState,
+  deadMinion: RuntimeMinion,
+  catalog: Map<string, CardDefinition>
+): void {
+  let graveyardIndex = -1;
+  for (let i = player.graveyard.length - 1; i >= 0; i--) {
+    if (player.graveyard[i].cardId === deadMinion.cardId) {
+      graveyardIndex = i;
+      break;
+    }
+  }
+  const graveyardCard = graveyardIndex >= 0 ? player.graveyard.splice(graveyardIndex, 1)[0] : undefined;
+  const original = catalog.get(deadMinion.cardId);
+  const card = original ? createCardForHand(state, original, player.seat) : graveyardCard;
+  if (!card) return;
+  player.deck.push(card);
+  state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
 }
 
 function handleDiscard(state: MatchState, player: PlayerState, discarded: RuntimeCard, catalog: Map<string, CardDefinition>, events: EffectContext["events"]): void {

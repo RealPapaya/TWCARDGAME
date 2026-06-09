@@ -3,7 +3,7 @@ import { SEATS } from "@twcardgame/shared";
 import { nextInt } from "../rng.js";
 import { addEvent } from "../state.js";
 import type { EffectContext, EffectHandler, MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
-import { bounceMinion, healUnit, summonCard } from "./core.js";
+import { bounceMinion, grantDivineShield, healUnit, summonCard } from "./core.js";
 import { boardLimit, isEnvironmentActive } from "./environment.js";
 
 /**
@@ -64,8 +64,7 @@ export function giveDivineShieldAllBoard(_effect: EffectDefinition, context: Eff
   for (const seat of SEATS) {
     const player = context.state.players[seat];
     for (const minion of player.board) {
-      minion.keywords.divineShield = true;
-      addEvent(context.state, context.events, "BUFF", { target: minion.instanceId, shield: true }, seat);
+      grantDivineShield(context.state, player, minion, context.events);
     }
   }
 }

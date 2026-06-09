@@ -93,4 +93,47 @@ describe("special-phase databases", () => {
       "AMP_GO_FOR_BROKE"
     ]);
   });
+
+  it("defines the three TPP amplifications with the intended tiers and category", () => {
+    expect(
+      ["AMP_THREE_WAY_RACE", "AMP_RETURN_COUNTRY_TO_YOU", "AMP_GARBAGE_NO_BLUE_GREEN"].map((id) => {
+        const augment = AMPLIFICATION_DB.find((entry) => entry.id === id);
+        return {
+          name: augment?.name,
+          tier: augment?.tier,
+          factionTags: augment?.factionTags,
+          targetCategory: augment?.effect.target_category
+        };
+      })
+    ).toEqual([
+      { name: "政壇三腳督", tier: "加減賺", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" },
+      { name: "把國家還給你們", tier: "穩穩仔賺", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" },
+      { name: "垃圾不分藍綠", tier: "卯死", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" }
+    ]);
+  });
+
+  it("validates category and value fields for TPP augment effect types", () => {
+    const bad = [
+      ...AMPLIFICATION_DB,
+      {
+        id: "AMP_BAD_CATEGORY_DRAW",
+        name: "x",
+        description: "x",
+        tier: "加減賺" as const,
+        factionTags: [],
+        effect: { type: "AUG_DRAW_CATEGORY", value: 0 }
+      },
+      {
+        id: "AMP_BAD_CATEGORY_HEAL",
+        name: "x",
+        description: "x",
+        tier: "穩穩仔賺" as const,
+        factionTags: [],
+        effect: { type: "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL", target_category: "x" }
+      }
+    ];
+    const result = validateAmplificationDb(bad);
+    expect(result.errors.filter((error) => error.includes("AMP_BAD_CATEGORY_DRAW"))).toHaveLength(2);
+    expect(result.errors.filter((error) => error.includes("AMP_BAD_CATEGORY_HEAL"))).toHaveLength(1);
+  });
 });
