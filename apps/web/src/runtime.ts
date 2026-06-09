@@ -1569,12 +1569,15 @@ function renderBattleHistoryPanel(): string {
 function renderBattlePlayerInfo(player: PublicPlayer | undefined): string {
   const displayName = player?.displayName || view.profile?.display_name || "玩家";
   return `
+    <div class="battle-player-hud">
     <aside class="player-info-card battle-player-info">
       <div class="player-details">
         <div class="player-username">${escapeHtml(displayName)}</div>
         <div class="player-title">無稱號</div>
       </div>
     </aside>
+    ${renderTurnCounter()}
+    </div>
   `;
 }
 
@@ -2142,6 +2145,53 @@ function visibleNewsPowerForSeat(seat: Seat): number {
   return Array.from(player?.board ?? []).reduce((sum, minion) => {
     return sum + (cardCatalog.get(minion.cardId)?.keywords?.newsPower ?? 0);
   }, 0);
+}
+
+function turnCounterTickClass(turn: number, offset: number): string {
+  const special = turn === 6 || turn === 14 ? " amplification" : turn === 20 ? " vote" : "";
+  const current = offset === 0 ? " current" : "";
+  const edge = Math.abs(offset) === 2 ? ` edge edge-${offset < 0 ? "left" : "right"}` : "";
+  return `turn-counter-tick${current}${edge}${special}`;
+}
+
+function turnCounterSpecialKind(turn: number): "amplification" | "vote" | undefined {
+  if (turn === 6 || turn === 14) return "amplification";
+  if (turn === 20) return "vote";
+  return undefined;
+}
+
+function renderTurnCounter(): string {
+  const currentTurn = readTurnNumber();
+  const currentSpecial = turnCounterSpecialKind(currentTurn);
+  const nextSpecial = turnCounterSpecialKind(currentTurn + 1);
+  const highlightedSpecial = currentSpecial ?? nextSpecial;
+  const specialLabel = highlightedSpecial === "amplification" ? "增幅回合" : highlightedSpecial === "vote" ? "公投回合" : "";
+  const tooltip = currentSpecial ? `本回合是${specialLabel}` : nextSpecial ? `下一回合是${specialLabel}` : "";
+  const stateClass = currentSpecial
+    ? ` is-${currentSpecial} has-special-tooltip`
+    : nextSpecial
+      ? ` is-${nextSpecial}-preview has-special-tooltip`
+      : "";
+  const offsets = [-2, -1, 0, 1, 2] as const;
+  const ticks = offsets.map((offset) => {
+    const turn = currentTurn + offset;
+    const label = turn > 0 ? String(turn) : "";
+    return `
+      <span class="${turnCounterTickClass(turn, offset)}" data-offset="${offset}" aria-hidden="true">
+        <span>${label}</span>
+      </span>
+    `;
+  }).join("");
+
+  return `
+    <div class="turn-counter${stateClass}" role="img" aria-label="目前第 ${currentTurn} 回合${tooltip ? `，${tooltip}` : ""}"
+      ${tooltip ? `data-tooltip="${tooltip}" tabindex="0"` : ""} data-testid="turn-counter">
+      <div class="turn-counter-numbers" data-dom-key="turn-counter-wheel-${currentTurn}">${ticks}</div>
+      <img class="turn-counter-frame" src="/images/ui/turn_counter_fan.png" alt="" draggable="false">
+      <img class="turn-counter-overlay" src="/images/ui/turn_counter_fan_overlay.png" alt="" draggable="false">
+      <div class="turn-counter-glass" aria-hidden="true"></div>
+    </div>
+  `;
 }
 
 function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, myPlayer?: PublicPlayer): string {
