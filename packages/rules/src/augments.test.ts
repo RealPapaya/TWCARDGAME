@@ -842,7 +842,7 @@ describe("destroyed-minion cost rebate augment", () => {
 });
 
 describe("new hero and resource augments", () => {
-  it("raises hero max HP without healing current HP", () => {
+  it("raises hero max HP and current HP by the same amount", () => {
     const state = startInProgress(25);
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
@@ -854,7 +854,7 @@ describe("new hero and resource augments", () => {
     applyAugmentSelection(state, seat, entry("AMP_ONE_PARTY_DOMINANCE"), []);
 
     expect(player.hero.maxHp).toBe(initialMax + 35);
-    expect(player.hero.hp).toBe(12);
+    expect(player.hero.hp).toBe(47);
   });
 
   it("loses 5 HP now and grants 5 current crystals at the start of the next own turn", () => {

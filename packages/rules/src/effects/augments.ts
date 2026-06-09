@@ -176,6 +176,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       break;
     case "AUG_HERO_MAX_HP":
       player.hero.maxHp += effect.value ?? 0;
+      player.hero.hp += effect.value ?? 0;
       triggered = true;
       break;
     case "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN":
