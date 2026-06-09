@@ -15,8 +15,8 @@ import { cssEscape } from "./dom.js";
 const PARTICLE_COUNT = 80;
 const PARTICLE_COLORS = ["#a335ee", "#444444", "#888888", "#ffffff"];
 const PARTICLE_LIFETIME_MS = 2100;
-const CLONE_LIFETIME_MS = 1500;
-export const DISCARD_CARD_BODY_MS = CLONE_LIFETIME_MS;
+const CARD_FADE_LIFETIME_MS = 1500;
+export const DISCARD_CARD_BODY_MS = CARD_FADE_LIFETIME_MS;
 
 /** Disintegrates the hand card behind each `DISCARD` event in `events`. */
 export function playDiscardAnimations(
@@ -49,41 +49,32 @@ function locateDiscardedCard(
   if (seat && seat === mySeat) {
     // The local hand tags each card with its catalog id.
     return (
-      document.querySelector<HTMLElement>(`.hand-row .card[data-card-id="${cssEscape(cardId)}"]`) ?? undefined
+      document.querySelector<HTMLElement>(
+        `.hand-row .card[data-card-id="${cssEscape(cardId)}"]:not([data-discard-disintegrating="true"])`
+      ) ?? undefined
     );
   }
   // Opponent cards are identical face-down backs — any one stands in.
-  const backs = document.querySelectorAll<HTMLElement>(".opponent-hand .card.card-back");
+  const backs = document.querySelectorAll<HTMLElement>(
+    `.opponent-hand .card.card-back:not([data-discard-disintegrating="true"])`
+  );
   return backs[backs.length - 1] ?? undefined;
 }
 
-/** Clones the card, fades the clone, and bursts it into drifting particles. */
+/** Keeps the real card in place while it fades and bursts into drifting particles. */
 function disintegrate(cardEl: HTMLElement): void {
   const rect = cardEl.getBoundingClientRect();
   if (rect.width === 0 || rect.height === 0) return;
 
-  const clone = cardEl.cloneNode(true) as HTMLElement;
-  clone.style.position = "fixed";
-  clone.style.top = `${rect.top}px`;
-  clone.style.left = `${rect.left}px`;
-  clone.style.width = `${rect.width}px`;
-  clone.style.height = `${rect.height}px`;
-  clone.style.margin = "0";
-  clone.style.zIndex = "10000";
-  clone.style.pointerEvents = "none";
-  clone.style.transition = "opacity 0.8s ease-in";
-  document.body.appendChild(clone);
-
-  // Hide the real card immediately; the next render() removes it for good.
-  cardEl.style.visibility = "hidden";
-
+  cardEl.dataset.discardDisintegrating = "true";
+  cardEl.classList.add("discard-disintegrating");
   for (let i = 0; i < PARTICLE_COUNT; i += 1) spawnParticle(rect);
 
-  // Fade the card body slightly after the particles start crumbling.
+  // Fade the body after the particle cascade has visibly started; the hand sync
+  // hold removes the real element after the body animation window.
   window.setTimeout(() => {
-    clone.style.opacity = "0";
-  }, 100);
-  window.setTimeout(() => clone.remove(), CLONE_LIFETIME_MS);
+    cardEl.style.opacity = "0";
+  }, 140);
 }
 
 /** One disintegration particle: random colour, origin, size and trajectory. */

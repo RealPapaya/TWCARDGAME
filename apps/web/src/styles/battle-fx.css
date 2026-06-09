@@ -489,6 +489,12 @@
 }
 
 /* --- Card discard disintegration (ported from LEGACY animateDiscard) --- */
+.card.discard-disintegrating {
+  pointer-events: none;
+  transition: opacity 0.8s ease-in;
+  will-change: opacity;
+}
+
 .disintegrate-particle {
   position: fixed;
   pointer-events: none;
