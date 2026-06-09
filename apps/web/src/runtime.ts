@@ -1692,6 +1692,15 @@ function pendingPublicBoardForSeat(seat: Seat): PublicMinion[] | undefined {
   return board ? Array.from(board) : undefined;
 }
 
+function pendingMinionCurrentHealth(seat: Seat, instanceId: string): number | undefined {
+  return pendingPublicBoardForSeat(seat)?.find(m => m.instanceId === instanceId)?.currentHealth;
+}
+
+function pendingHeroHp(seat: Seat): number | undefined {
+  const sync = pendingPublicSync as typeof view.publicSync | undefined;
+  return sync?.players?.[seat]?.hero?.hp;
+}
+
 /**
  * A non-interactive minion shown on the board while its battlecry is being
  * aimed. Uses the exact same `<button class="minion">` markup as `renderMinion`
@@ -1761,11 +1770,13 @@ function renderSummonPreview(cue: AnimationCue): string {
 
 function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player" | "opponent"): string {
   const target = targetAttr({ type: "HERO", side: seat });
-  const hp = player?.hero?.hp ?? 0;
   const maxHp = player?.hero?.maxHp ?? 0;
   const name = player?.displayName || seat;
   const targetRef: TargetRef = { type: "HERO", side: seat };
   const targetKey = targetKeyFor(targetRef);
+  // Show post-damage/heal HP immediately when the cue fires, same as renderMinion.
+  const hasHeroDmgHealCue = hasCue(targetKey, "damage") || hasCue(targetKey, "heal");
+  const hp = (hasHeroDmgHealCue ? pendingHeroHp(seat) : undefined) ?? player?.hero?.hp ?? 0;
   const heroClasses = classNames([
     "hero",
     role === "player" ? "player-hero" : "opponent-hero",
@@ -1908,14 +1919,18 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     typeof catalogCard?.attack === "number" &&
     typeof catalogCard?.health === "number";
   const shownAttack = holdBaseStat ? catalogCard!.attack : minion.attack;
-  const shownHealth = holdBaseStat ? catalogCard!.health : minion.currentHealth;
+  // Show post-damage/heal HP immediately when the cue fires (at impact, ~560ms into
+  // the lunge) instead of waiting for the full publicSync flush at ~920ms.
+  const hasDmgHealCue = hasCue(minion.instanceId, "damage") || hasCue(minion.instanceId, "heal");
+  const pendingHealth = hasDmgHealCue ? pendingMinionCurrentHealth(seat, minion.instanceId) : undefined;
+  const shownHealth = holdBaseStat ? catalogCard!.health : (pendingHealth ?? minion.currentHealth);
   const attackClass = classNames([
     "stat-atk",
     holdBaseStat ? "" : valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)
   ]);
   const healthClass = classNames([
     "stat-hp",
-    holdBaseStat ? "" : valueDeltaClass(minion.currentHealth, catalogCard?.health)
+    holdBaseStat ? "" : valueDeltaClass(shownHealth, catalogCard?.health)
   ]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
