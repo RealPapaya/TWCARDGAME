@@ -2621,17 +2621,31 @@ function renderEventCue(cue: AnimationCue): string {
   if (cue.kind === "damage" || cue.kind === "heal" || cue.kind === "effectStrike") {
     if (!cue.targetKey) return "";
     const isHeal = cue.kind === "heal";
-    const sign = isHeal ? "+" : "-";
-    // The readable -N / +N stays (it is data, not decoration); the particles
-    // wrap it. Combat "damage" keeps just the number + the taking-damage shake.
+    if (isHeal) {
+      // The green frame (.receiving-heal → heal-flash) is gated by cueIsReady and
+      // has no animation-delay, so it fires at readyAtMs. The green "+" used to be
+      // animated via --cue-delay, but morph re-renders (publicSync held during a
+      // card play, worst on the enemy's view) keep resetting that countdown — so
+      // the "+" trailed the frame by the play delay. Mirror the AOE-pluses fix:
+      // hold the heal visuals until the cue is ready, then animate immediately
+      // (delay-free) so the frame and the "+" fire on the same render.
+      if (!cueIsReady(cue)) return "";
+      const readyStyle = cueStyleAttr({ ...cue, delayMs: 0 });
+      const number = cue.amount !== undefined
+        ? `<div class="float-number heal"${readyStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">+${cue.amount}</div>`
+        : "";
+      const burst = renderHealBurst(cue, readyStyle);
+      return `${burst}${number}`;
+    }
+    const sign = "-";
+    // The readable -N stays (it is data, not decoration); the particles wrap it.
+    // Combat "damage" keeps just the number + the taking-damage shake.
     const number = cue.amount !== undefined
-      ? `<div class="float-number ${isHeal ? "heal" : "damage"}"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`
+      ? `<div class="float-number damage"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="float-number">${sign}${cue.amount}</div>`
       : "";
     // Every damage gets an impact burst: combat damage a red spark, effect /
-    // spell damage the magenta strike. Heal keeps its green motes.
-    const burst = isHeal
-      ? renderHealBurst(cue, cueStyle)
-      : renderEffectStrike(cue, cueStyle, cue.kind === "effectStrike" ? "effect" : "combat");
+    // spell damage the magenta strike.
+    const burst = renderEffectStrike(cue, cueStyle, cue.kind === "effectStrike" ? "effect" : "combat");
     return `${burst}${number}`;
   }
   if (cue.kind === "destroy") {
