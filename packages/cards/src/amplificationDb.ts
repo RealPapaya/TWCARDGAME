@@ -40,10 +40,10 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_VOUCHER_3600",
     name: "消費券3600",
-    description: "下一回合獲得 3 顆水晶（僅一回合）。",
+    description: "下一回合獲得 2 顆水晶（僅一回合）。",
     tier: "加減賺",
     factionTags: [],
-    effect: { type: "AUG_GRANT_CRYSTALS_NEXT_TURN", crystals: 3 }
+    effect: { type: "AUG_GRANT_CRYSTALS_NEXT_TURN", crystals: 2 }
   },
   {
     id: "AMP_SHAREHOLDER_GIFT",
@@ -138,10 +138,10 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_BLOOD_DONATION_VOUCHER",
     name: "捐血送禮券",
-    description: "英雄生命 -5，下回合獲得 +5 水晶（僅一回合）。",
+    description: "英雄生命 -5，下回合獲得 +3 水晶（僅一回合）。",
     tier: "加減賺",
     factionTags: [],
-    effect: { type: "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN", health: 5, crystals: 5 }
+    effect: { type: "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN", health: 5, crystals: 3 }
   },
   {
     id: "AMP_BANQUET",

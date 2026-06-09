@@ -840,6 +840,57 @@
   100% { transform: translate(0, 0) scale(0.4); opacity: 0; }
 }
 
+/* === Quest countdown completes — golden ring pulse + outward sparks. === */
+.quest-complete-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  z-index: 92;
+}
+
+.quest-complete-ring {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 76px;
+  height: 76px;
+  margin: -38px 0 0 -38px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 215, 0, 0.95);
+  box-shadow: 0 0 22px rgba(255, 185, 0, 0.85), inset 0 0 12px rgba(255, 255, 180, 0.4);
+  opacity: 0;
+  animation: quest-ring 0.65s ease-out forwards;
+  animation-delay: var(--cue-delay, 0ms);
+}
+
+.quest-complete-burst > span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 9px;
+  height: 9px;
+  margin: -4.5px 0 0 -4.5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff8b0 0%, #ffcc00 55%, rgba(255, 190, 0, 0) 100%);
+  box-shadow: 0 0 8px rgba(255, 220, 80, 0.9);
+  opacity: 0;
+  animation: quest-sparkle 0.65s ease-out forwards;
+  animation-delay: var(--cue-delay, 0ms);
+}
+
+@keyframes quest-ring {
+  0%   { transform: scale(0.3); opacity: 0; }
+  20%  { opacity: 1; }
+  100% { transform: scale(2); opacity: 0; }
+}
+
+@keyframes quest-sparkle {
+  0%   { transform: translate(0, 0) scale(0.5); opacity: 0; }
+  25%  { opacity: 1; }
+  100% { transform: translate(var(--dx, 0), var(--dy, 0)) scale(0.2); opacity: 0; }
+}
+
 /* === Whole-board AOE sweep (全場特效) — sized to the board rect by JS. === */
 .aoe-sweep {
   position: absolute;
@@ -961,6 +1012,8 @@
   .shield-shatter > span,
   .lock-clamp-ring,
   .lock-clamp > span,
+  .quest-complete-ring,
+  .quest-complete-burst > span,
   .aoe-heal-plus,
   .aoe-sweep-wave {
     animation: none;

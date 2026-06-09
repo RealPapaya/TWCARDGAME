@@ -152,6 +152,8 @@ const HERO_SHATTER_MS = 1600;
 const RESULT_OVERLAY_PAUSE_MS = 400;
 const APP_VERSION = "v1.1.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
+/** Pause inserted between a quest-complete flash and its downstream effects (damage/destroy/summon). */
+const QUEST_COMPLETE_EFFECT_DELAY_MS = 700;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
 const AMP_REROLL_FLIP_OUT_MS = 260;
 const AMP_REROLL_FLIP_IN_MS = 320;
@@ -2571,6 +2573,11 @@ function renderEventCue(cue: AnimationCue): string {
     if (!cue.targetKey) return "";
     const particles = particleSpread(cue.id);
     return `<div class="death-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="death-burst"><i class="death-burst-ring"></i>${particles}</div>`;
+  }
+  if (cue.kind === "questComplete") {
+    if (!cue.targetKey) return "";
+    const sparks = particleSpread(cue.id, 10);
+    return `<div class="quest-complete-burst"${cueStyle} data-cue-id="${escapeAttr(cue.id)}" data-dom-key="cue-${escapeAttr(cue.id)}" data-anchor-key="${escapeAttr(cue.targetKey)}" data-testid="quest-complete-burst"><span class="quest-complete-ring"></span>${sparks}</div>`;
   }
   return `<div class="event-cue event-${cue.kind}"${cueStyle} data-dom-key="cue-${escapeAttr(cue.id)}">${escapeHtml(cue.text)}</div>`;
 }
@@ -7758,7 +7765,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   insertAoeSweepCues(rawCues, aoeClusters);
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
-  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(rawCues, multiHitSeqs));
+  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(applyPostQuestEffectDelays(rawCues), multiHitSeqs));
   if (cues.length === 0) return [];
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push
   // the board-effect cues out until the roulette reveals the winner, so e.g.
@@ -7807,6 +7814,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
       : cue.kind === "destroy" ? 700
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
       : cue.kind === "augmentGlow" ? AUGMENT_GLOW_MAX_DEFER_MS + AUGMENT_GLOW_REVEAL_DELAY_MS
+      : cue.kind === "questComplete" ? QUEST_COMPLETE_EFFECT_DELAY_MS + 200
       : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
@@ -8144,6 +8152,56 @@ function isPostAttackEffectCue(cue: AnimationCue): boolean {
     || cue.kind === "aoeSweep";
 }
 
+/**
+ * After a `questComplete` cue, delays all downstream effect cues so the golden
+ * flash has time to register before damage / destroy / summon animate.
+ * Holds `pendingPublicSync` so the board stays frozen at the pre-effect state
+ * while the effects play through.
+ */
+function applyPostQuestEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
+  const cues: AnimationCue[] = [];
+  let pendingQuestDelay = 0;
+
+  for (const cue of rawCues) {
+    if (cue.kind === "questComplete") {
+      pendingQuestDelay = QUEST_COMPLETE_EFFECT_DELAY_MS;
+      holdPendingPublicSyncFor(QUEST_COMPLETE_EFFECT_DELAY_MS + DESTROY_EFFECT_SYNC_LAG_MS);
+      cues.push(cue);
+      continue;
+    }
+    if (pendingQuestDelay > 0 && isPostQuestEffectCue(cue)) {
+      const syncLag =
+        cue.kind === "destroy" ? DESTROY_EFFECT_SYNC_LAG_MS
+        : cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS
+        : POST_PLAY_STATE_SYNC_LAG_MS;
+      holdPendingPublicSyncFor(pendingQuestDelay + syncLag);
+      if (cue.kind === "bounce") holdPlayerHandSyncFor(pendingQuestDelay + syncLag, { suppressNewIds: true });
+      cues.push({
+        ...cue,
+        delayMs: Math.max(cue.delayMs ?? 0, pendingQuestDelay),
+        readyAtMs: performance.now() + pendingQuestDelay
+      });
+      continue;
+    }
+    cues.push(cue);
+  }
+  return cues;
+}
+
+function isPostQuestEffectCue(cue: AnimationCue): boolean {
+  return cue.kind === "damage"
+    || cue.kind === "heal"
+    || cue.kind === "buff"
+    || cue.kind === "bounce"
+    || cue.kind === "destroy"
+    || cue.kind === "effectStrike"
+    || cue.kind === "deathrattle"
+    || cue.kind === "shieldPop"
+    || cue.kind === "lock"
+    || cue.kind === "aoeSweep"
+    || cue.kind === "summon";
+}
+
 function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, combatDamageSeqs?: Set<number>): AnimationCue | undefined {
   const payload = event.payload ?? {};
   const target = typeof payload.target === "string" ? payload.target : undefined;
@@ -8216,6 +8274,10 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     // imperative blade sprite knows where to fly from.
     const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
     return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq };
+  }
+  if (event.type === "QUEST_COMPLETED") {
+    const source = typeof payload.source === "string" ? payload.source : undefined;
+    return { id, kind: "questComplete", text: "任務完成", seat: event.seat, targetKey: source, cardId };
   }
   if (event.type === "TURN_STARTED") return undefined;
   if (event.type === "COMMAND_REJECTED") return { id, kind: "reject", text: String(payload.reason ?? "動作被拒絕。"), seat: event.seat };

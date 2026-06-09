@@ -42,7 +42,8 @@ export type AnimationKind =
   | "shieldPop" // divine shield breaking (split out of "buff")
   | "lock" // silence / lock (split out of "buff")
   | "aoeSweep" // one board-wide overlay drawn per AOE cluster
-  | "augmentGlow"; // 增幅 indicator pulse when a bound augment fires
+  | "augmentGlow" // 增幅 indicator pulse when a bound augment fires
+  | "questComplete"; // quest countdown reaches zero — golden ring before effects fire
 
 /** Whether an effect hit a single target or swept the whole board (全場). */
 export type AnimationScope = "single" | "aoe";
