@@ -27,10 +27,11 @@ export function opponentFanStyle(index: number, total: number): string {
   if (total <= 1) return `--rot: 0deg; --y: 0px; --squeeze: ${squeeze};`;
   const center = (total - 1) / 2;
   const distance = index - center;
-  const rotation = Math.max(-18, Math.min(18, distance * 6));
+  const rotation = Math.max(-18, Math.min(18, distance * 5));
   const abs = Math.abs(distance);
-  // Negative y lifts edge cards upward, creating an upward (∩) arc as seen from the player's side.
-  const y = -(abs * abs * 3 + abs * 5);
+  // Negative y pulls edge cards toward the top of the screen, forming a ∪ arc
+  // (opening upward) once the cards are flipped 180° in CSS.
+  const y = -(abs * 6);
   return `--rot: ${rotation}deg; --y: ${y}px; --squeeze: ${squeeze};`;
 }
 
