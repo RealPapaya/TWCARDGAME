@@ -2,6 +2,7 @@ import { CARD_CATALOG, type AmplificationDbEntry } from "@twcardgame/cards";
 import { AMPLIFICATION_TIERS, opponentOf, type AmplificationTier, type Seat } from "@twcardgame/shared";
 import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
+import { nextInt } from "../rng.js";
 import { bounceMinion, drawCards, grantDivineShield, summonCard, updateEnrage } from "./core.js";
 import { boardLimit } from "./environment.js";
 import { unlockLowHpManaCap } from "./augmentFlags.js";
@@ -281,6 +282,31 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
         triggered = true;
       }
       break;
+    case "AUG_SUMMON_RANDOM_CATEGORY_FROM_DECK_AND_DEATH_MANA": {
+      const category = effect.target_category;
+      if (!category) break;
+      flags.categoryDeathManaGains ??= [];
+      flags.categoryDeathManaGains.push({
+        augmentId: entry.id,
+        category,
+        value: effect.value ?? 1
+      });
+      for (let i = 0; i < (effect.count ?? 1); i++) {
+        const candidates = player.deck
+          .map((card, index) => ({ card, index }))
+          .filter(({ card }) => card.type === "MINION" && card.category === category);
+        if (candidates.length === 0 || player.board.length >= boardLimit(state, seat)) break;
+        const roll = nextInt(state.private.rngState, candidates.length);
+        state.private.rngState = roll.state;
+        const selected = candidates[roll.value];
+        const definition = CATALOG_MAP.get(selected.card.cardId);
+        if (!definition || !summonCard(state, player, definition, events)) break;
+        player.deck.splice(selected.index, 1);
+        glowTargets.push(player.board[player.board.length - 1].instanceId);
+      }
+      triggered = true;
+      break;
+    }
     default:
       break;
   }

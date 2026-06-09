@@ -31,6 +31,7 @@ const DIRECT_CARD_COVERAGE = new Set([
   "TW066",
   "TW071",
   "TW077",
+  "TW078",
   "S001",
   "S006",
   "S007",

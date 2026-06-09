@@ -315,7 +315,8 @@ export function resolveDeaths(state: MatchState, events: EffectContext["events"]
         player.graveyard.push(minionToCard(state, minion));
         addEvent(state, events, "DESTROY", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
         grantDestroyedMinionCostRebate(state, minion, events, catalog);
-        resolveDeathrattle(state, player, minion, events, catalog);
+        grantCategoryDeathMana(state, minion, events);
+        resolveDeathrattle(state, player, minion, deathTimeNeighbors, events, catalog);
         healDeathTimeNeighborsFromAugments(state, player, minion, deathTimeNeighbors, events);
         if (
           minion.keywords.deathrattle?.type !== "SHUFFLE_SELF_INTO_DECK" &&
@@ -854,6 +855,7 @@ function resolveDeathrattle(
   state: MatchState,
   player: PlayerState,
   deadMinion: RuntimeMinion,
+  deathTimeNeighbors: readonly RuntimeMinion[],
   events: EffectContext["events"],
   catalog: Map<string, CardDefinition>
 ): void {
@@ -877,6 +879,33 @@ function resolveDeathrattle(
   }
   if (deathrattle.type === "SHUFFLE_SELF_INTO_DECK") {
     shuffleDeadMinionIntoDeck(state, player, deadMinion, catalog);
+  }
+  if (deathrattle.type === "BUFF_ADJACENT_HEALTH") {
+    for (const neighbor of deathTimeNeighbors) {
+      if (player.board.includes(neighbor)) {
+        buffMinion(state, player, neighbor, "HEALTH", deathrattle.value ?? 1, events);
+      }
+    }
+  }
+}
+
+function grantCategoryDeathMana(
+  state: MatchState,
+  deadMinion: RuntimeMinion,
+  events: EffectContext["events"]
+): void {
+  for (const player of Object.values(state.players)) {
+    for (const gain of player.augmentFlags.categoryDeathManaGains ?? []) {
+      if (deadMinion.category !== gain.category) continue;
+      player.mana.current += gain.value;
+      addEvent(
+        state,
+        events,
+        "AUGMENT_TRIGGERED",
+        { augmentId: gain.augmentId, amount: gain.value, cardId: deadMinion.cardId },
+        player.seat
+      );
+    }
   }
 }
 

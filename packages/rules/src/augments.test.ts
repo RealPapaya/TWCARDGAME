@@ -158,6 +158,58 @@ describe("augment one-shot grants & hand snapshots", () => {
   });
 });
 
+describe("labor cards and amplification", () => {
+  it("非法移工 summons three random laborers from the deck and grants temporary mana when any laborer dies", () => {
+    const state = startInProgress(777);
+    const player = state.players.player1;
+    player.board = [];
+    player.deck = [
+      makeCard({ instanceId: "labor-1", cardId: "TW003", type: "MINION", category: "勞工", attack: 1, health: 2 }),
+      makeCard({ instanceId: "labor-2", cardId: "TW004", type: "MINION", category: "勞工", attack: 1, health: 4 }),
+      makeCard({ instanceId: "labor-3", cardId: "TW005", type: "MINION", category: "勞工", attack: 2, health: 3 }),
+      makeCard({ instanceId: "labor-4", cardId: "TW006", type: "MINION", category: "勞工", attack: 3, health: 2 }),
+      makeCard({ instanceId: "news-1", cardId: "S001", type: "NEWS", category: "新聞" })
+    ];
+
+    applyAugmentSelection(state, "player1", entry("AMP_ILLEGAL_MIGRANT_WORKERS"), []);
+
+    expect(player.board).toHaveLength(3);
+    expect(player.board.every((minion) => minion.category === "勞工")).toBe(true);
+    expect(player.deck.filter((card) => card.category === "勞工")).toHaveLength(1);
+
+    player.mana.current = 0;
+    const maxMana = player.mana.max;
+    state.players.player2.board = [makeMinion({ instanceId: "enemy-labor", ownerSeat: "player2", currentHealth: 0 })];
+    resolveDeaths(state, [], catalogMap);
+
+    expect(player.mana.current).toBe(1);
+    expect(player.mana.max).toBe(maxMana);
+  });
+
+  it("作業員 deathrattle grants both adjacent minions +1 health", () => {
+    const state = startInProgress(778);
+    const player = state.players.player1;
+    const left = makeMinion({ instanceId: "left", health: 3, currentHealth: 2 });
+    const operator = makeMinion({
+      instanceId: "operator",
+      cardId: "TW078",
+      name: "作業員",
+      health: 1,
+      currentHealth: 0,
+      keywords: { deathrattle: { type: "BUFF_ADJACENT_HEALTH", value: 1 } }
+    });
+    const right = makeMinion({ instanceId: "right", health: 4, currentHealth: 4 });
+    player.board = [left, operator, right];
+
+    resolveDeaths(state, [], catalogMap);
+
+    expect(left.health).toBe(4);
+    expect(left.currentHealth).toBe(3);
+    expect(right.health).toBe(5);
+    expect(right.currentHealth).toBe(5);
+  });
+});
+
 describe("faction nuclear augments", () => {
   it("能源轉型 fills only the opponent's available board slots with nuclear waste", () => {
     const state = startInProgress(801);

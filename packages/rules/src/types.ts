@@ -105,6 +105,8 @@ export interface AugmentFlags {
   shuffleIntoDeckOnDeathCategories?: string[];
   /** Heal granted to the surviving, death-time neighbors of a dying category minion. */
   categoryDeathrattleAdjacentHeals?: Array<{ augmentId: string; category: string; value: number }>;
+  /** Temporary current-mana grants when any minion of a category dies. */
+  categoryDeathManaGains?: Array<{ augmentId: string; category: string; value: number }>;
   /** Attack granted whenever a category minion gains or enters play with divine shield. */
   categoryDivineShieldAttackBuffs?: Array<{ augmentId: string; category: string; value: number }>;
   /** Summon-trigger augments that place cards on the opponent's board. */

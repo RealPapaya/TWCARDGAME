@@ -18,6 +18,7 @@ export function defaultAugmentFlags(): AugmentFlags {
     categoryCostReductions: [],
     shuffleIntoDeckOnDeathCategories: [],
     categoryDeathrattleAdjacentHeals: [],
+    categoryDeathManaGains: [],
     categoryDivineShieldAttackBuffs: [],
     summonEnemyOnCategory: [],
     damageReductionPerInstance: 0,

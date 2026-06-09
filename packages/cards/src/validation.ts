@@ -129,6 +129,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
 
   switch (effect.type) {
     case "BUFF_ADJACENT":
+    case "BUFF_ADJACENT_HEALTH":
     case "BUFF_ALL":
     case "BUFF_CATEGORY":
     case "BUFF_HEALTH_AND_TAUNT_TARGET":

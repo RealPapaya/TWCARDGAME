@@ -1935,5 +1935,41 @@ export const CARD_CATALOG_GENERATED = [
     },
     "image": "assets/images/cards/nuclear_waste.webp",
     "collectible": false
+  },
+  {
+    "id": "TW078",
+    "name": "作業員",
+    "category": "勞工",
+    "cost": 2,
+    "attack": 1,
+    "health": 1,
+    "type": "MINION",
+    "rarity": "COMMON",
+    "description": "遺志: 賦予兩側隨從 +1 生命",
+    "keywords": {
+      "deathrattle": {
+        "type": "BUFF_ADJACENT_HEALTH",
+        "value": 1
+      }
+    },
+    "image": "assets/images/cards/operator.webp"
+  },
+  {
+    "id": "TW079",
+    "name": "服務生",
+    "category": "勞工",
+    "cost": 3,
+    "attack": 0,
+    "health": 1,
+    "type": "MINION",
+    "rarity": "RARE",
+    "description": "持續效果: 賦予兩側隨從 +2/+2",
+    "keywords": {
+      "ongoing": {
+        "type": "ADJACENT_BUFF_STATS",
+        "value": 2
+      }
+    },
+    "image": "assets/images/cards/server.webp"
   }
 ] as const satisfies readonly CardDefinition[];

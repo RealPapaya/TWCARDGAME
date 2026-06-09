@@ -310,6 +310,19 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_DESTROYED_MINION_COST_REBATE" }
   },
   {
+    id: "AMP_ILLEGAL_MIGRANT_WORKERS",
+    name: "非法移工",
+    description: "隨機從牌組召喚三名勞工。本場每當有勞工死亡，本回合獲得 1 點臨時費用。",
+    tier: "卯死",
+    factionTags: ["勞工"],
+    effect: {
+      type: "AUG_SUMMON_RANDOM_CATEGORY_FROM_DECK_AND_DEATH_MANA",
+      target_category: "勞工",
+      count: 3,
+      value: 1
+    }
+  },
+  {
     id: "AMP_PUDU",
     name: "普渡",
     description: "本場我方隨從死後都會復活一次 但攻擊 / 生命只有 1。",
@@ -456,10 +469,17 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
     if (
       type === "AUG_DRAW_CATEGORY" ||
       type === "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL" ||
-      type === "AUG_CATEGORY_DIVINE_SHIELD_ATTACK"
+      type === "AUG_CATEGORY_DIVINE_SHIELD_ATTACK" ||
+      type === "AUG_SUMMON_RANDOM_CATEGORY_FROM_DECK_AND_DEATH_MANA"
     ) {
       if (!entry.effect.target_category) errors.push(`${entry.id}: category augment requires target_category`);
       if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: category augment requires a positive value`);
+    }
+    if (
+      type === "AUG_SUMMON_RANDOM_CATEGORY_FROM_DECK_AND_DEATH_MANA" &&
+      !positiveInt(entry.effect.count)
+    ) {
+      errors.push(`${entry.id}: random category summon augment requires a positive count`);
     }
     if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
       errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);

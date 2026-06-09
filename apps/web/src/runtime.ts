@@ -9118,7 +9118,10 @@ function renderCountdownBadges(minion: PublicMinion): string {
     html += `<div class="countdown-badge lock-countdown">${BADGE_ICON_LOCK}<span>${minion.lockedTurns}</span></div>`;
   }
   if (minion.questTurns !== undefined && minion.questTurns >= 0) {
-    html += `<div class="countdown-badge quest-countdown">${BADGE_ICON_QUEST}<span>${minion.questTurns}</span></div>`;
+    const questTotal = cardCatalog.get(minion.cardId)?.keywords?.quest?.turns ?? 1;
+    const questRemaining = questTotal - minion.questTurns;
+    const urgentStyle = questRemaining <= 1 ? ' style="color:#ff4d4d;"' : '';
+    html += `<div class="countdown-badge quest-countdown">${BADGE_ICON_QUEST}<span${urgentStyle}>${questRemaining}</span></div>`;
   }
   if (minion.deathTimer !== undefined && minion.deathTimer >= 0) {
     html += `<div class="countdown-badge death-countdown" style="background: rgba(139, 0, 0, 0.9); border-color: #ff4d4d; color: #fff;">${BADGE_ICON_DEATH}<span>${minion.deathTimer}</span></div>`;
