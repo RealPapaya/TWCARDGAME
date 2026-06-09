@@ -16,8 +16,6 @@ export interface HandDragOptions {
 
 export interface AttackDragOptions {
   pointerId: number;
-  startX: number;
-  startY: number;
   sourceEl: HTMLElement;
   isEligibleTarget: (el: HTMLElement) => boolean;
   onResolve: (targetEl: HTMLElement) => void;
@@ -145,12 +143,15 @@ export function beginAttackDrag(opts: AttackDragOptions): void {
   ensureDragLayer();
   finishSession(true);
   endBattlecryTargeting();
+  const sourceRect = opts.sourceEl.getBoundingClientRect();
+  const startX = sourceRect.left + sourceRect.width / 2;
+  const startY = sourceRect.top + sourceRect.height / 2;
 
   session = {
     kind: "attack",
     pointerId: opts.pointerId,
-    startX: opts.startX,
-    startY: opts.startY,
+    startX,
+    startY,
     isMinion: true,
     needsTarget: true,
     lineKind: "damage",
@@ -168,7 +169,7 @@ export function beginAttackDrag(opts: AttackDragOptions): void {
     onCancel: opts.onCancel
   };
 
-  showLine("damage", opts.startX, opts.startY);
+  showLine("damage", startX, startY);
   attachListeners();
 }
 

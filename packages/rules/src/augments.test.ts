@@ -551,6 +551,30 @@ describe("augment combat / persistent effects", () => {
     expect(pricey.attack).toBe(1);
   });
 
+  it("基本工資調漲 makes a ready nuclear waste a legal attacker", () => {
+    const state = startInProgress(901);
+    const seat = state.turn.activeSeat;
+    const waste = makeMinion({
+      cardId: "TW077",
+      ownerSeat: seat,
+      cost: 1,
+      attack: 0,
+      baseAttack: 0,
+      sleeping: false,
+      canAttack: true
+    });
+    state.players[seat].board = [waste];
+
+    applyAugmentSelection(state, seat, entry("AMP_MIN_WAGE"), []);
+
+    expect(waste.attack).toBe(2);
+    expect(legalMoves(state, seat)).toContainEqual({
+      type: "attack",
+      attackerInstanceId: waste.instanceId,
+      target: { type: "HERO", side: seat === "player1" ? "player2" : "player1" }
+    });
+  });
+
   it("育兒津貼 gives a played minion +1 max health", () => {
     const state = startInProgress(10);
     const seat = state.turn.activeSeat;

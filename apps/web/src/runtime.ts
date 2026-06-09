@@ -5940,14 +5940,14 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
     suppressNextClick();
     render();
 
+    // Keep target validation tied to this gesture. A state sync can clear the
+    // UI selection while the pointer is still down.
     beginAttackDrag({
       pointerId,
-      startX,
-      startY,
       sourceEl,
       isEligibleTarget: (targetEl) => {
         const target = parseTargetAttr(targetEl);
-        return Boolean(target && isLegalAttackTarget(target));
+        return Boolean(target && isLegalAttackTarget(target, attackerId));
       },
       onResolve: (targetEl) => {
         if (isBattleActionLocked()) {
@@ -5957,7 +5957,7 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
           return;
         }
         const target = parseTargetAttr(targetEl);
-        if (target && isLegalAttackTarget(target)) {
+        if (target && isLegalAttackTarget(target, attackerId)) {
           send({ type: "attack", attackerInstanceId: attackerId, target });
         }
         view.selectedAttackerId = undefined;
@@ -8573,14 +8573,14 @@ function selectedHandCard(): HandCardView | undefined {
   return view.hand.find((card) => card.instanceId === view.selectedHandId);
 }
 
-function isLegalAttackTarget(target: TargetRef): boolean {
-  return !attackTargetError(target);
+function isLegalAttackTarget(target: TargetRef, attackerId = view.selectedAttackerId): boolean {
+  return !attackTargetError(target, attackerId);
 }
 
-function attackTargetError(target: TargetRef | undefined): string | undefined {
+function attackTargetError(target: TargetRef | undefined, attackerId = view.selectedAttackerId): string | undefined {
   if (!target) return "請選擇攻擊目標。";
-  if (!view.mySeat || !view.selectedAttackerId) return "請先選擇要攻擊的隨從。";
-  const attacker = Array.from(readPlayer(view.mySeat)?.board ?? []).find((minion) => minion.instanceId === view.selectedAttackerId);
+  if (!view.mySeat || !attackerId) return "請先選擇要攻擊的隨從。";
+  const attacker = Array.from(readPlayer(view.mySeat)?.board ?? []).find((minion) => minion.instanceId === attackerId);
   const attackerReason = attackerError(attacker);
   if (attackerReason) return attackerReason;
   const enemy = otherSeat(view.mySeat);
