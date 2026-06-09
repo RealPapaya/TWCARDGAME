@@ -21,9 +21,11 @@
 
 .v1-deck-selection,
 .ai-battle-setup {
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(7, 18, 24, 0.28), rgba(7, 18, 24, 0.48)),
-    url("/images/ui/game-mode-map-20260610.webp") center / cover no-repeat,
+    url("/images/ui/game-mode-map-base.webp") center / cover no-repeat,
     url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
   padding: 0;
   color: #f1e4d1;
@@ -38,6 +40,8 @@
 }
 
 .battle-selection-content {
+  position: relative;
+  z-index: 2;
   width: 100%;
   height: 100%;
   display: grid;
@@ -45,6 +49,65 @@
   justify-items: center;
   align-items: center;
   padding: 52px 56px 44px;
+  pointer-events: none;
+}
+
+.battle-selection-content :is(a, button, input, select, textarea, label, summary, details) {
+  pointer-events: auto;
+}
+
+.battle-map-stage {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.battle-map-hotspot {
+  position: absolute;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transform-origin: center bottom;
+  transition: transform 180ms ease, filter 180ms ease;
+}
+
+.battle-map-hotspot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+}
+
+.battle-map-hotspot:hover,
+.battle-map-hotspot:focus-visible,
+.battle-map-hotspot.selected {
+  transform: translateY(-8px) scale(1.035);
+  filter:
+    drop-shadow(0 0 8px rgba(255, 247, 190, 0.95))
+    drop-shadow(0 14px 18px rgba(0, 0, 0, 0.58));
+}
+
+.battle-map-hotspot:focus-visible {
+  outline: none;
+}
+
+.battle-map-hotspot--challenge {
+  left: 70%;
+  top: 61%;
+  width: clamp(230px, 24vw, 430px);
+  transform: translate(-50%, -50%);
+}
+
+.battle-map-hotspot--challenge:hover,
+.battle-map-hotspot--challenge:focus-visible,
+.battle-map-hotspot--challenge.selected {
+  transform: translate(-50%, calc(-50% - 8px)) scale(1.035);
 }
 
 .v1-deck-selection .back-button {

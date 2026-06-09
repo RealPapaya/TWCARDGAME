@@ -639,6 +639,19 @@ function renderBattleScreen(): string {
 
   return `
     <section class="screen battle-pick v1-deck-selection battle-mode-${activeMode}" data-screen="battle" data-dom-key="screen-battle">
+      <div class="battle-map-stage" aria-label="戰鬥地圖入口">
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--challenge ${activeMode === "challenge" ? "selected" : ""}"
+          data-battle-mode="challenge"
+          data-dom-key="battle-map-hotspot-challenge"
+          data-testid="battle-map-hotspot-challenge"
+          aria-pressed="${activeMode === "challenge"}"
+          aria-label="挑戰模式"
+        >
+          <img src="/images/ui/gamemode-arena-hotspot.webp" alt="" draggable="false" />
+        </button>
+      </div>
       <div class="battle-selection-content">
         <button class="back-button neon-button secondary" data-menu-screen="main" data-testid="back-to-menu">返回</button>
         <h2 id="deck-select-title" class="sub-title">選擇戰鬥模式</h2>
