@@ -23,7 +23,7 @@
 .ai-battle-setup {
   background:
     linear-gradient(180deg, rgba(7, 18, 24, 0.28), rgba(7, 18, 24, 0.48)),
-    url("/images/ui/GameMode.webp") center / cover no-repeat,
+    url("/images/ui/game-mode-map-20260610.webp") center / cover no-repeat,
     url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
   padding: 0;
   color: #f1e4d1;
