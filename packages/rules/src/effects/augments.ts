@@ -1,8 +1,8 @@
 import { CARD_CATALOG, type AmplificationDbEntry } from "@twcardgame/cards";
-import { AMPLIFICATION_TIERS, type AmplificationTier, type Seat } from "@twcardgame/shared";
+import { AMPLIFICATION_TIERS, opponentOf, type AmplificationTier, type Seat } from "@twcardgame/shared";
 import { addEvent, createCardForHand, nextInstanceId } from "../state.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeMinion } from "../types.js";
-import { bounceMinion, drawCards, updateEnrage } from "./core.js";
+import { bounceMinion, drawCards, summonCard, updateEnrage } from "./core.js";
 import { boardLimit } from "./environment.js";
 import { unlockLowHpManaCap } from "./augmentFlags.js";
 
@@ -215,6 +215,33 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_DESTROYED_MINION_COST_REBATE":
       flags.destroyedMinionCostRebate = true;
       break;
+    case "AUG_SUMMON_CARD": {
+      const targetSeat = effect.target?.side === "ENEMY" ? opponentOf(seat) : seat;
+      const targetPlayer = state.players[targetSeat];
+      const card = effect.cardId ? CATALOG_MAP.get(effect.cardId) : undefined;
+      if (card) {
+        for (let i = 0; i < (effect.count ?? 1); i++) summonCard(state, targetPlayer, card, events);
+        triggered = true;
+      }
+      break;
+    }
+    case "AUG_ON_SUMMON_CATEGORY_SUMMON_ENEMY":
+      if (effect.target_category && effect.cardId) {
+        flags.summonEnemyOnCategory ??= [];
+        flags.summonEnemyOnCategory.push({
+          augmentId: entry.id,
+          category: effect.target_category,
+          cardId: effect.cardId,
+          count: effect.count ?? 1
+        });
+      }
+      break;
+    case "AUG_CATEGORY_COST_REDUCTION":
+      if (effect.target_category && (effect.value ?? 0) > 0) {
+        flags.categoryCostReductions ??= [];
+        flags.categoryCostReductions.push({ category: effect.target_category, value: effect.value ?? 0 });
+      }
+      break;
     default:
       break;
   }
@@ -272,6 +299,23 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
 
   if (changed) {
     addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: `persist:${seat}`, targets: [minion.instanceId] }, seat);
+  }
+}
+
+/** Resolves passive augments after a minion has entered the board. */
+export function applyMinionSummonedAugments(state: MatchState, seat: Seat, minion: RuntimeMinion, events: Events): void {
+  const flags = state.players[seat]?.augmentFlags;
+  if (!flags) return;
+  for (const trigger of flags.summonEnemyOnCategory ?? []) {
+    if (minion.category !== trigger.category) continue;
+    const card = CATALOG_MAP.get(trigger.cardId);
+    if (!card) continue;
+    const enemy = state.players[opponentOf(seat)];
+    const before = enemy.board.length;
+    for (let i = 0; i < trigger.count; i++) summonCard(state, enemy, card, events);
+    if (enemy.board.length > before) {
+      addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: trigger.augmentId }, seat);
+    }
   }
 }
 
@@ -346,6 +390,7 @@ export function tryReviveMinion(state: MatchState, player: PlayerState, deadMini
   };
   player.board.push(token);
   addEvent(state, events, "MINION_SUMMONED", { target: token.instanceId, cardId: token.cardId }, player.seat);
+  applyMinionSummonedAugments(state, player.seat, token, events);
   addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_PUDU", targets: [token.instanceId] }, player.seat);
 }
 

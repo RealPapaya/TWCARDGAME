@@ -10,6 +10,19 @@ describe("card catalog", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("defines nuclear waste as a non-collectible token with owner-damage deathrattle", () => {
+    const waste = CARD_CATALOG.find((card) => card.id === "TW077");
+    expect(waste).toMatchObject({
+      name: "核廢料",
+      category: "物品",
+      cost: 1,
+      attack: 0,
+      health: 2,
+      collectible: false,
+      keywords: { deathrattle: { type: "DAMAGE_OWN_HERO", value: 2 } }
+    });
+  });
+
   it("keeps every current battlecry effect in the supported list", () => {
     const effectTypes = new Set(
       CARD_CATALOG.map((card) => card.keywords?.battlecry?.type).filter((type): type is string => !!type)

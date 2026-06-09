@@ -1,6 +1,6 @@
 import type { CardDefinition, EffectDefinition } from "@twcardgame/cards";
 import { opponentOf, type Seat } from "@twcardgame/shared";
-import { nextInt } from "../rng.js";
+import { nextInt, shuffleInPlace } from "../rng.js";
 import {
   activePlayer,
   addEvent,
@@ -13,7 +13,12 @@ import {
 import { turnTimeLimitForPlayer } from "../timing.js";
 import type { EffectContext, MatchState, PlayerState, RuntimeCard, RuntimeMinion, TargetUnitRef } from "../types.js";
 import { applyEnvironmentTick, boardLimit, environmentTurnTimeLimitMs, suppressRuntimeCardMinionEffects } from "./environment.js";
-import { applyPersistentMinionAugments, applyStartOfTurnAugments, tryReviveMinion } from "./augments.js";
+import {
+  applyMinionSummonedAugments,
+  applyPersistentMinionAugments,
+  applyStartOfTurnAugments,
+  tryReviveMinion
+} from "./augments.js";
 import { augmentManaRamp, unlockLowHpManaCap } from "./augmentFlags.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
@@ -847,6 +852,25 @@ function resolveDeathrattle(
   if (deathrattle.type === "DRAW") {
     drawCards(state, player, deathrattle.value ?? 1, events);
   }
+  if (deathrattle.type === "DAMAGE_OWN_HERO") {
+    applyDamage(state, { owner: player, kind: "HERO", unit: player.hero }, deathrattle.value ?? 0, events);
+  }
+  if (deathrattle.type === "SHUFFLE_SELF_INTO_DECK") {
+    let graveyardIndex = -1;
+    for (let i = player.graveyard.length - 1; i >= 0; i--) {
+      if (player.graveyard[i].cardId === deadMinion.cardId) {
+        graveyardIndex = i;
+        break;
+      }
+    }
+    const graveyardCard = graveyardIndex >= 0 ? player.graveyard.splice(graveyardIndex, 1)[0] : undefined;
+    const original = catalog.get(deadMinion.cardId);
+    const card = original ? createCardForHand(state, original, player.seat) : graveyardCard;
+    if (card) {
+      player.deck.push(card);
+      state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+    }
+  }
 }
 
 function handleDiscard(state: MatchState, player: PlayerState, discarded: RuntimeCard, catalog: Map<string, CardDefinition>, events: EffectContext["events"]): void {
@@ -902,6 +926,7 @@ export function summonCard(state: MatchState, player: PlayerState, card: CardDef
   player.board.splice(insertion, 0, minion);
   applyPersistentMinionAugments(state, player.seat, minion, events);
   addEvent(state, events, "MINION_SUMMONED", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
+  applyMinionSummonedAugments(state, player.seat, minion, events);
   return minion;
 }
 

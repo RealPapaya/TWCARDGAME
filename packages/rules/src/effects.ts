@@ -16,6 +16,7 @@ export {
 export {
   applyAugmentSelection,
   applyPersistentMinionAugments,
+  applyMinionSummonedAugments,
   bumpTier
 } from "./effects/augments.js";
 export {

@@ -207,11 +207,15 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
       break;
     case "SUMMON":
     case "AUG_ADD_CARD_TO_HAND":
+    case "AUG_SUMMON_CARD":
       requireCardId(errors, cardId, label, effect);
       break;
     case "SUMMON_MULTIPLE":
       requireCardId(errors, cardId, label, effect);
       requireNumber(errors, cardId, label, effect, "count");
+      break;
+    case "DAMAGE_OWN_HERO":
+      requireNumber(errors, cardId, label, effect, "value");
       break;
   }
 

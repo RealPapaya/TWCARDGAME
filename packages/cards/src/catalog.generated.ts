@@ -1916,5 +1916,24 @@ export const CARD_CATALOG_GENERATED = [
       }
     },
     "image": "assets/images/cards/TW075.webp"
+  },
+  {
+    "id": "TW077",
+    "name": "核廢料",
+    "category": "物品",
+    "cost": 1,
+    "attack": 0,
+    "health": 2,
+    "type": "MINION",
+    "rarity": "COMMON",
+    "description": "遺志：對自己英雄造成 2 點傷害。",
+    "keywords": {
+      "deathrattle": {
+        "type": "DAMAGE_OWN_HERO",
+        "value": 2
+      }
+    },
+    "image": "assets/images/cards/nuclear_waste.webp",
+    "collectible": false
   }
 ] as const satisfies readonly CardDefinition[];

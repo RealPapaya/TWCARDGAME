@@ -3,6 +3,7 @@ import { opponentOf, type CommandEnvelope, type GameEvent, type Seat, type Targe
 import { createRuntimeCard, validateDeck } from "./deck.js";
 import {
   applyPersistentMinionAugments,
+  applyMinionSummonedAugments,
   defaultAugmentFlags,
   drawCards,
   finishIfHeroDead,
@@ -344,6 +345,7 @@ function playCard(
     player.board.splice(insertion, 0, minion);
     applyPersistentMinionAugments(state, seat, minion, events);
     addEvent(state, events, "MINION_SUMMONED", { cardId: minion.cardId, target: minion.instanceId }, seat);
+    applyMinionSummonedAugments(state, seat, minion, events);
     resolveEffect(minion.keywords.battlecry, { state, activeSeat: seat, source: minion, target, events, catalog });
   } else {
     if (card.cardId === "S002" && card.keywords.battlecry) {

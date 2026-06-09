@@ -2,7 +2,16 @@ import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type Amplificatio
 import type { CommandEnvelope, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch, reduce } from "./engine.js";
-import { applyAugmentSelection, applyDamage, applyPersistentMinionAugments, drawCards, resolveDeaths, resolveEffect, startTurn } from "./effects.js";
+import {
+  applyAugmentSelection,
+  applyDamage,
+  applyMinionSummonedAugments,
+  applyPersistentMinionAugments,
+  drawCards,
+  resolveDeaths,
+  resolveEffect,
+  startTurn
+} from "./effects.js";
 import { getCardActualCost } from "./state.js";
 import { legalMoves } from "./legalMoves.js";
 import type { MatchState, RuntimeCard, RuntimeMinion } from "./types.js";
@@ -146,6 +155,111 @@ describe("augment one-shot grants & hand snapshots", () => {
     const printed = sample.cost;
     applyAugmentSelection(state, seat, entry("AMP_DIVIDEND"), []);
     expect(sample.cost).toBe(Math.max(0, printed - 2));
+  });
+});
+
+describe("faction nuclear augments", () => {
+  it("能源轉型 fills only the opponent's available board slots with nuclear waste", () => {
+    const state = startInProgress(801);
+    const seat = state.turn.activeSeat;
+    const foe = seat === "player1" ? "player2" : "player1";
+    state.players[foe].board = Array.from({ length: 6 }, (_, index) =>
+      makeMinion({ instanceId: `foe-${index}`, ownerSeat: foe })
+    );
+
+    applyAugmentSelection(state, seat, entry("AMP_ENERGY_TRANSITION"), []);
+
+    expect(state.players[foe].board).toHaveLength(7);
+    expect(state.players[foe].board.filter((minion) => minion.cardId === "TW077")).toHaveLength(1);
+  });
+
+  it("重啟核四 places four nuclear power plants on the holder's board", () => {
+    const state = startInProgress(802);
+    const seat = state.turn.activeSeat;
+    state.players[seat].board = [];
+
+    applyAugmentSelection(state, seat, entry("AMP_RESTART_NUCLEAR_FOUR"), []);
+
+    expect(state.players[seat].board.map((minion) => minion.cardId)).toEqual(["TW063", "TW063", "TW063", "TW063"]);
+  });
+
+  it("非核家園 places nuclear waste when a DPP politician is summoned", () => {
+    const state = startInProgress(803);
+    const seat = state.turn.activeSeat;
+    const foe = seat === "player1" ? "player2" : "player1";
+    applyAugmentSelection(state, seat, entry("AMP_NUCLEAR_FREE_HOMELAND"), []);
+
+    applyMinionSummonedAugments(state, seat, makeMinion({ category: "民進黨政治人物", ownerSeat: seat }), []);
+
+    expect(state.players[foe].board.filter((minion) => minion.cardId === "TW077")).toHaveLength(1);
+  });
+
+  it("非核家園 also triggers when a DPP politician is revived by 普渡", () => {
+    const state = startInProgress(807);
+    const seat = state.turn.activeSeat;
+    const foe = seat === "player1" ? "player2" : "player1";
+    applyAugmentSelection(state, seat, entry("AMP_NUCLEAR_FREE_HOMELAND"), []);
+    applyAugmentSelection(state, seat, entry("AMP_PUDU"), []);
+    state.players[seat].board.push(makeMinion({
+      ownerSeat: seat,
+      category: "民進黨政治人物",
+      currentHealth: 0
+    }));
+
+    resolveDeaths(state, [], catalogMap);
+
+    expect(state.players[seat].board).toHaveLength(1);
+    expect(state.players[foe].board.filter((minion) => minion.cardId === "TW077")).toHaveLength(1);
+  });
+
+  it("九二共識 permanently reduces current and future KMT politician costs, stacking to zero", () => {
+    const state = startInProgress(804);
+    const seat = state.turn.activeSeat;
+    const kmt = makeCard({ type: "MINION", category: "國民黨政治人物", cost: 1, attack: 1, health: 1 });
+
+    applyAugmentSelection(state, seat, entry("AMP_1992_CONSENSUS"), []);
+    expect(getCardActualCost(state, seat, kmt)).toBe(0);
+    applyAugmentSelection(state, seat, entry("AMP_1992_CONSENSUS"), []);
+    expect(getCardActualCost(state, seat, kmt)).toBe(0);
+  });
+});
+
+describe("new deathrattles", () => {
+  it("核廢料 damages its owner's hero when it dies", () => {
+    const state = startInProgress(805);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const beforeHp = player.hero.hp;
+    player.board.push(makeMinion({
+      cardId: "TW077",
+      ownerSeat: seat,
+      currentHealth: 0,
+      keywords: { deathrattle: { type: "DAMAGE_OWN_HERO", value: 2 } }
+    }));
+
+    resolveDeaths(state, [], catalogMap);
+
+    expect(player.hero.hp).toBe(beforeHp - 2);
+  });
+
+  it("SHUFFLE_SELF_INTO_DECK removes the dead card from graveyard and shuffles an original copy into deck", () => {
+    const state = startInProgress(806);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    const beforeDeck = player.deck.length;
+    player.board.push(makeMinion({
+      cardId: "TW003",
+      ownerSeat: seat,
+      attack: 99,
+      currentHealth: 0,
+      keywords: { deathrattle: { type: "SHUFFLE_SELF_INTO_DECK" } }
+    }));
+
+    resolveDeaths(state, [], catalogMap);
+
+    expect(player.deck).toHaveLength(beforeDeck + 1);
+    expect(player.graveyard.some((card) => card.cardId === "TW003")).toBe(false);
+    expect(player.deck.find((card) => card.cardId === "TW003")?.attack).not.toBe(99);
   });
 });
 

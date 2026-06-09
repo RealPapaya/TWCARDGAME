@@ -104,6 +104,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_PERSIST_CATEGORY_BUFF", target_category: "勞工", stat: "ALL", value: 1 }
   },
   {
+    id: "AMP_ENERGY_TRANSITION",
+    name: "能源轉型",
+    description: "在對手場上放置 3 個核廢料。",
+    tier: "加減賺",
+    factionTags: ["民進黨政治人物"],
+    effect: { type: "AUG_SUMMON_CARD", cardId: "TW077", count: 3, target: { side: "ENEMY" } }
+  },
+  {
     id: "AMP_LIFE_INSURANCE",
     name: "壽險理賠",
     description: "英雄生命降至 5 或以下時，永久解鎖水晶上限 20。",
@@ -225,6 +233,27 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     factionTags: [],
     effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 2, costReduction: 1 }
   },
+  {
+    id: "AMP_NUCLEAR_FREE_HOMELAND",
+    name: "非核家園",
+    description: "每當召喚一名民進黨政治人物，在對手場上放置一個核廢料。",
+    tier: "穩穩仔賺",
+    factionTags: ["民進黨政治人物"],
+    effect: {
+      type: "AUG_ON_SUMMON_CATEGORY_SUMMON_ENEMY",
+      target_category: "民進黨政治人物",
+      cardId: "TW077",
+      count: 1
+    }
+  },
+  {
+    id: "AMP_RESTART_NUCLEAR_FOUR",
+    name: "重啟核四",
+    description: "在自己的場上放置 4 張核電廠。",
+    tier: "穩穩仔賺",
+    factionTags: ["國民黨政治人物"],
+    effect: { type: "AUG_SUMMON_CARD", cardId: "TW063", count: 4, target: { side: "FRIENDLY" } }
+  },
 
   // ---- 卯死（高增幅）------------------------------------------------------
   {
@@ -299,6 +328,14 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     tier: "卯死",
     factionTags: [],
     effect: { type: "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN" }
+  },
+  {
+    id: "AMP_1992_CONSENSUS",
+    name: "九二共識",
+    description: "所有國民黨政治人物費用永久 -1。",
+    tier: "卯死",
+    factionTags: ["國民黨政治人物"],
+    effect: { type: "AUG_CATEGORY_COST_REDUCTION", target_category: "國民黨政治人物", value: 1 }
   }
 ];
 
@@ -359,6 +396,22 @@ export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { 
       if (entry.effect.costReduction !== undefined && !positiveInt(entry.effect.costReduction)) {
         errors.push(`${entry.id}: bounce-buff augment costReduction must be a positive integer when present`);
       }
+    }
+    if (type === "AUG_SUMMON_CARD") {
+      if (!entry.effect.cardId) errors.push(`${entry.id}: summon-card augment requires cardId`);
+      if (!positiveInt(entry.effect.count)) errors.push(`${entry.id}: summon-card augment requires a positive count`);
+      if (!entry.effect.target?.side || !["FRIENDLY", "ENEMY"].includes(entry.effect.target.side)) {
+        errors.push(`${entry.id}: summon-card augment requires FRIENDLY or ENEMY target side`);
+      }
+    }
+    if (type === "AUG_ON_SUMMON_CATEGORY_SUMMON_ENEMY") {
+      if (!entry.effect.target_category) errors.push(`${entry.id}: summon-trigger augment requires target_category`);
+      if (!entry.effect.cardId) errors.push(`${entry.id}: summon-trigger augment requires cardId`);
+      if (!positiveInt(entry.effect.count)) errors.push(`${entry.id}: summon-trigger augment requires a positive count`);
+    }
+    if (type === "AUG_CATEGORY_COST_REDUCTION") {
+      if (!entry.effect.target_category) errors.push(`${entry.id}: category-cost augment requires target_category`);
+      if (!positiveInt(entry.effect.value)) errors.push(`${entry.id}: category-cost augment requires a positive value`);
     }
     if (entry.firstPhaseOnly && !FIRST_PHASE_ONLY_IDS.has(entry.id)) {
       errors.push(`${entry.id}: firstPhaseOnly is only valid for ${[...FIRST_PHASE_ONLY_IDS].join(", ")}`);

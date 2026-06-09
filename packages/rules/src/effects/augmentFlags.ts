@@ -15,6 +15,8 @@ export function defaultAugmentFlags(): AugmentFlags {
     nextDrawHalfCost: false,
     lowCostMinionAttackBuff: 0,
     playedMinionMaxHpBonus: 0,
+    categoryCostReductions: [],
+    summonEnemyOnCategory: [],
     damageReductionPerInstance: 0,
     reviveOnceAsVanilla: false,
     referendumImmune: false,
@@ -77,6 +79,9 @@ export function augmentFlatCostReduction(state: MatchState, seat: Seat, card: Ru
   let reduction = 0;
   if (card.type === "NEWS") reduction += flags.newsCostReduce;
   if (card.category === "建築") reduction += flags.buildingCostReduce;
+  for (const categoryReduction of flags.categoryCostReductions ?? []) {
+    if (card.category === categoryReduction.category) reduction += categoryReduction.value;
+  }
   return reduction;
 }
 

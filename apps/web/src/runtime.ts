@@ -1899,8 +1899,22 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
 
 function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const catalogCard = cardCatalog.get(minion.cardId);
-  const attackClass = classNames(["stat-atk", valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)]);
-  const healthClass = classNames(["stat-hp", valueDeltaClass(minion.currentHealth, catalogCard?.health)]);
+  // Hold a freshly-summoned, augment-buffed minion at its printed base stats until
+  // the glow reveal lands, so the buff reads as a distinct beat AFTER the glow.
+  const holdBaseStat =
+    augmentHoldBaseStatIds.has(minion.instanceId) &&
+    typeof catalogCard?.attack === "number" &&
+    typeof catalogCard?.health === "number";
+  const shownAttack = holdBaseStat ? catalogCard!.attack : minion.attack;
+  const shownHealth = holdBaseStat ? catalogCard!.health : minion.currentHealth;
+  const attackClass = classNames([
+    "stat-atk",
+    holdBaseStat ? "" : valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)
+  ]);
+  const healthClass = classNames([
+    "stat-hp",
+    holdBaseStat ? "" : valueDeltaClass(minion.currentHealth, catalogCard?.health)
+  ]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
   const targetKey = targetKeyFor(target);
@@ -1965,8 +1979,8 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
       ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
       <div class="minion-stats">
-        <span class="${attackClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "attack" })}"><span>${minion.attack}</span></span>
-        <span class="${healthClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "health" })}">${minion.currentHealth}</span>
+        <span class="${attackClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "attack" })}"><span>${shownAttack}</span></span>
+        <span class="${healthClass} ${trainingHighlightClass({ type: "minionStat", instanceId: minion.instanceId, stat: "health" })}">${shownHealth}</span>
       </div>
       <span class="sr-e2e">${canAttackNow ? "ready" : ""} ${minion.taunt ? "taunt" : ""}</span>
     </button>
@@ -7302,9 +7316,14 @@ const AUGMENT_GLOW_LEAD_MS = 220;
  * wait for the ~850ms draw flight to land so the card is on screen at base cost
  * before it glows and drops. */
 const AUGMENT_GLOW_DRAW_LEAD_MS = 950;
-/** Time from the glow firing to the value reveal (cost drop / stat change),
- * roughly the 720ms glow keyframe + settle, so the number changes as it fades. */
-const AUGMENT_GLOW_REVEAL_DELAY_MS = 680;
+/** Beat between the triggering animation finishing (minion landing / attack lunge
+ * returning) and the augment glow firing — a deliberate pause so the glow reads as
+ * a distinct, separate event from the action, not a continuation of it. */
+const AUGMENT_GLOW_SETTLE_MS = 480;
+/** Time from the glow firing to the value reveal (cost drop / stat change). Set
+ * just PAST the ~1.4s glow keyframe so the effect manifests strictly AFTER the
+ * glow finishes — trigger → glow → effect → (then input unlocks). */
+const AUGMENT_GLOW_REVEAL_DELAY_MS = 1500;
 /** Battle input is locked until this time while an augment glow is mid-sequence
  * (mid-turn augments aren't already covered by the special-phase lock). */
 let augmentGlowLockUntilMs = 0;
@@ -7312,6 +7331,25 @@ let augmentGlowLockUntilMs = 0;
  * discount) until the augment glow reveal lands — 股東紀念品's "show original
  * cost → glow → cost drops" beat. Cleared by `applyAugmentGlow`'s reveal timer. */
 const augmentHoldBaseCostIds = new Set<string>();
+/** Board minion instanceIds (freshly summoned this batch) to render at their
+ * PRINTED base stats until the augment glow reveal lands — the summon equivalent
+ * of `augmentHoldBaseCostIds`, so a landing buff shows base → glow → buffed.
+ * On-board targets use the public-sync hold instead. Cleared at the glow reveal. */
+const augmentHoldBaseStatIds = new Set<string>();
+/** Hard cap on how long an augment glow waits for the triggering summon/attack
+ * animation to finish before it force-fires, so a missed busy-clear can never
+ * strand the value reveal (would otherwise leak `augmentHoldBaseCostIds`). */
+const AUGMENT_GLOW_MAX_DEFER_MS = 4000;
+/** Drives re-checks of the glow gate while an augment glow waits behind a
+ * card-play landing or attack animation, re-asserting the value hold + input
+ * lock each tick so the reveal can't slip out before the glow lands. */
+let augmentGlowPumpTimer: number | undefined;
+const augmentGlowDeadlines = new Map<string, number>();
+/** True while a deferred glow batch is holding the public sync for an
+ * already-on-board target (so the pump re-asserts that hold). Freshly-summoned
+ * targets are NOT held — they ride their card-play landing flush — so the pump
+ * must not re-hold and strand them off-board. */
+let augmentGlowHoldsSync = false;
 
 function cardPlayPreviewBusy(): boolean {
   return cardPlayCueActive || cardPlayCueQueue.length > 0;
@@ -7606,6 +7644,14 @@ function resetCardPlayCues(): void {
   pendingPublicSyncHoldUntilMs = 0;
   augmentGlowLockUntilMs = 0;
   augmentHoldBaseCostIds.clear();
+  augmentHoldBaseStatIds.clear();
+  if (augmentGlowPumpTimer !== undefined) {
+    window.clearTimeout(augmentGlowPumpTimer);
+    augmentGlowPumpTimer = undefined;
+  }
+  augmentGlowDeadlines.clear();
+  augmentGlowHoldsSync = false;
+  appliedAugmentGlow.clear();
   clearPendingHandSyncHold();
   if (pendingPublicSyncFlushTimer !== undefined) {
     window.clearTimeout(pendingPublicSyncFlushTimer);
@@ -7760,6 +7806,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
       : cue.kind === "bounce" ? 900
       : cue.kind === "destroy" ? 700
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
+      : cue.kind === "augmentGlow" ? AUGMENT_GLOW_MAX_DEFER_MS + AUGMENT_GLOW_REVEAL_DELAY_MS
       : 900;
     window.setTimeout(() => {
       view.animationCues = view.animationCues.filter((item) => item.id !== cue.id);
@@ -7771,15 +7818,27 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
 
 /**
  * Sequences the 增幅 value reveal (Part B). For each augmentGlow cue that carries
- * affected cards/units, delays the glow by a lead so the pre-effect value shows
- * first, holds the public/hand sync so the new value lands as the glow fades, and
- * locks battle input for the window. Augments with no visible target stay
- * dot-only (no hold, no lock).
+ * affected cards/units, sets a minimum lead so the pre-effect value shows first,
+ * holds the public/hand sync so the new value lands as the glow fades, and locks
+ * battle input for the window. Augments with no visible target stay dot-only (no
+ * hold, no lock). The glow itself is gated on the triggering animation finishing
+ * (card-play landing / attack lunge) — see `pumpAugmentGlowGate`. The pump runs
+ * for ALL augment glows so e.g. 廠商回扣 (dot-only, fired by a kill) still waits
+ * for the attack to land before flashing.
  */
 function scheduleAugmentGlowReveal(cues: AnimationCue[]): void {
   const now = performance.now();
+  // Instance ids already on either board this frame — a target NOT in this set is
+  // a minion summoned by this very batch, which lands via its card-play flush and
+  // must not have its public sync held back (or it would pop in late).
+  const onBoardIds = new Set<string>();
+  for (const seat of ["player1", "player2"] as const) {
+    for (const minion of readPlayer(seat)?.board ?? []) onBoardIds.add(minion.instanceId);
+  }
+  let hasAugmentGlow = false;
   for (const cue of cues) {
     if (cue.kind !== "augmentGlow") continue;
+    hasAugmentGlow = true;
     const targets = cue.augmentTargets ?? [];
     const myCards = cue.seat === view.mySeat ? cue.augmentCards ?? [] : [];
     if (targets.length === 0 && myCards.length === 0) continue;
@@ -7792,9 +7851,19 @@ function scheduleAugmentGlowReveal(cues: AnimationCue[]): void {
     cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + lead);
     cue.delayMs = Math.max(cue.delayMs ?? 0, lead);
 
-    // Board stat changes ride the public sync — hold it so the minion shows its
-    // pre-effect stats until the glow reveal flushes it.
-    if (targets.length > 0) holdPendingPublicSyncFor(revealAtMs);
+    // Already-on-board stat changes (e.g. amplification-phase category buff) ride
+    // the public sync — hold it so the minion shows its pre-effect stats until the
+    // glow reveal flushes it. Freshly-summoned targets are excluded: they land at
+    // their final stats via the card-play impact flush and just glow afterwards.
+    const visibleTargets = targets.filter((id) => onBoardIds.has(id));
+    if (visibleTargets.length > 0) {
+      holdPendingPublicSyncFor(revealAtMs);
+      augmentGlowHoldsSync = true;
+    }
+    // Freshly-summoned targets land at their final (buffed) stats via the card-play
+    // flush, so we can't hold the sync (would strand them off-board). Instead pin
+    // them to base stats via the render override until the glow reveal clears it.
+    for (const id of targets) if (!onBoardIds.has(id)) augmentHoldBaseStatIds.add(id);
 
     // Cost changes (fresh draws like 股東紀念品, or whole-hand discounts) show the
     // base cost via the render override until the reveal clears it — simpler and
@@ -7803,6 +7872,62 @@ function scheduleAugmentGlowReveal(cues: AnimationCue[]): void {
 
     augmentGlowLockUntilMs = Math.max(augmentGlowLockUntilMs, now + revealAtMs);
   }
+  if (hasAugmentGlow && augmentGlowPumpTimer === undefined) {
+    augmentGlowPumpTimer = window.setTimeout(pumpAugmentGlowGate, 0);
+  }
+}
+
+/**
+ * While an augment glow is queued, holds it back until the animation that
+ * triggered it finishes — a minion's card-play landing (`cardPlayPreviewBusy`)
+ * or an attacker's lunge (`attackAnimationBusy`) — then lets `applyPostRenderEffects`
+ * fire it. The minion/effect should appear first, the glow second. While deferred,
+ * a value-changing glow keeps the pre-effect value frozen (publicSync hold) and
+ * input locked. A per-cue deadline force-fires the glow as a fail-safe so a stuck
+ * busy flag can't strand the reveal. Self-reschedules until no glow is pending.
+ */
+function pumpAugmentGlowGate(): void {
+  augmentGlowPumpTimer = undefined;
+  const now = performance.now();
+  const pending = view.animationCues.filter(
+    (cue) => cue.kind === "augmentGlow" && cue.seat && !appliedAugmentGlow.has(cue.id)
+  );
+  if (pending.length === 0) {
+    augmentGlowDeadlines.clear();
+    augmentGlowHoldsSync = false;
+    return;
+  }
+
+  const busy = cardPlayPreviewBusy() || attackAnimationBusy();
+  let anyValueChanging = false;
+  let anyWaiting = false;
+  for (const cue of pending) {
+    if ((cue.augmentTargets?.length ?? 0) > 0 || (cue.seat === view.mySeat && (cue.augmentCards?.length ?? 0) > 0)) {
+      anyValueChanging = true;
+    }
+    if (!augmentGlowDeadlines.has(cue.id)) augmentGlowDeadlines.set(cue.id, now + AUGMENT_GLOW_MAX_DEFER_MS);
+    if (now >= (augmentGlowDeadlines.get(cue.id) ?? 0)) {
+      // Fail-safe: never leave the reveal stranded if a busy flag never clears.
+      applyAugmentGlow(cue);
+      continue;
+    }
+    // While the triggering animation runs, keep pushing the glow's earliest-fire
+    // time forward, so it only becomes ready AUGMENT_GLOW_SETTLE_MS after the
+    // animation last cleared — the deliberate gap between action and glow.
+    if (busy) cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + AUGMENT_GLOW_SETTLE_MS);
+    if (busy || !cueIsReady(cue)) anyWaiting = true;
+  }
+
+  // Keep input locked while any value-changing glow waits on its animation (or
+  // lead). Only re-assert the public-sync hold when this batch actually holds it
+  // for an on-board target — re-holding for a fresh summon would strand it off-board.
+  if (anyValueChanging && anyWaiting) {
+    if (augmentGlowHoldsSync) holdPendingPublicSyncFor(AUGMENT_GLOW_REVEAL_DELAY_MS + 160);
+    augmentGlowLockUntilMs = Math.max(augmentGlowLockUntilMs, now + AUGMENT_GLOW_REVEAL_DELAY_MS + 160);
+  }
+
+  render(); // re-run applyPostRenderEffects so a now-ungated glow can fire
+  augmentGlowPumpTimer = window.setTimeout(pumpAugmentGlowGate, 70);
 }
 
 function appendKoSoloHealCue(cues: AnimationCue[], events: GameEvent[]): AoeCluster | undefined {
@@ -8780,7 +8905,15 @@ function applyPostRenderEffects(): void {
     if (cue.kind === "deathrattle" && cue.targetKey && cueIsReady(cue)) {
       applyDeathrattlePlume(cue);
     }
-    if (cue.kind === "augmentGlow" && cue.seat && cueIsReady(cue)) {
+    if (
+      cue.kind === "augmentGlow" &&
+      cue.seat &&
+      cueIsReady(cue) &&
+      !cardPlayPreviewBusy() &&
+      !attackAnimationBusy()
+    ) {
+      // The triggering summon/attack must finish first: the minion lands or the
+      // attacker returns, THEN the augment glows. The pump (re)drives this check.
       applyAugmentGlow(cue);
     }
   }
@@ -8862,20 +8995,32 @@ function applyAugmentGlow(cue: AnimationCue): void {
     if (el) spawnUnitAugmentGlow(el);
   }
 
-  // After the glow lands, drop any base-cost hold and pop the now-revealed value
-  // (cost / stats), so the number visibly changes BECAUSE of the glow.
+  // The effect manifests only AFTER the glow finishes: keep input locked until the
+  // reveal (anchored to this actual fire time, not the pre-defer estimate), then
+  // drop the base-cost/base-stat holds, flush the held board sync, and pop the
+  // now-revealed values so the change reads as caused by the glow.
   if (targetIds.length > 0 || cardIds.length > 0) {
+    augmentGlowLockUntilMs = Math.max(
+      augmentGlowLockUntilMs,
+      performance.now() + AUGMENT_GLOW_REVEAL_DELAY_MS + 200
+    );
     window.setTimeout(() => {
       for (const id of cardIds) augmentHoldBaseCostIds.delete(id);
+      for (const id of targetIds) augmentHoldBaseStatIds.delete(id);
       // Force the held board sync through first so stats are current, then drop
-      // the cost override and pop the revealed numbers.
+      // the cost/stat overrides and pop the revealed numbers.
       if (targetIds.length > 0) applyPendingPublicSyncNow();
       renderNow();
       popAugmentValues(targetIds, cardIds);
     }, AUGMENT_GLOW_REVEAL_DELAY_MS);
   }
 
-  window.setTimeout(() => appliedAugmentGlow.delete(cue.id), 1200);
+  // Hold the applied-guard past the cue's (now defer-extended) lifetime so the cue
+  // can't re-fire if its DOM node briefly reappears via a re-render.
+  window.setTimeout(
+    () => appliedAugmentGlow.delete(cue.id),
+    AUGMENT_GLOW_MAX_DEFER_MS + AUGMENT_GLOW_REVEAL_DELAY_MS + (cue.delayMs ?? 0) + 400
+  );
 }
 
 function spawnAugmentGlow(dot: HTMLElement): void {
@@ -8884,13 +9029,13 @@ function spawnAugmentGlow(dot: HTMLElement): void {
   dot.classList.remove("augment-trigger");
   void dot.offsetWidth; // restart the dot's own pulse
   dot.classList.add("augment-trigger");
-  window.setTimeout(() => dot.classList.remove("augment-trigger"), 720);
+  window.setTimeout(() => dot.classList.remove("augment-trigger"), 1400);
   const glow = document.createElement("div");
   glow.className = "augment-glow-fx";
   glow.style.left = `${rect.left + rect.width / 2}px`;
   glow.style.top = `${rect.top + rect.height / 2}px`;
   document.body.appendChild(glow);
-  window.setTimeout(() => glow.remove(), 720);
+  window.setTimeout(() => glow.remove(), 1400);
 }
 
 /**
@@ -8909,9 +9054,9 @@ function spawnUnitAugmentGlow(el: HTMLElement): void {
   glow.style.width = `${Math.round(rect.width)}px`;
   glow.style.height = `${Math.round(rect.height)}px`;
   document.body.appendChild(glow);
-  window.setTimeout(() => glow.remove(), 760);
+  window.setTimeout(() => glow.remove(), 1450);
   el.classList.add("augment-affected-glow");
-  window.setTimeout(() => el.classList.remove("augment-affected-glow"), 760);
+  window.setTimeout(() => el.classList.remove("augment-affected-glow"), 1450);
 }
 
 /** Adds a one-shot "pop" to the just-revealed cost/stat numbers of affected nodes. */

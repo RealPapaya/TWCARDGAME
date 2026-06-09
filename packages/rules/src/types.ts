@@ -99,6 +99,10 @@ export interface AugmentFlags {
   playedMinionMaxHpBonus: number;
   /** 島嶼天光: minions of this category have attack & health doubled. */
   doubleCategory?: string;
+  /** Permanent flat cost reductions keyed by card category. */
+  categoryCostReductions?: Array<{ category: string; value: number }>;
+  /** Summon-trigger augments that place cards on the opponent's board. */
+  summonEnemyOnCategory?: Array<{ augmentId: string; category: string; cardId: string; count: number }>;
   /** 減稅: hero takes this much less from every damage instance. */
   damageReductionPerInstance: number;
   /** 普渡: own minions revive once as a 1/1 when they die. */
