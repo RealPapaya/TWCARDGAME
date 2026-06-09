@@ -2187,8 +2187,8 @@ function renderTurnCounter(): string {
     <div class="turn-counter${stateClass}" role="img" aria-label="目前第 ${currentTurn} 回合${tooltip ? `，${tooltip}` : ""}"
       ${tooltip ? `data-tooltip="${tooltip}" tabindex="0"` : ""} data-testid="turn-counter">
       <div class="turn-counter-numbers" data-dom-key="turn-counter-wheel-${currentTurn}">${ticks}</div>
-      <img class="turn-counter-frame" src="/images/ui/turn_counter_fan.png" alt="" draggable="false">
-      <img class="turn-counter-overlay" src="/images/ui/turn_counter_fan_overlay.png" alt="" draggable="false">
+      <img class="turn-counter-frame" src="/images/ui/turn_counter_fan.webp" alt="" draggable="false">
+      <img class="turn-counter-overlay" src="/images/ui/turn_counter_fan_overlay.webp" alt="" draggable="false">
       <div class="turn-counter-glass" aria-hidden="true"></div>
     </div>
   `;
