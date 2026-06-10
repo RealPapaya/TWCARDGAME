@@ -18,17 +18,22 @@ export interface VoteRouletteData {
 }
 
 const SPIN_MS = 3200;
-const REVEAL_HOLD_MS = 850;
+const REVEAL_HOLD_MS = 2000;
 const FADE_OUT_MS = 280;
+const BALLOT_FADE_MS = 420;
 const FULL_TURNS = 6;
 const ROLL_RESOLUTION = 1_000_000;
 
-export const VOTE_ROULETTE_TOTAL_MS = SPIN_MS + REVEAL_HOLD_MS + FADE_OUT_MS;
-export const VOTE_REVEAL_HOLD_MS = SPIN_MS;
+export const VOTE_ROULETTE_TOTAL_MS = BALLOT_FADE_MS + SPIN_MS + REVEAL_HOLD_MS + FADE_OUT_MS;
+export const VOTE_REVEAL_HOLD_MS = BALLOT_FADE_MS + SPIN_MS;
 
-let rouletteSpinning = false;
+let rouletteVisible = false;
 export function voteRouletteActive(): boolean {
-  return rouletteSpinning;
+  return rouletteVisible;
+}
+
+export function voteRouletteVisible(): boolean {
+  return rouletteVisible;
 }
 
 let overlayEl: HTMLElement | undefined;
@@ -38,7 +43,7 @@ let activeResolve: (() => void) | undefined;
 let activeSpinAnimation: Animation | undefined;
 
 export function resetVoteRoulette(): void {
-  rouletteSpinning = false;
+  rouletteVisible = false;
   token += 1;
   for (const timer of timers) window.clearTimeout(timer);
   timers = [];
@@ -53,50 +58,42 @@ export function resetVoteRoulette(): void {
 
 export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
   resetVoteRoulette();
-  rouletteSpinning = true;
+  rouletteVisible = true;
   const myToken = (token += 1);
   const weights = normalizedWeights(data.weights);
   const player1Percent = weights.player1;
   const targetRotation = rollRotation(data.rollMillionths);
 
-  const overlay = document.createElement("div");
-  overlay.className = "vote-roulette-overlay";
+  const overlay = document.getElementById("voting-modal") ?? document.createElement("section");
+  overlay.id = "voting-modal";
+  overlay.classList.add("mulligan-overlay", "vote-overlay", "vote-roulette-overlay", "is-opening-roulette");
+  overlay.setAttribute("data-testid", "voting-overlay");
   overlay.setAttribute("role", "status");
   overlay.setAttribute("aria-live", "polite");
-  overlay.innerHTML = `
-    <div class="vote-roulette-stage">
-      <h2 class="vote-roulette-title" data-role="title">中選會開票中</h2>
-      <p class="vote-roulette-subtitle">圓餅比例依弱勢族群中選率分配</p>
-      <div class="vote-roulette-shell">
-        <div class="vote-roulette-pointer" aria-hidden="true"></div>
-        <div
-          class="vote-roulette-wheel"
-          data-role="wheel"
-          style="--player1-percent: ${player1Percent}%;"
-          aria-label="${wheelAriaLabel(data, weights)}"
-        ></div>
-        <div class="vote-roulette-hub">
-          <span>公投</span>
-          <strong data-role="hub-status">開票中</strong>
-        </div>
-      </div>
-      <div class="vote-roulette-legend">
-        ${renderLegendItem("player1", data.choices.player1, weights.player1, data.mySeat)}
-        ${renderLegendItem("player2", data.choices.player2, weights.player2, data.mySeat)}
-      </div>
-    </div>
-  `;
-  document.body.appendChild(overlay);
-  overlayEl = overlay;
+  let contentEl = overlay.querySelector<HTMLElement>(".vote-content");
+  if (!contentEl) {
+    contentEl = document.createElement("div");
+    contentEl.className = "mulligan-content vote-content";
+    overlay.appendChild(contentEl);
+  }
+  let titleEl = contentEl.querySelector<HTMLElement>("h2");
+  if (!titleEl) {
+    titleEl = document.createElement("h2");
+    contentEl.prepend(titleEl);
+  }
+  titleEl.textContent = "中選會開票";
+  titleEl.dataset.role = "title";
+  titleEl.classList.add("vote-roulette-title");
 
-  const wheelEl = overlay.querySelector<HTMLElement>("[data-role='wheel']");
-  const titleEl = overlay.querySelector<HTMLElement>("[data-role='title']");
-  const hubStatusEl = overlay.querySelector<HTMLElement>("[data-role='hub-status']");
-  const legendEls = Array.from(overlay.querySelectorAll<HTMLElement>(".vote-roulette-legend-item"));
+  if (!overlay.isConnected) document.querySelector(".battle-surface")?.appendChild(overlay);
+  overlayEl = overlay;
 
   return new Promise<void>((resolve) => {
     activeResolve = resolve;
     let revealed = false;
+    let wheelEl: HTMLElement | null = null;
+    let hubStatusEl: HTMLElement | null = null;
+    let legendEls: HTMLElement[] = [];
 
     const finish = (): void => {
       if (myToken !== token) return;
@@ -104,6 +101,7 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
       timers.push(
         window.setTimeout(() => {
           if (myToken !== token) return;
+          rouletteVisible = false;
           overlay.remove();
           if (overlayEl === overlay) overlayEl = undefined;
           activeResolve = undefined;
@@ -115,7 +113,8 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
     const reveal = (): void => {
       if (myToken !== token || revealed) return;
       revealed = true;
-      rouletteSpinning = false;
+      if (wheelEl) wheelEl.style.transform = `rotate(${targetRotation}deg)`;
+      activeSpinAnimation?.cancel();
       activeSpinAnimation = undefined;
       overlay.classList.add("is-revealed");
       titleEl?.classList.add("is-winner");
@@ -128,7 +127,43 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
       timers.push(window.setTimeout(finish, REVEAL_HOLD_MS));
     };
 
-    if (wheelEl) {
+    const startSpin = (): void => {
+      if (myToken !== token) return;
+      for (const child of Array.from(contentEl.children)) {
+        if (child !== titleEl) child.remove();
+      }
+      contentEl.insertAdjacentHTML("beforeend", `
+        <div class="vote-roulette-stage">
+          <p class="vote-roulette-subtitle">圓餅比例依弱勢族群中選率分配</p>
+          <div class="vote-roulette-shell">
+            <div class="vote-roulette-pointer" aria-hidden="true"></div>
+            <div
+              class="vote-roulette-wheel"
+              data-role="wheel"
+              style="--player1-percent: ${player1Percent}%;"
+              aria-label="${wheelAriaLabel(data, weights)}"
+            ></div>
+            <div class="vote-roulette-hub">
+              <span>公投</span>
+              <strong data-role="hub-status">開票中</strong>
+            </div>
+          </div>
+          <div class="vote-roulette-legend">
+            ${renderLegendItem("player1", data.choices.player1, weights.player1, data.mySeat)}
+            ${renderLegendItem("player2", data.choices.player2, weights.player2, data.mySeat)}
+          </div>
+        </div>
+      `);
+      overlay.classList.remove("is-opening-roulette");
+      overlay.classList.add("is-roulette-visible");
+      wheelEl = overlay.querySelector<HTMLElement>("[data-role='wheel']");
+      hubStatusEl = overlay.querySelector<HTMLElement>("[data-role='hub-status']");
+      legendEls = Array.from(overlay.querySelectorAll<HTMLElement>(".vote-roulette-legend-item"));
+
+      if (!wheelEl) {
+        reveal();
+        return;
+      }
       const animation = wheelEl.animate(
         [
           { transform: "rotate(0deg)" },
@@ -143,11 +178,13 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
       activeSpinAnimation = animation;
       playSfx("turn", 0.35);
       void animation.finished.then(reveal).catch(() => undefined);
-    }
 
-    // Keeps game-state gating from getting stuck if an animation completion
-    // event is lost because the tab or renderer is interrupted.
-    timers.push(window.setTimeout(reveal, SPIN_MS + 100));
+      // Keeps game-state gating from getting stuck if an animation completion
+      // event is lost because the tab or renderer is interrupted.
+      timers.push(window.setTimeout(reveal, SPIN_MS + 100));
+    };
+
+    timers.push(window.setTimeout(startSpin, BALLOT_FADE_MS));
   });
 }
 

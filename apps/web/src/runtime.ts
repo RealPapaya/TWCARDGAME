@@ -66,7 +66,7 @@ import {
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
-import { playVoteRoulette, resetVoteRoulette, voteRouletteActive, VOTE_REVEAL_HOLD_MS, VOTE_ROULETTE_TOTAL_MS, type VoteRouletteChoice } from "./app/vote-roulette.js";
+import { playVoteRoulette, resetVoteRoulette, voteRouletteActive, voteRouletteVisible, VOTE_REVEAL_HOLD_MS, VOTE_ROULETTE_TOTAL_MS, type VoteRouletteChoice } from "./app/vote-roulette.js";
 import { cssEscape } from "./app/dom.js";
 import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
@@ -450,6 +450,10 @@ function render(): void {
 }
 
 function renderNow(): void {
+  // The referendum roulette owns the existing voting overlay DOM from ballot
+  // fade-out through result reveal. Patching the app during that window makes
+  // the stopped wheel visibly rebuild, so defer runtime renders until it closes.
+  if (voteRouletteVisible()) return;
   const status = readStatus();
   const shellClass = view.state ? "app-shell in-match" : "app-shell";
   const nextHtml = `
@@ -2606,12 +2610,22 @@ function renderSpecialPhaseActions(opts: {
         : "重抽增幅";
   return `
     <div class="special-phase-actions">
-      <button type="button" class="special-phase-btn" data-special-peek ${opts.submitted ? "disabled" : ""}>透視</button>
       ${
         opts.canReroll !== undefined
           ? `<button type="button" class="special-phase-btn accent" data-amp-reroll ${rerollDisabled ? "disabled" : ""}>${rerollLabel}</button>`
           : ""
       }
+    </div>
+  `;
+}
+
+/** Eye-icon peek toggle, rendered below the option cards in the special-phase overlays. */
+function renderSpecialPhasePeekButton(submitted: boolean): string {
+  return `
+    <div class="special-phase-peek-row">
+      <button type="button" class="special-phase-peek-btn" data-special-peek aria-label="透視" title="透視" ${submitted ? "disabled" : ""}>
+        <span class="special-phase-peek-icon" aria-hidden="true">👁</span>
+      </button>
     </div>
   `;
 }
@@ -2639,6 +2653,7 @@ function renderAmplificationOverlay(): string {
         <div class="mulligan-card-area amp-card-area">
           ${options.map((option) => renderAmplificationOption(option, submitted || rerolling)).join("")}
         </div>
+        ${renderSpecialPhasePeekButton(submitted)}
       </div>
     </section>
   `;
@@ -2662,6 +2677,7 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
 
 /** Turn 20 inverse-HP referendum ballot — three highlighted events, mulligan-style. */
 function renderVotingOverlay(): string {
+  if (voteRouletteVisible()) return document.getElementById("voting-modal")?.outerHTML ?? "";
   if (readPhase() !== "VOTING_PHASE" || (!view.room && !trainingSession)) return "";
   if (view.specialPhasePeek) return renderSpecialPhasePeekOverlay("vote");
   const sp = view.state?.specialPhase;
@@ -2686,10 +2702,10 @@ function renderVotingOverlay(): string {
           <span class="vote-weight-tag">你的中選率 ${myWeight}%（弱勢族群加成）</span>
         </p>
         ${renderPhaseCountdown("公投倒數")}
-        ${renderSpecialPhaseActions({ submitted })}
         <div class="mulligan-card-area vote-card-area">
           ${events.map((event, index) => renderVoteOption(event, index, submitted)).join("")}
         </div>
+        ${renderSpecialPhasePeekButton(submitted)}
       </div>
     </section>
   `;
@@ -7722,7 +7738,7 @@ function flushPendingPublicSync(opts: { ignoreCardPlayBusy?: boolean } = {}): vo
   }
   if (voteRouletteActive()) {
     // Hold the post-vote board state (e.g. 高雄氣爆 deaths) until the roulette
-    // reveals the winner; the flag clears synchronously inside reveal().
+    // result closes, so the stopped wheel is never rebuilt by a public sync.
     blog("flush skip", { reason: "vote-roulette-busy" });
     schedulePendingPublicSyncFlush(120, opts);
     return;

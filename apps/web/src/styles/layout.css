@@ -1458,6 +1458,37 @@ body.hand-dragging .hand-row .card {
   opacity: 0.9;
 }
 
+.vote-content {
+  width: min(94vw, 1180px);
+  max-width: none;
+  padding: 32px 38px;
+}
+
+.vote-content > h2 {
+  font-size: clamp(36px, 5vw, 58px);
+}
+
+.vote-content > p {
+  font-size: 18px;
+}
+
+.vote-card-area {
+  gap: clamp(18px, 3vw, 34px);
+}
+
+.vote-card-area .vote-option {
+  min-height: clamp(270px, 42vh, 410px);
+  padding: 30px 24px;
+}
+
+.vote-card-area .vote-option-name {
+  font-size: clamp(25px, 3vw, 36px);
+}
+
+.vote-card-area .vote-option-desc {
+  font-size: clamp(15px, 1.5vw, 19px);
+}
+
 /* Tier framing: low / mid / high amplification (加減賺 / 穩穩仔賺 / 卯死). */
 .card.mulligan-card.amp-tier-low { border-color: #7fae6a; }
 .card.mulligan-card.amp-tier-mid { border-color: #d8a23c; }
@@ -1512,6 +1543,43 @@ body.hand-dragging .hand-row .card {
 .special-phase-btn.accent {
   color: #1a1008;
   background: #f0cd7e;
+}
+
+.special-phase-peek-row {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.special-phase-peek-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 2px solid rgba(230, 198, 116, 0.78);
+  border-radius: 50%;
+  color: #f8ecd0;
+  background: rgba(20, 12, 6, 0.88);
+  cursor: pointer;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.38);
+}
+
+.special-phase-peek-btn:hover:not(:disabled) {
+  border-color: var(--gold, #d4af37);
+  background: rgba(54, 35, 14, 0.94);
+}
+
+.special-phase-peek-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.special-phase-peek-icon {
+  font-size: 20px;
+  line-height: 1;
 }
 
 .special-peek-overlay {
@@ -1573,14 +1641,21 @@ body.hand-dragging .hand-row .card {
 
 /* --- Turn-20 referendum roulette: weighted pie wheel with a wood-and-gold frame --- */
 .vote-roulette-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 3000;
-  display: grid;
-  place-items: center;
-  background: rgba(0, 0, 0, 0.78);
-  backdrop-filter: blur(3px);
-  animation: confirm-fade-in 180ms ease-out both;
+  overflow: hidden;
+}
+
+.vote-roulette-overlay.is-opening-roulette .vote-content > :not(h2, .vote-card-area),
+.vote-roulette-overlay.is-opening-roulette .vote-option {
+  animation: vote-ballot-fade-out 360ms ease-in both;
+  pointer-events: none;
+}
+
+.vote-roulette-overlay.is-opening-roulette .vote-option:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.vote-roulette-overlay.is-opening-roulette .vote-option:nth-child(3) {
+  animation-delay: 80ms;
 }
 
 .vote-roulette-overlay.is-closing {
@@ -1592,7 +1667,8 @@ body.hand-dragging .hand-row .card {
   justify-items: center;
   gap: 14px;
   text-align: center;
-  width: min(92vw, 680px);
+  width: min(94vw, 820px);
+  animation: vote-roulette-content-in 300ms ease-out both;
 }
 
 .vote-roulette-title {
@@ -1618,7 +1694,7 @@ body.hand-dragging .hand-row .card {
 
 .vote-roulette-shell {
   position: relative;
-  width: clamp(250px, 48vh, 390px);
+  width: clamp(300px, 54vh, 460px);
   aspect-ratio: 1;
   padding: 19px;
   border: 5px solid #2b160b;
@@ -1810,6 +1886,24 @@ body.hand-dragging .hand-row .card {
   }
   to {
     opacity: 0;
+  }
+}
+
+@keyframes vote-roulette-content-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes vote-ballot-fade-out {
+  to {
+    opacity: 0;
+    transform: translateY(12px);
   }
 }
 
