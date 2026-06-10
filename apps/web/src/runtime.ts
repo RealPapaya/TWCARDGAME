@@ -595,6 +595,7 @@ function renderPvpPlaceholderScreen(): string {
       </div>
 
       <button class="back-button neon-button secondary" data-menu-screen="battle" style="min-width: 140px; min-height: 48px; font-size: 18px; margin-top: 10px;">返回</button>
+      ${renderMatchmakingOverlay()}
     </section>
   `;
 }
