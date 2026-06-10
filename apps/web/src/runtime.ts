@@ -514,7 +514,7 @@ function renderComputerPlaceholderScreen(): string {
       </div>`;
 
   return `
-    <section class="screen placeholder-screen" data-screen="computer-placeholder" style="background: #000000; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+    <section class="screen placeholder-screen" data-screen="computer-placeholder" style="background: url('/images/backgrounds/AImode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
       <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">電腦模式</h2>
       
       <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
@@ -563,7 +563,7 @@ function renderPvpPlaceholderScreen(): string {
       </div>`;
 
   return `
-    <section class="screen placeholder-screen" data-screen="pvp-placeholder" style="background: #000000; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+    <section class="screen placeholder-screen" data-screen="pvp-placeholder" style="background: url('/images/backgrounds/arenamode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
       <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">玩家模式</h2>
       
       <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">

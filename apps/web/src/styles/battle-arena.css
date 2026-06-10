@@ -561,6 +561,10 @@
 }
 
 /* Dedicated 訓練場 level-select page (reached from the battle screen's 訓練場 tile). */
+.training-screen {
+  background: url("/images/backgrounds/Trainingmode_bg.webp") center / cover no-repeat;
+}
+
 .training-screen-intro {
   margin: 4px 0 18px;
   color: #f4e4bc;
