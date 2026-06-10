@@ -5,6 +5,7 @@
     "dockerfilePath": "apps/server/Dockerfile"
   },
   "deploy": {
+    "startCommand": "node apps/server/dist/index.js",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 30,
     "restartPolicyType": "ON_FAILURE",
