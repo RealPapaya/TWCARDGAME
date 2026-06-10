@@ -22,7 +22,7 @@
 .v1-deck-selection {
   position: relative;
   overflow: hidden;
-  background: url("/Gamemode.webp") center / cover no-repeat;
+  background: #000 url("/images/ui/GameMode.webp") center / cover no-repeat;
   padding: 0;
   color: #f1e4d1;
 }
@@ -104,35 +104,39 @@
   outline: none;
 }
 
-/* 挑戰模式 (右下競技場) */
+/* 挑戰模式 */
 .battle-map-hotspot--challenge {
-  left: 67.5%;
-  top: 68.3%;
-  width: clamp(190px, 20vw, 380px);
+  --scale: 2 ; /* 調整此倍率來等比例放大縮小 */
+  left: 60.5%;
+  top: 68.45%;
+  width: clamp(calc(180px * var(--scale)), calc(19vw * var(--scale)), calc(360px * var(--scale)));
   transform: translate(-50%, -50%);
 }
 
-/* 電腦模式 (地圖中央) */
+/* 電腦模式 */
 .battle-map-hotspot--ai {
-  left: 45.8%;
-  top: 41.2%;
-  width: clamp(160px, 16vw, 320px);
+  --scale: 2.4; /* 調整此倍率來等比例放大縮小 */
+  left: 36.6%;
+  top: 35%;
+  width: clamp(calc(140px * var(--scale)), calc(14vw * var(--scale)), calc(280px * var(--scale)));
   transform: translate(-50%, -50%);
 }
 
-/* 玩家模式 (地圖左下) */
+/* 玩家模式 */
 .battle-map-hotspot--pvp {
-  left: 29.5%;
-  top: 63.5%;
-  width: clamp(150px, 15vw, 290px);
+  --scale: 1.8; /* 調整此倍率來等比例放大縮小 */
+  left: 25%;
+  top: 58%;
+  width: clamp(calc(140px * var(--scale)), calc(14vw * var(--scale)), calc(270px * var(--scale)));
   transform: translate(-50%, -50%);
 }
 
-/* 訓練場 (地圖左上) */
+/* 訓練場 */
 .battle-map-hotspot--training {
-  left: 22.5%;
-  top: 33.5%;
-  width: clamp(140px, 15vw, 290px);
+  --scale: 2.7; /* 調整此倍率來等比例放大縮小 */
+  left: 13.9%;
+  top: 83.8%;
+  width: clamp(calc(130px * var(--scale)), calc(14vw * var(--scale)), calc(270px * var(--scale)));
   transform: translate(-50%, -50%);
 }
 

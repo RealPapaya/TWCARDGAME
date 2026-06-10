@@ -818,47 +818,59 @@ function renderBattleScreen(): string {
       <div class="battle-map-stage" aria-label="戰鬥地圖入口">
         <button
           type="button"
-          class="battle-map-hotspot battle-map-hotspot--challenge ${activeMode === "challenge" ? "selected" : ""}"
-          data-battle-mode="challenge"
+          class="battle-map-hotspot battle-map-hotspot--challenge"
+          data-battle-mode="pvp"
           data-dom-key="battle-map-hotspot-challenge"
           data-testid="battle-map-hotspot-challenge"
-          aria-pressed="${activeMode === "challenge"}"
-          aria-label="挑戰模式"
-        >
-          <img src="${processImageDechecker("/images/ui/gamemode-arena-hotspot.webp")}" alt="" draggable="false" />
-        </button>
-        <button
-          type="button"
-          class="battle-map-hotspot battle-map-hotspot--ai ${activeMode === "ai" ? "selected" : ""}"
-          data-battle-mode="ai"
-          data-dom-key="battle-map-hotspot-ai"
-          data-testid="battle-map-hotspot-ai"
-          aria-pressed="${activeMode === "ai"}"
-          aria-label="電腦模式"
-        >
-          <img src="${processImageDechecker("/images/ui/gamemode-president.webp")}" alt="" draggable="false" />
-        </button>
-        <button
-          type="button"
-          class="battle-map-hotspot battle-map-hotspot--pvp ${activeMode === "pvp" ? "selected" : ""}"
-          data-battle-mode="pvp"
-          data-dom-key="battle-map-hotspot-pvp"
-          data-testid="battle-map-hotspot-pvp"
-          aria-pressed="${activeMode === "pvp"}"
           aria-label="玩家模式"
         >
-          <img src="${processImageDechecker("/images/ui/gamemode-towel.webp")}" alt="" draggable="false" />
+          <img src="${processImageDechecker("/images/ui/gamemode-arena-hotspot.webp")}" alt="" draggable="false" />
+          <div class="mode-banner-container">
+            <img src="${processImageDechecker("/images/ui/Banner.webp")}" class="mode-banner-bg" alt="" draggable="false" />
+            <span class="mode-banner-text">玩家對戰</span>
+          </div>
         </button>
         <button
           type="button"
-          class="battle-map-hotspot battle-map-hotspot--training ${activeMode === "training" ? "selected" : ""}"
+          class="battle-map-hotspot battle-map-hotspot--ai"
+          data-battle-mode="challenge"
+          data-dom-key="battle-map-hotspot-ai"
+          data-testid="battle-map-hotspot-ai"
+          aria-label="挑戰模式"
+        >
+          <img src="${processImageDechecker("/images/ui/gamemode-president.webp")}" alt="" draggable="false" />
+          <div class="mode-banner-container">
+            <img src="${processImageDechecker("/images/ui/Banner.webp")}" class="mode-banner-bg" alt="" draggable="false" />
+            <span class="mode-banner-text">挑戰模式</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--pvp"
+          data-battle-mode="ai"
+          data-dom-key="battle-map-hotspot-pvp"
+          data-testid="battle-map-hotspot-pvp"
+          aria-label="電腦模式"
+        >
+          <img src="${processImageDechecker("/images/ui/gamemode-towel.webp")}" alt="" draggable="false" />
+          <div class="mode-banner-container">
+            <img src="${processImageDechecker("/images/ui/Banner.webp")}" class="mode-banner-bg" alt="" draggable="false" />
+            <span class="mode-banner-text">電腦模式</span>
+          </div>
+        </button>
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--training"
           data-battle-mode="training"
           data-dom-key="battle-map-hotspot-training"
           data-testid="battle-map-hotspot-training"
-          aria-pressed="${activeMode === "training"}"
           aria-label="訓練場"
         >
           <img src="${processImageDechecker("/images/ui/gamemode-training.webp")}" alt="" draggable="false" />
+          <div class="mode-banner-container">
+            <img src="${processImageDechecker("/images/ui/Banner.webp")}" class="mode-banner-bg" alt="" draggable="false" />
+            <span class="mode-banner-text">訓練場</span>
+          </div>
         </button>
       </div>
       <div class="battle-selection-content" style="grid-template-rows: auto auto 1fr;">
