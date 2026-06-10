@@ -12,6 +12,8 @@ import {
   applyDamage,
   isFrozen,
   processEndOfTurn,
+  resolveChannelPrompt,
+  resolveChannelPromptDefault,
   resolveEffect,
   resolvePostAction,
   startTurn
@@ -187,6 +189,24 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   const turnBefore = next.turn.number;
   const activeSeatBefore = next.turn.activeSeat;
   const serverTimeoutEndTurn = envelope.serverTimeout === true && envelope.command.type === "endTurn";
+
+  // 通靈 / Discover: while a choice prompt is open the active seat may only resolve
+  // it. A timed-out turn auto-resolves with the first candidate, then ends as usual.
+  if (next.pendingPrompt) {
+    if (envelope.command.type === "resolvePrompt") {
+      resolveChannelPrompt(next, envelope.seat, envelope.command.promptId, envelope.command.choiceInstanceId, events);
+      return { state: next, events };
+    }
+    if (serverTimeoutEndTurn) {
+      resolveChannelPromptDefault(next, envelope.seat, events);
+    } else {
+      reject(next, events, envelope.seat, "請先完成你的選擇。");
+      return { state: next, events };
+    }
+  } else if (envelope.command.type === "resolvePrompt") {
+    reject(next, events, envelope.seat, "目前沒有等待中的選擇。");
+    return { state: next, events };
+  }
 
   if (envelope.command.type === "playCard") {
     playCard(next, envelope.seat, envelope.command.handInstanceId, envelope.command.target, envelope.command.boardIndex, events, catalog);

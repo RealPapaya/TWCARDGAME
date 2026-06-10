@@ -13,6 +13,7 @@ import type {
   HandCardView,
   LeaderboardRow,
   Phase,
+  PromptChoiceOffer,
   PublicPlayer,
   RewardSummary,
   Seat,
@@ -183,6 +184,8 @@ export type ClientViewState = {
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];
+  /** This seat's privately-delivered 通靈 / Discover candidate cards, while a choice prompt is open. */
+  promptChoice?: PromptChoiceOffer;
   specialPhasePeek?: boolean;
   amplificationRerollStage?: "out" | "in";
   amplificationRerollStartedAtMs?: number;

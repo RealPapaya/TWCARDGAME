@@ -3,6 +3,7 @@ import {
   opponentOf,
   type GameEvent,
   type HandCardView,
+  type PromptChoiceOffer,
   type PublicGameState,
   type Seat,
   type SpecialPhaseView,
@@ -178,6 +179,28 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
     health: card.health,
     needsTarget: effectNeedsTarget(card.keywords.battlecry)
   }));
+}
+
+/**
+ * Per-seat projection of an open 通靈 / Discover choice, for the private direct
+ * message. Returns undefined unless `seat` is the prompted seat. Card identities are
+ * delivered only here — never in `toPublicState` — so deck order isn't leaked.
+ */
+export function toPromptChoiceOffer(state: MatchState, seat: Seat): PromptChoiceOffer | undefined {
+  const pending = state.private.pendingChoice;
+  if (!pending || pending.seat !== seat) return undefined;
+  return {
+    promptId: pending.promptId,
+    label: pending.label,
+    cards: pending.cards.map((card) => ({
+      instanceId: card.instanceId,
+      cardId: card.cardId,
+      cost: getCardActualCost(state, seat, card),
+      type: card.type,
+      attack: card.attack,
+      health: card.health
+    }))
+  };
 }
 
 export function getCardActualCost(state: MatchState, seat: Seat, card: RuntimeCard): number {

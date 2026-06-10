@@ -216,6 +216,21 @@ export interface PrivateMatchState {
   turnActionTaken: boolean;
   turnTimeLimitMs: number;
   devTestInfiniteMana?: Partial<Record<Seat, boolean>>;
+  /**
+   * 通靈 / Discover candidates pulled out of the prompted seat's deck while
+   * `pendingPrompt` is open. Private — never projected to public state (it would
+   * leak deck order). On resolve the chosen card goes to hand and the rest are
+   * shuffled back into the deck.
+   */
+  pendingChoice?: PendingChoice;
+}
+
+export interface PendingChoice {
+  promptId: string;
+  seat: Seat;
+  sourceInstanceId: string;
+  label?: string;
+  cards: RuntimeCard[];
 }
 
 export interface MatchState {

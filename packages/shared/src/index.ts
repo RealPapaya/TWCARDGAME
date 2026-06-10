@@ -284,6 +284,31 @@ export interface PendingPrompt {
   kind: "target" | "choice";
   sourceInstanceId: string;
   validTargets: TargetRef[];
+  /**
+   * Choice prompts (通靈 / Discover): how many cards are offered. PUBLIC count only —
+   * the candidate card identities are private and delivered per-seat via
+   * {@link PromptChoiceOffer}, never in the synced state (they would leak deck order).
+   */
+  choiceCount?: number;
+  /** Choice prompts: short label for the picker UI, e.g. "通靈". */
+  label?: string;
+}
+
+/** One offered card in a 通靈 / Discover choice prompt (private per-seat). */
+export interface PromptChoiceCardView {
+  instanceId: string;
+  cardId: string;
+  cost: number;
+  type: CardType;
+  attack?: number;
+  health?: number;
+}
+
+/** Private direct message delivering a seat's 通靈 / Discover candidate cards. */
+export interface PromptChoiceOffer {
+  promptId: string;
+  label?: string;
+  cards: PromptChoiceCardView[];
 }
 
 export interface MatchResult {
@@ -336,7 +361,8 @@ export type GameCommand =
   | { type: "reconnect"; matchId: string }
   | { type: "selectAmplification"; optionId: string }
   | { type: "rerollAmplification" }
-  | { type: "submitVote"; optionIndex: 0 | 1 | 2 };
+  | { type: "submitVote"; optionIndex: 0 | 1 | 2 }
+  | { type: "resolvePrompt"; promptId: string; choiceInstanceId: string };
 
 export interface ClientCommandMessage {
   commandId: string;
@@ -383,6 +409,8 @@ export type GameEventType =
   | "VOTE_RESOLVED"
   | "ENVIRONMENT_APPLIED"
   | "ENVIRONMENT_EXPIRED"
+  | "PROMPT_OPENED"
+  | "PROMPT_RESOLVED"
   | "EVENT_NOTICE";
 
 export interface GameEvent {

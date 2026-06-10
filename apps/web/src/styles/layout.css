@@ -1371,6 +1371,17 @@ body.hand-dragging .hand-row .card {
   box-shadow: 0 0 20px rgba(255, 51, 51, 0.45), 0 8px 20px rgba(0, 0, 0, 0.55);
 }
 
+/* 通靈 / Discover picker — cards are click-to-pick, so highlight on hover. */
+.card.channel-card {
+  cursor: pointer;
+}
+
+.card.channel-card:hover {
+  border-color: var(--gold);
+  box-shadow: 0 0 24px rgba(255, 200, 80, 0.55), 0 10px 24px rgba(0, 0, 0, 0.6);
+  transform: translateY(-6px);
+}
+
 .mulligan-card.selected .card-art-box {
   filter: grayscale(100%) contrast(120%);
 }

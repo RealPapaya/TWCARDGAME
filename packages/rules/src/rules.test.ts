@@ -482,3 +482,98 @@ describe("target legality", () => {
     expect(rejectionReason(result.events)).toBe("只能攻擊敵方目標。");
   });
 });
+
+describe("通靈 / Discover (CHANNEL)", () => {
+  function channelDef(): CardDefinition {
+    return {
+      id: "TEST_CHANNEL",
+      name: "通靈測試",
+      category: "新聞",
+      cost: 0,
+      type: "NEWS",
+      rarity: "COMMON",
+      description: "從牌庫挑 3 張選 1 張加入手牌。",
+      image: "test.webp",
+      keywords: { battlecry: { type: "CHANNEL", count: 3 } }
+    };
+  }
+
+  function playChannel(seed = 4321, def: CardDefinition = channelDef()) {
+    const state = startMatch(seed);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+    const deckBefore = state.players[seat].deck.length;
+    const result = reduce(
+      state,
+      { commandId: "ch-play", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    );
+    return { state: result.state, events: result.events, seat, deckBefore };
+  }
+
+  it("opens a private choice prompt with 3 candidates pulled from the deck", () => {
+    const { state, seat, deckBefore } = playChannel();
+    expect(state.pendingPrompt?.kind).toBe("choice");
+    expect(state.pendingPrompt?.seat).toBe(seat);
+    expect(state.pendingPrompt?.choiceCount).toBe(3);
+    expect(state.private.pendingChoice?.cards).toHaveLength(3);
+    expect(state.players[seat].deck.length).toBe(deckBefore - 3);
+    // The public projection never exposes the candidate card identities.
+    expect(toPublicState(state).pendingPrompt?.choiceCount).toBe(3);
+    expect(JSON.stringify(toPublicState(state))).not.toContain("pendingChoice");
+  });
+
+  it("rejects other actions while the prompt is open", () => {
+    const { state, seat } = playChannel();
+    const other = createRuntimeCard(channelDef(), seat, nextInstanceId(state, "card"));
+    state.players[seat].hand.push(other);
+    const result = reduce(
+      state,
+      { commandId: "ch-block", seat, nowMs: 2100, command: { type: "playCard", handInstanceId: other.instanceId } },
+      CARD_CATALOG
+    );
+    expect(rejectionReason(result.events)).toBe("請先完成你的選擇。");
+    expect(result.state.pendingPrompt).toBeDefined();
+  });
+
+  it("resolvePrompt adds the chosen card to hand and shuffles the rest back", () => {
+    const opened = playChannel();
+    const { seat, deckBefore } = opened;
+    const promptId = opened.state.pendingPrompt!.promptId;
+    const chosen = opened.state.private.pendingChoice!.cards[1];
+    const result = reduce(
+      opened.state,
+      { commandId: "ch-resolve", seat, nowMs: 2200, command: { type: "resolvePrompt", promptId, choiceInstanceId: chosen.instanceId } },
+      CARD_CATALOG
+    );
+    const next = result.state;
+    expect(next.pendingPrompt).toBeUndefined();
+    expect(next.private.pendingChoice).toBeUndefined();
+    expect(next.players[seat].hand.some((c) => c.instanceId === chosen.instanceId)).toBe(true);
+    // 3 pulled, 1 to hand, 2 returned → one fewer card than before the channel.
+    expect(next.players[seat].deck.length).toBe(deckBefore - 1);
+    expect(result.events.some((e) => e.type === "PROMPT_RESOLVED")).toBe(true);
+  });
+
+  it("rejects a resolvePrompt that names an unoffered card", () => {
+    const opened = playChannel();
+    const promptId = opened.state.pendingPrompt!.promptId;
+    const result = reduce(
+      opened.state,
+      { commandId: "ch-bad", seat: opened.seat, nowMs: 2200, command: { type: "resolvePrompt", promptId, choiceInstanceId: "not-a-candidate" } },
+      CARD_CATALOG
+    );
+    expect(rejectionReason(result.events)).toBe("無效的選擇。");
+    expect(result.state.pendingPrompt).toBeDefined();
+  });
+
+  it("is a no-op when no deck card matches the pool filter", () => {
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, target_category_includes: "__no_such_category__" };
+    const { state } = playChannel(9876, def);
+    expect(state.pendingPrompt).toBeUndefined();
+    expect(state.private.pendingChoice).toBeUndefined();
+  });
+});

@@ -17,6 +17,12 @@ export interface EffectDefinition {
   target_category?: string;
   target_category_includes?: string;
   excluded_categories?: string[];
+  /**
+   * 通靈 / Discover (CHANNEL): restricts the candidate pool to this card type. When
+   * omitted, any deck card qualifies. Combine with `target_category_includes` for a
+   * category filter and `count` for how many cards are revealed (default 3).
+   */
+  poolCardType?: CardType;
   buff_stat?: StatName;
   buff_value?: number;
   keyword?: string;
@@ -81,6 +87,7 @@ export interface CardDefinition {
 
 export const SUPPORTED_BATTLECRY_EFFECTS = [
   "ADD_CARD_TO_HAND",
+  "CHANNEL",
   "BOUNCE",
   "BOUNCE_ALL_CATEGORY",
   "BOUNCE_ALL_ENEMY",

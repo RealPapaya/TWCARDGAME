@@ -5,6 +5,7 @@ import {
   DEFAULT_TURN_TIME_LIMIT_MS,
   reduce,
   toHandView,
+  toPromptChoiceOffer,
   toPublicState,
   type MatchState
 } from "@twcardgame/rules";
@@ -352,6 +353,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (this.match.phase === "AMPLIFICATION_PHASE" && this.match.specialPhase?.amplificationOptions) {
       client.send("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] });
     }
+    // 通靈 / Discover: the candidate cards are private to the prompted seat (revealing
+    // them publicly would leak deck order), so deliver them only here.
+    const promptChoice = toPromptChoiceOffer(this.match, seat);
+    if (promptChoice) client.send("promptChoice", promptChoice);
   }
 
   private rejectCommand(seat: Seat, reason: string): void {

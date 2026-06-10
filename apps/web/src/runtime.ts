@@ -15,6 +15,7 @@ import type {
   HandCardView,
   LeaderboardRow,
   Phase,
+  PromptChoiceOffer,
   PublicMinion,
   PublicPlayer,
   RewardSummary,
@@ -1765,6 +1766,7 @@ function renderGame(status: GameStatus | ""): string {
       ${renderTurnAnnouncementOverlay()}
       ${renderMulliganOverlay(status)}
       ${renderAmplificationOverlay()}
+      ${renderChannelOverlay()}
       ${renderVotingOverlay()}
       ${renderOpponentDisconnectOverlay(status)}
       ${renderResultOverlay(status)}
@@ -2169,7 +2171,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   ]);
   const healthClass = classNames([
     "stat-hp",
-    holdBaseStat ? "" : valueDeltaClass(shownHealth, catalogCard?.health)
+    holdBaseStat ? "" : healthDeltaClass(shownHealth, minion.health, catalogCard?.health)
   ]);
   const target: TargetRef = { type: "MINION", side: seat, instanceId: minion.instanceId };
   const mine = seat === view.mySeat;
@@ -2333,6 +2335,19 @@ function valueDeltaClass(value: number | undefined, base: number | undefined): s
   if (value === undefined || base === undefined) return "";
   if (value < base) return "stat-lower";
   if (value > base) return "stat-higher";
+  return "";
+}
+
+// Board health is the displayed currentHealth: red when below the live max (damaged),
+// green only when at full and the max was raised above the printed base, white otherwise.
+function healthDeltaClass(
+  current: number | undefined,
+  max: number | undefined,
+  base: number | undefined
+): string {
+  if (current === undefined || max === undefined) return "";
+  if (current < max) return "stat-lower";
+  if (base !== undefined && max > base) return "stat-higher";
   return "";
 }
 
@@ -2678,6 +2693,55 @@ function renderAmplificationOverlay(): string {
       </div>
     </section>
   `;
+}
+
+/**
+ * 通靈 / Discover picker — the privately-delivered candidate cards, presented
+ * mulligan-style. Shown only while this seat owns the open choice prompt; clicking
+ * a card sends `resolvePrompt` to add it to hand.
+ */
+function renderChannelOverlay(): string {
+  const offer = currentPromptChoice();
+  if (!offer) return "";
+  return `
+    <section id="channel-modal" class="mulligan-overlay channel-overlay" data-testid="channel-overlay">
+      <div class="mulligan-content channel-content">
+        <h2>${escapeHtml(offer.label ?? "通靈")}</h2>
+        <p>從卡池中選擇 1 張加入手牌</p>
+        <div class="mulligan-card-area channel-card-area">
+          ${offer.cards.map((card) => renderChannelCard(offer.promptId, card)).join("")}
+        </div>
+      </div>
+    </section>
+  `;
+}
+
+function renderChannelCard(promptId: string, card: PromptChoiceOffer["cards"][number]): string {
+  const resolved = resolveHandCard(card as HandCardView);
+  return `
+    <button
+      class="card mulligan-card channel-card"
+      data-prompt-id="${escapeAttr(promptId)}"
+      data-prompt-card="${escapeAttr(card.instanceId)}"
+      data-dom-key="channel-${escapeAttr(card.instanceId)}"
+      data-card-type="${escapeAttr(card.type)}"
+      data-cost="${card.cost}"
+    >
+      ${renderCardFace(resolved, "mulligan")}
+      <span class="sr-e2e">Cost ${card.cost} ${card.type}</span>
+    </button>
+  `;
+}
+
+/** This seat's live 通靈 offer, or undefined once the prompt is resolved/cleared. */
+function currentPromptChoice(): PromptChoiceOffer | undefined {
+  const offer = view.promptChoice;
+  if (!offer) return undefined;
+  const promptId = (view.state?.pendingPromptId as string | undefined) ?? "";
+  if (!promptId || promptId !== offer.promptId) return undefined;
+  const seat = (view.state?.pendingPromptSeat as string | undefined) ?? "";
+  if (seat && view.mySeat && seat !== view.mySeat) return undefined;
+  return offer;
 }
 
 function renderAmplificationOption(option: AmplificationOption, disabled: boolean): string {
@@ -5252,6 +5316,10 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
   joined.onMessage("amplificationOptions", (message: { options: AmplificationOption[] }) => {
     handleAmplificationOptionsMessage(message.options ?? []);
   });
+  joined.onMessage("promptChoice", (message: PromptChoiceOffer) => {
+    view.promptChoice = message;
+    render();
+  });
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
   });
@@ -5505,9 +5573,18 @@ function activateRoomStateWhenReady(nextState: any): boolean {
     view.state = nextState;
     publishDebugState();
     pruneSelections();
+    syncPromptChoiceState();
   }
   render();
   return true;
+}
+
+/** Drop a stored 通靈 offer once its prompt has been resolved/cleared (or replaced). */
+function syncPromptChoiceState(): void {
+  const promptId = (view.state?.pendingPromptId as string | undefined) ?? "";
+  if (view.promptChoice && view.promptChoice.promptId !== promptId) {
+    view.promptChoice = undefined;
+  }
 }
 
 async function startMatchmaking(): Promise<void> {
@@ -5853,6 +5930,17 @@ function bindSelectionActions(): void {
       const optionId = el.dataset.ampId;
       if (!optionId) return;
       send({ type: "selectAmplification", optionId });
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-prompt-card]")) {
+    on(el, "click", "resolve-prompt", () => {
+      const promptId = el.dataset.promptId;
+      const choiceInstanceId = el.dataset.promptCard;
+      if (!promptId || !choiceInstanceId) return;
+      send({ type: "resolvePrompt", promptId, choiceInstanceId });
+      // Hide the picker immediately; the server's cleared pendingPrompt confirms it.
+      view.promptChoice = undefined;
+      render();
     });
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-vote-index]")) {
@@ -7166,6 +7254,7 @@ function isBattleActionLocked(): boolean {
   // briefly while a mid-turn augment glow is revealing its value change.
   return (
     readPhase() !== "NORMAL_PLAY" ||
+    Boolean(currentPromptChoice()) ||
     Boolean(activeTurnAnnouncement()) ||
     performance.now() < augmentGlowLockUntilMs ||
     trainingBlocksBattle(trainingSession)

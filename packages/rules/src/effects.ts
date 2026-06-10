@@ -1,4 +1,5 @@
 export { effectHandlers, resolveEffect } from "./effects/registry.js";
+export { resolveChannelPrompt, resolveChannelPromptDefault } from "./effects/channel.js";
 export {
   applyDamage,
   applyNewsPower,

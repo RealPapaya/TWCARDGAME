@@ -19,7 +19,10 @@ export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   if (state.phase === "AMPLIFICATION_PHASE") return legalAmplificationMoves(state, seat);
   if (state.phase === "VOTING_PHASE") return legalVoteMoves(state, seat);
   if (state.turn.activeSeat !== seat) return [];
-  if (state.pendingPrompt && state.pendingPrompt.seat !== seat) return [];
+  if (state.pendingPrompt) {
+    if (state.pendingPrompt.seat !== seat) return [];
+    return legalPromptMoves(state, seat);
+  }
   // 違約交割: a frozen player can only end their turn (avoids a deadlock and keeps
   // the bot's only legal move well-defined).
   if (isFrozen(state, seat)) return [{ type: "endTurn" }];
@@ -29,6 +32,17 @@ export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   for (const cmd of legalAttacks(state, seat)) moves.push(cmd);
   moves.push({ type: "endTurn" });
   return moves;
+}
+
+/** 通靈 / Discover: one resolvePrompt move per privately-held candidate card. */
+function legalPromptMoves(state: MatchState, seat: Seat): GameCommand[] {
+  const pending = state.private.pendingChoice;
+  if (!pending || pending.seat !== seat) return [];
+  return pending.cards.map((card) => ({
+    type: "resolvePrompt" as const,
+    promptId: pending.promptId,
+    choiceInstanceId: card.instanceId
+  }));
 }
 
 function legalAmplificationMoves(state: MatchState, seat: Seat): GameCommand[] {

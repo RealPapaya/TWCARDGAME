@@ -26,6 +26,7 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
 
   state.status = "in_progress";
   state.pendingPrompt = undefined;
+  state.private.pendingChoice = undefined;
   state.result = undefined;
   state.turn.activeSeat = activeSeat;
   state.turn.number = clampInt(setup.turnNumber, 1, 999, 1);

@@ -85,7 +85,16 @@ function scoreMove(state: MatchState, seat: Seat, move: GameCommand): number {
   if (move.type === "attack") return scoreAttack(state, seat, move);
   if (move.type === "selectAmplification") return scoreAmplification(state, seat, move);
   if (move.type === "submitVote") return 3 - move.optionIndex; // deterministic: prefer index 0
+  if (move.type === "resolvePrompt") return scoreResolvePrompt(state, move);
   return 0;
+}
+
+/** 通靈 / Discover: pick the highest-value candidate (stats for minions, cost otherwise). */
+function scoreResolvePrompt(state: MatchState, move: Extract<GameCommand, { type: "resolvePrompt" }>): number {
+  const card = state.private.pendingChoice?.cards.find((c) => c.instanceId === move.choiceInstanceId);
+  if (!card) return 0;
+  if (card.type === "MINION") return (card.attack ?? 0) + (card.health ?? 0);
+  return card.cost; // spells/news: prefer the higher-impact (costlier) option
 }
 
 const TIER_RANK: Record<string, number> = { 加減賺: 1, 穩穩仔賺: 2, 卯死: 3 };
