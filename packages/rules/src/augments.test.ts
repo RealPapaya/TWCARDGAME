@@ -348,8 +348,8 @@ describe("betel nut effects", () => {
     resolveEffect(
       {
         type: "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
-        value: 3,
-        bonus_value: 3,
+        value: 2,
+        bonus_value: 2,
         target_category_includes: "勞工"
       },
       {
@@ -361,9 +361,9 @@ describe("betel nut effects", () => {
       }
     );
 
-    expect(minion.attack).toBe(5);
-    expect(minion.health).toBe(8);
-    expect(minion.currentHealth).toBe(8);
+    expect(minion.attack).toBe(4);
+    expect(minion.health).toBe(7);
+    expect(minion.currentHealth).toBe(7);
   });
 
   it("does not grant the attack bonus to non-labor minions", () => {
@@ -375,8 +375,8 @@ describe("betel nut effects", () => {
     resolveEffect(
       {
         type: "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
-        value: 3,
-        bonus_value: 3,
+        value: 2,
+        bonus_value: 2,
         target_category_includes: "勞工"
       },
       {
@@ -389,8 +389,8 @@ describe("betel nut effects", () => {
     );
 
     expect(minion.attack).toBe(2);
-    expect(minion.health).toBe(8);
-    expect(minion.currentHealth).toBe(8);
+    expect(minion.health).toBe(7);
+    expect(minion.currentHealth).toBe(7);
   });
 });
 

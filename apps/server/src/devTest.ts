@@ -162,7 +162,13 @@ function withRequestedOption(option: AmplificationOption, options: Amplification
 }
 
 function toAmplificationOption(entry: AmplificationDbEntry): AmplificationOption {
-  return { id: entry.id, tier: entry.tier, name: entry.name, description: entry.description };
+  return {
+    id: entry.id,
+    tier: entry.tier,
+    name: entry.name,
+    description: entry.description,
+    relatedCardIds: entry.relatedCardIds
+  };
 }
 
 function buildVoteEvents(requestedIds: readonly string[]): VoteEvent[] {

@@ -2691,9 +2691,41 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
     >
       <span class="amp-tier-badge">${escapeHtml(option.tier)}</span>
       <span class="amp-option-name">${escapeHtml(option.name)}</span>
-      <span class="amp-option-desc">${escapeHtml(option.description)}</span>
+      <span class="amp-option-desc">${renderDescriptionWithRelatedCards(option.description, option.relatedCardIds)}</span>
     </button>
   `;
+}
+
+function renderDescriptionWithRelatedCards(description: string, relatedCardIds: readonly string[] | undefined): string {
+  const relatedCards = (relatedCardIds ?? [])
+    .map((cardId) => cardCatalog.get(cardId))
+    .filter((card): card is CardDefinition => card !== undefined && description.includes(card.name))
+    .sort((a, b) => b.name.length - a.name.length);
+  if (relatedCards.length === 0) return escapeHtml(description);
+
+  const rendered: string[] = [];
+  let cursor = 0;
+  while (cursor < description.length) {
+    let nextCard: CardDefinition | undefined;
+    let nextIndex = description.length;
+    for (const card of relatedCards) {
+      const index = description.indexOf(card.name, cursor);
+      if (index >= 0 && (index < nextIndex || (index === nextIndex && card.name.length > (nextCard?.name.length ?? 0)))) {
+        nextCard = card;
+        nextIndex = index;
+      }
+    }
+    if (!nextCard) {
+      rendered.push(escapeHtml(description.slice(cursor)));
+      break;
+    }
+    rendered.push(escapeHtml(description.slice(cursor, nextIndex)));
+    rendered.push(
+      `<span class="related-card-link" data-hover-card-id="${escapeAttr(nextCard.id)}" title="預覽${escapeAttr(nextCard.name)}">${escapeHtml(nextCard.name)}</span>`
+    );
+    cursor = nextIndex + nextCard.name.length;
+  }
+  return rendered.join("");
 }
 
 /** Turn 20 inverse-HP referendum ballot — three highlighted events, mulligan-style. */

@@ -54,7 +54,11 @@ const gameServer = new Server({
         ok: true,
         service: "twcardgame",
         supabase: {
-          configured: supabaseConfigured
+          configured: supabaseConfigured,
+          // Presence-only diagnostics — never expose the values. Lets a redeploy
+          // reveal exactly which env var Railway is failing to inject.
+          hasSupabaseUrl: Boolean(process.env.SUPABASE_URL),
+          hasServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY)
         },
         rewards: {
           enabled: supabaseConfigured

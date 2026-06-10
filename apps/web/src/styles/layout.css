@@ -1458,6 +1458,19 @@ body.hand-dragging .hand-row .card {
   opacity: 0.9;
 }
 
+.related-card-link {
+  color: #7ed7ff;
+  text-decoration: underline;
+  text-decoration-color: rgba(126, 215, 255, 0.75);
+  text-underline-offset: 3px;
+  cursor: help;
+}
+
+.related-card-link:hover {
+  color: #c7efff;
+  text-decoration-color: currentColor;
+}
+
 .vote-content {
   width: min(94vw, 1180px);
   max-width: none;

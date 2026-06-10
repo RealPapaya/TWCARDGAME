@@ -1331,15 +1331,15 @@ export const CARD_CATALOG_GENERATED = [
     "id": "S029",
     "name": "檳榔",
     "category": "新聞",
-    "cost": 3,
+    "cost": 4,
     "type": "NEWS",
     "rarity": "COMMON",
-    "description": "將一名隨從生命全部恢復，並增加3點生命。如果是勞工，再增加3點攻擊。",
+    "description": "將一名隨從生命全部恢復，並增加2點生命。如果是勞工，再增加2點攻擊。",
     "keywords": {
       "battlecry": {
         "type": "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
         "value": 3,
-        "bonus_value": 3,
+        "bonus_value": 2,
         "target_category_includes": "勞工",
         "target": {
           "side": "ALL",

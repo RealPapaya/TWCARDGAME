@@ -209,6 +209,7 @@ export interface AmplificationOption {
   tier: AmplificationTier;
   name: string;
   description: string;
+  relatedCardIds?: string[];
 }
 
 /** The amplification a player committed to; shown beside their hero avatar. */

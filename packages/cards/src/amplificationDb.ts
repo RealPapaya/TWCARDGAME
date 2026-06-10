@@ -14,6 +14,8 @@ export interface AmplificationDbEntry {
   id: string;
   name: string;
   description: string;
+  /** Cards explicitly named by the description and previewable from the UI. */
+  relatedCardIds?: string[];
   tier: AmplificationTier;
   /** Card categories this amplification is offered for, e.g. "勞工". Empty = universal. */
   factionTags: string[];
@@ -115,6 +117,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_ENERGY_TRANSITION",
     name: "能源轉型",
     description: "在對手場上放置 3 個核廢料。",
+    relatedCardIds: ["TW077"],
     tier: "加減賺",
     factionTags: ["民進黨政治人物"],
     effect: { type: "AUG_SUMMON_CARD", cardId: "TW077", count: 3, target: { side: "ENEMY" } }
@@ -205,6 +208,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_BETEL_NUT_500",
     name: "林北檳榔擠剛攏哺500啦",
     description: "獲得 3 張檳榔到手牌。",
+    relatedCardIds: ["S029"],
     tier: "穩穩仔賺",
     factionTags: ["勞工"],
     effect: { type: "AUG_ADD_CARD_TO_HAND", cardId: "S029", count: 3 }
@@ -245,6 +249,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_NUCLEAR_FREE_HOMELAND",
     name: "非核家園",
     description: "每當召喚一名民進黨政治人物，在對手場上放置一個核廢料。",
+    relatedCardIds: ["TW077"],
     tier: "穩穩仔賺",
     factionTags: ["民進黨政治人物"],
     effect: {
@@ -258,6 +263,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_RESTART_NUCLEAR_FOUR",
     name: "重啟核四",
     description: "在自己的場上放置 4 張核電廠。",
+    relatedCardIds: ["TW063"],
     tier: "穩穩仔賺",
     factionTags: ["國民黨政治人物"],
     effect: { type: "AUG_SUMMON_CARD", cardId: "TW063", count: 4, target: { side: "FRIENDLY" } }

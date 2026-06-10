@@ -23,6 +23,23 @@ describe("card catalog", () => {
     });
   });
 
+  it("defines betel nut as a 4-cost full heal with +2 health and labor attack", () => {
+    const betelNut = CARD_CATALOG.find((card) => card.id === "S029");
+    expect(betelNut).toMatchObject({
+      name: "檳榔",
+      cost: 4,
+      description: "將一名隨從生命全部恢復，並增加2點生命。如果是勞工，再增加2點攻擊。",
+      keywords: {
+        battlecry: {
+          type: "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
+          value: 2,
+          bonus_value: 2,
+          target_category_includes: "勞工"
+        }
+      }
+    });
+  });
+
   it("keeps every current battlecry effect in the supported list", () => {
     const effectTypes = new Set(
       CARD_CATALOG.map((card) => card.keywords?.battlecry?.type).filter((type): type is string => !!type)

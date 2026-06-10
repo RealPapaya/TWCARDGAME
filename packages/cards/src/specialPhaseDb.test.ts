@@ -15,6 +15,18 @@ describe("special-phase databases", () => {
     expect(result.valid).toBe(true);
   });
 
+  it("marks amplifications that name specific cards with their related cards", () => {
+    const relatedCards = Object.fromEntries(
+      AMPLIFICATION_DB.filter((entry) => entry.relatedCardIds).map((entry) => [entry.id, entry.relatedCardIds])
+    );
+    expect(relatedCards).toEqual({
+      AMP_ENERGY_TRANSITION: ["TW077"],
+      AMP_BETEL_NUT_500: ["S029"],
+      AMP_NUCLEAR_FREE_HOMELAND: ["TW077"],
+      AMP_RESTART_NUCLEAR_FOUR: ["TW063"]
+    });
+  });
+
   it("offers at least one amplification per tier so the sampler can fill three picks", () => {
     for (const tier of ["加減賺", "穩穩仔賺", "卯死"] as const) {
       expect(filterAmplification(AMPLIFICATION_DB, undefined, tier).length).toBeGreaterThanOrEqual(1);

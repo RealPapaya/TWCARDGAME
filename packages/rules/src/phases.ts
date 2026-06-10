@@ -222,7 +222,13 @@ export function sampleAugmentOptions(args: {
 }
 
 function toOption(entry: AmplificationDbEntry): AmplificationOption {
-  return { id: entry.id, tier: entry.tier, name: entry.name, description: entry.description };
+  return {
+    id: entry.id,
+    tier: entry.tier,
+    name: entry.name,
+    description: entry.description,
+    relatedCardIds: entry.relatedCardIds
+  };
 }
 
 /** Draws `count` unique vote events weighted by their tier weight. Deterministic per seed. */

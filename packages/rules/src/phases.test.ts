@@ -159,6 +159,21 @@ describe("phase pure helpers", () => {
     expect(effectHandlers.ENV_SILENCE_ALL).toBeTypeOf("function");
     expect(effectHandlers.ENV_COST_PLUS_CAPPED).toBeTypeOf("function");
   });
+
+  it("carries related card ids into sampled amplification options", () => {
+    const betelNut = AMPLIFICATION_DB.find((entry) => entry.id === "AMP_BETEL_NUT_500");
+    expect(betelNut).toBeDefined();
+    const sampled = sampleAugmentOptions({
+      rngState: 5,
+      pool: [betelNut!],
+      categoryCounts: { 勞工: 1 },
+      excludeIds: new Set(),
+      isFirstPhase: true,
+      secondPhaseTier: "穩穩仔賺",
+      count: 1
+    });
+    expect(sampled.options[0]?.relatedCardIds).toEqual(["S029"]);
+  });
 });
 
 describe("amplification phase (turn 6)", () => {
