@@ -270,6 +270,98 @@ const view: ClientViewState = {
   changelogOpen: false
 };
 
+const decheckeredCache = new Map<string, string>();
+
+function processImageDechecker(url: string): string {
+  if (decheckeredCache.has(url)) {
+    return decheckeredCache.get(url)!;
+  }
+  decheckeredCache.set(url, url);
+
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.src = url;
+  img.onload = () => {
+    const canvas = document.createElement("canvas");
+    const w = img.naturalWidth || img.width;
+    const h = img.naturalHeight || img.height;
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+    ctx.drawImage(img, 0, 0);
+    const imgData = ctx.getImageData(0, 0, w, h);
+    const data = imgData.data;
+
+    const isBg = (r: number, g: number, b: number) => {
+      const max = Math.max(r, g, b);
+      const min = Math.min(r, g, b);
+      return (max - min < 20) && (min > 190);
+    };
+
+    const visited = new Uint8Array(w * h);
+    const queue: [number, number][] = [];
+
+    for (let x = 0; x < w; x++) {
+      if (isBg(data[x * 4], data[x * 4 + 1], data[x * 4 + 2])) {
+        queue.push([x, 0]);
+        visited[0 * w + x] = 1;
+      }
+      const bottomY = h - 1;
+      const idx = bottomY * w + x;
+      if (isBg(data[idx * 4], data[idx * 4 + 1], data[idx * 4 + 2])) {
+        queue.push([x, bottomY]);
+        visited[idx] = 1;
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      const idxLeft = y * w;
+      if (isBg(data[idxLeft * 4], data[idxLeft * 4 + 1], data[idxLeft * 4 + 2])) {
+        queue.push([0, y]);
+        visited[idxLeft] = 1;
+      }
+      const idxRight = y * w + (w - 1);
+      if (isBg(data[idxRight * 4], data[idxRight * 4 + 1], data[idxRight * 4 + 2])) {
+        queue.push([w - 1, y]);
+        visited[idxRight] = 1;
+      }
+    }
+
+    let head = 0;
+    while (head < queue.length) {
+      const [cx, cy] = queue[head++];
+      const idx = cy * w + cx;
+      data[idx * 4 + 3] = 0;
+
+      const dirs = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+      for (const [dx, dy] of dirs) {
+        const nx = cx + dx;
+        const ny = cy + dy;
+        if (nx >= 0 && nx < w && ny >= 0 && ny < h) {
+          const nidx = ny * w + nx;
+          if (visited[nidx] === 0) {
+            if (isBg(data[nidx * 4], data[nidx * 4 + 1], data[nidx * 4 + 2])) {
+              visited[nidx] = 1;
+              queue.push([nx, ny]);
+            }
+          }
+        }
+      }
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    try {
+      const dataUrl = canvas.toDataURL("image/png");
+      decheckeredCache.set(url, dataUrl);
+      render();
+    } catch (e) {
+      console.error("Failed to dechecker image", e);
+    }
+  };
+
+  return url;
+}
+
 let renderScheduled = false;
 let trainingSession: TrainingSession | undefined;
 let remoteTrainingCompletions = new Set<string>();
@@ -403,6 +495,110 @@ function renderLanding(): string {
   return renderMenu();
 }
 
+function renderComputerPlaceholderScreen(): string {
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  const accountMode = Boolean(supabase);
+  const aiModeDisabled = view.joining || Boolean(view.matchmaking) || !view.aiDifficultySelected || (accountMode && (!view.session || !view.selectedDeckId));
+  const difficulties: { value: AiDifficulty; label: string }[] = [
+    { value: "easy", label: "簡單" },
+    { value: "normal", label: "普通" },
+    { value: "hard", label: "困難" }
+  ];
+  const deckSlots = accountMode
+    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
+        <button class="deck-select" type="button">
+          <h3>Dev Deck</h3>
+          <span class="slot-info">Server default deck</span>
+        </button>
+      </div>`;
+
+  return `
+    <section class="screen placeholder-screen" data-screen="computer-placeholder" style="background: #000000; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+      <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">電腦模式</h2>
+      
+      <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
+        ${deckSlots}
+        <button id="new-deck" type="button" class="deck-slot add-deck-slot">
+          <span class="plus-icon">+</span>
+          <span class="slot-info">新增牌組</span>
+        </button>
+      </div>
+
+      <p class="battle-selected-note" style="margin: 0; font-size: 16px;">
+        ${selectedDeck ? `已選擇：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一組完整 30 張牌組。" : "Dev mode 會使用伺服器預設牌組。"}
+      </p>
+
+      <div class="battle-ai-mode-section" style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 10px;">
+        <h4 class="ai-section-label" style="margin: 0; color: #f4e4bc; font-size: 18px; text-shadow: 0 2px 5px #000;">難度</h4>
+        <div class="ai-difficulty-options" style="display: flex; flex-direction: row; gap: 14px;">
+          ${difficulties.map((opt) => `
+            <label class="ai-difficulty-option ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}" data-dom-key="battle-difficulty-${opt.value}">
+              <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
+              <strong>${escapeHtml(opt.label)}</strong>
+            </label>
+          `).join("")}
+        </div>
+        <button id="start-ai-mode-match" class="neon-button battle-start-btn" data-testid="start-ai-mode-match" ${aiModeDisabled ? "disabled" : ""} style="min-width: 170px; min-height: 56px; font-size: 22px; margin-top: 10px;">
+          ${view.joining ? "連線中..." : "開始對戰"}
+        </button>
+      </div>
+
+      <button class="back-button neon-button secondary" data-menu-screen="battle" style="min-width: 140px; min-height: 48px; font-size: 18px; margin-top: 10px;">返回</button>
+    </section>
+  `;
+}
+
+function renderPvpPlaceholderScreen(): string {
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  const accountMode = Boolean(supabase);
+  const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
+  const deckSlots = accountMode
+    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
+        <button class="deck-select" type="button">
+          <h3>Dev Deck</h3>
+          <span class="slot-info">Server default deck</span>
+        </button>
+      </div>`;
+
+  return `
+    <section class="screen placeholder-screen" data-screen="pvp-placeholder" style="background: #000000; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+      <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">玩家模式</h2>
+      
+      <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
+        ${deckSlots}
+        <button id="new-deck" type="button" class="deck-slot add-deck-slot">
+          <span class="plus-icon">+</span>
+          <span class="slot-info">新增牌組</span>
+        </button>
+      </div>
+
+      <p class="battle-selected-note" style="margin: 0; font-size: 16px;">
+        ${selectedDeck ? `已選擇：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一組完整 30 張牌組。" : "Dev mode 會使用伺服器預設牌組。"}
+      </p>
+
+      <div class="battle-selection-actions" style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 10px;">
+        <button id="find-match" class="neon-button battle-start-btn" data-testid="find-match" ${findDisabled ? "disabled" : ""} style="min-width: 170px; min-height: 56px; font-size: 22px;">
+          ${view.joining ? "連線中..." : "開始排隊"}
+        </button>
+        
+        <details class="advanced-disclosure battle-advanced" style="color: #cbbca2; font-size: 14px; cursor: pointer; display: block;">
+          <summary>進階設定</summary>
+          <form id="join-form-advanced" class="advanced-form" style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px; text-align: left;">
+            <label>Server URL
+              <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" style="margin-left: 8px; padding: 4px;" />
+            </label>
+            ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" style="margin-left: 8px; padding: 4px;" /></label>`}
+          </form>
+        </details>
+      </div>
+
+      <button class="back-button neon-button secondary" data-menu-screen="battle" style="min-width: 140px; min-height: 48px; font-size: 18px; margin-top: 10px;">返回</button>
+    </section>
+  `;
+}
+
 function renderMenu(): string {
   switch (view.menuScreen) {
     case "battle":
@@ -423,6 +619,10 @@ function renderMenu(): string {
       return renderLegacyShopScreen();
     case "ai":
       return renderAiBattleSetupScreen();
+    case "computer_placeholder":
+      return renderComputerPlaceholderScreen();
+    case "pvp_placeholder":
+      return renderPvpPlaceholderScreen();
     case "test":
       return devTestModeAvailable ? devTestPanel?.renderDevTestPanel(Boolean(view.joining || view.room)) ?? `<section class="screen" data-screen="test"></section>` : renderMainMenu();
     case "main":
@@ -611,31 +811,7 @@ function renderChangelogModal(): string {
 }
 
 function renderBattleScreen(): string {
-  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
-  const accountMode = Boolean(supabase);
   const activeMode = view.battleMode;
-  const battleModes: Array<{ value: BattleMode; title: string; description: string }> = [
-    { value: "challenge", title: "挑戰模式", description: "挑戰五大主題魔王" },
-    { value: "ai", title: "電腦模式", description: "與電腦對戰，選擇難度" },
-    { value: "pvp", title: "玩家模式", description: "線上排隊配對真人玩家" },
-    { value: "training", title: "訓練場", description: "固定腳本新手關卡" }
-  ];
-  const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
-  const aiEntryDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
-  const aiModeDisabled = view.joining || Boolean(view.matchmaking) || !view.aiDifficultySelected || (accountMode && (!view.session || !view.selectedDeckId));
-  const difficulties: { value: AiDifficulty; label: string }[] = [
-    { value: "easy", label: "簡單" },
-    { value: "normal", label: "普通" },
-    { value: "hard", label: "困難" }
-  ];
-  const deckSlots = accountMode
-    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
-    : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
-        <button class="deck-select" type="button">
-          <h3>Dev Deck</h3>
-          <span class="slot-info">Server default deck</span>
-        </button>
-      </div>`;
 
   return `
     <section class="screen battle-pick v1-deck-selection battle-mode-${activeMode}" data-screen="battle" data-dom-key="screen-battle">
@@ -649,66 +825,45 @@ function renderBattleScreen(): string {
           aria-pressed="${activeMode === "challenge"}"
           aria-label="挑戰模式"
         >
-          <img src="/images/ui/gamemode-arena-hotspot.webp" alt="" draggable="false" />
+          <img src="${processImageDechecker("/images/ui/gamemode-arena-hotspot.webp")}" alt="" draggable="false" />
+        </button>
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--ai ${activeMode === "ai" ? "selected" : ""}"
+          data-battle-mode="ai"
+          data-dom-key="battle-map-hotspot-ai"
+          data-testid="battle-map-hotspot-ai"
+          aria-pressed="${activeMode === "ai"}"
+          aria-label="電腦模式"
+        >
+          <img src="${processImageDechecker("/images/ui/gamemode-president.webp")}" alt="" draggable="false" />
+        </button>
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--pvp ${activeMode === "pvp" ? "selected" : ""}"
+          data-battle-mode="pvp"
+          data-dom-key="battle-map-hotspot-pvp"
+          data-testid="battle-map-hotspot-pvp"
+          aria-pressed="${activeMode === "pvp"}"
+          aria-label="玩家模式"
+        >
+          <img src="${processImageDechecker("/images/ui/gamemode-towel.webp")}" alt="" draggable="false" />
+        </button>
+        <button
+          type="button"
+          class="battle-map-hotspot battle-map-hotspot--training ${activeMode === "training" ? "selected" : ""}"
+          data-battle-mode="training"
+          data-dom-key="battle-map-hotspot-training"
+          data-testid="battle-map-hotspot-training"
+          aria-pressed="${activeMode === "training"}"
+          aria-label="訓練場"
+        >
+          <img src="${processImageDechecker("/images/ui/gamemode-training.webp")}" alt="" draggable="false" />
         </button>
       </div>
-      <div class="battle-selection-content">
+      <div class="battle-selection-content" style="grid-template-rows: auto auto 1fr;">
         <button class="back-button neon-button secondary" data-menu-screen="main" data-testid="back-to-menu">返回</button>
-        <h2 id="deck-select-title" class="sub-title">選擇戰鬥模式</h2>
-        <div class="battle-mode-grid" aria-label="戰鬥模式">
-          ${battleModes.map((mode) => `
-            <button
-              type="button"
-              class="battle-mode-card ${activeMode === mode.value ? "selected" : ""}"
-              data-battle-mode="${mode.value}"
-              data-dom-key="battle-mode-${mode.value}"
-              data-testid="battle-mode-${mode.value}"
-              aria-pressed="${activeMode === mode.value}"
-            >
-              <strong>${escapeHtml(mode.title)}</strong>
-              <span>${escapeHtml(mode.description)}</span>
-            </button>
-          `).join("")}
-        </div>
-        <div class="deck-slots-container" data-testid="battle-deck-list">
-          ${deckSlots}
-          <button id="new-deck" type="button" class="deck-slot add-deck-slot">
-            <span class="plus-icon">+</span>
-            <span class="slot-info">新增牌組</span>
-          </button>
-        </div>
-        <div class="battle-selection-actions">
-          <div class="battle-start-row">
-            <button class="neon-button battle-start-btn" data-menu-screen="ai" data-testid="battle-challenge-entry" ${aiEntryDisabled ? "disabled" : ""}>進入挑戰</button>
-            <button id="find-match" class="neon-button battle-start-btn" data-testid="find-match" ${findDisabled ? "disabled" : ""}>
-              ${view.joining ? "連線中..." : "開始排隊"}
-            </button>
-          </div>
-          <div class="battle-ai-mode-section">
-            <h4 class="ai-section-label">難度</h4>
-            <div class="ai-difficulty-options">
-              ${difficulties.map((opt) => `
-                <label class="ai-difficulty-option ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "selected" : ""}" data-dom-key="battle-difficulty-${opt.value}">
-                  <input type="radio" name="ai-difficulty" value="${opt.value}" ${view.aiDifficultySelected && view.aiDifficulty === opt.value ? "checked" : ""} />
-                  <strong>${escapeHtml(opt.label)}</strong>
-                </label>
-              `).join("")}
-            </div>
-            <button id="start-ai-mode-match" class="neon-button battle-start-btn" data-testid="start-ai-mode-match" ${aiModeDisabled ? "disabled" : ""}>
-              ${view.joining ? "連線中..." : "開始對戰"}
-            </button>
-          </div>
-          <details class="advanced-disclosure battle-advanced">
-            <summary>進階設定</summary>
-            <form id="join-form-advanced" class="advanced-form">
-              <label>Server URL
-                <input id="server-url-advanced" value="${escapeAttr(defaultServerUrl)}" />
-              </label>
-              ${accountMode ? "" : `<label>Display Name<input id="display-name-advanced" value="${escapeAttr(view.profile?.display_name ?? "Player")}" /></label>`}
-            </form>
-          </details>
-          <p class="battle-selected-note">${selectedDeck ? `已選擇：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一組完整 30 張牌組。" : "Dev mode 會使用伺服器預設牌組。"}</p>
-        </div>
+        <h2 id="deck-select-title" class="sub-title" style="margin-top: 20px;">選擇戰鬥模式</h2>
       </div>
       ${renderMatchmakingOverlay()}
     </section>
@@ -3243,9 +3398,20 @@ function bindStaticActions(): void {
     on(el, "click", "battle-mode", () => {
       const mode = el.dataset.battleMode as BattleMode | undefined;
       if (!mode) return;
-      // 訓練場 is its own dedicated level-select page, not an inline battle mode.
       if (mode === "training") {
         navigateToScreen("training");
+        return;
+      }
+      if (mode === "challenge") {
+        navigateToScreen("ai");
+        return;
+      }
+      if (mode === "ai") {
+        navigateToScreen("computer_placeholder");
+        return;
+      }
+      if (mode === "pvp") {
+        navigateToScreen("pvp_placeholder");
         return;
       }
       view.battleMode = mode;

@@ -19,24 +19,23 @@
   border: 0 !important;
 }
 
-.v1-deck-selection,
-.ai-battle-setup {
+.v1-deck-selection {
   position: relative;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, rgba(7, 18, 24, 0.28), rgba(7, 18, 24, 0.48)),
-    url("/images/ui/game-mode-map-base.webp") center / cover no-repeat,
-    url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
+  background: url("/Gamemode.webp") center / cover no-repeat;
   padding: 0;
   color: #f1e4d1;
 }
 
-/* 挑戰模式入口畫面 (ai-battle-setup) keeps its own background — not GameMode.webp. */
 .ai-battle-setup {
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(7, 18, 24, 0.16), rgba(7, 18, 24, 0.36)),
     url("/images/backgrounds/battle_map_bg.webp") center / cover no-repeat,
     url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
+  padding: 0;
+  color: #f1e4d1;
 }
 
 .battle-selection-content {
@@ -86,28 +85,55 @@
 
 .battle-map-hotspot:hover,
 .battle-map-hotspot:focus-visible,
-.battle-map-hotspot.selected {
-  transform: translateY(-8px) scale(1.035);
+.battle-map-hotspot.selected,
+.battle-map-hotspot:active {
+  transform: translate(-50%, -50%) !important;
+}
+
+.battle-map-hotspot:hover img,
+.battle-map-hotspot:focus-visible img {
   filter:
-    drop-shadow(0 0 8px rgba(255, 247, 190, 0.95))
-    drop-shadow(0 14px 18px rgba(0, 0, 0, 0.58));
+    drop-shadow(2px 0 0 #ffffff)
+    drop-shadow(-2px 0 0 #ffffff)
+    drop-shadow(0 2px 0 #ffffff)
+    drop-shadow(0 -2px 0 #ffffff)
+    drop-shadow(0 0 5px rgba(255, 255, 255, 0.8)) !important;
 }
 
 .battle-map-hotspot:focus-visible {
   outline: none;
 }
 
+/* 挑戰模式 (右下競技場) */
 .battle-map-hotspot--challenge {
-  left: 70%;
-  top: 61%;
-  width: clamp(230px, 24vw, 430px);
+  left: 67.5%;
+  top: 68.3%;
+  width: clamp(190px, 20vw, 380px);
   transform: translate(-50%, -50%);
 }
 
-.battle-map-hotspot--challenge:hover,
-.battle-map-hotspot--challenge:focus-visible,
-.battle-map-hotspot--challenge.selected {
-  transform: translate(-50%, calc(-50% - 8px)) scale(1.035);
+/* 電腦模式 (地圖中央) */
+.battle-map-hotspot--ai {
+  left: 45.8%;
+  top: 41.2%;
+  width: clamp(160px, 16vw, 320px);
+  transform: translate(-50%, -50%);
+}
+
+/* 玩家模式 (地圖左下) */
+.battle-map-hotspot--pvp {
+  left: 29.5%;
+  top: 63.5%;
+  width: clamp(150px, 15vw, 290px);
+  transform: translate(-50%, -50%);
+}
+
+/* 訓練場 (地圖左上) */
+.battle-map-hotspot--training {
+  left: 22.5%;
+  top: 33.5%;
+  width: clamp(140px, 15vw, 290px);
+  transform: translate(-50%, -50%);
 }
 
 .v1-deck-selection .back-button {
@@ -168,6 +194,21 @@
     linear-gradient(180deg, rgba(79, 96, 47, 0.92), rgba(54, 38, 24, 0.9)),
     rgba(36, 40, 20, 0.86);
   box-shadow: 0 0 24px rgba(255, 215, 0, 0.36), 0 12px 26px rgba(0, 0, 0, 0.48);
+}
+
+.battle-mode-card:hover {
+  border-color: #ffffff !important;
+  box-shadow: 0 0 16px rgba(255, 255, 255, 0.4), 0 10px 22px rgba(0, 0, 0, 0.42) !important;
+}
+
+.battle-mode-card:active {
+  transform: none !important;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+
+.battle-mode-card:focus,
+.battle-mode-card:focus-visible {
+  outline: none !important;
 }
 
 .deck-slots-container {
