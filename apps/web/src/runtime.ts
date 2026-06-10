@@ -514,7 +514,7 @@ function renderComputerPlaceholderScreen(): string {
       </div>`;
 
   return `
-    <section class="screen placeholder-screen" data-screen="computer-placeholder" style="background: url('/images/backgrounds/AImode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+    <section class="screen placeholder-screen" data-screen="computer-placeholder" style="background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/images/backgrounds/AImode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
       <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">電腦模式</h2>
       
       <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
@@ -563,7 +563,7 @@ function renderPvpPlaceholderScreen(): string {
       </div>`;
 
   return `
-    <section class="screen placeholder-screen" data-screen="pvp-placeholder" style="background: url('/images/backgrounds/arenamode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+    <section class="screen placeholder-screen" data-screen="pvp-placeholder" style="background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/images/backgrounds/arenamode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
       <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">玩家模式</h2>
       
       <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
@@ -619,6 +619,8 @@ function renderMenu(): string {
       return renderLegacyShopScreen();
     case "ai":
       return renderAiBattleSetupScreen();
+    case "challenge_setup":
+      return renderChallengeSetupScreen();
     case "computer_placeholder":
       return renderComputerPlaceholderScreen();
     case "pvp_placeholder":
@@ -963,14 +965,54 @@ function renderAiBattleSetupScreen(): string {
             <div id="start-battle-wrapper" class="${aiDisabled ? "disabled" : ""}">
               <button id="start-ai-match" class="hearth-select-btn" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
                 <div class="btn-ripple"></div>
-                <span class="btn-text">${view.joining ? "連線" : "選擇"}</span>
+                <span class="btn-text">${view.joining ? "連線" : "開始挑戰"}</span>
                 <div class="ring-glow"></div>
               </button>
             </div>
-            <button class="neon-button secondary" data-menu-screen="battle">返回</button>
+            <button class="neon-button secondary" data-menu-screen="challenge_setup">返回</button>
           </div>
         </div>
       </div>
+    </section>
+  `;
+}
+
+function renderChallengeSetupScreen(): string {
+  const selectedDeck = view.decks.find((deck) => deck.id === view.selectedDeckId);
+  const accountMode = Boolean(supabase);
+  const startDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
+  const deckSlots = accountMode
+    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
+        <button class="deck-select" type="button">
+          <h3>Dev Deck</h3>
+          <span class="slot-info">Server default deck</span>
+        </button>
+      </div>`;
+
+  return `
+    <section class="screen placeholder-screen" data-screen="challenge-setup" style="background: linear-gradient(rgba(0, 0, 0, 0.45), rgba(0, 0, 0, 0.45)), url('/images/backgrounds/Challengemode_bg.webp') center / cover no-repeat; width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 20px; padding: 40px; overflow-y: auto;">
+      <h2 style="color: #ffffff; font-size: 38px; text-shadow: 0 0 10px rgba(255,255,255,0.5); font-family: var(--font-display); margin: 0;">挑戰模式</h2>
+      
+      <div class="deck-slots-container" data-testid="battle-deck-list" style="margin: 10px 0;">
+        ${deckSlots}
+        <button id="new-deck" type="button" class="deck-slot add-deck-slot">
+          <span class="plus-icon">+</span>
+          <span class="slot-info">新增牌組</span>
+        </button>
+      </div>
+
+      <p class="battle-selected-note" style="margin: 0; font-size: 16px;">
+        ${selectedDeck ? `已選擇：${escapeHtml(selectedDeck!.name)}` : accountMode ? "請選擇一組完整 30 張牌組。" : "Dev mode 會使用伺服器預設牌組。"}
+      </p>
+
+      <div class="battle-selection-actions" style="display: flex; flex-direction: column; align-items: center; gap: 14px; margin-top: 10px;">
+        <button id="start-challenge-btn" class="neon-button battle-start-btn" ${startDisabled ? "disabled" : ""} style="min-width: 170px; min-height: 56px; font-size: 22px;">
+          開始挑戰
+        </button>
+      </div>
+
+      <button class="back-button neon-button secondary" data-menu-screen="battle" style="min-width: 140px; min-height: 48px; font-size: 18px; margin-top: 10px;">返回</button>
     </section>
   `;
 }
@@ -1053,7 +1095,6 @@ function renderProfileScreen(): string {
   const xpRequired = getXPRequiredForLevel(level);
   const xpProgress = level >= MAX_LEVEL || xpRequired <= 0 ? 100 : Math.min(100, Math.round((xp / xpRequired) * 100));
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
-  const ownedCardCount = [...buildCollectionMap(view.collection).values()].reduce((sum, quantity) => sum + quantity, 0);
   const title = profile?.selected_title ? `#${titleLabel(profile.selected_title)}` : "未設定稱號";
   const avatars = ["avatar1", "avatar2", "avatar3", "avatar4"];
   const ownedAvatars = avatars.filter((slug) => profile?.owned_avatars?.includes(slug));
@@ -1076,6 +1117,7 @@ function renderProfileScreen(): string {
               <img class="profile-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
               <span class="profile-avatar-edit-overlay" aria-hidden="true">✏️</span>
             </button>
+            <div class="profile-level-badge">Lv. ${level}</div>
           </div>
           <div class="profile-identity">
             <form id="profile-form" class="profile-form">
@@ -1100,11 +1142,6 @@ function renderProfileScreen(): string {
                 : `<div class="profile-title-badge">${escapeHtml(title)}</div>`
               }
             </div>
-            <div class="profile-ribbon">
-              <span>Lv. ${level}</span>
-              <span>${stats.wins} 勝</span>
-              <span>${winRateLabel} 勝率</span>
-            </div>
             <div class="profile-xp" data-testid="profile-xp-bar">
               <div class="profile-xp-top">
                 <span>經驗值</span>
@@ -1122,15 +1159,15 @@ function renderProfileScreen(): string {
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="profile-section profile-section--wallet">
-          <h3>帳號資源</h3>
-          <div class="profile-resource-grid">
-            <div class="profile-resource"><span>金幣</span><strong>${profile?.gold ?? 0}</strong></div>
-            <div class="profile-resource"><span>消費券</span><strong>${profile?.vouchers ?? 0}</strong></div>
-            <div class="profile-resource"><span>卡牌收藏</span><strong>${ownedCardCount}</strong></div>
-            <div class="profile-resource"><span>牌組</span><strong>${view.decks.length}</strong></div>
+          <div class="profile-currency-badges">
+            <div class="profile-currency-badge" title="金幣">
+              <img src="/images/ui/Coin.webp" alt="金幣" class="profile-currency-icon" />
+              <span>${profile?.gold ?? 0}</span>
+            </div>
+            <div class="profile-currency-badge" title="消費券">
+              <img src="/images/ui/voucher.webp" alt="消費券" class="profile-currency-icon" />
+              <span>${profile?.vouchers ?? 0}</span>
+            </div>
           </div>
         </div>
 
@@ -3415,7 +3452,7 @@ function bindStaticActions(): void {
         return;
       }
       if (mode === "challenge") {
-        navigateToScreen("ai");
+        navigateToScreen("challenge_setup");
         return;
       }
       if (mode === "ai") {
@@ -3660,6 +3697,9 @@ function bindStaticActions(): void {
   }
   on(document.querySelector<HTMLButtonElement>("#start-ai-match"), "click", "start-ai-match", () => {
     void startAiMatch();
+  });
+  on(document.querySelector<HTMLButtonElement>("#start-challenge-btn"), "click", "start-challenge", () => {
+    navigateToScreen("ai");
   });
   on(document.querySelector<HTMLButtonElement>("#start-ai-mode-match"), "click", "start-ai-mode-match", () => {
     void startAiMatch({ withTheme: false });
