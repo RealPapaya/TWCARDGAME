@@ -86,7 +86,7 @@ export function createMatchRewardsWithClient(
   };
 }
 
-export function isHumanUser(userId: string | undefined | null): boolean {
+export function isHumanUser(userId: string | undefined | null): userId is string {
   return typeof userId === "string" && UUID_PATTERN.test(userId);
 }
 

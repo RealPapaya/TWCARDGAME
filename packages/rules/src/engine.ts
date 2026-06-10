@@ -190,7 +190,7 @@ export function reduce(state: MatchState, envelope: CommandEnvelope, catalogInpu
   const activeSeatBefore = next.turn.activeSeat;
   const serverTimeoutEndTurn = envelope.serverTimeout === true && envelope.command.type === "endTurn";
 
-  // 通靈 / Discover: while a choice prompt is open the active seat may only resolve
+  // 教召 / Discover: while a choice prompt is open the active seat may only resolve
   // it. A timed-out turn auto-resolves with the first candidate, then ends as usual.
   if (next.pendingPrompt) {
     if (envelope.command.type === "resolvePrompt") {

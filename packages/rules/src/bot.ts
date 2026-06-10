@@ -89,7 +89,7 @@ function scoreMove(state: MatchState, seat: Seat, move: GameCommand): number {
   return 0;
 }
 
-/** 通靈 / Discover: pick the highest-value candidate (stats for minions, cost otherwise). */
+/** 教召 / Discover: pick the highest-value candidate (stats for minions, cost otherwise). */
 function scoreResolvePrompt(state: MatchState, move: Extract<GameCommand, { type: "resolvePrompt" }>): number {
   const card = state.private.pendingChoice?.cards.find((c) => c.instanceId === move.choiceInstanceId);
   if (!card) return 0;

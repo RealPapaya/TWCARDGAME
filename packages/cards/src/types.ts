@@ -18,7 +18,7 @@ export interface EffectDefinition {
   target_category_includes?: string;
   excluded_categories?: string[];
   /**
-   * 通靈 / Discover (CHANNEL): restricts the candidate pool to this card type. When
+   * 教召 / Discover (CHANNEL): restricts the candidate pool to this card type. When
    * omitted, any deck card qualifies. Combine with `target_category_includes` for a
    * category filter and `count` for how many cards are revealed (default 3).
    */

@@ -1371,7 +1371,7 @@ body.hand-dragging .hand-row .card {
   box-shadow: 0 0 20px rgba(255, 51, 51, 0.45), 0 8px 20px rgba(0, 0, 0, 0.55);
 }
 
-/* 通靈 / Discover picker — cards are click-to-pick, so highlight on hover. */
+/* 教召 / Discover picker — cards are click-to-pick, so highlight on hover. */
 .card.channel-card {
   cursor: pointer;
 }

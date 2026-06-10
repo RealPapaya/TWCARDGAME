@@ -28,6 +28,7 @@ const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_a
 const trainingCompletionsMigration = readFileSync(new URL("../migrations/0019_training_completions.sql", import.meta.url), "utf8");
 const collisionTrainingMigration = readFileSync(new URL("../migrations/0020_training_collision_news.sql", import.meta.url), "utf8");
 const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_training_card_lessons.sql", import.meta.url), "utf8");
+const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
   const browserTables = ["profiles", "card_catalog_snapshots", "decks", "card_collections", "match_history"];
@@ -223,5 +224,65 @@ describe("Supabase RLS migration coverage", () => {
     expect(cardLessonsTrainingMigration).toContain("when 'advanced_keywords' then v_reward_gold := 100;");
     expect(cardLessonsTrainingMigration).toContain("when 'amp_field' then v_reward_gold := 100;");
     expect(cardLessonsTrainingMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
+  });
+});
+
+describe("Tasks / achievements migration (0023)", () => {
+  it("adds recurrence and a period dimension to the quest progress key", () => {
+    expect(tasksMigration).toContain("add column if not exists recurrence text not null default 'once'");
+    expect(tasksMigration).toContain("recurrence in ('once', 'daily', 'weekly')");
+    expect(tasksMigration).toContain("add column if not exists period_key text not null default ''");
+    expect(tasksMigration).toContain("primary key (user_id, quest_id, period_key)");
+  });
+
+  it("derives the daily reset bucket from the Asia/Taipei server clock", () => {
+    expect(tasksMigration).toContain("create or replace function public.quest_period_key(p_recurrence text)");
+    expect(tasksMigration).toContain("now() at time zone 'Asia/Taipei'");
+  });
+
+  it("keeps progress writers service-role only and emit_user_event signature stable", () => {
+    expect(tasksMigration).toContain("revoke all on function public.emit_user_progress_event(uuid, text, integer, text, text, jsonb) from public;");
+    expect(tasksMigration).toContain("grant execute on function public.emit_user_progress_event(uuid, text, integer, text, text, jsonb) to service_role;");
+    // emit_user_event keeps its (uuid, text, text, text, jsonb) signature and now delegates.
+    expect(tasksMigration).toContain("return public.emit_user_progress_event(p_user_id, p_event_type, 1, p_source_type, p_source_id, p_metadata);");
+    expect(tasksMigration).toContain("on conflict (user_id, quest_id, period_key) do update");
+    // No new public/anon exposure introduced by this migration.
+    expect(tasksMigration).not.toContain("to anon");
+  });
+
+  it("claims rewards through an authenticated, server-validated, single-use RPC", () => {
+    expect(tasksMigration).toContain("create or replace function public.claim_quest_reward(p_quest_id text)");
+    expect(tasksMigration).toContain("v_user uuid := auth.uid();");
+    // Reward amount is read server-side, never from client input.
+    expect(tasksMigration).toContain("(q.reward->>'gold')::integer");
+    // Anti-refarm guards + row lock.
+    expect(tasksMigration).toContain("for update");
+    expect(tasksMigration).toContain("prog.completed_at is null");
+    expect(tasksMigration).toContain("prog.claimed_at is not null");
+    expect(tasksMigration).toContain("public.adjust_user_currency(");
+    expect(tasksMigration).toContain("set claimed_at = now()");
+    expect(tasksMigration).toContain("revoke all on function public.claim_quest_reward(text) from public;");
+    expect(tasksMigration).toContain("grant execute on function public.claim_quest_reward(text) to authenticated;");
+  });
+
+  it("seeds the starter achievements and daily tasks as active quests", () => {
+    expect(tasksMigration).toContain("insert into public.quest_definitions");
+    for (const id of [
+      "ach_first_pve_win",
+      "ach_first_pvp_win",
+      "ach_reach_level_10",
+      "ach_win_10_total",
+      "daily_login",
+      "daily_win_1",
+      "daily_play_10_cards",
+      "daily_summon_5",
+      "daily_deal_30_dmg"
+    ]) {
+      expect(tasksMigration).toContain(`'${id}'`);
+    }
+    for (const eventType of ["pve_win", "match_played", "match_won", "cards_played", "minions_summoned", "damage_dealt"]) {
+      expect(tasksMigration).toContain(`'${eventType}'`);
+    }
+    expect(tasksMigration).toContain("on conflict (id) do update");
   });
 });

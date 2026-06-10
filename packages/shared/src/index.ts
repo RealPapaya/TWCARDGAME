@@ -285,16 +285,16 @@ export interface PendingPrompt {
   sourceInstanceId: string;
   validTargets: TargetRef[];
   /**
-   * Choice prompts (通靈 / Discover): how many cards are offered. PUBLIC count only —
+   * Choice prompts (教召 / Discover): how many cards are offered. PUBLIC count only —
    * the candidate card identities are private and delivered per-seat via
    * {@link PromptChoiceOffer}, never in the synced state (they would leak deck order).
    */
   choiceCount?: number;
-  /** Choice prompts: short label for the picker UI, e.g. "通靈". */
+  /** Choice prompts: short label for the picker UI, e.g. "教召". */
   label?: string;
 }
 
-/** One offered card in a 通靈 / Discover choice prompt (private per-seat). */
+/** One offered card in a 教召 / Discover choice prompt (private per-seat). */
 export interface PromptChoiceCardView {
   instanceId: string;
   cardId: string;
@@ -304,7 +304,7 @@ export interface PromptChoiceCardView {
   health?: number;
 }
 
-/** Private direct message delivering a seat's 通靈 / Discover candidate cards. */
+/** Private direct message delivering a seat's 教召 / Discover candidate cards. */
 export interface PromptChoiceOffer {
   promptId: string;
   label?: string;

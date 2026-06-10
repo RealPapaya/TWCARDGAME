@@ -483,11 +483,11 @@ describe("target legality", () => {
   });
 });
 
-describe("通靈 / Discover (CHANNEL)", () => {
+describe("教召 / Discover (CHANNEL)", () => {
   function channelDef(): CardDefinition {
     return {
       id: "TEST_CHANNEL",
-      name: "通靈測試",
+      name: "教召測試",
       category: "新聞",
       cost: 0,
       type: "NEWS",

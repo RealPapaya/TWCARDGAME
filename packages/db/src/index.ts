@@ -110,6 +110,7 @@ export interface QuestDefinitionRow {
   description?: string | null;
   event_type: string;
   target_count: number;
+  recurrence?: "once" | "daily" | "weekly";
   reward?: Record<string, unknown>;
   active: boolean;
   starts_at?: string | null;
@@ -195,6 +196,33 @@ export async function persistMatchHistory(client: SupabaseClient, row: MatchHist
 
 export async function recordPvpWin(client: SupabaseClient, matchId: string): Promise<void> {
   const { error } = await client.rpc("record_pvp_win", { p_match_id: matchId });
+  if (error) throw error;
+}
+
+export interface EmitUserEventInput {
+  userId: string;
+  eventType: string;
+  /** Quest-progress increment for this event. Defaults to 1. */
+  amount?: number;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Server-only. Records a user_event and advances matching active quests by
+ * `amount` (bucketed per quest period). Wraps the service_role-only
+ * `emit_user_progress_event` RPC — clients cannot call this.
+ */
+export async function emitUserProgressEvent(client: SupabaseClient, input: EmitUserEventInput): Promise<void> {
+  const { error } = await client.rpc("emit_user_progress_event", {
+    p_user_id: input.userId,
+    p_event_type: input.eventType,
+    p_amount: input.amount ?? 1,
+    p_source_type: input.sourceType ?? null,
+    p_source_id: input.sourceId ?? null,
+    p_metadata: input.metadata ?? {}
+  });
   if (error) throw error;
 }
 

@@ -89,7 +89,7 @@ export interface BattleLogEntry {
   /** Acting seat, for friendly/enemy tinting. */
   seat?: Seat;
 }
-export type MenuScreen = "main" | "battle" | "training" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "ai" | "test" | "computer_placeholder" | "pvp_placeholder" | "challenge_setup";
+export type MenuScreen = "main" | "battle" | "training" | "profile" | "collection" | "deckEditor" | "friends" | "leaderboard" | "shop" | "tasks" | "ai" | "test" | "computer_placeholder" | "pvp_placeholder" | "challenge_setup";
 export type BattleMode = "training" | "challenge" | "pvp" | "ai";
 export type CollectionFilter = "all" | "owned" | "missing";
 export type CollectionSort = "cost-asc" | "cost-desc" | "rarity" | "name";
@@ -184,7 +184,7 @@ export type ClientViewState = {
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];
-  /** This seat's privately-delivered 通靈 / Discover candidate cards, while a choice prompt is open. */
+  /** This seat's privately-delivered 教召 / Discover candidate cards, while a choice prompt is open. */
   promptChoice?: PromptChoiceOffer;
   specialPhasePeek?: boolean;
   amplificationRerollStage?: "out" | "in";
@@ -273,6 +273,8 @@ export type ClientViewState = {
   publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
+  tasks: TaskView[];
+  tasksLoading?: boolean;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
   packOpeningRewards?: PackOpeningReward[];
   packOpeningFlipped?: boolean[];
@@ -330,6 +332,38 @@ export type ProfileRow = {
   current_login_streak?: number;
   longest_login_streak?: number;
   last_login_date?: string | null;
+};
+
+export type TaskRecurrence = "once" | "daily" | "weekly";
+
+/** Active row from `quest_definitions` (read via RLS for display). */
+export type TaskQuestRow = {
+  id: string;
+  display_name: string;
+  description?: string | null;
+  event_type: string;
+  target_count: number;
+  recurrence: TaskRecurrence;
+  reward?: { gold?: number } & Record<string, unknown>;
+  active: boolean;
+};
+
+/** The caller's own `user_quest_progress` row for the current period. */
+export type TaskProgressRow = {
+  quest_id: string;
+  period_key: string;
+  current_count: number;
+  completed_at?: string | null;
+  claimed_at?: string | null;
+};
+
+/** A quest joined with the caller's progress for the current period. */
+export type TaskView = {
+  quest: TaskQuestRow;
+  progress?: TaskProgressRow;
+  state: "in-progress" | "claimable" | "claimed";
+  current: number;
+  target: number;
 };
 
 export type DeckRow = {

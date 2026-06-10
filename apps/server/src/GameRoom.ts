@@ -22,6 +22,7 @@ import { logger } from "./logger.js";
 import { isMatchComplete, MatchResultFinalizer } from "./matchFinalizer.js";
 import { createMatchResultPersistenceFromEnv, type MatchPersistenceMetadata, type MatchResultPersistence } from "./persistence.js";
 import { createMatchRewardsFromEnv, type MatchRewardDispatcher } from "./rewards.js";
+import { createTaskEventsFromEnv, type MatchTaskEventDispatcher } from "./taskEvents.js";
 import { generateUniqueJoinCode, normalizeJoinCode, registerJoinCode, releaseJoinCodeForRoom } from "./privateRooms.js";
 import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
@@ -70,7 +71,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   constructor(
     persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv(),
     protected readonly accountStore: AccountDeckStore = createAccountDeckStoreFromEnv(),
-    protected readonly rewards: MatchRewardDispatcher = createMatchRewardsFromEnv()
+    protected readonly rewards: MatchRewardDispatcher = createMatchRewardsFromEnv(),
+    protected readonly taskEvents: MatchTaskEventDispatcher = createTaskEventsFromEnv()
   ) {
     super();
     this.finalizer = new MatchResultFinalizer(persistence);
@@ -353,7 +355,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (this.match.phase === "AMPLIFICATION_PHASE" && this.match.specialPhase?.amplificationOptions) {
       client.send("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] });
     }
-    // 通靈 / Discover: the candidate cards are private to the prompted seat (revealing
+    // 教召 / Discover: the candidate cards are private to the prompted seat (revealing
     // them publicly would leak deck order), so deliver them only here.
     const promptChoice = toPromptChoiceOffer(this.match, seat);
     if (promptChoice) client.send("promptChoice", promptChoice);
@@ -404,6 +406,14 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       }
     } catch (error) {
       logger.warn("match.rewards.dispatch_failed", { matchId: this.match.matchId, error });
+    }
+    // Emit task/achievement progress events after rewards (so level_up events from
+    // grantForMatch precede level quests), and isolated so a failure never blocks
+    // reward delivery. Runs once per match via the same single-call guarantee.
+    try {
+      await this.taskEvents.emitForMatch(this.match, metadata);
+    } catch (error) {
+      logger.warn("match.taskEvents.failed", { matchId: this.match.matchId, error });
     }
   }
 

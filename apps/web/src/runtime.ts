@@ -103,7 +103,10 @@ import type {
   ProfileRow,
   PurchaseShopResult,
   ResolvedCardView,
-  ShopItemRow
+  ShopItemRow,
+  TaskProgressRow,
+  TaskQuestRow,
+  TaskView
 } from "./app/types.js";
 import { installViewportGuards } from "./app/viewport.js";
 import {
@@ -258,6 +261,7 @@ const view: ClientViewState = {
   leaderboardSortBy: "wins",
   publicPlayerProfile: undefined,
   shopItems: [],
+  tasks: [],
   aiDifficulty: "normal",
   aiDifficultySelected: true,
   aiTheme: AI_THEMES[0].id,
@@ -625,6 +629,8 @@ function renderMenu(): string {
       return renderLeaderboardScreen();
     case "shop":
       return renderLegacyShopScreen();
+    case "tasks":
+      return renderTasksScreen();
     case "ai":
       return renderAiBattleSetupScreen();
     case "challenge_setup":
@@ -775,6 +781,11 @@ function renderMainMenu(): string {
             <img class="corner-icon" src="/images/ui/Shop.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">💰</span>
             <span class="corner-label">商店</span>
+          </button>
+          <button class="menu-corner-btn" data-menu-screen="tasks" data-testid="menu-tasks" ${accountMode ? "" : "disabled"}>
+            <img class="corner-icon" src="/images/ui/Quest.webp" alt="任務" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="corner-icon-emoji" style="display:none">📋</span>
+            <span class="corner-label">任務</span>
           </button>
         </nav>
       </div>
@@ -2696,7 +2707,7 @@ function renderAmplificationOverlay(): string {
 }
 
 /**
- * 通靈 / Discover picker — the privately-delivered candidate cards, presented
+ * 教召 / Discover picker — the privately-delivered candidate cards, presented
  * mulligan-style. Shown only while this seat owns the open choice prompt; clicking
  * a card sends `resolvePrompt` to add it to hand.
  */
@@ -2706,7 +2717,7 @@ function renderChannelOverlay(): string {
   return `
     <section id="channel-modal" class="mulligan-overlay channel-overlay" data-testid="channel-overlay">
       <div class="mulligan-content channel-content">
-        <h2>${escapeHtml(offer.label ?? "通靈")}</h2>
+        <h2>${escapeHtml(offer.label ?? "教召")}</h2>
         <p>從卡池中選擇 1 張加入手牌</p>
         <div class="mulligan-card-area channel-card-area">
           ${offer.cards.map((card) => renderChannelCard(offer.promptId, card)).join("")}
@@ -2733,7 +2744,7 @@ function renderChannelCard(promptId: string, card: PromptChoiceOffer["cards"][nu
   `;
 }
 
-/** This seat's live 通靈 offer, or undefined once the prompt is resolved/cleared. */
+/** This seat's live 教召 offer, or undefined once the prompt is resolved/cleared. */
 function currentPromptChoice(): PromptChoiceOffer | undefined {
   const offer = view.promptChoice;
   if (!offer) return undefined;
@@ -3835,6 +3846,12 @@ function bindStaticActions(): void {
       if (id) void claimShopItem(id);
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-claim-task]")) {
+    on(el, "click", "claim-task", () => {
+      const id = el.dataset.claimTask;
+      if (id) void claimTask(id);
+    });
+  }
   bindPackOpeningActions();
   for (const el of document.querySelectorAll<HTMLInputElement>('input[name="ai-difficulty"]')) {
     on(el, "change", "ai-difficulty", () => {
@@ -4051,6 +4068,7 @@ function navigateToScreen(target: MenuScreen): void {
   if (target === "friends") void loadFriends();
   if (target === "leaderboard") void loadLeaderboard();
   if (target === "shop") void loadShopItems();
+  if (target === "tasks") void loadTasks();
   render();
   if (target === "collection" && supabase && view.session?.user) void loadAccountData();
 }
@@ -4788,6 +4806,147 @@ async function loadShopItems(): Promise<void> {
     view.shopLoading = false;
     render();
   }
+}
+
+/** YYYY-MM-DD in Asia/Taipei — must match the server's quest_period_key(). */
+function todayTaipei(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Taipei" }).format(new Date());
+}
+
+/** Joins active quests with the caller's progress row for the CURRENT period. */
+function joinTasks(quests: TaskQuestRow[], progress: TaskProgressRow[]): TaskView[] {
+  const byQuestPeriod = new Map<string, TaskProgressRow>();
+  for (const row of progress) byQuestPeriod.set(`${row.quest_id}:${row.period_key}`, row);
+  const stateRank = { claimable: 0, "in-progress": 1, claimed: 2 } as const;
+  return quests
+    .map((quest): TaskView => {
+      const expectedPeriod = quest.recurrence === "daily" ? todayTaipei() : "";
+      const prog = byQuestPeriod.get(`${quest.id}:${expectedPeriod}`);
+      const target = quest.target_count;
+      const current = Math.min(prog?.current_count ?? 0, target);
+      const state: TaskView["state"] = prog?.claimed_at
+        ? "claimed"
+        : prog?.completed_at
+          ? "claimable"
+          : "in-progress";
+      return { quest, progress: prog, state, current, target };
+    })
+    .sort((a, b) => stateRank[a.state] - stateRank[b.state]);
+}
+
+async function loadTasks(): Promise<void> {
+  const session = view.session;
+  if (!supabase || !session?.user) return;
+  view.tasksLoading = true;
+  render();
+  try {
+    const userId = session.user.id;
+    const [questsResult, progressResult] = await Promise.all([
+      supabase
+        .from("quest_definitions")
+        .select("id,display_name,description,event_type,target_count,recurrence,reward,active")
+        .eq("active", true),
+      supabase
+        .from("user_quest_progress")
+        .select("quest_id,period_key,current_count,completed_at,claimed_at")
+        .eq("user_id", userId)
+    ]);
+    if (questsResult.error) throw questsResult.error;
+    if (progressResult.error) throw progressResult.error;
+    const quests = (questsResult.data as TaskQuestRow[]) ?? [];
+    const progress = (progressResult.data as TaskProgressRow[]) ?? [];
+    view.tasks = joinTasks(quests, progress);
+  } catch (error) {
+    showAlert(error instanceof Error ? error.message : "Failed to load tasks.");
+  } finally {
+    view.tasksLoading = false;
+    render();
+  }
+}
+
+async function claimTask(questId: string): Promise<void> {
+  if (!supabase || !view.session) return;
+  try {
+    const { data, error } = await supabase.rpc("claim_quest_reward", { p_quest_id: questId });
+    if (error) throw error;
+    const result = data as { goldGranted?: number } | null;
+    const granted = result?.goldGranted ?? 0;
+    showToast(granted > 0 ? `領取成功！+${granted} 金幣` : "領取成功！");
+    await loadAccountDataRaw();
+    await loadTasks();
+  } catch (error) {
+    showAlert(error instanceof Error ? error.message : "領取失敗。");
+  }
+}
+
+const TASK_SECTIONS: Array<{ title: string; match: (task: TaskView) => boolean }> = [
+  { title: "每日任務", match: (task) => task.quest.recurrence !== "once" },
+  { title: "成就", match: (task) => task.quest.recurrence === "once" }
+];
+
+function renderTasksScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode || !view.session) {
+    return signInRequiredScreen("任務 · Tasks");
+  }
+  const gold = view.profile?.gold ?? 0;
+  const body = view.tasksLoading
+    ? `<p class="muted">載入中…</p>`
+    : view.tasks.length === 0
+      ? `<p class="muted">目前沒有可進行的任務。</p>`
+      : TASK_SECTIONS.map((section) => {
+          const rows = view.tasks.filter(section.match);
+          if (rows.length === 0) return "";
+          return `
+            <section class="task-section">
+              <h3 class="task-section-title">${escapeHtml(section.title)}</h3>
+              <div class="task-list">${rows.map(renderTaskRow).join("")}</div>
+            </section>
+          `;
+        }).join("");
+  return `
+    <section class="screen shop-screen tasks-screen" data-screen="tasks">
+      <div class="shop-container">
+        <header class="shop-header">
+          <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
+          <h2 class="shop-title">任務</h2>
+          <div class="shop-gold-display">
+            <img class="gold-icon" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <span id="tasks-gold-amount">${gold}</span>
+          </div>
+        </header>
+        <div class="shop-products tasks-body" data-preserve-scroll>${body}</div>
+      </div>
+    </section>
+  `;
+}
+
+function renderTaskRow(task: TaskView): string {
+  const reward = task.quest.reward?.gold ?? 0;
+  const pct = task.target > 0 ? Math.min(100, Math.round((task.current / task.target) * 100)) : 0;
+  let control: string;
+  if (task.state === "claimed") {
+    control = `<button class="task-claim-btn" disabled>已領取</button>`;
+  } else if (task.state === "claimable") {
+    control = `<button class="task-claim-btn ready" data-claim-task="${escapeAttr(task.quest.id)}" data-testid="claim-task">領取</button>`;
+  } else {
+    control = `<span class="task-progress-count">${task.current}/${task.target}</span>`;
+  }
+  return `
+    <article class="task-card task-state-${task.state}" data-testid="task-item">
+      <div class="task-info">
+        <div class="task-head">
+          <span class="task-name">${escapeHtml(task.quest.display_name)}</span>
+          ${reward > 0
+            ? `<span class="task-reward"><img class="task-coin" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">+${reward}</span>`
+            : ""}
+        </div>
+        ${task.quest.description ? `<p class="task-desc">${escapeHtml(task.quest.description)}</p>` : ""}
+        <div class="xp-bar-track task-bar"><div class="xp-bar-fill" style="width:${pct}%"></div></div>
+      </div>
+      <div class="task-action">${control}</div>
+    </article>
+  `;
 }
 
 async function claimShopItem(itemId: string): Promise<void> {
@@ -5579,7 +5738,7 @@ function activateRoomStateWhenReady(nextState: any): boolean {
   return true;
 }
 
-/** Drop a stored 通靈 offer once its prompt has been resolved/cleared (or replaced). */
+/** Drop a stored 教召 offer once its prompt has been resolved/cleared (or replaced). */
 function syncPromptChoiceState(): void {
   const promptId = (view.state?.pendingPromptId as string | undefined) ?? "";
   if (view.promptChoice && view.promptChoice.promptId !== promptId) {

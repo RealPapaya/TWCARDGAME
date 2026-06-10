@@ -34,7 +34,7 @@ export function legalMoves(state: MatchState, seat: Seat): GameCommand[] {
   return moves;
 }
 
-/** 通靈 / Discover: one resolvePrompt move per privately-held candidate card. */
+/** 教召 / Discover: one resolvePrompt move per privately-held candidate card. */
 function legalPromptMoves(state: MatchState, seat: Seat): GameCommand[] {
   const pending = state.private.pendingChoice;
   if (!pending || pending.seat !== seat) return [];
