@@ -177,6 +177,8 @@ export class GameStateSchema extends Schema {
   resultWinnerSeat = "";
   resultReason = "";
   boardLimit = 7;
+  activeEnvironmentId = "";
+  activeEnvironmentName = "";
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -193,7 +195,9 @@ defineTypes(GameStateSchema, {
   specialPhase: SpecialPhaseSchema,
   resultWinnerSeat: "string",
   resultReason: "string",
-  boardLimit: "number"
+  boardLimit: "number",
+  activeEnvironmentId: "string",
+  activeEnvironmentName: "string"
 });
 
 export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameState): void {
@@ -216,6 +220,8 @@ export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameS
   schema.resultWinnerSeat = state.result?.winnerSeat ?? "";
   schema.resultReason = state.result?.reason ?? "";
   schema.boardLimit = state.boardLimit;
+  schema.activeEnvironmentId = state.activeEnvironment?.id ?? "";
+  schema.activeEnvironmentName = state.activeEnvironment?.name ?? "";
 }
 
 function syncSpecialPhase(target: SpecialPhaseSchema, sp: SpecialPhaseView | undefined): void {

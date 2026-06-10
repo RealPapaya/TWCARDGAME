@@ -303,6 +303,17 @@ export interface PublicGameState {
   result?: MatchResult;
   /** Current per-side board cap (7 normally, lowered by the 社交距離 referendum). */
   boardLimit: number;
+  /**
+   * The active global 公投 venue/field effect installed by the turn-20 referendum,
+   * if any. Display-only (id + name); drives the event indicator beside each hero.
+   */
+  activeEnvironment?: ActiveEnvironmentView;
+}
+
+/** Public, display-only view of the active referendum venue/field effect. */
+export interface ActiveEnvironmentView {
+  id: string;
+  name: string;
 }
 
 export interface HandCardView {

@@ -179,6 +179,7 @@ export type ClientViewState = {
     result?: any;
     players?: Partial<Record<Seat, PublicPlayer>>;
     boardLimit?: number;
+    activeEnvironment?: { id: string; name: string };
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];
@@ -232,6 +233,8 @@ export type ClientViewState = {
   hoverAnchor?: { x: number; y: number; width: number; height: number };
   hoveredAugment?: AmplificationSelection & { description?: string };
   augmentHoverAnchor?: { x: number; y: number; width: number; height: number };
+  hoveredEvent?: { id: string; name: string; description?: string };
+  eventHoverAnchor?: { x: number; y: number; width: number; height: number };
   confirmingConcede?: boolean;
   menuScreen: MenuScreen;
   matchmaking?: MatchmakingState;

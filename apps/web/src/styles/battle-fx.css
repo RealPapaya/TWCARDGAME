@@ -397,6 +397,7 @@
 .augment-tooltip.amp-tier-low .augment-tooltip-tier { background: #bfe0a6; }
 .augment-tooltip.amp-tier-mid .augment-tooltip-tier { background: #f0cd7e; }
 .augment-tooltip.amp-tier-high .augment-tooltip-tier { background: #f0998f; }
+.augment-tooltip.event-tooltip .augment-tooltip-tier { background: #c9b3ec; }
 
 .augment-tooltip-name {
   position: relative;

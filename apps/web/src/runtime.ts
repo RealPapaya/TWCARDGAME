@@ -1,5 +1,5 @@
 import { Client, type Room } from "@colyseus/sdk";
-import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type CardDefinition } from "@twcardgame/cards";
+import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, VOTE_EVENT_DB, type CardDefinition } from "@twcardgame/cards";
 import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared";
 import type {
   AiDifficulty,
@@ -180,6 +180,7 @@ const devTestModeAvailable = import.meta.env.DEV && isLocalDevHost();
 let devTestPanel: typeof import("./app/dev-test.js") | undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const amplificationCatalog = new Map(AMPLIFICATION_DB.map((augment) => [augment.id, augment]));
+const voteEventCatalog = new Map(VOTE_EVENT_DB.map((event) => [event.id, event]));
 const seats: Seat[] = ["player1", "player2"];
 /**
  * Remembers each minion's card identity by `instanceId` for the battle log. Populated when a minion
@@ -465,6 +466,7 @@ function renderNow(): void {
       ${renderLegacyShopPackOverlay()}
       ${renderHoverTooltip()}
       ${renderAugmentTooltip()}
+      ${renderEventTooltip()}
     </main>
   `;
 
@@ -2023,9 +2025,21 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
         <span class="hero-mana">Mana ${player?.mana?.current ?? 0}/${player?.mana?.max ?? 0}</span>
         <span class="hero-meta">Hand ${player?.handCount ?? 0} - Deck ${player?.deckCount ?? 0}</span>
       </button>
+      ${renderHeroEventBadge()}
       ${renderAmplificationBadge(player)}
     </div>
   `;
+}
+
+/**
+ * The active 公投 venue/field effect, shown to the LEFT of each hero avatar (the
+ * effect is global, so it mirrors on both sides). Renders nothing when no
+ * referendum environment is live.
+ */
+function renderHeroEventBadge(): string {
+  const env = readActiveEnvironment();
+  if (!env) return "";
+  return `<span class="hero-events" aria-hidden="false"><button class="hero-event-dot" type="button" data-event-id="${escapeAttr(env.id)}" aria-label="${escapeAttr(`公投場地效果：${env.name}`)}">${escapeHtml(env.name.slice(0, 2))}</button></span>`;
 }
 
 /**
@@ -3081,6 +3095,33 @@ function renderAugmentTooltip(): string {
       <div class="augment-tooltip-tier">${escapeHtml(view.hoveredAugment.tier)}</div>
       <div class="augment-tooltip-name">${escapeHtml(view.hoveredAugment.name)}</div>
       <div class="augment-tooltip-desc">${escapeHtml(view.hoveredAugment.description ?? "")}</div>
+    </div>
+  `;
+}
+
+/** Themed tooltip for the active 公投 venue effect, reusing the augment-tooltip shell. */
+function renderEventTooltip(): string {
+  if (!view.hoveredEvent || !view.eventHoverAnchor) return "";
+  const shell = document.querySelector<HTMLElement>(".app-shell");
+  const anchor = shell ? localAnchorFromViewport(shell, view.eventHoverAnchor) : view.eventHoverAnchor;
+  const margin = 16;
+  const gap = 18;
+  const tooltipWidth = 250;
+  const tooltipHeight = 128;
+  const viewportWidth = shell?.offsetWidth || window.innerWidth;
+  const viewportHeight = shell?.offsetHeight || window.innerHeight;
+  const anchorLeft = anchor.x - anchor.width / 2;
+  const anchorRight = anchor.x + anchor.width / 2;
+  const preferRight = viewportWidth - anchorRight >= anchorLeft;
+  let left = preferRight ? anchorRight + gap : anchorLeft - tooltipWidth - gap;
+  left = Math.max(margin, Math.min(left, viewportWidth - tooltipWidth - margin));
+  let top = anchor.y - tooltipHeight / 2;
+  top = Math.max(margin, Math.min(top, viewportHeight - tooltipHeight - margin));
+  return `
+    <div class="augment-tooltip event-tooltip" data-testid="event-tooltip" style="left:${left}px;top:${top}px">
+      <div class="augment-tooltip-tier">公投場地效果</div>
+      <div class="augment-tooltip-name">${escapeHtml(view.hoveredEvent.name)}</div>
+      <div class="augment-tooltip-desc">${escapeHtml(view.hoveredEvent.description ?? "")}</div>
     </div>
   `;
 }
@@ -5171,6 +5212,7 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
       boardLimit?: number;
+      activeEnvironment?: { id: string; name: string };
     }) => {
       applyPublicSync(message);
     }
@@ -5686,6 +5728,16 @@ function bindSelectionActions(): void {
     });
   }
 
+  for (const el of document.querySelectorAll<HTMLElement>("[data-event-id]")) {
+    bindEventHover(el);
+    on(el, "pointerdown", "event-pointer-isolate", (event) => {
+      event.stopPropagation();
+    });
+    on(el, "click", "event-click-isolate", (event) => {
+      event.stopPropagation();
+    });
+  }
+
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
@@ -5782,6 +5834,7 @@ function bindSelectionActions(): void {
 
 const hoverState: { timer?: number; lastCardId?: string; lastEl?: HTMLElement } = {};
 const augmentHoverState: { timer?: number; lastEl?: HTMLElement } = {};
+const eventHoverState: { timer?: number; lastEl?: HTMLElement } = {};
 
 function bindHoverPreview(el: HTMLElement, resolve: () => ResolvedCardView | undefined): void {
   const hoverCapable = typeof window !== "undefined" && (
@@ -5830,6 +5883,9 @@ function clearHoverTooltip(): void {
   window.clearTimeout(augmentHoverState.timer);
   augmentHoverState.timer = undefined;
   augmentHoverState.lastEl = undefined;
+  window.clearTimeout(eventHoverState.timer);
+  eventHoverState.timer = undefined;
+  eventHoverState.lastEl = undefined;
   if (view.hoveredCardId) {
     view.hoveredCardId = undefined;
     view.hoveredCard = undefined;
@@ -5838,6 +5894,10 @@ function clearHoverTooltip(): void {
   if (view.hoveredAugment) {
     view.hoveredAugment = undefined;
     view.augmentHoverAnchor = undefined;
+  }
+  if (view.hoveredEvent) {
+    view.hoveredEvent = undefined;
+    view.eventHoverAnchor = undefined;
   }
 }
 
@@ -5882,6 +5942,49 @@ function augmentFromElement(el: HTMLElement): (AmplificationSelection & { descri
   const selected = (player?.augments?.length ? player.augments : player?.amplification ? [player.amplification] : []).find((augment) => augment.id === augmentId);
   if (!selected) return undefined;
   return { ...selected, description: amplificationCatalog.get(augmentId)?.description };
+}
+
+function bindEventHover(el: HTMLElement): void {
+  const hoverCapable = typeof window !== "undefined" && (
+    (typeof window.matchMedia === "function" && window.matchMedia("(hover: hover)").matches) ||
+    (window as any).__el !== undefined
+  );
+  if (!hoverCapable) return;
+  on(el, "mouseenter", "event-hover-enter", () => {
+    if (view.confirmingConcede || view.pendingBattlecry) return;
+    const hovered = eventFromElement(el);
+    if (!hovered) return;
+    window.clearTimeout(eventHoverState.timer);
+    eventHoverState.lastEl = el;
+    const rect = el.getBoundingClientRect();
+    const anchor = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2, width: rect.width, height: rect.height };
+    eventHoverState.timer = window.setTimeout(() => {
+      if (eventHoverState.lastEl !== el) return;
+      view.hoveredEvent = hovered;
+      view.eventHoverAnchor = anchor;
+      render();
+    }, 120);
+  });
+  on(el, "mouseleave", "event-hover-leave", () => {
+    if (eventHoverState.lastEl === el) eventHoverState.lastEl = undefined;
+    window.clearTimeout(eventHoverState.timer);
+    eventHoverState.timer = undefined;
+    if (view.hoveredEvent) {
+      view.hoveredEvent = undefined;
+      view.eventHoverAnchor = undefined;
+      render();
+    }
+  });
+}
+
+function eventFromElement(el: HTMLElement): { id: string; name: string; description?: string } | undefined {
+  const eventId = el.dataset.eventId;
+  if (!eventId) return undefined;
+  const entry = voteEventCatalog.get(eventId);
+  const env = readActiveEnvironment();
+  const name = entry?.name ?? env?.name ?? eventId;
+  // The winning ballot lines are identical across the three options; show the first.
+  return { id: eventId, name, description: entry?.options?.[0] };
 }
 
 function minionCardFromElement(el: HTMLElement): ResolvedCardView | undefined {
@@ -8762,6 +8865,19 @@ function readPhase(): Phase {
 /** Current per-side board cap (7 normally; lowered to 3 by the 社交距離 referendum). */
 function readBoardLimit(): number {
   return view.publicSync?.boardLimit ?? (view.state?.boardLimit as number | undefined) ?? 7;
+}
+
+/**
+ * The active global 公投 venue/field effect (id + name), or undefined when none is
+ * live. Prefers the live `publicSync` message, falling back to the synced schema
+ * (`activeEnvironmentId`/`activeEnvironmentName`, empty strings → none).
+ */
+function readActiveEnvironment(): { id: string; name: string } | undefined {
+  const fromSync = view.publicSync?.activeEnvironment;
+  if (fromSync?.id) return fromSync;
+  const id = view.state?.activeEnvironmentId as string | undefined;
+  const name = view.state?.activeEnvironmentName as string | undefined;
+  return id ? { id, name: name ?? id } : undefined;
 }
 
 function readPhaseDeadlineAtMs(): number {

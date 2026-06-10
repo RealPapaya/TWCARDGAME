@@ -334,7 +334,8 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       actionSeq: this.match.turn.actionSeq,
       result: this.match.result,
       players: publicState.players,
-      boardLimit: publicState.boardLimit
+      boardLimit: publicState.boardLimit,
+      activeEnvironment: publicState.activeEnvironment
     });
   }
 

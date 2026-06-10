@@ -9,7 +9,7 @@ import {
   type TargetRef
 } from "@twcardgame/shared";
 import { createRuntimeCard } from "./deck.js";
-import { environmentBoardLimit, environmentCostDelta, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
+import { environmentBoardLimit, environmentCostDelta, isEnvironmentActive, suppressRuntimeCardMinionEffects, suppressRuntimeMinionEffects } from "./effects/environment.js";
 import { environmentForcesZeroCost } from "./effects/voteEvents.js";
 import { effectNeedsTarget } from "./targeting.js";
 import {
@@ -65,8 +65,16 @@ export function toPublicState(state: MatchState): PublicGameState {
     pendingPrompt: state.pendingPrompt ? structuredClone(state.pendingPrompt) : undefined,
     specialPhase: toSpecialPhaseView(state),
     result: state.result ? structuredClone(state.result) : undefined,
-    boardLimit: environmentBoardLimit(state)
+    boardLimit: environmentBoardLimit(state),
+    activeEnvironment: toActiveEnvironmentView(state)
   };
+}
+
+/** Display-only projection of the live referendum venue effect (id + name), or undefined. */
+function toActiveEnvironmentView(state: MatchState) {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return undefined;
+  return { id: env.id, name: env.name };
 }
 
 /**

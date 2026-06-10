@@ -1988,16 +1988,62 @@ body.hand-dragging .hand-row .card {
 .hero-amp-badge.amp-tier-mid { background: #f0cd7e; }
 .hero-amp-badge.amp-tier-high { background: #f0998f; }
 
-/* Circular 增幅 indicators beside the hero avatar (one per bound augment). */
+/* Circular 增幅 indicators down the RIGHT of the hero avatar (one per bound
+   augment, max 2). Spread along the whole right side and shifted slightly down
+   so two dots distribute evenly (one upper, one lower) clear of the name. */
 .hero-augments {
   position: absolute;
-  top: -6px;
-  right: -6px;
+  top: 16%;
+  bottom: 2%;
+  right: -15px;
   display: flex;
   flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
   gap: 4px;
   z-index: 30;
   pointer-events: none;
+}
+
+/* Active 公投 venue/field effect, mirrored down the LEFT of the hero avatar. */
+.hero-events {
+  position: absolute;
+  top: 16%;
+  bottom: 2%;
+  left: -15px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  z-index: 30;
+  pointer-events: none;
+}
+.hero-event-dot {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  color: #f4ecff;
+  background: #6c4bb0;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  pointer-events: auto;
+  cursor: help;
+  text-shadow: none;
+  transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
+}
+.hero-event-dot:hover {
+  transform: scale(1.14);
+  filter: brightness(1.1);
+  box-shadow: 0 0 0 2px rgba(93, 46, 23, 0.45), 0 0 16px rgba(186, 150, 236, 0.78);
 }
 .hero-augment-dot {
   display: flex;

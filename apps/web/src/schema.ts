@@ -176,6 +176,8 @@ export class GameStateSchema extends Schema {
   resultWinnerSeat = "";
   resultReason = "";
   boardLimit = 7;
+  activeEnvironmentId = "";
+  activeEnvironmentName = "";
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -193,4 +195,6 @@ defineTypes(GameStateSchema, {
   resultWinnerSeat: "string",
   resultReason: "string",
   boardLimit: "number",
+  activeEnvironmentId: "string",
+  activeEnvironmentName: "string",
 });
