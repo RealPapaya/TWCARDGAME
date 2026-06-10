@@ -1,0 +1,17 @@
+# Speed up Vercel deploys. Only apps/web (plus its workspace deps packages/shared
+# and packages/cards) is needed to build the web client. Everything listed here is
+# not used by the web build, so excluding it shrinks the upload Vercel has to clone.
+
+# Preserved v1 app — not part of the v2 build (see CLAUDE.md). ~108MB.
+LEGACY/
+
+# Tooling / docs / tests not needed to build the web bundle.
+e2e/
+docs/
+.github/
+.claude/
+playwright.config.ts
+vitest.config.ts
+
+# Throwaway debugging artifacts.
+.tmp-*.mjs
