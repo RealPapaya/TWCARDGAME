@@ -25,6 +25,8 @@ import { addEvent } from "./state.js";
 import { turnTimeLimitForPlayer } from "./timing.js";
 import type { MatchState, PlayerState, RuntimeCard, RuntimeMinion, SpecialPhaseState } from "./types.js";
 
+const VOTE_ROLL_RESOLUTION = 1_000_000;
+
 /** One seat's referendum pick, carried on the `VOTE_RESOLVED` event payload. */
 export interface VoteResolvedChoice {
   seat: Seat;
@@ -106,11 +108,19 @@ export function voteWeightsInt(hpPlayer1: number, hpPlayer2: number): Record<Sea
   return { player1, player2 };
 }
 
-/** Picks the winning seat from integer weights, threading the seeded RNG. */
-export function weightedPickSeat(rngState: number, weights: Record<Seat, number>): { seat: Seat; rngState: number } {
+/** Picks the winning seat and a replayable roulette position from integer weights. */
+export function weightedPickSeat(
+  rngState: number,
+  weights: Record<Seat, number>
+): { seat: Seat; rngState: number; rollMillionths: number } {
   const total = weights.player1 + weights.player2;
-  const roll = nextInt(rngState, total);
-  return { seat: roll.value < weights.player1 ? "player1" : "player2", rngState: roll.state };
+  const roll = nextInt(rngState, VOTE_ROLL_RESOLUTION);
+  const player1Boundary = Math.floor((weights.player1 / total) * VOTE_ROLL_RESOLUTION);
+  return {
+    seat: roll.value < player1Boundary ? "player1" : "player2",
+    rngState: roll.state,
+    rollMillionths: roll.value
+  };
 }
 
 /** Converts integer roulette weights into display win percentages summing to ~100. */
@@ -526,8 +536,8 @@ function resolveVotingPhase(
   const winningEvent = voteEvents[winningIndex] ?? voteEvents[0];
   const display = voteWeightsDisplay(sp.voteWeightsInt);
 
-  // Each seat's ballot pick, so the client can run the inverse-HP "roulette"
-  // animation that flips between the two voted cards before landing on the winner.
+  // Exact weights and roll let every client render the same near-boundary result
+  // without trusting any client-side random value.
   const ballotChoice = (seat: Seat): VoteResolvedChoice => {
     const optionIndex = sp.voteChoice?.[seat] ?? 0;
     const event = voteEvents[optionIndex] ?? voteEvents[0];
@@ -556,7 +566,16 @@ function resolveVotingPhase(
     state,
     events,
     "VOTE_RESOLVED",
-    { winningSeat, eventId: winningEvent.id, eventName: winningEvent.name, weights: display, choices, processText },
+    {
+      winningSeat,
+      eventId: winningEvent.id,
+      eventName: winningEvent.name,
+      weights: display,
+      weightsInt: sp.voteWeightsInt,
+      rollMillionths: pick.rollMillionths,
+      choices,
+      processText
+    },
     winningSeat
   );
 

@@ -7455,11 +7455,17 @@ function startVoteRouletteFromEvent(event: GameEvent): void {
   const winnerSeat = payload.winningSeat;
   const winnerEventId = typeof payload.eventId === "string" ? payload.eventId : undefined;
   const winnerEventName = typeof payload.eventName === "string" ? payload.eventName : "";
+  const weights = payload.weightsInt as Partial<Record<Seat, number>> | undefined;
+  const rollMillionths = payload.rollMillionths;
   if (!choices?.player1 || !choices?.player2) return;
   if (winnerSeat !== "player1" && winnerSeat !== "player2") return;
   if (!winnerEventId) return;
+  if (typeof weights?.player1 !== "number" || typeof weights?.player2 !== "number") return;
+  if (typeof rollMillionths !== "number") return;
   void playVoteRoulette({
     choices: { player1: choices.player1, player2: choices.player2 },
+    weights: { player1: weights.player1, player2: weights.player2 },
+    rollMillionths,
     winnerSeat,
     winnerEventId,
     winnerEventName,

@@ -960,6 +960,9 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
             winningSeat: PLAYER,
             eventId: chosen.id,
             eventName: chosen.name,
+            weights: { player1: 50, player2: 50 },
+            weightsInt: { player1: 1, player2: 1 },
+            rollMillionths: 250000,
             processText: `公投開票：${chosen.name} 中選`
           })
         ];

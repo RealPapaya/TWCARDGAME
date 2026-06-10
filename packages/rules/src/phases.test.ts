@@ -82,6 +82,8 @@ describe("phase pure helpers", () => {
     for (let i = 0; i < trials; i++) {
       const pick = weightedPickSeat(rng, weights);
       rng = pick.rngState;
+      const player1Boundary = Math.floor((weights.player1 / (weights.player1 + weights.player2)) * 1_000_000);
+      expect(pick.seat).toBe(pick.rollMillionths < player1Boundary ? "player1" : "player2");
       if (pick.seat === "player1") player1Wins += 1;
     }
     expect(player1Wins / trials).toBeGreaterThan(0.7);
@@ -321,14 +323,26 @@ describe("voting phase (turn 20)", () => {
     expect(choices?.player2?.eventId).toBe(ballot[1]?.id);
     const winningSeat = resolved?.payload?.winningSeat as "player1" | "player2";
     expect(choices?.[winningSeat]?.eventId).toBe(resolved?.payload?.eventId);
+    const weightsInt = resolved?.payload?.weightsInt as Record<"player1" | "player2", number>;
+    const rollMillionths = resolved?.payload?.rollMillionths as number;
+    const player1Boundary = Math.floor((weightsInt.player1 / (weightsInt.player1 + weightsInt.player2)) * 1_000_000);
+    expect(rollMillionths).toBeGreaterThanOrEqual(0);
+    expect(rollMillionths).toBeLessThan(1_000_000);
+    expect(winningSeat).toBe(rollMillionths < player1Boundary ? "player1" : "player2");
   });
 
-  it("is deterministic: same seed + votes → same winning event", () => {
+  it("is deterministic: same seed + votes → same winning event and roulette position", () => {
     const run = (): string => {
       let state = advanceToTurn(startMatch(777), 20);
       state = reduce(state, env("rv1", "player1", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG).state;
       const r = reduce(state, env("rv2", "player2", { type: "submitVote", optionIndex: 1 }), CARD_CATALOG);
-      return String(r.events.find((e) => e.type === "VOTE_RESOLVED")?.payload?.eventId);
+      const payload = r.events.find((e) => e.type === "VOTE_RESOLVED")?.payload;
+      return JSON.stringify({
+        eventId: payload?.eventId,
+        winningSeat: payload?.winningSeat,
+        rollMillionths: payload?.rollMillionths,
+        weightsInt: payload?.weightsInt
+      });
     };
     expect(run()).toBe(run());
   });

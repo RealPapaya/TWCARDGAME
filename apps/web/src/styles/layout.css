@@ -1571,7 +1571,7 @@ body.hand-dragging .hand-row .card {
   }
 }
 
-/* --- Turn-20 referendum roulette: flips between the two voted cards, fast → slow --- */
+/* --- Turn-20 referendum roulette: weighted pie wheel with a wood-and-gold frame --- */
 .vote-roulette-overlay {
   position: fixed;
   inset: 0;
@@ -1590,11 +1590,13 @@ body.hand-dragging .hand-row .card {
 .vote-roulette-stage {
   display: grid;
   justify-items: center;
-  gap: 24px;
+  gap: 14px;
   text-align: center;
+  width: min(92vw, 680px);
 }
 
 .vote-roulette-title {
+  margin: 0;
   font-family: var(--font-display);
   font-size: 40px;
   letter-spacing: 0.06em;
@@ -1607,63 +1609,198 @@ body.hand-dragging .hand-row .card {
   text-shadow: 0 0 18px rgba(255, 210, 90, 0.8), 0 4px 14px #000;
 }
 
-.vote-roulette-cards {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 40px;
-}
-
-/* Dimmed at rest so the moving highlight reads clearly as "正在抽選". */
-.vote-roulette-card {
-  position: relative;
-  opacity: 0.5;
-  filter: brightness(0.68);
-  transform: none;
-  cursor: default;
-  transition: opacity 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
-}
-
-.vote-roulette-card:hover {
-  transform: none;
-  border-color: #555;
-  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.55);
-}
-
-.vote-roulette-chooser {
-  align-self: center;
-  padding: 3px 12px;
-  border-radius: 999px;
+.vote-roulette-subtitle {
+  margin: -8px 0 2px;
+  color: #d8c08a;
   font-size: 13px;
-  font-weight: 800;
-  color: #1a1008;
-  background: #d8c08a;
+  letter-spacing: 0.08em;
 }
 
-.vote-roulette-card.is-drawing {
-  opacity: 1;
-  filter: brightness(1.25);
-  border-color: var(--gold, #d4af37);
-  box-shadow: 0 0 26px rgba(255, 200, 80, 0.85), 0 0 60px rgba(255, 200, 80, 0.4);
-  transform: translateY(-6px) scale(1.04);
+.vote-roulette-shell {
+  position: relative;
+  width: clamp(250px, 48vh, 390px);
+  aspect-ratio: 1;
+  padding: 19px;
+  border: 5px solid #2b160b;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 44%, #f3d783 0 3%, #b67a27 30%, #5c3215 68%, #2b1408 100%);
+  box-shadow:
+    inset 0 0 0 4px #d5a843,
+    inset 0 0 0 9px #6c3e19,
+    0 0 0 4px #d5a843,
+    0 0 0 9px #3c210e,
+    0 14px 34px rgba(0, 0, 0, 0.72),
+    0 0 38px rgba(218, 168, 67, 0.28);
 }
 
-.vote-roulette-card.is-winner {
-  opacity: 1;
-  filter: none;
+.vote-roulette-shell::before,
+.vote-roulette-shell::after {
+  content: "";
+  position: absolute;
+  inset: 7px;
+  z-index: 2;
+  border: 2px dashed rgba(255, 225, 145, 0.62);
+  border-radius: 50%;
+  pointer-events: none;
+}
+
+.vote-roulette-shell::after {
+  inset: 14px;
+  border-style: solid;
+  border-color: rgba(65, 28, 10, 0.72);
+}
+
+.vote-roulette-pointer {
+  position: absolute;
+  z-index: 5;
+  top: -25px;
+  left: 50%;
+  width: 42px;
+  height: 55px;
+  transform: translateX(-50%);
+  clip-path: polygon(50% 100%, 0 22%, 18% 0, 82% 0, 100% 22%);
+  background: linear-gradient(90deg, #8b551e, #ffe19a 48%, #a96a25);
+  filter: drop-shadow(0 4px 2px rgba(0, 0, 0, 0.75));
+}
+
+.vote-roulette-wheel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: 3px solid #2b1408;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, transparent 0 60%, rgba(255, 238, 178, 0.22) 61% 63%, transparent 64%),
+    conic-gradient(
+      from 0deg,
+      #b94335 0 var(--player1-percent),
+      #285f72 var(--player1-percent) 100%
+  );
+  box-shadow: inset 0 0 30px rgba(0, 0, 0, 0.55);
+  transform: rotate(0deg);
+  will-change: transform;
+}
+
+.vote-roulette-wheel::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.12) 0 1deg, transparent 1deg 12deg),
+    radial-gradient(circle at 35% 28%, rgba(255, 255, 255, 0.22), transparent 34%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+.vote-roulette-hub {
+  position: absolute;
+  z-index: 4;
+  inset: 50% auto auto 50%;
+  display: grid;
+  place-content: center;
+  width: 32%;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  border: 4px double #efcf7c;
+  border-radius: 50%;
+  color: #fff0c5;
+  background: radial-gradient(circle, #81411e, #35180b 72%);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.68), inset 0 0 14px rgba(255, 213, 117, 0.28);
+  text-shadow: 0 2px 4px #000;
+}
+
+.vote-roulette-hub span {
+  font-family: var(--font-display);
+  font-size: clamp(19px, 3vh, 28px);
+}
+
+.vote-roulette-hub strong {
+  color: #e2bd68;
+  font-size: 11px;
+  letter-spacing: 0.18em;
+}
+
+.vote-roulette-legend {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.vote-roulette-legend-item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 2px solid #6f4b24;
+  border-radius: 10px;
+  color: #eadbb9;
+  background: rgba(18, 9, 5, 0.72);
+  text-align: left;
+  transition: border-color 180ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.vote-roulette-swatch {
+  width: 18px;
+  aspect-ratio: 1;
+  border: 2px solid #e2c584;
+  border-radius: 50%;
+  background: #b94335;
+}
+
+.vote-roulette-legend-item.player2 .vote-roulette-swatch {
+  background: #285f72;
+}
+
+.vote-roulette-choice {
+  display: grid;
+  min-width: 0;
+}
+
+.vote-roulette-choice strong {
+  overflow: hidden;
+  color: #fff1cb;
+  font-family: var(--font-display);
+  font-size: 16px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vote-roulette-choice small {
+  color: #bfa979;
+  font-size: 11px;
+}
+
+.vote-roulette-percent {
+  color: #f2cf79;
+  font-family: var(--font-display);
+  font-size: 24px;
+}
+
+.vote-roulette-legend-item.is-winner {
   border-color: #ffd76a;
-  box-shadow: 0 0 36px rgba(255, 210, 90, 1), 0 0 90px rgba(255, 180, 60, 0.6);
-  transform: translateY(-8px) scale(1.08);
-  animation: vote-roulette-winner 1.1s ease-in-out infinite;
+  box-shadow: 0 0 22px rgba(255, 210, 90, 0.68);
+  transform: translateY(-3px);
+}
+
+.vote-roulette-overlay.is-revealed .vote-roulette-shell {
+  animation: vote-roulette-winner 850ms ease-in-out infinite;
 }
 
 @keyframes vote-roulette-winner {
-  0%,
-  100% {
-    box-shadow: 0 0 30px rgba(255, 210, 90, 0.8), 0 0 70px rgba(255, 180, 60, 0.45);
-  }
   50% {
-    box-shadow: 0 0 46px rgba(255, 225, 120, 1), 0 0 110px rgba(255, 190, 70, 0.7);
+    box-shadow:
+      inset 0 0 0 4px #ffe09a,
+      inset 0 0 0 9px #6c3e19,
+      0 0 0 4px #ffe09a,
+      0 0 0 9px #3c210e,
+      0 14px 34px rgba(0, 0, 0, 0.72),
+      0 0 70px rgba(255, 207, 95, 0.72);
   }
 }
 
@@ -1673,6 +1810,20 @@ body.hand-dragging .hand-row .card {
   }
   to {
     opacity: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .vote-roulette-stage {
+    padding: 20px 14px 16px;
+  }
+
+  .vote-roulette-title {
+    font-size: 30px;
+  }
+
+  .vote-roulette-legend {
+    grid-template-columns: 1fr;
   }
 }
 

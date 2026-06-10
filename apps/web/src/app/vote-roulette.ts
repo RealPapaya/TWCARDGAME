@@ -1,21 +1,6 @@
 import type { Seat } from "@twcardgame/shared";
 import { playSfx } from "./audio.js";
 
-/**
- * --- TURN-20 REFERENDUM ROULETTE ---
- *
- * After both players vote, the server resolves the winner via an inverse-HP
- * weighted draw (`resolveVotingPhase` in packages/rules) and immediately closes
- * the special phase. The reactive voting overlay therefore vanishes the instant
- * the result arrives, so this draw is rendered as a *self-contained* imperative
- * overlay built from the `VOTE_RESOLVED` payload snapshot — it does not depend on
- * `view.state.specialPhase`, which is already gone by the time we run.
- *
- * The highlight flips between the two cards the players actually voted for,
- * starting fast and decelerating ("由快到慢"), then lands on and glows the
- * winning card so the player feels the suspense of "正在抽選".
- */
-
 export interface VoteRouletteChoice {
   seat: Seat;
   eventId: string;
@@ -24,54 +9,41 @@ export interface VoteRouletteChoice {
 
 export interface VoteRouletteData {
   choices: { player1: VoteRouletteChoice; player2: VoteRouletteChoice };
+  weights: Record<Seat, number>;
+  rollMillionths: number;
   winnerSeat: Seat;
   winnerEventId: string;
   winnerEventName: string;
   mySeat?: Seat;
 }
 
-/** Total spin time of the accelerating-to-slow highlight, before the reveal. */
-const SPIN_MS = 2000;
-/** Fastest / slowest hop interval (ms). The gap widens on an ease-out curve. */
-const MIN_STEP_MS = 70;
-const MAX_STEP_MS = 360;
-/** How long the winner glow holds before the overlay fades out. */
+const SPIN_MS = 3200;
 const REVEAL_HOLD_MS = 850;
 const FADE_OUT_MS = 280;
+const FULL_TURNS = 6;
+const ROLL_RESOLUTION = 1_000_000;
 
-/** Total wall-clock of the roulette (spin → reveal hold → fade), for callers that
- * need to wait for it to clear (e.g. holding an event-notice toast). */
 export const VOTE_ROULETTE_TOTAL_MS = SPIN_MS + REVEAL_HOLD_MS + FADE_OUT_MS;
-
-/** Time from overlay open until the winner is revealed (`reveal()` fires). The
- * runtime holds the public sync / death cues for this long so the board effect
- * (e.g. 高雄氣爆 destroying minions) only lands AFTER the roulette decides. */
 export const VOTE_REVEAL_HOLD_MS = SPIN_MS;
 
-/** True while a roulette overlay is spinning, before the winner is revealed.
- * The runtime gates `flushPendingPublicSync` on this so the effect stays hidden
- * until the decision is shown. Cleared synchronously inside `reveal()`. */
 let rouletteSpinning = false;
 export function voteRouletteActive(): boolean {
   return rouletteSpinning;
-}
-
-interface Slot {
-  choice: VoteRouletteChoice;
-  seats: Seat[];
 }
 
 let overlayEl: HTMLElement | undefined;
 let timers: number[] = [];
 let token = 0;
 let activeResolve: (() => void) | undefined;
+let activeSpinAnimation: Animation | undefined;
 
-/** Tears down any in-flight roulette. Call on match start / teardown. */
 export function resetVoteRoulette(): void {
   rouletteSpinning = false;
   token += 1;
-  for (const t of timers) window.clearTimeout(t);
+  for (const timer of timers) window.clearTimeout(timer);
   timers = [];
+  activeSpinAnimation?.cancel();
+  activeSpinAnimation = undefined;
   overlayEl?.remove();
   overlayEl = undefined;
   const resolve = activeResolve;
@@ -79,17 +51,13 @@ export function resetVoteRoulette(): void {
   resolve?.();
 }
 
-/**
- * Plays the referendum roulette overlay and resolves once it has faded out.
- * Safe to fire-and-forget; a second call cancels the first.
- */
 export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
   resetVoteRoulette();
   rouletteSpinning = true;
   const myToken = (token += 1);
-
-  const slots = buildSlots(data);
-  const winnerSlot = Math.max(0, slots.findIndex((slot) => slot.seats.includes(data.winnerSeat)));
+  const weights = normalizedWeights(data.weights);
+  const player1Percent = weights.player1;
+  const targetRotation = rollRotation(data.rollMillionths);
 
   const overlay = document.createElement("div");
   overlay.className = "vote-roulette-overlay";
@@ -97,123 +65,137 @@ export function playVoteRoulette(data: VoteRouletteData): Promise<void> {
   overlay.setAttribute("aria-live", "polite");
   overlay.innerHTML = `
     <div class="vote-roulette-stage">
-      <h2 class="vote-roulette-title" data-role="title">開票中…</h2>
-      <div class="vote-roulette-cards">
-        ${slots.map((slot, index) => renderCard(slot, index, data.mySeat)).join("")}
+      <h2 class="vote-roulette-title" data-role="title">中選會開票中</h2>
+      <p class="vote-roulette-subtitle">圓餅比例依弱勢族群中選率分配</p>
+      <div class="vote-roulette-shell">
+        <div class="vote-roulette-pointer" aria-hidden="true"></div>
+        <div
+          class="vote-roulette-wheel"
+          data-role="wheel"
+          style="--player1-percent: ${player1Percent}%;"
+          aria-label="${wheelAriaLabel(data, weights)}"
+        ></div>
+        <div class="vote-roulette-hub">
+          <span>公投</span>
+          <strong data-role="hub-status">開票中</strong>
+        </div>
+      </div>
+      <div class="vote-roulette-legend">
+        ${renderLegendItem("player1", data.choices.player1, weights.player1, data.mySeat)}
+        ${renderLegendItem("player2", data.choices.player2, weights.player2, data.mySeat)}
       </div>
     </div>
   `;
   document.body.appendChild(overlay);
   overlayEl = overlay;
 
-  const cardEls = Array.from(overlay.querySelectorAll<HTMLElement>(".vote-roulette-card"));
+  const wheelEl = overlay.querySelector<HTMLElement>("[data-role='wheel']");
   const titleEl = overlay.querySelector<HTMLElement>("[data-role='title']");
+  const hubStatusEl = overlay.querySelector<HTMLElement>("[data-role='hub-status']");
+  const legendEls = Array.from(overlay.querySelectorAll<HTMLElement>(".vote-roulette-legend-item"));
 
   return new Promise<void>((resolve) => {
     activeResolve = resolve;
+    let revealed = false;
+
     const finish = (): void => {
       if (myToken !== token) return;
-      for (const t of timers) window.clearTimeout(t);
-      timers = [];
       overlay.classList.add("is-closing");
-      const removeAt = window.setTimeout(() => {
-        if (myToken !== token) return;
-        overlay.remove();
-        if (overlayEl === overlay) overlayEl = undefined;
-        activeResolve = undefined;
-        resolve();
-      }, FADE_OUT_MS);
-      timers.push(removeAt);
+      timers.push(
+        window.setTimeout(() => {
+          if (myToken !== token) return;
+          overlay.remove();
+          if (overlayEl === overlay) overlayEl = undefined;
+          activeResolve = undefined;
+          resolve();
+        }, FADE_OUT_MS)
+      );
     };
 
     const reveal = (): void => {
-      if (myToken !== token) return;
-      // Winner is now shown — release the held public sync / death cues so the
-      // board effect lands on this beat, not under the spin.
+      if (myToken !== token || revealed) return;
+      revealed = true;
       rouletteSpinning = false;
-      for (const el of cardEls) el.classList.remove("is-drawing");
-      cardEls[winnerSlot]?.classList.add("is-winner");
-      if (titleEl) {
-        titleEl.classList.add("is-winner");
-        titleEl.textContent = `通過！「${data.winnerEventName}」`;
+      activeSpinAnimation = undefined;
+      overlay.classList.add("is-revealed");
+      titleEl?.classList.add("is-winner");
+      if (titleEl) titleEl.textContent = `通過：${data.winnerEventName}`;
+      if (hubStatusEl) hubStatusEl.textContent = "中選";
+      for (const legendEl of legendEls) {
+        legendEl.classList.toggle("is-winner", legendEl.dataset.seat === data.winnerSeat);
       }
       playSfx("cardPlayHeavy");
       timers.push(window.setTimeout(finish, REVEAL_HOLD_MS));
     };
 
-    // A single card (both players voted the same case) has nothing to flip
-    // between — give a short suspense pulse, then reveal.
-    if (cardEls.length < 2) {
-      cardEls[0]?.classList.add("is-drawing");
-      let tick = 0;
-      const pulse = (): void => {
-        if (myToken !== token) return;
-        cardEls[0]?.classList.toggle("is-drawing");
-        playSfx("turn", 0.35);
-        if (++tick < 6) timers.push(window.setTimeout(pulse, 130 + tick * 35));
-        else reveal();
-      };
-      timers.push(window.setTimeout(pulse, 160));
-      return;
+    if (wheelEl) {
+      const animation = wheelEl.animate(
+        [
+          { transform: "rotate(0deg)" },
+          { transform: `rotate(${targetRotation}deg)` }
+        ],
+        {
+          duration: SPIN_MS,
+          easing: "cubic-bezier(0.08, 0.72, 0.04, 1)",
+          fill: "forwards"
+        }
+      );
+      activeSpinAnimation = animation;
+      playSfx("turn", 0.35);
+      void animation.finished.then(reveal).catch(() => undefined);
     }
 
-    const steps = buildStepIntervals();
-    // Alternate the highlight between the two cards; pick the starting card so
-    // that the final hop lands exactly on the winning card.
-    const start = (winnerSlot + steps.length - 1) % 2;
-    let elapsed = 0;
-    steps.forEach((interval, step) => {
-      elapsed += interval;
-      timers.push(
-        window.setTimeout(() => {
-          if (myToken !== token) return;
-          const lit = (start + step) % 2;
-          for (let i = 0; i < cardEls.length; i++) cardEls[i].classList.toggle("is-drawing", i === lit);
-          playSfx("turn", 0.3);
-          if (step === steps.length - 1) reveal();
-        }, elapsed)
-      );
-    });
+    // Keeps game-state gating from getting stuck if an animation completion
+    // event is lost because the tab or renderer is interrupted.
+    timers.push(window.setTimeout(reveal, SPIN_MS + 100));
   });
 }
 
-/** Two distinct ballot cards, or a single shared one when both voted alike. */
-function buildSlots(data: VoteRouletteData): Slot[] {
-  const { player1, player2 } = data.choices;
-  if (player1.eventId === player2.eventId) {
-    return [{ choice: player1, seats: ["player1", "player2"] }];
-  }
-  return [
-    { choice: player1, seats: ["player1"] },
-    { choice: player2, seats: ["player2"] }
-  ];
+function normalizedWeights(weights: Record<Seat, number>): Record<Seat, number> {
+  const player1 = Math.max(0, Number(weights.player1) || 0);
+  const player2 = Math.max(0, Number(weights.player2) || 0);
+  const total = player1 + player2;
+  if (total <= 0) return { player1: 50, player2: 50 };
+  const player1Boundary = Math.floor((player1 / total) * ROLL_RESOLUTION);
+  const player1Percent = (player1Boundary / ROLL_RESOLUTION) * 100;
+  return {
+    player1: player1Percent,
+    player2: 100 - player1Percent
+  };
 }
 
-/** Hop intervals that grow on an ease-out curve, summing to ~SPIN_MS (fast → slow). */
-function buildStepIntervals(): number[] {
-  const steps: number[] = [];
-  let elapsed = 0;
-  while (elapsed < SPIN_MS) {
-    const progress = elapsed / SPIN_MS; // 0 → 1
-    const interval = MIN_STEP_MS + (MAX_STEP_MS - MIN_STEP_MS) * (progress * progress);
-    steps.push(interval);
-    elapsed += interval;
-  }
-  return steps;
+function rollRotation(rollMillionths: number): number {
+  const normalizedRoll = Math.min(ROLL_RESOLUTION - 1, Math.max(0, Math.floor(rollMillionths)));
+  const winningAngle = (normalizedRoll / ROLL_RESOLUTION) * 360;
+  return FULL_TURNS * 360 + ((360 - winningAngle) % 360);
 }
 
-function renderCard(slot: Slot, index: number, mySeat: Seat | undefined): string {
+function renderLegendItem(seat: Seat, choice: VoteRouletteChoice, percent: number, mySeat: Seat | undefined): string {
   return `
-    <div class="card mulligan-card vote-option vote-roulette-card" data-slot="${index}">
-      <span class="vote-roulette-chooser">${chooserLabel(slot.seats, mySeat)}</span>
-      <span class="vote-option-name">${escapeHtml(slot.choice.eventName)}</span>
+    <div class="vote-roulette-legend-item ${seat}" data-seat="${seat}">
+      <span class="vote-roulette-swatch" aria-hidden="true"></span>
+      <span class="vote-roulette-choice">
+        <strong>${escapeHtml(choice.eventName)}</strong>
+        <small>${chooserLabel(seat, mySeat)}</small>
+      </span>
+      <span class="vote-roulette-percent">${formatPercent(percent)}%</span>
     </div>
   `;
 }
 
-function chooserLabel(seats: Seat[], mySeat: Seat | undefined): string {
-  if (seats.length > 1) return "雙方一致";
-  return seats[0] === mySeat ? "你投的" : "對手投的";
+function chooserLabel(seat: Seat, mySeat: Seat | undefined): string {
+  return seat === mySeat ? "你的提案" : "對手提案";
+}
+
+function formatPercent(percent: number): string {
+  return Number.isInteger(percent) ? String(percent) : percent.toFixed(1);
+}
+
+function wheelAriaLabel(data: VoteRouletteData, weights: Record<Seat, number>): string {
+  return escapeHtml(
+    `${chooserLabel("player1", data.mySeat)} ${data.choices.player1.eventName} ${formatPercent(weights.player1)}%，` +
+      `${chooserLabel("player2", data.mySeat)} ${data.choices.player2.eventName} ${formatPercent(weights.player2)}%`
+  );
 }
 
 function escapeHtml(value: string): string {
