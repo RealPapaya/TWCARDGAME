@@ -22,9 +22,13 @@
 .v1-deck-selection {
   position: relative;
   overflow: hidden;
-  background: #000 url("/images/ui/GameMode.webp") center / cover no-repeat;
+  background: #000;
   padding: 0;
   color: #f1e4d1;
+  container-type: size;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 .ai-battle-setup {
@@ -39,7 +43,7 @@
 }
 
 .battle-selection-content {
-  position: relative;
+  position: absolute;
   z-index: 2;
   width: 100%;
   height: 100%;
@@ -56,10 +60,18 @@
 }
 
 .battle-map-stage {
-  position: absolute;
-  inset: 0;
-  z-index: 1;
+  position: relative;
+  /* 精準模擬 background-size: cover 效果，確保建築座標絕對不會跑位 */
+  width: max(100cqi, calc(100cqb * (1672 / 941)));
+  height: max(100cqb, calc(100cqi * (941 / 1672)));
+  background: url("/images/ui/GameMode.webp") center / 100% 100% no-repeat;
+  flex-shrink: 0;
   pointer-events: none;
+  z-index: 1;
+  /* 解決 Hover 時瀏覽器 promotion 造成背景模糊的 Bug */
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 .battle-map-hotspot {
@@ -67,6 +79,7 @@
   display: block;
   padding: 0;
   border: 0;
+  outline: none;
   background: transparent;
   box-shadow: none;
   cursor: pointer;
@@ -75,7 +88,7 @@
   transition: transform 180ms ease, filter 180ms ease;
 }
 
-.battle-map-hotspot img {
+.battle-map-hotspot > img {
   display: block;
   width: 100%;
   height: auto;
@@ -87,11 +100,11 @@
 .battle-map-hotspot:focus-visible,
 .battle-map-hotspot.selected,
 .battle-map-hotspot:active {
-  transform: translate(-50%, -50%) !important;
+  transform: translate3d(-50%, -50%, 0) !important;
 }
 
-.battle-map-hotspot:hover img,
-.battle-map-hotspot:focus-visible img {
+.battle-map-hotspot:hover > img,
+.battle-map-hotspot:focus-visible > img {
   filter:
     drop-shadow(2px 0 0 #ffffff)
     drop-shadow(-2px 0 0 #ffffff)
@@ -100,44 +113,123 @@
     drop-shadow(0 0 5px rgba(255, 255, 255, 0.8)) !important;
 }
 
-.battle-map-hotspot:focus-visible {
-  outline: none;
+.mode-banner-container {
+  position: absolute;
+  bottom: var(--banner-bottom, 0%);
+  left: var(--banner-left, 50%);
+  transform: translate(var(--banner-offset-x, -50%), var(--banner-offset-y, 40%));
+  width: 256px; /* 縮小一點避免擁擠，四個 banner 大小維持一致 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  filter: drop-shadow(0 8px 12px rgba(0, 0, 0, 0.6));
+  z-index: 2;
 }
 
-/* 挑戰模式 */
+.mode-banner-bg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  pointer-events: none;
+  transition: filter 180ms ease;
+}
+
+.mode-banner-text {
+  position: absolute;
+  top: var(--banner-text-y, 53%);
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: #211510;
+  font-family: var(--font-display);
+  font-size: 26px; /* 文字大小適度縮小 */
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.4);
+  margin: 0;
+  white-space: nowrap; /* 確保文字永遠不換行 */
+}
+
+.battle-map-hotspot:hover .mode-banner-bg,
+.battle-map-hotspot:focus-visible .mode-banner-bg {
+  filter:
+    drop-shadow(2px 0 0 #ffffff)
+    drop-shadow(-2px 0 0 #ffffff)
+    drop-shadow(0 2px 0 #ffffff)
+    drop-shadow(0 -2px 0 #ffffff)
+    drop-shadow(0 0 5px rgba(255, 255, 255, 0.8));
+}
+
+.battle-map-hotspot:focus,
+.battle-map-hotspot:focus-visible,
+.battle-map-hotspot:active {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 挑戰模式 (右下競技場) */
 .battle-map-hotspot--challenge {
-  --scale: 2 ; /* 調整此倍率來等比例放大縮小 */
+  --scale: 1.5 ; /* 調整此倍率來等比例放大縮小 */
   left: 60.5%;
   top: 68.45%;
-  width: clamp(calc(180px * var(--scale)), calc(19vw * var(--scale)), calc(360px * var(--scale)));
-  transform: translate(-50%, -50%);
+  width: calc(304px * var(--scale));
+  transform: translate3d(-50%, -50%, 0);
+
+  /* Banner 客製化參數 (預設正下方) */
+  --banner-bottom: 0%;
+  --banner-left: 50%;
+  --banner-offset-x: -50%;
+  --banner-offset-y: 40%;
+  --banner-text-y: 35%; /* 文字往上調 */
 }
 
-/* 電腦模式 */
+/* 電腦模式 (地圖中央總統府) */
 .battle-map-hotspot--ai {
-  --scale: 2.4; /* 調整此倍率來等比例放大縮小 */
+  --scale: 1.7; /* 調整此倍率來等比例放大縮小 */
   left: 36.6%;
   top: 35%;
-  width: clamp(calc(140px * var(--scale)), calc(14vw * var(--scale)), calc(280px * var(--scale)));
-  transform: translate(-50%, -50%);
+  width: calc(224px * var(--scale));
+  transform: translate3d(-50%, -50%, 0);
+
+  /* Banner 客製化參數 (向右調整) */
+  --banner-bottom: 0%;
+  --banner-left: 70%;
+  --banner-offset-x: -50%;
+  --banner-offset-y: 40%;
+  --banner-text-y: 35%; /* 文字往上調 */
 }
 
-/* 玩家模式 */
+/* 玩家模式 (地圖左下雙塔) */
 .battle-map-hotspot--pvp {
-  --scale: 1.8; /* 調整此倍率來等比例放大縮小 */
+  --scale: 1.3; /* 調整此倍率來等比例放大縮小 */
   left: 25%;
   top: 58%;
-  width: clamp(calc(140px * var(--scale)), calc(14vw * var(--scale)), calc(270px * var(--scale)));
-  transform: translate(-50%, -50%);
+  width: calc(224px * var(--scale));
+  transform: translate3d(-50%, -50%, 0);
+
+  /* Banner 客製化參數 (移至正左方) */
+  --banner-bottom: 30%;
+  --banner-left: 40%;
+  --banner-offset-x: -110%;
+  --banner-offset-y: -50%;
+  --banner-text-y: 35%; /* 文字往上調 */
 }
 
-/* 訓練場 */
+/* 訓練場 (地圖左上) */
 .battle-map-hotspot--training {
-  --scale: 2.7; /* 調整此倍率來等比例放大縮小 */
+  --scale: 1.91; /* 調整此倍率來等比例放大縮小 */
   left: 13.9%;
   top: 83.8%;
-  width: clamp(calc(130px * var(--scale)), calc(14vw * var(--scale)), calc(270px * var(--scale)));
-  transform: translate(-50%, -50%);
+  width: calc(224px * var(--scale));
+  transform: translate3d(-50%, -50%, 0);
+
+  /* Banner 客製化參數 (右下方) */
+  --banner-bottom: 10%;
+  --banner-left: 70%;
+  --banner-offset-x: 0%;
+  --banner-offset-y: 0%;
+  --banner-text-y: 35%; /* 文字往上調 */
 }
 
 .v1-deck-selection .back-button {
