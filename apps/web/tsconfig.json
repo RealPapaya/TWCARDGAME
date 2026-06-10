@@ -9,6 +9,9 @@
     "noEmit": true
   },
   "include": ["src/**/*.ts"],
+  // Cross-workspace parity test imports apps/server source directly (verified at
+  // runtime by vitest); excluded here so tsc -b's per-project rootDir is happy.
+  "exclude": ["src/schema.test.ts"],
   "references": [
     { "path": "../../packages/shared" },
     { "path": "../../packages/cards" }

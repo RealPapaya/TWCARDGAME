@@ -110,6 +110,8 @@ export type PublicPlayerProfile = {
   displayName: string;
   avatarUrl?: string | null;
   winsCount: number;
+  /** Real progression level when known (e.g. from the leaderboard). */
+  level?: number;
   source: string;
   rank?: number;
 };

@@ -124,6 +124,10 @@ export interface LeaderboardRow {
   display_name: string;
   avatar_url?: string | null;
   wins_count: number;
+  /** Real XP-based progression level (get_leaderboard, migration 0022). Optional
+   * so the client can fall back gracefully before the migration is applied. */
+  level?: number;
+  xp?: number;
 }
 
 export interface ShopItemRow {

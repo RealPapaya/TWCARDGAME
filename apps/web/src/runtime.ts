@@ -4057,11 +4057,17 @@ function deriveLbLevel(wins: number): number {
   return Math.floor(wins / 10) + 1;
 }
 
+// Prefer the real XP-based level from get_leaderboard (migration 0022); fall back
+// to the win-count derivation only if the server hasn't supplied a level yet.
+function lbLevel(row: { level?: number; wins_count: number }): number {
+  return row.level ?? deriveLbLevel(row.wins_count);
+}
+
 function renderPublicPlayerProfileModal(): string {
   const player = view.publicPlayerProfile;
   if (!player) return "";
   const avatarUrl = player.avatarUrl || DEFAULT_AVATAR_URL;
-  const level = deriveLbLevel(player.winsCount);
+  const level = player.level ?? deriveLbLevel(player.winsCount);
   const rankText = player.rank ? `#${player.rank}` : "—";
   return `
     <section id="public-profile-backdrop" class="public-profile-backdrop" role="dialog" aria-modal="true" aria-label="玩家個人頁面">
@@ -4117,7 +4123,7 @@ function openPublicPlayerProfile(userId: string): void {
   }
   const sorted = [...view.leaderboard].sort((a, b) =>
     view.leaderboardSortBy === "level"
-      ? deriveLbLevel(b.wins_count) - deriveLbLevel(a.wins_count) || b.wins_count - a.wins_count
+      ? lbLevel(b) - lbLevel(a) || b.wins_count - a.wins_count
       : b.wins_count - a.wins_count
   );
   const leaderboardRow = sorted.find((row) => row.user_id === userId);
@@ -4127,6 +4133,7 @@ function openPublicPlayerProfile(userId: string): void {
       displayName: leaderboardRow.display_name,
       avatarUrl: leaderboardRow.avatar_url,
       winsCount: leaderboardRow.wins_count,
+      level: lbLevel(leaderboardRow),
       source: "排行榜",
       rank: sorted.findIndex((row) => row.user_id === userId) + 1
     };
@@ -4138,7 +4145,7 @@ function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, s
   const rankClass = displayRank <= 3 ? ` lb-card-rank-${displayRank}` : "";
   const rankBadge = displayRank === 1 ? "🥇" : displayRank === 2 ? "🥈" : displayRank === 3 ? "🥉" : `#${displayRank}`;
   const avatarUrl = row.avatar_url || DEFAULT_AVATAR_URL;
-  const level = deriveLbLevel(row.wins_count);
+  const level = lbLevel(row);
   const statLabel = sortBy === "level" ? `Lv. ${level}` : `${row.wins_count} 勝`;
   return `
     <div class="lb-player-card${rankClass}">
@@ -4158,7 +4165,7 @@ function renderLeaderboardScreen(): string {
   const sortBy = view.leaderboardSortBy;
   const sorted = [...view.leaderboard].sort((a, b) =>
     sortBy === "level"
-      ? deriveLbLevel(b.wins_count) - deriveLbLevel(a.wins_count) || b.wins_count - a.wins_count
+      ? lbLevel(b) - lbLevel(a) || b.wins_count - a.wins_count
       : b.wins_count - a.wins_count
   );
   const titleText = sortBy === "level" ? "等級排行榜" : "勝場排行榜";

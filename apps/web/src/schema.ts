@@ -74,6 +74,13 @@ defineTypes(PublicMinionSchema, {
   hasOngoing: "boolean",
 });
 
+class AugmentSchema extends Schema {
+  id = "";
+  name = "";
+  tier = "";
+}
+defineTypes(AugmentSchema, { id: "string", name: "string", tier: "string" });
+
 class PublicPlayerSchema extends Schema {
   userId = "";
   displayName = "";
@@ -89,6 +96,7 @@ class PublicPlayerSchema extends Schema {
   amplificationId = "";
   amplificationName = "";
   amplificationTier = "";
+  augments = new ArraySchema<AugmentSchema>();
 }
 defineTypes(PublicPlayerSchema, {
   userId: "string",
@@ -105,6 +113,7 @@ defineTypes(PublicPlayerSchema, {
   amplificationId: "string",
   amplificationName: "string",
   amplificationTier: "string",
+  augments: [AugmentSchema],
 });
 
 class VoteEventSchema extends Schema {
