@@ -1464,7 +1464,19 @@ body.hand-dragging .hand-row .card {
   padding: 32px 38px;
 }
 
+.vote-overlay:not(.is-roulette-visible) .vote-content {
+  transform: translateY(-clamp(24px, 4vh, 44px));
+}
+
 .vote-content > h2 {
+  position: absolute;
+  top: clamp(70px, 15%, 100px);
+  left: 50%;
+  z-index: 1;
+  width: max-content;
+  max-width: 94%;
+  margin: 0;
+  transform: translateX(-50%);
   font-size: clamp(36px, 5vw, 58px);
 }
 
@@ -1477,16 +1489,18 @@ body.hand-dragging .hand-row .card {
 }
 
 .vote-card-area .vote-option {
-  min-height: clamp(270px, 42vh, 410px);
+  width: clamp(220px, 24vw, 290px);
+  height: auto;
+  min-height: clamp(290px, 44vh, 420px);
   padding: 30px 24px;
 }
 
 .vote-card-area .vote-option-name {
-  font-size: clamp(25px, 3vw, 36px);
+  font-size: clamp(21px, 2.4vw, 28px);
 }
 
 .vote-card-area .vote-option-desc {
-  font-size: clamp(15px, 1.5vw, 19px);
+  font-size: clamp(13px, 1.3vw, 16px);
 }
 
 /* Tier framing: low / mid / high amplification (加減賺 / 穩穩仔賺 / 卯死). */
@@ -1545,41 +1559,49 @@ body.hand-dragging .hand-row .card {
   background: #f0cd7e;
 }
 
-.special-phase-peek-row {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  margin-top: 10px;
-}
-
 .special-phase-peek-btn {
+  position: fixed;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  z-index: 90;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 44px;
-  height: 44px;
+  width: 68px;
+  height: 68px;
   padding: 0;
-  border: 2px solid rgba(230, 198, 116, 0.78);
+  border: 3px solid rgba(230, 198, 116, 0.92);
   border-radius: 50%;
-  color: #f8ecd0;
-  background: rgba(20, 12, 6, 0.88);
+  background: rgba(20, 12, 6, 0.92);
   cursor: pointer;
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.38);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.5), 0 0 0 5px rgba(212, 175, 55, 0.2);
+  transition: transform 120ms ease, background 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
 .special-phase-peek-btn:hover:not(:disabled) {
   border-color: var(--gold, #d4af37);
-  background: rgba(54, 35, 14, 0.94);
+  background: rgba(54, 35, 14, 0.96);
+  transform: translateX(-50%) scale(1.08);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), 0 0 0 6px rgba(212, 175, 55, 0.32);
+}
+
+.special-phase-peek-btn.peeking {
+  border-color: var(--gold, #d4af37);
+  background: rgba(54, 35, 14, 0.96);
 }
 
 .special-phase-peek-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 .special-phase-peek-icon {
-  font-size: 20px;
-  line-height: 1;
+  width: 38px;
+  height: 38px;
+  display: block;
+  /* Source SVG is solid black — tint to the overlay's warm cream so it reads on the dark button. */
+  filter: brightness(0) saturate(100%) invert(92%) sepia(18%) saturate(548%) hue-rotate(331deg) brightness(98%) contrast(95%);
 }
 
 .special-peek-overlay {
@@ -1908,6 +1930,24 @@ body.hand-dragging .hand-row .card {
 }
 
 @media (max-width: 640px) {
+  .vote-overlay:not(.is-roulette-visible) .vote-content {
+    transform: translateY(-18px);
+  }
+
+  .vote-card-area .vote-option {
+    width: clamp(92px, 28vw, 132px);
+    min-height: clamp(210px, 38vh, 290px);
+    padding: 16px 10px;
+  }
+
+  .vote-card-area .vote-option-name {
+    font-size: 16px;
+  }
+
+  .vote-card-area .vote-option-desc {
+    font-size: 11px;
+  }
+
   .vote-roulette-stage {
     padding: 20px 14px 16px;
   }

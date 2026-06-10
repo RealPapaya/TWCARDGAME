@@ -2586,8 +2586,8 @@ function renderSpecialPhasePeekOverlay(kind: "amplification" | "vote"): string {
       <div class="special-peek-toolbar">
         <span>${title}</span>
         ${renderPhaseCountdown(kind === "amplification" ? "增幅倒數" : "事件倒數")}
-        <button type="button" class="special-phase-btn primary" data-special-return>返回選項</button>
       </div>
+      ${renderSpecialPhasePeekButton({ submitted: false, peeking: true })}
     </section>
   `;
 }
@@ -2619,14 +2619,21 @@ function renderSpecialPhaseActions(opts: {
   `;
 }
 
-/** Eye-icon peek toggle, rendered below the option cards in the special-phase overlays. */
-function renderSpecialPhasePeekButton(submitted: boolean): string {
+/**
+ * Eye-icon peek toggle for the special-phase overlays. Fixed at bottom-centre so the
+ * eye (透視) and eye-off (返回選項) icons occupy the exact same screen position — pressing
+ * the eye reveals the board, pressing eye-off at the same spot restores the options.
+ */
+function renderSpecialPhasePeekButton(opts: { submitted: boolean; peeking: boolean }): string {
+  const { submitted, peeking } = opts;
+  const icon = peeking ? "eye-off-svgrepo-com.svg" : "eye-svgrepo-com.svg";
+  const label = peeking ? "返回選項" : "透視";
+  const action = peeking ? "data-special-return" : "data-special-peek";
+  const disabled = submitted && !peeking ? "disabled" : "";
   return `
-    <div class="special-phase-peek-row">
-      <button type="button" class="special-phase-peek-btn" data-special-peek aria-label="透視" title="透視" ${submitted ? "disabled" : ""}>
-        <span class="special-phase-peek-icon" aria-hidden="true">👁</span>
-      </button>
-    </div>
+    <button type="button" class="special-phase-peek-btn ${peeking ? "peeking" : ""}" ${action} aria-label="${label}" title="${label}" ${disabled}>
+      <img class="special-phase-peek-icon" src="/images/ui/${icon}" alt="" aria-hidden="true" draggable="false" />
+    </button>
   `;
 }
 
@@ -2653,7 +2660,7 @@ function renderAmplificationOverlay(): string {
         <div class="mulligan-card-area amp-card-area">
           ${options.map((option) => renderAmplificationOption(option, submitted || rerolling)).join("")}
         </div>
-        ${renderSpecialPhasePeekButton(submitted)}
+        ${renderSpecialPhasePeekButton({ submitted, peeking: false })}
       </div>
     </section>
   `;
@@ -2705,7 +2712,7 @@ function renderVotingOverlay(): string {
         <div class="mulligan-card-area vote-card-area">
           ${events.map((event, index) => renderVoteOption(event, index, submitted)).join("")}
         </div>
-        ${renderSpecialPhasePeekButton(submitted)}
+        ${renderSpecialPhasePeekButton({ submitted, peeking: false })}
       </div>
     </section>
   `;
