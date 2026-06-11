@@ -9,6 +9,8 @@
 // service_role-only by design (anti-cheat), which is why the editor produces a
 // migration rather than writing to Supabase from the browser.
 
+import { QUEST_EVENT_TYPES } from "@twcardgame/shared";
+
 export type QuestRecurrence = "once" | "daily" | "weekly";
 
 /**
@@ -28,20 +30,14 @@ export interface QuestDefinitionDraft {
   active: boolean;
 }
 
-/** Event types known to be emitted server-side, offered as datalist hints. */
-export const KNOWN_EVENT_TYPES: ReadonlyArray<{ value: string; label: string }> = [
-  { value: "pve_win", label: "擊敗電腦 (pve_win)" },
-  { value: "pvp_win", label: "玩家對戰獲勝 (pvp_win)" },
-  { value: "match_won", label: "對戰獲勝 (match_won)" },
-  { value: "match_played", label: "進行對戰 (match_played)" },
-  { value: "level_up", label: "升級 (level_up)" },
-  { value: "card_acquired", label: "獲得卡牌 (card_acquired)" },
-  { value: "daily_login", label: "每日登入 (daily_login)" },
-  { value: "cards_played", label: "出牌 (cards_played)" },
-  { value: "minions_summoned", label: "召喚單位 (minions_summoned)" },
-  { value: "damage_dealt", label: "造成傷害 (damage_dealt)" },
-  { value: "quest_claimed", label: "領取獎勵 (quest_claimed)" }
-];
+/**
+ * Event types known to be emitted server-side, offered as datalist hints.
+ * Derived from the shared QUEST_EVENT_TYPES registry (the single source of
+ * truth) so the editor stays in sync with what the server actually emits.
+ */
+export const KNOWN_EVENT_TYPES: ReadonlyArray<{ value: string; label: string }> = QUEST_EVENT_TYPES.map(
+  ({ value, label }) => ({ value, label })
+);
 
 export const QUEST_RECURRENCE_OPTIONS: ReadonlyArray<{ value: QuestRecurrence; label: string }> = [
   { value: "once", label: "成就 (once)" },

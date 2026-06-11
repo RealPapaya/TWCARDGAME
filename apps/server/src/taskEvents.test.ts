@@ -55,7 +55,7 @@ describe("createTaskEventsWithEmit", () => {
     await createTaskEventsWithEmit(emit).emitForMatch(state, { isVsAi: false });
 
     expect(eventTypesFor(calls, HUMAN_USER_1)).toEqual(["match_played", "match_won"]);
-    expect(eventTypesFor(calls, HUMAN_USER_2)).toEqual(["match_played"]);
+    expect(eventTypesFor(calls, HUMAN_USER_2)).toEqual(["match_played", "match_lost"]);
     expect(calls.some((c) => c.eventType === "pve_win")).toBe(false);
     // mode flows through metadata for analytics.
     expect(calls.find((c) => c.eventType === "match_played")?.metadata).toMatchObject({ mode: "pvp" });
@@ -70,7 +70,12 @@ describe("createTaskEventsWithEmit", () => {
       aiDifficulty: "normal"
     });
 
-    expect(eventTypesFor(calls, HUMAN_USER_1)).toEqual(["match_played", "match_won", "pve_win"]);
+    expect(eventTypesFor(calls, HUMAN_USER_1)).toEqual([
+      "match_played",
+      "match_won",
+      "pve_win",
+      "pve_win:normal"
+    ]);
     expect(calls.some((c) => c.userId === BOT_USER)).toBe(false);
   });
 
@@ -135,10 +140,54 @@ describe("aggregateMatchStats", () => {
       ev("DAMAGE", "player2", { target: "player2:hero", amount: 7 }), // player1 → p2 hero
       ev("DAMAGE", "player1", { target: "player1:hero", amount: 4 }), // player2 → p1 hero
       ev("DAMAGE", "player1", { target: "player1:hero", amount: 2, payment: "HEALTH", lifeLoss: true }), // self, excluded
-      ev("DAMAGE", "player2", { target: "minion-instance-1", amount: 9 }) // minion dmg, not attributed
+      ev("DAMAGE", "player2", { target: "minion-instance-1", amount: 9 }) // player1 → p2's minion
     ];
     const stats = aggregateMatchStats(log);
-    expect(stats.player1).toEqual({ cardsPlayed: 2, minionsSummoned: 1, damageDealt: 12 });
-    expect(stats.player2).toEqual({ cardsPlayed: 1, minionsSummoned: 0, damageDealt: 4 });
+    expect(stats.player1).toEqual({
+      cardsPlayed: 2,
+      minionsSummoned: 1,
+      damageDealt: 12,
+      damageToMinions: 9,
+      minionsKilled: 0,
+      healthRestored: 0,
+      minionsResurrected: 0,
+      minionsBounced: 0
+    });
+    expect(stats.player2).toEqual({
+      cardsPlayed: 1,
+      minionsSummoned: 0,
+      damageDealt: 4,
+      damageToMinions: 0,
+      minionsKilled: 0,
+      healthRestored: 0,
+      minionsResurrected: 0,
+      minionsBounced: 0
+    });
+  });
+
+  it("credits kills/heals/resurrects to owners' opponents/owners and bounces to the caster", () => {
+    const log: GameEvent[] = [
+      ev("DESTROY", "player2", { target: "m1" }), // p2's minion died → kill credited to player1
+      ev("DESTROY", "player2", { target: "m2" }),
+      ev("DESTROY", "player1", { target: "m3" }), // p1's minion died → kill credited to player2
+      ev("HEAL", "player1", { target: "player1:hero", amount: 6 }), // player1 healed own hero
+      ev("HEAL", "player1", { target: "m4", amount: 0 }), // zero heal ignored
+      ev("RESURRECT", "player1", { target: "m5" }), // player1 revived a minion
+      ev("BOUNCE", "player2", { target: "m6", actorSeat: "player1" }), // player1 bounced p2's minion
+      ev("BOUNCE", "player1", { target: "m7" }) // ownerless/global bounce — no actorSeat, not counted
+    ];
+    const stats = aggregateMatchStats(log);
+    expect(stats.player1).toMatchObject({
+      minionsKilled: 2,
+      healthRestored: 6,
+      minionsResurrected: 1,
+      minionsBounced: 1
+    });
+    expect(stats.player2).toMatchObject({
+      minionsKilled: 1,
+      healthRestored: 0,
+      minionsResurrected: 0,
+      minionsBounced: 0
+    });
   });
 });

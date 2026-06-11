@@ -6964,7 +6964,7 @@ async function loadAccountData(): Promise<void> {
     view.profile = profileResult.data as ProfileRow;
     view.decks = (decksResult.data ?? []) as DeckRow[];
     view.collection = (collectionResult.data ?? []) as CollectionRow[];
-    view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+    view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
     syncRemoteTrainingCompletions(trainingResult.data);
     if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
       view.selectedDeckId = view.decks[0]?.id;
@@ -7028,7 +7028,7 @@ async function loadAccountDataRaw(): Promise<void> {
   view.profile = profileResult.data as ProfileRow;
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
-  view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+  view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
   syncRemoteTrainingCompletions(trainingResult.data);
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;
