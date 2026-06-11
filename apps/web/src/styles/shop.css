@@ -6,7 +6,7 @@
   align-items: center;
   justify-content: center;
   padding: 0;
-  background: url("/images/backgrounds/profile_bg.jpg") center / cover no-repeat;
+  background: url("/images/backgrounds/Shop_bg.webp") center / cover no-repeat;
 }
 
 .shop-screen::before {
