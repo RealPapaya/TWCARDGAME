@@ -82,6 +82,7 @@ import {
   type ActiveMatchRecord
 } from "./app/activeMatch.js";
 import { PATCH_NOTES } from "./app/patch-notes.js";
+import { selectDailyBoard } from "./app/daily-board.js";
 import {
   computeMatchStats,
   matchLengthLabel,
@@ -652,6 +653,8 @@ function renderMenu(): string {
       return renderLegacyShopScreen();
     case "tasks":
       return renderTasksScreen();
+    case "achievements":
+      return renderAchievementsScreen();
     case "ai":
       return renderAiBattleSetupScreen();
     case "challenge_setup":
@@ -807,6 +810,11 @@ function renderMainMenu(): string {
             <img class="corner-icon" src="/images/ui/Quest.webp" alt="任務" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
             <span class="corner-icon-emoji" style="display:none">📋</span>
             <span class="corner-label">任務</span>
+          </button>
+          <button class="menu-corner-btn" data-menu-screen="achievements" data-testid="menu-achievements" ${accountMode ? "" : "disabled"}>
+            <img class="corner-icon" src="/images/ui/Achievement.webp" alt="成就" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+            <span class="corner-icon-emoji" style="display:none">🏆</span>
+            <span class="corner-label">成就</span>
           </button>
         </nav>
       </div>
@@ -4096,7 +4104,7 @@ function navigateToScreen(target: MenuScreen): void {
   if (target === "friends") void loadFriends();
   if (target === "leaderboard") void loadLeaderboard();
   if (target === "shop") void loadShopItems();
-  if (target === "tasks") void loadTasks();
+  if (target === "tasks" || target === "achievements") void loadTasks();
   render();
   if (target === "collection" && supabase && view.session?.user) void loadAccountData();
 }
@@ -4970,40 +4978,59 @@ async function claimTask(questId: string): Promise<void> {
   }
 }
 
-const TASK_SECTIONS: Array<{ title: string; match: (task: TaskView) => boolean }> = [
-  { title: "每日任務", match: (task) => task.quest.recurrence !== "once" },
-  { title: "成就", match: (task) => task.quest.recurrence === "once" }
-];
-
 function renderTasksScreen(): string {
   const accountMode = Boolean(supabase);
   if (!accountMode || !view.session) {
-    return signInRequiredScreen("任務 · Tasks");
+    return signInRequiredScreen("每日任務 · Daily");
   }
   const gold = view.profile?.gold ?? 0;
+  const seed = `${view.session.user.id}:${todayTaipei()}`;
+  const daily = view.tasksLoading ? [] : selectDailyBoard(view.tasks, seed);
   const body = view.tasksLoading
     ? `<p class="muted">載入中…</p>`
-    : view.tasks.length === 0
+    : daily.length === 0
       ? `<p class="muted">目前沒有可進行的任務。</p>`
-      : TASK_SECTIONS.map((section) => {
-          const rows = view.tasks.filter(section.match);
-          if (rows.length === 0) return "";
-          return `
-            <section class="task-section">
-              <h3 class="task-section-title">${escapeHtml(section.title)}</h3>
-              <div class="task-list">${rows.map(renderTaskRow).join("")}</div>
-            </section>
-          `;
-        }).join("");
+      : `<div class="task-list">${daily.map(renderTaskRow).join("")}</div>`;
   return `
-    <section class="screen shop-screen tasks-screen" data-screen="tasks">
+    <section class="screen shop-screen tasks-screen menu-bg-screen" data-screen="tasks">
       <div class="shop-container">
         <header class="shop-header">
           <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
-          <h2 class="shop-title">任務</h2>
+          <h2 class="shop-title">每日任務</h2>
           <div class="shop-gold-display">
             <img class="gold-icon" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
             <span id="tasks-gold-amount">${gold}</span>
+          </div>
+        </header>
+        <div class="shop-products tasks-body" data-preserve-scroll>${body}</div>
+      </div>
+    </section>
+  `;
+}
+
+function renderAchievementsScreen(): string {
+  const accountMode = Boolean(supabase);
+  if (!accountMode || !view.session) {
+    return signInRequiredScreen("成就 · Achievements");
+  }
+  const gold = view.profile?.gold ?? 0;
+  const achievements = view.tasksLoading
+    ? []
+    : view.tasks.filter((task) => task.quest.recurrence === "once");
+  const body = view.tasksLoading
+    ? `<p class="muted">載入中…</p>`
+    : achievements.length === 0
+      ? `<p class="muted">目前沒有可進行的成就。</p>`
+      : `<div class="task-list">${achievements.map(renderTaskRow).join("")}</div>`;
+  return `
+    <section class="screen shop-screen tasks-screen achievements-screen menu-bg-screen" data-screen="achievements">
+      <div class="shop-container">
+        <header class="shop-header">
+          <button class="shop-back-btn" data-menu-screen="main">← 返回</button>
+          <h2 class="shop-title">成就</h2>
+          <div class="shop-gold-display">
+            <img class="gold-icon" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <span id="achievements-gold-amount">${gold}</span>
           </div>
         </header>
         <div class="shop-products tasks-body" data-preserve-scroll>${body}</div>
