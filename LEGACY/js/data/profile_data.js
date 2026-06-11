@@ -20,7 +20,13 @@ const PROFILE_DATA = {
         { id: 'monument_smoker', name: '古蹟抽菸' },
         { id: 'busy_worker', name: '活網仔' },
         { id: 'wehavemusic', name: '至少我們還有音樂' },
-        { id: 'heartbroken_dog', name: '心碎小狗' }
+        { id: 'heartbroken_dog', name: '心碎小狗' },
+        { id: 'sixty_seven', name: '67' },
+        { id: 'salmon_dream', name: '張鮭魚之夢' },
+        { id: 'how_pitiful', name: '可憐哪' },
+        { id: 'kaohsiung_fortune', name: '高雄發大財' },
+        { id: 'duck_blood_tofu', name: '鴨血豆腐鴨血豆腐' },
+        { id: 'taoyuan_hsinchu', name: '你從桃園新竹' }
     ]
 };
 

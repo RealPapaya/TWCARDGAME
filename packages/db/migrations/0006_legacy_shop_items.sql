@@ -73,7 +73,13 @@ declare
     {"id":"monument_smoker","name":"古蹟菸客"},
     {"id":"busy_worker","name":"忙碌社畜"},
     {"id":"wehavemusic","name":"我們有音樂"},
-    {"id":"heartbroken_dog","name":"傷心狗狗"}
+    {"id":"heartbroken_dog","name":"傷心狗狗"},
+    {"id":"sixty_seven","name":"67"},
+    {"id":"salmon_dream","name":"張鮭魚之夢"},
+    {"id":"how_pitiful","name":"可憐哪"},
+    {"id":"kaohsiung_fortune","name":"高雄發大財"},
+    {"id":"duck_blood_tofu","name":"鴨血豆腐鴨血豆腐"},
+    {"id":"taoyuan_hsinchu","name":"你從桃園新竹"}
   ]'::jsonb;
   reward jsonb;
   reward_id text;
@@ -251,7 +257,7 @@ values
     'COSMETIC_PACK',
     '酷炫包',
     '獲得稀有頭像或稱號',
-    75,
+    50,
     '{
       "itemCount": 1,
       "dropRates": [

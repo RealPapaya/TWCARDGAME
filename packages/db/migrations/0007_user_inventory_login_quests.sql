@@ -146,7 +146,13 @@ values
   ('title', 'monument_smoker', 'Monument Smoker', null),
   ('title', 'busy_worker', 'Busy Worker', null),
   ('title', 'wehavemusic', 'We Have Music', null),
-  ('title', 'heartbroken_dog', 'Heartbroken Dog', null)
+  ('title', 'heartbroken_dog', 'Heartbroken Dog', null),
+  ('title', 'sixty_seven', 'Sixty Seven', null),
+  ('title', 'salmon_dream', 'Salmon Dream', null),
+  ('title', 'how_pitiful', 'How Pitiful', null),
+  ('title', 'kaohsiung_fortune', 'Kaohsiung Fortune', null),
+  ('title', 'duck_blood_tofu', 'Duck Blood Tofu', null),
+  ('title', 'taoyuan_hsinchu', 'Taoyuan Hsinchu', null)
 on conflict (kind, id) do update
   set display_name = excluded.display_name,
       asset_path = excluded.asset_path,

@@ -158,7 +158,13 @@ const TITLE_LABELS: Record<string, string> = {
   monument_smoker: "古蹟菸客",
   busy_worker: "忙碌社畜",
   wehavemusic: "我們有音樂",
-  heartbroken_dog: "傷心狗狗"
+  heartbroken_dog: "傷心狗狗",
+  sixty_seven: "67",
+  salmon_dream: "張鮭魚之夢",
+  how_pitiful: "可憐哪",
+  kaohsiung_fortune: "高雄發大財",
+  duck_blood_tofu: "鴨血豆腐鴨血豆腐",
+  taoyuan_hsinchu: "你從桃園新竹"
 };
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
