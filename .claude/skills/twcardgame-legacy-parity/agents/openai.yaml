@@ -1,4 +1,0 @@
-interface:
-  display_name: "TWCARDGAME Legacy Parity"
-  short_description: "Preserve v1 gameplay behavior and UIUX during the v2 rewrite."
-  default_prompt: "Use $twcardgame-legacy-parity to compare this TWCARDGAME v2 change against LEGACY behavior, assets, and UIUX before implementation."
