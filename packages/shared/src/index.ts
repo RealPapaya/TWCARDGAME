@@ -142,6 +142,12 @@ export interface ShopItemRow {
     itemCount?: number;
     dropRates?: Array<{ label: string; rate: number; rarity?: Rarity; type?: string }>;
     note?: string;
+    /** Per-pack shop artwork (absolute path under /public, e.g. "/images/ui/SHOP_KMT.webp"). */
+    image?: string;
+    /** Card `category` this pack favours when rolling rewards (server-side weighting). */
+    faction?: string;
+    /** Selection-weight multiplier applied to `faction` cards of the rolled rarity. */
+    factionWeight?: number;
   };
 }
 
