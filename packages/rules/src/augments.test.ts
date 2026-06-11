@@ -874,7 +874,7 @@ describe("new hero and resource augments", () => {
     expect(player.hero.hp).toBe(47);
   });
 
-  it("loses 5 HP now and grants 5 current crystals at the start of the next own turn", () => {
+  it("loses 5 HP now and grants 3 current crystals at the start of the next own turn", () => {
     const state = startInProgress(26);
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
@@ -885,11 +885,11 @@ describe("new hero and resource augments", () => {
 
     applyAugmentSelection(state, seat, entry("AMP_BLOOD_DONATION_VOUCHER"), []);
     expect(player.hero.hp).toBe(15);
-    expect(player.augmentFlags.bonusCrystalsNextTurn).toBe(5);
+    expect(player.augmentFlags.bonusCrystalsNextTurn).toBe(3);
 
     startTurn(state, 2000, []);
     expect(player.mana.max).toBe(5);
-    expect(player.mana.current).toBe(10);
+    expect(player.mana.current).toBe(8);
     expect(player.augmentFlags.bonusCrystalsNextTurn).toBeUndefined();
   });
 
