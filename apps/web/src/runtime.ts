@@ -4796,7 +4796,8 @@ function signInRequiredScreen(title: string): string {
 
 async function loadFriends(): Promise<void> {
   if (!supabase || !view.session) return;
-  view.friendsLoading = true;
+  // Spinner only before the first successful fetch; afterwards refresh silently.
+  view.friendsLoading = !view.friendsLoaded;
   render();
   try {
     const [friendsResult, requestsResult] = await Promise.all([
@@ -4807,6 +4808,7 @@ async function loadFriends(): Promise<void> {
     if (requestsResult.error) throw requestsResult.error;
     view.friends = (friendsResult.data as FriendRow[]) ?? [];
     view.friendRequests = (requestsResult.data as FriendRequestRow[]) ?? [];
+    view.friendsLoaded = true;
   } catch (error) {
     showAlert(errorMessage(error));
   } finally {
@@ -4873,12 +4875,14 @@ async function loadLeaderboard(): Promise<void> {
     view.leaderboard = [];
     return;
   }
-  view.leaderboardLoading = true;
+  // Spinner only before the first successful fetch; afterwards refresh silently.
+  view.leaderboardLoading = !view.leaderboardLoaded;
   render();
   try {
     const { data, error } = await supabase.rpc("get_leaderboard", { p_limit: 50 });
     if (error) throw error;
     view.leaderboard = (data as LeaderboardRow[]) ?? [];
+    view.leaderboardLoaded = true;
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Failed to load leaderboard.");
   } finally {
@@ -4887,9 +4891,24 @@ async function loadLeaderboard(): Promise<void> {
   }
 }
 
+/**
+ * Warm the shop / tasks / achievements / friends / leaderboard caches in the background
+ * right after sign-in, so opening those screens shows content immediately instead of a
+ * 載入中 spinner.
+ */
+function preloadMenuData(): void {
+  if (!supabase || !view.session?.user) return;
+  void loadShopItems();
+  void loadTasks();
+  void loadFriends();
+  void loadLeaderboard();
+}
+
 async function loadShopItems(): Promise<void> {
   if (!supabase || !view.session) return;
-  view.shopLoading = true;
+  // Only block the screen with a spinner before the first successful fetch.
+  // Once preloaded, re-entries render cached items immediately and refresh silently.
+  view.shopLoading = !view.shopLoaded;
   render();
   try {
     const { data, error } = await supabase
@@ -4898,7 +4917,11 @@ async function loadShopItems(): Promise<void> {
       .eq("active", true)
       .order("price_gold", { ascending: false });
     if (error) throw error;
-    view.shopItems = (data as ShopItemRow[]) ?? [];
+    const items = (data as ShopItemRow[]) ?? [];
+    // 「通用牌組」固定在最左上角，其餘維持價格由高到低。
+    items.sort((a, b) => (a.id === "pack-general" ? -1 : 0) - (b.id === "pack-general" ? -1 : 0));
+    view.shopItems = items;
+    view.shopLoaded = true;
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Failed to load shop.");
   } finally {
@@ -4936,7 +4959,8 @@ function joinTasks(quests: TaskQuestRow[], progress: TaskProgressRow[]): TaskVie
 async function loadTasks(): Promise<void> {
   const session = view.session;
   if (!supabase || !session?.user) return;
-  view.tasksLoading = true;
+  // Spinner only before the first successful fetch; afterwards refresh silently.
+  view.tasksLoading = !view.tasksLoaded;
   render();
   try {
     const userId = session.user.id;
@@ -4955,6 +4979,7 @@ async function loadTasks(): Promise<void> {
     const quests = (questsResult.data as TaskQuestRow[]) ?? [];
     const progress = (progressResult.data as TaskProgressRow[]) ?? [];
     view.tasks = joinTasks(quests, progress);
+    view.tasksLoaded = true;
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Failed to load tasks.");
   } finally {
@@ -6926,7 +6951,10 @@ async function initializeAccount(): Promise<void> {
   if (!supabase) return;
   const { data } = await supabase.auth.getSession();
   view.session = data.session;
-  if (view.session) await loadAccountData();
+  if (view.session) {
+    await loadAccountData();
+    preloadMenuData();
+  }
   supabase.auth.onAuthStateChange((event, session) => {
     const previousUserId = view.session?.user?.id;
     const nextUserId = session?.user?.id;
@@ -6936,6 +6964,7 @@ async function initializeAccount(): Promise<void> {
     if (session) {
       if (previousUserId !== nextUserId) view.menuScreen = "main";
       void loadAccountData();
+      preloadMenuData();
     } else {
       view.profile = undefined;
       view.decks = [];
@@ -6946,6 +6975,14 @@ async function initializeAccount(): Promise<void> {
       remoteTrainingCompletions = new Set();
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
+      // Drop the previous account's preloaded data so the next sign-in re-warms it.
+      view.shopItems = [];
+      view.tasks = [];
+      view.leaderboard = [];
+      view.shopLoaded = false;
+      view.tasksLoaded = false;
+      view.friendsLoaded = false;
+      view.leaderboardLoaded = false;
       view.menuScreen = "main";
       render();
     }

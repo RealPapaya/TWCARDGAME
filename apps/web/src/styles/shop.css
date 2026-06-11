@@ -126,7 +126,7 @@
 
 .shop-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
   padding: 4px 2px 8px;
   overflow-y: auto;

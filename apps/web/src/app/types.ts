@@ -267,17 +267,25 @@ export type ClientViewState = {
   friendRequests: FriendRequestRow[];
   friendsPanel: FriendsPanel;
   friendsLoading?: boolean;
+  /** True once a friends fetch has succeeded at least once (drives preload-then-silent-refresh). */
+  friendsLoaded?: boolean;
   leaderboard: LeaderboardRow[];
   leaderboardLoading?: boolean;
+  /** True once a leaderboard fetch has succeeded at least once. */
+  leaderboardLoaded?: boolean;
   leaderboardSortBy: "wins" | "level";
   /** Which match kind the profile 戰績統計 panel is showing (PvP vs PvE). */
   statsMode: "pvp" | "pve";
   publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
+  /** True once a shop fetch has succeeded at least once (drives preload-then-silent-refresh). */
+  shopLoaded?: boolean;
   selectedShopItemId?: string;
   tasks: TaskView[];
   tasksLoading?: boolean;
+  /** True once a tasks/achievements fetch has succeeded at least once. */
+  tasksLoaded?: boolean;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
   packOpeningRewards?: PackOpeningReward[];
   packOpeningFlipped?: boolean[];
