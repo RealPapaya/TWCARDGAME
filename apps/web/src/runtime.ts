@@ -3394,7 +3394,10 @@ function logIcon(name: keyof typeof BATTLE_LOG_SVG): string {
 function renderLogCardArt(ref: BattleLogCardRef, size: "tile" | "big"): string {
   const cls = size === "big" ? "log-card-art log-card-art-big" : "log-card-art";
   if (ref.thumb) return `<span class="${cls}" style="background-image:url('${escapeAttr(ref.thumb)}')" aria-hidden="true"></span>`;
-  if (ref.hero) return `<span class="${cls} log-card-hero" aria-hidden="true">${logIcon("shield")}</span>`;
+  if (ref.hero) {
+    if (ref.avatarUrl) return `<span class="${cls} log-card-hero log-card-hero-avatar" style="background-image:url('${escapeAttr(ref.avatarUrl)}')" aria-hidden="true"></span>`;
+    return `<span class="${cls} log-card-hero" aria-hidden="true">${logIcon("shield")}</span>`;
+  }
   return `<span class="${cls} log-card-empty" aria-hidden="true">${logIcon("star")}</span>`;
 }
 
@@ -7511,6 +7514,17 @@ function battleLogHeroName(seat: Seat | undefined): string {
   return readPlayer(seat)?.displayName || (seat === view.mySeat ? "You" : "Opponent");
 }
 
+/** Avatar image URL to show for a hero ref in the battle log. */
+function heroAvatarForSeat(seat: Seat | undefined): string {
+  if (seat && seat === view.mySeat) return view.profile?.avatar_url || FALLBACK_PROFILE_AVATAR_URL;
+  return DEFAULT_AVATAR_URL;
+}
+
+/** A BattleLogCardRef for a hero of the given seat, including avatar. */
+function battleLogHeroRef(seat: Seat | undefined): BattleLogCardRef {
+  return { name: battleLogHeroName(seat), hero: true, avatarUrl: heroAvatarForSeat(seat) };
+}
+
 /** Resolve a minion `instanceId` to a name + card id, using the live board then the summon cache. */
 function battleLogUnit(instanceId: string): { name: string; cardId?: string } {
   const minion = findMinion(instanceId);
@@ -7533,7 +7547,7 @@ function logUnitRef(instanceId: string): BattleLogCardRef {
 
 /** A card ref for a damage/heal/buff target string (`instanceId` or `"{seat}:hero"`). */
 function logTargetRef(target: string): BattleLogCardRef {
-  if (target.endsWith(":hero")) return { name: battleLogHeroName(target.split(":")[0] as Seat), hero: true };
+  if (target.endsWith(":hero")) return battleLogHeroRef(target.split(":")[0] as Seat);
   return logUnitRef(target);
 }
 
@@ -7622,11 +7636,11 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
     }
     case "ATTACK": {
       const attackerId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
-      const tile = attackerId ? logUnitRef(attackerId) : { name: battleLogHeroName(event.seat), hero: true };
+      const tile = attackerId ? logUnitRef(attackerId) : battleLogHeroRef(event.seat);
       const ref = payload.target as TargetRef | undefined;
       const flowTo = ref
         ? ref.type === "HERO"
-          ? { name: battleLogHeroName(ref.side), hero: true }
+          ? battleLogHeroRef(ref.side)
           : logUnitRef(ref.instanceId ?? "")
         : undefined;
       const dealt = ctx.attackTargetDamage.get(event.seq);

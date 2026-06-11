@@ -62,8 +62,10 @@ export interface BattleLogCardRef {
   name: string;
   /** Resolved card art URL; absent for heroes or unknown cards. */
   thumb?: string;
-  /** True when this references a hero rather than a card (no art available). */
+  /** True when this references a hero rather than a card. */
   hero?: boolean;
+  /** Avatar image URL for hero refs — shown as a circular portrait instead of the shield icon. */
+  avatarUrl?: string;
 }
 
 export interface BattleLogEntry {

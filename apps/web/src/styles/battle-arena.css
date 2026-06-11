@@ -2133,6 +2133,12 @@
   color: var(--wood-dark, #5d2e17);
 }
 
+/* Hero log tile backed by a player avatar photo — centre-crop, circular-ish feel. */
+.log-card-hero-avatar {
+  background-position: center center;
+  border-radius: 50%;
+}
+
 /* Placeholder glyph (shield for heroes, star for unknown cards) inside an art block. */
 .log-card-hero svg,
 .log-card-empty svg {
