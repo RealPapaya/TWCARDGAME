@@ -197,7 +197,9 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
     }
     minion.currentHealth -= amount;
     updateEnrage(minion);
-    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount }, ref.owner.seat);
+    // Carry the authoritative post-hit health so the client can drop the HP digit
+    // AT impact without waiting for (or racing) the held publicSync flush.
+    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth }, ref.owner.seat);
   } else {
     // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
     const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
@@ -206,7 +208,7 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAX_CUT" }, ref.owner.seat);
     }
     ref.owner.hero.hp -= dealt;
-    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt }, ref.owner.seat);
+    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp }, ref.owner.seat);
     if (unlockLowHpManaCap(ref.owner)) {
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, ref.owner.seat);
     }
@@ -220,12 +222,12 @@ export function healUnit(state: MatchState, ref: TargetUnitRef, amount: number, 
     const healed = Math.max(0, Math.min(amount, minion.health - minion.currentHealth));
     minion.currentHealth += healed;
     updateEnrage(minion);
-    addEvent(state, events, "HEAL", { target: minion.instanceId, amount: healed }, ref.owner.seat);
+    addEvent(state, events, "HEAL", { target: minion.instanceId, amount: healed, remainingHealth: minion.currentHealth }, ref.owner.seat);
     return healed;
   }
   const healed = Math.max(0, Math.min(amount, ref.owner.hero.maxHp - ref.owner.hero.hp));
   ref.owner.hero.hp += healed;
-  addEvent(state, events, "HEAL", { target: `${ref.owner.seat}:hero`, amount: healed }, ref.owner.seat);
+  addEvent(state, events, "HEAL", { target: `${ref.owner.seat}:hero`, amount: healed, remainingHealth: ref.owner.hero.hp }, ref.owner.seat);
   return healed;
 }
 

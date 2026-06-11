@@ -1935,6 +1935,27 @@ function pendingMinionCurrentHealth(seat: Seat, instanceId: string): number | un
   return pendingPublicBoardForSeat(seat)?.find(m => m.instanceId === instanceId)?.currentHealth;
 }
 
+/**
+ * Post-effect health to display for a unit (minion or `seat:hero` key) right at
+ * impact, read from the latest READY damage/heal cue's `resultingHealth`. This is
+ * the engine's authoritative absolute value, carried on the cue itself — so the HP
+ * digit drops in lockstep with the `-N`/`+N` number and never waits on (or races)
+ * the held publicSync flush. Absolute + idempotent: still correct after the flush.
+ * Returns undefined when no such cue is ready, so callers fall back to the synced
+ * value. (Overkill can make this negative; callers clamp for display.)
+ */
+function readyResultingHealth(targetKey: string): number | undefined {
+  let best: { seq: number; health: number } | undefined;
+  for (const cue of view.animationCues) {
+    if (cue.targetKey !== targetKey || cue.resultingHealth === undefined) continue;
+    if (cue.kind !== "damage" && cue.kind !== "heal" && cue.kind !== "effectStrike") continue;
+    if (!cueIsReady(cue)) continue;
+    const seq = cue.seq ?? -1;
+    if (!best || seq >= best.seq) best = { seq, health: cue.resultingHealth };
+  }
+  return best?.health;
+}
+
 function pendingHeroHp(seat: Seat): number | undefined {
   const sync = pendingPublicSync as typeof view.publicSync | undefined;
   return sync?.players?.[seat]?.hero?.hp;
@@ -2015,7 +2036,12 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   const targetKey = targetKeyFor(targetRef);
   // Show post-damage/heal HP immediately when the cue fires, same as renderMinion.
   const hasHeroDmgHealCue = hasCue(targetKey, "damage") || hasCue(targetKey, "heal");
-  const hp = (hasHeroDmgHealCue ? pendingHeroHp(seat) : undefined) ?? player?.hero?.hp ?? 0;
+  // Authoritative post-hit HP from the cue first (drops at impact), then the held
+  // sync, then the live value — same lockstep treatment as renderMinion.
+  const cueHeroHp = readyResultingHealth(targetKey);
+  const hp = cueHeroHp !== undefined
+    ? Math.max(0, cueHeroHp)
+    : ((hasHeroDmgHealCue ? pendingHeroHp(seat) : undefined) ?? player?.hero?.hp ?? 0);
   const heroClasses = classNames([
     "hero",
     role === "player" ? "player-hero" : "opponent-hero",
@@ -2173,8 +2199,13 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   // Show post-damage/heal HP immediately when the cue fires (at impact, ~560ms into
   // the lunge) instead of waiting for the full publicSync flush at ~920ms.
   const hasDmgHealCue = hasCue(minion.instanceId, "damage") || hasCue(minion.instanceId, "heal");
+  // Prefer the authoritative post-hit health carried on the cue (drops at impact,
+  // no sync-timing race); fall back to the held publicSync value, then the live one.
+  const cueHealth = readyResultingHealth(minion.instanceId);
   const pendingHealth = hasDmgHealCue ? pendingMinionCurrentHealth(seat, minion.instanceId) : undefined;
-  const shownHealth = holdBaseStat ? catalogCard!.health : (pendingHealth ?? minion.currentHealth);
+  const shownHealth = holdBaseStat
+    ? catalogCard!.health
+    : (cueHealth !== undefined ? Math.max(0, cueHealth) : (pendingHealth ?? minion.currentHealth));
   const attackClass = classNames([
     "stat-atk",
     holdBaseStat ? "" : valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)
@@ -9026,7 +9057,8 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     // Battlecry damage and selected NEWS damage can carry a sourceKey so the
     // imperative blade sprite knows where to fly from.
     const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
-    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq };
+    const resultingHealth = typeof payload.remainingHealth === "number" ? payload.remainingHealth : undefined;
+    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq, resultingHealth };
   }
   if (event.type === "QUEST_COMPLETED") {
     const source = typeof payload.source === "string" ? payload.source : undefined;

@@ -144,6 +144,14 @@ export type AnimationCue = {
   playBaseEffectBonusValue?: number;
   attackerInstanceId?: string;
   amount?: number;
+  /**
+   * Authoritative post-effect health of the damage/heal target, taken from the
+   * engine's DAMAGE/HEAL event (`remainingHealth`). An ABSOLUTE value — the render
+   * shows it at impact so the HP digit drops in lockstep with the `-N`/`+N` number,
+   * without depending on (or racing) the held publicSync flush. Idempotent, so it
+   * stays correct after the flush too (no double-subtraction).
+   */
+  resultingHealth?: number;
   delayMs?: number;
   readyAtMs?: number;
   /** Board minion instanceIds an `augmentGlow` should light up (units the 增幅 changed). */
