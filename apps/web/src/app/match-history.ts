@@ -69,6 +69,20 @@ export function computeMatchStats(
   return { wins, losses, draws, total: wins + losses + draws };
 }
 
+/** Wins/losses/draws across every match kind (the main-menu glance chip). */
+export function overallMatchStats(rows: MatchHistoryRow[], userId: string | undefined): MatchStats {
+  let wins = 0;
+  let losses = 0;
+  let draws = 0;
+  for (const row of rows) {
+    const outcome = matchOutcome(row, userId);
+    if (outcome === "win") wins++;
+    else if (outcome === "loss") losses++;
+    else draws++;
+  }
+  return { wins, losses, draws, total: wins + losses + draws };
+}
+
 export function difficultyLabel(difficulty: AiDifficulty | string | null | undefined): string {
   if (!difficulty) return "";
   return DIFFICULTY_LABELS[difficulty as AiDifficulty] ?? "";

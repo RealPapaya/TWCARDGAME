@@ -25,6 +25,19 @@ describe("match result persistence", () => {
     expect(row.final_state.result?.winnerSeat).toBe("player2");
   });
 
+  it("records created_at from the match start time when provided", () => {
+    const finishedAt = new Date("2026-05-17T00:08:32.000Z");
+    const startedAtMs = Date.parse("2026-05-17T00:00:00.000Z");
+
+    const withStart = buildMatchHistoryRow(finishedMatch(), finishedAt, { startedAtMs });
+    expect(withStart.created_at).toBe("2026-05-17T00:00:00.000Z");
+    expect(withStart.finished_at).toBe("2026-05-17T00:08:32.000Z");
+
+    // No start time → leave created_at unset so the DB default (insert time) applies.
+    const withoutStart = buildMatchHistoryRow(finishedMatch(), finishedAt);
+    expect(withoutStart.created_at).toBeUndefined();
+  });
+
   it("logs persistence failures without throwing", async () => {
     const warn = vi.fn();
     const persistence: MatchResultPersistence = {

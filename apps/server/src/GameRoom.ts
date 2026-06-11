@@ -67,6 +67,9 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   private serverCommandSeq = 0;
   protected readonly finalizer: MatchResultFinalizer;
   private registeredJoinCode?: string;
+  // Wall-clock time the match was created, used to record real match duration.
+  // A room-level concern (server adapter), so the rules engine stays pure.
+  private matchStartedAtMs?: number;
 
   constructor(
     persistence: MatchResultPersistence = createMatchResultPersistenceFromEnv(),
@@ -218,11 +221,13 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     const player2 = this.setup.get("player2");
     if (!player1 || !player2) return;
 
+    const startedAtMs = Date.now();
+    this.matchStartedAtMs = startedAtMs;
     const created = createInitialMatch({
       matchId: this.roomId,
       cardCatalogVersion: CARD_CATALOG_VERSION,
       seed: seedFromRoomId(this.roomId),
-      nowMs: Date.now(),
+      nowMs: startedAtMs,
       mulliganTimeLimitMs: DEFAULT_MULLIGAN_TIME_LIMIT_MS,
       turnTimeLimitMs: DEFAULT_TURN_TIME_LIMIT_MS,
       catalog: CARD_CATALOG,
@@ -382,7 +387,10 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
       this.scheduleCleanup();
       return;
     }
-    const metadata = this.getMatchPersistenceMetadata();
+    const metadata: MatchPersistenceMetadata = {
+      ...this.getMatchPersistenceMetadata(),
+      startedAtMs: this.matchStartedAtMs
+    };
     void this.finalizeAndReward(metadata);
     this.scheduleCleanup();
   }

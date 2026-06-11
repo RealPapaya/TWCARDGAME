@@ -82,6 +82,15 @@ import {
   type ActiveMatchRecord
 } from "./app/activeMatch.js";
 import { PATCH_NOTES } from "./app/patch-notes.js";
+import {
+  computeMatchStats,
+  matchLengthLabel,
+  matchOutcome,
+  matchTypeLabel,
+  opponentLabel,
+  overallMatchStats,
+  type MatchKind
+} from "./app/match-history.js";
 import type {
   AnimationCue,
   AnimationKind,
@@ -136,6 +145,11 @@ import {
 
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+// Match-history columns + jsonb sub-objects from final_state (opponent display
+// names and turn count). created_at carries the match start time (see persistence.ts).
+const MATCH_HISTORY_SELECT =
+  "id,winner_seat,result_reason,created_at,finished_at,player1_user_id,player2_user_id," +
+  "is_vs_ai,ai_theme,ai_difficulty,players_view:final_state->players,turn_view:final_state->turn";
 const DEFAULT_AVATAR_URL = "/images/avatars/ai_default.webp";
 const FALLBACK_PROFILE_AVATAR_URL = "/images/avatars/avatar1.webp";
 const TITLE_LABELS: Record<string, string> = {
@@ -259,6 +273,7 @@ const view: ClientViewState = {
   friendsPanel: "friends",
   leaderboard: [],
   leaderboardSortBy: "wins",
+  statsMode: "pvp",
   publicPlayerProfile: undefined,
   shopItems: [],
   tasks: [],
@@ -721,7 +736,7 @@ function renderCloudLayer(): string {
 function renderMainMenu(): string {
   const displayName = view.profile?.display_name ?? "Player";
   const avatarUrl = view.profile?.avatar_url || DEFAULT_AVATAR_URL;
-  const stats = computeMatchStats();
+  const stats = overallMatchStats(view.matchHistory, view.session?.user?.id);
   const collectionMap = buildCollectionMap(view.collection);
   const collectibles = CARD_CATALOG.filter((card) => card.collectible !== false);
   const ownedCount = ownedCollectionTypeCount(collectibles, collectionMap);
@@ -1107,7 +1122,8 @@ function renderProfileScreen(): string {
   const profile = view.profile;
   const displayName = view.editingDisplayName ?? profile?.display_name ?? "玩家";
   const avatarUrl = profile?.avatar_url || DEFAULT_AVATAR_URL;
-  const stats = computeMatchStats();
+  const statsMode = view.statsMode;
+  const stats = computeMatchStats(view.matchHistory, view.session?.user?.id, statsMode);
   const winRateLabel = stats.total === 0 ? "—" : `${Math.round((stats.wins / stats.total) * 100)}%`;
   const level = Math.min(MAX_LEVEL, Math.max(1, Math.floor(profile?.level ?? 1)));
   const xp = Math.max(0, Math.floor(profile?.xp ?? 0));
@@ -1191,7 +1207,13 @@ function renderProfileScreen(): string {
         </div>
 
         <div class="profile-section profile-section--stats">
-          <h3>戰績統計</h3>
+          <div class="stats-header">
+            <h3>戰績統計</h3>
+            <div class="stats-mode-switch" role="tablist" aria-label="戰績類型">
+              <button type="button" class="stats-mode-tab ${statsMode === "pvp" ? "active" : ""}" data-stats-mode="pvp" role="tab" aria-selected="${statsMode === "pvp"}">玩家對戰</button>
+              <button type="button" class="stats-mode-tab ${statsMode === "pve" ? "active" : ""}" data-stats-mode="pve" role="tab" aria-selected="${statsMode === "pve"}">電腦對戰</button>
+            </div>
+          </div>
           <ul class="stat-list">
             <li><span>勝場</span><strong>${stats.wins}</strong></li>
             <li><span>敗場</span><strong>${stats.losses}</strong></li>
@@ -1534,28 +1556,6 @@ function renderDeckEditorScreen(): string {
   return renderCollectionWorkspace("battle", "編輯牌組");
 }
 
-function computeMatchStats(): { wins: number; losses: number; draws: number; total: number } {
-  let wins = 0;
-  let losses = 0;
-  let draws = 0;
-  const userId = view.session?.user?.id;
-  for (const row of view.matchHistory) {
-    const mySeatInRow: Seat | undefined =
-      userId && row.player1_user_id === userId ? "player1"
-      : userId && row.player2_user_id === userId ? "player2"
-      : undefined;
-    if (!row.winner_seat) {
-      draws++;
-      continue;
-    }
-    if (mySeatInRow && row.winner_seat === mySeatInRow) wins++;
-    else if (mySeatInRow) losses++;
-    else draws++;
-  }
-  const total = wins + losses + draws;
-  return { wins, losses, draws, total };
-}
-
 function renderSavedDeck(deck: DeckRow): string {
   const selected = deck.id === view.selectedDeckId;
   const incomplete = deck.card_ids.length !== 30;
@@ -1709,22 +1709,21 @@ function renderCurrentDeckCards(cardIds: readonly string[]): string {
 }
 
 function renderMatchHistoryRow(row: MatchHistoryRow): string {
-  const finished = row.finished_at ? new Date(row.finished_at).toLocaleString() : row.id;
   const userId = view.session?.user?.id;
-  const mySeatInRow: Seat | undefined =
-    userId && row.player1_user_id === userId ? "player1"
-    : userId && row.player2_user_id === userId ? "player2"
-    : undefined;
-  const outcome = !row.winner_seat ? "draw"
-    : mySeatInRow && row.winner_seat === mySeatInRow ? "win"
-    : mySeatInRow ? "loss"
-    : "info";
-  const label = outcome === "win" ? "勝" : outcome === "loss" ? "敗" : outcome === "draw" ? "平局" : (row.winner_seat ?? "—");
+  const outcome = matchOutcome(row, userId);
+  const outcomeLabel = outcome === "win" ? "勝" : outcome === "loss" ? "敗" : "平局";
+  const finished = row.finished_at ? new Date(row.finished_at).toLocaleString() : "";
   return `
     <div class="history-row outcome-${outcome}">
-      <strong class="history-outcome">${escapeHtml(label)}</strong>
-      <span class="history-reason">${escapeHtml(row.result_reason)}</span>
-      <small>${escapeHtml(finished)}</small>
+      <strong class="history-outcome">${escapeHtml(outcomeLabel)}</strong>
+      <div class="history-info">
+        <span class="history-type">${escapeHtml(matchTypeLabel(row))}</span>
+        <span class="history-vs">對手：${escapeHtml(opponentLabel(row, userId))}</span>
+      </div>
+      <div class="history-meta">
+        <span class="history-duration">時長：${escapeHtml(matchLengthLabel(row))}</span>
+        ${finished ? `<small>${escapeHtml(finished)}</small>` : ""}
+      </div>
     </div>
   `;
 }
@@ -3708,6 +3707,14 @@ function bindStaticActions(): void {
       const value = el.dataset.lbSort as "wins" | "level" | undefined;
       if (!value) return;
       view.leaderboardSortBy = value;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-stats-mode]")) {
+    on(el, "click", "stats-mode", () => {
+      const value = el.dataset.statsMode as MatchKind | undefined;
+      if (!value || view.statsMode === value) return;
+      view.statsMode = value;
       render();
     });
   }
@@ -6939,7 +6946,7 @@ async function loadAccountData(): Promise<void> {
         .order("card_id", { ascending: true }),
       supabase
         .from("match_history")
-        .select("id,winner_seat,result_reason,created_at,finished_at,player1_user_id,player2_user_id")
+        .select(MATCH_HISTORY_SELECT)
         .order("finished_at", { ascending: false })
         .limit(20),
       supabase
@@ -7003,7 +7010,7 @@ async function loadAccountDataRaw(): Promise<void> {
       .order("card_id", { ascending: true }),
     supabase
       .from("match_history")
-      .select("id,winner_seat,result_reason,created_at,finished_at")
+      .select(MATCH_HISTORY_SELECT)
       .order("finished_at", { ascending: false })
       .limit(20),
     supabase

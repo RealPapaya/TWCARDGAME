@@ -8,7 +8,8 @@ import {
   matchOutcome,
   matchTurns,
   matchTypeLabel,
-  opponentLabel
+  opponentLabel,
+  overallMatchStats
 } from "./match-history.js";
 import type { MatchHistoryRow } from "./types.js";
 
@@ -68,6 +69,10 @@ describe("computeMatchStats", () => {
 
   it("returns zeros for an empty history", () => {
     expect(computeMatchStats([], ME, "pvp")).toEqual({ wins: 0, losses: 0, draws: 0, total: 0 });
+  });
+
+  it("overallMatchStats sums across both kinds", () => {
+    expect(overallMatchStats(rows, ME)).toEqual({ wins: 2, losses: 2, draws: 1, total: 5 });
   });
 });
 
