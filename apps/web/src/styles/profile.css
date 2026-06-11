@@ -23,7 +23,7 @@
   grid-template-rows: auto auto 1fr;
   grid-template-areas:
     "header  header"
-    "login   stats"
+    "stats   stats"
     "history history";
   gap: 10px 20px;
   align-items: start;
@@ -38,7 +38,6 @@
 }
 
 .profile-section--stats { grid-area: stats; }
-.profile-section--login { grid-area: login; }
 .profile-section--history {
   grid-area: history;
   /* Grow to fill remaining grid row */
@@ -55,9 +54,6 @@
   margin: 0;
 }
 
-/* 讓登入紀錄與戰績統計的標題列等高、下緣對齊，
-   使左側登入資料列與右側勝率列水平對齊。 */
-.profile-section--login > h3,
 .profile-section--stats .stats-header {
   min-height: 32px;
   margin-bottom: 10px;
@@ -330,15 +326,13 @@
   transition: width 0.28s ease;
 }
 
-.profile-resource-grid,
-.profile-login-grid {
+.profile-resource-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
-.profile-resource,
-.profile-login-grid div {
+.profile-resource {
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -350,14 +344,12 @@
   border: 1px solid rgba(93, 46, 23, 0.1);
 }
 
-.profile-resource span,
-.profile-login-grid span {
+.profile-resource span {
   color: #5d2e17;
   font-size: 13px;
 }
 
-.profile-resource strong,
-.profile-login-grid strong {
+.profile-resource strong {
   color: #3d1e0f;
   font-family: var(--font-display);
   font-size: 22px;
@@ -406,7 +398,7 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 

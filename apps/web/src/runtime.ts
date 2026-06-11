@@ -1237,15 +1237,6 @@ function renderProfileScreen(): string {
           </ul>
         </div>
 
-        <div class="profile-section profile-section--login">
-          <h3>登入紀錄</h3>
-          <div class="profile-login-grid">
-            <div><span>累積登入</span><strong>${profile?.login_days ?? 0}</strong></div>
-            <div><span>目前連續</span><strong>${profile?.current_login_streak ?? 0}</strong></div>
-            <div><span>最長連續</span><strong>${profile?.longest_login_streak ?? 0}</strong></div>
-          </div>
-        </div>
-
         <div class="profile-section profile-section--history">
           <h3>近期對戰</h3>
           <div class="history-list">

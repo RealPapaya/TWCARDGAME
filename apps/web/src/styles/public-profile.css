@@ -126,8 +126,7 @@
     justify-content: center;
   }
   .stat-list,
-  .profile-resource-grid,
-  .profile-login-grid {
+  .profile-resource-grid {
     grid-template-columns: 1fr;
   }
   .public-profile-hero {
