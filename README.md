@@ -1,8 +1,6 @@
 # TWCARDGAME v2
 
-This repository root now contains the v2 parallel rewrite workspace.
-
-The original static/v1 project has been moved into `LEGACY/` for reference.
+This repository root contains the v2 rewrite workspace.
 
 ## v2 Commands
 
@@ -26,7 +24,6 @@ npm run dev -w @twcardgame/web
 - `packages/rules`: deterministic gameplay engine.
 - `packages/db`: Supabase helpers and migrations.
 - `packages/shared`: shared command/state/event contracts.
-- `LEGACY`: original v1 app, assets, scripts, and old tests.
 
 ## Documentation And Skill
 

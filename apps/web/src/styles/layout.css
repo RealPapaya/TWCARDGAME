@@ -1108,7 +1108,7 @@ body.hand-dragging .hand-row .card {
 
 /*
  * The card landed on the field while its battlecry target is being aimed.
- * LEGACY v1 parity: a battlecry card is no different from any other card, so
+ * v1 parity: a battlecry card is no different from any other card, so
  * this looks like a normal minion — just non-interactive (it never blocks
  * target hit-tests). It carries NO entrance animation on purpose: the battle
  * surface re-renders on every cue during battlecry resolution and any keyframe
@@ -2749,7 +2749,7 @@ body.hand-dragging .hand-row .card {
   100% { opacity: 1; transform: translateZ(0) rotateX(0); }
 }
 
-/* Mirrors LEGACY preview-slam: the card recedes into the board while
+/* Mirrors the v1 preview-slam: the card recedes into the board while
    shrinking and fading out — fully gone before the board minion appears.
    The player card recedes in place; the opponent card drifts up toward the
    opponent board so it reads as landing there, not flying at the player. */

@@ -10,7 +10,7 @@ Use this path when the card uses only existing fields and existing effect types.
 2. Use a stable, unique `id`. Keep current casing conventions: `TW###` for minions and `S###` for NEWS-style spell cards.
 3. Fill every base field: `id`, `name`, `category`, `cost`, `type`, `rarity`, `description`, and `image`.
 4. For `MINION` cards, include integer `attack` and `health`. Do not add those fields to `NEWS` cards unless a future schema requires it.
-5. Point `image` at an existing client asset path. Prefer the same filename stem as the card id or the established legacy asset name.
+5. Point `image` at an existing client asset path under `apps/web/public/`. Prefer the same filename stem as the card id or an existing asset name.
 6. Add only supported keyword hooks and effect types. The validator rejects unsupported hooks, missing referenced cards, and effect payloads missing required fields.
 7. Run:
 

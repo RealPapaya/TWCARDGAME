@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Repository layout
 
-This is the TWCARDGAME **v2** rewrite — a TypeScript npm-workspaces monorepo (ESM, `NodeNext`, strict). The original static v1 app is preserved verbatim under `LEGACY/` and is **not** part of the build. Keep v2 work in `apps/`, `packages/`, and `docs/`.
+This is the TWCARDGAME **v2** rewrite — a TypeScript npm-workspaces monorepo (ESM, `NodeNext`, strict). All work lives in `apps/`, `packages/`, and `docs/`.
 
 Workspaces (TS project references are wired in [tsconfig.json](tsconfig.json)):
 

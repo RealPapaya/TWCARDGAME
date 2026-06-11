@@ -27,7 +27,6 @@ Keep these responsibilities separate:
 - `apps/server`: Colyseus adapter — `GameRoom` (PvP) and `BotRoom` (PvE). Seat assignment, room lifecycle, command routing, public sync, private hand messages, account/persistence wiring, bot pacing.
 - `apps/web`: rendering and input only, organized as a thin entry (`main.ts` → `runtime.ts`) plus focused `app/` modules (DOM rendering/patching, animations, audio, viewport, storage). It sends commands and renders server state; it does not apply authoritative game state changes.
 - `packages/db`: persistence adapters and migrations only.
-- `LEGACY`: reference only. Do not spread v1 architecture back into v2.
 
 All gameplay mutation must flow through:
 
@@ -77,7 +76,7 @@ When adding a new effect type:
 4. Add catalog/rules tests.
 5. Run `npm run validate:cards`, `npm test`, and `npm run check`.
 
-Do not special-case cards by name unless the legacy behavior truly requires it. Prefer effect data that can be reused by future cards.
+Do not special-case cards by name unless the card's intended behavior truly requires it. Prefer effect data that can be reused by future cards.
 
 ## Server Style
 

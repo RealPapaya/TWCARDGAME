@@ -1,6 +1,6 @@
 ---
 name: twcardgame-v2
-description: Use when working on the TWCARDGAME v2 rewrite, including its Colyseus authoritative server, deterministic TypeScript rules engine, card catalog validation, Vite web client, Supabase scaffolding, or migration from the LEGACY v1 app.
+description: Use when working on the TWCARDGAME v2 rewrite, including its Colyseus authoritative server, deterministic TypeScript rules engine, card catalog validation, Vite web client, or Supabase scaffolding.
 ---
 
 # TWCARDGAME v2
@@ -11,7 +11,6 @@ description: Use when working on the TWCARDGAME v2 rewrite, including its Colyse
 - Adding or changing cards/effect types in `packages/cards`.
 - Touching Colyseus room logic in `apps/server` (PvP `GameRoom`, PvE `BotRoom`).
 - Touching the Vite client in `apps/web`.
-- Migrating behavior or assets from `LEGACY/`.
 
 ## First Move
 
@@ -26,7 +25,7 @@ Also inspect the relevant package before editing:
 
 ## Hard Rules
 
-- Keep v2 code in `apps/`, `packages/`, and `docs/`; keep v1 material in `LEGACY/`.
+- Keep all code in `apps/`, `packages/`, and `docs/`.
 - All gameplay mutations go through `GameRoom.handleCommand -> reduce(...) -> rules state/events -> Colyseus sync`.
 - Do not put gameplay rules in `apps/web` or `apps/server`.
 - Do not use DOM, Colyseus, Supabase, `Date.now()`, or `Math.random()` inside `packages/rules`.

@@ -1,6 +1,6 @@
 -- Grant starter card collection (20 types × 2 copies) and a pre-built
 -- 30-card starter deck to every new user at sign-up.
--- Card list matches LEGACY/js/auth/auth_manager.js generateStarterCollection().
+-- Card list matches the v1 generateStarterCollection() starter grant.
 
 -- Starter card ids (20 types, 2 copies each in collection)
 -- Deck subset: 15 types × 2 = 30 cards, ready to queue immediately.

@@ -1,7 +1,6 @@
 import type { AiDifficulty, AiTheme } from "./index.js";
 
-// Player progression values ported from LEGACY v1
-// (LEGACY/js/ui/app.js lines 4981-5168). The exact numbers below match v1; the
+// Player progression values ported from v1. The exact numbers below match v1; the
 // only translation is the v2 difficulty mapping the user picked: v2 `easy` is
 // v1 `NORMAL`, v2 `normal` is v1 `HARD`, v2 `hard` is v1 `HELL`. Server, UI,
 // and SQL helper (migration 0012) all derive from this single source of truth.

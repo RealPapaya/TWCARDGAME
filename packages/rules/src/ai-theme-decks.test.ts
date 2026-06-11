@@ -3,7 +3,7 @@ import { AI_THEMES, AI_THEME_DECKS, type AiTheme } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { validateDeck } from "./deck.js";
 
-// The PvE bot plays these fixed themed decks (ported from LEGACY v1). If a deck
+// The PvE bot plays these fixed themed decks (ported from v1). If a deck
 // fails validation the BotRoom cannot create a match, so guard every theme.
 describe("AI theme decks", () => {
   for (const theme of AI_THEMES) {

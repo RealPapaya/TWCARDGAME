@@ -117,7 +117,7 @@
   border-color: var(--wood-dark);
 }
 
-/* Medieval toast — matches LEGACY .medieval-toast style */
+/* Medieval toast — matches the v1 .medieval-toast style */
 .medieval-toast {
   position: fixed;
   bottom: 50px;

@@ -292,7 +292,7 @@
   animation: board-dust-fade 1s ease-out forwards;
 }
 
-/* Board shake when a played card lands — mirrors LEGACY board-slam, fired
+/* Board shake when a played card lands — mirrors the v1 board-slam, fired
    imperatively the instant the minion appears (alongside the sound + dust).
    The board is centred with `transform: translateX(-50%)`, so every keyframe
    must keep that translateX or the board snaps to the right mid-shake. */
@@ -489,7 +489,7 @@
   }
 }
 
-/* --- Card discard disintegration (ported from LEGACY animateDiscard) --- */
+/* --- Card discard disintegration (ported from v1 animateDiscard) --- */
 .card.discard-disintegrating {
   pointer-events: none;
   transition: opacity 0.8s ease-in;
@@ -529,7 +529,7 @@
   visibility: hidden;
 }
 
-/* --- Minion death shatter fragments (matched from LEGACY animateShatter) --- */
+/* --- Minion death shatter fragments (matched from v1 animateShatter) --- */
 .shatter-fragment {
   position: absolute;
   background-size: cover;
@@ -1064,7 +1064,7 @@
   }
 }
 
-/* Battlefield click dust — ported from LEGACY/js/ui/click_effect.js + style.css.
+/* Battlefield click dust — ported from the v1 click effect.
    A small puff of beige grains kicked up when clicking empty board space. */
 .click-dust-particle {
   position: absolute;

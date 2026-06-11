@@ -11,7 +11,7 @@ import {
 } from "./progression.js";
 
 describe("getXPRequiredForLevel", () => {
-  // Mirrors the boundaries in LEGACY/js/ui/app.js:4981-4990.
+  // Mirrors the v1 level boundaries.
   const cases: Array<[number, number]> = [
     [0, 0],
     [1, 20],
@@ -37,7 +37,7 @@ describe("getXPRequiredForLevel", () => {
 });
 
 describe("calculatePvPExp", () => {
-  // Cases derived directly from LEGACY/js/ui/app.js:5015-5037.
+  // Cases derived directly from the v1 PvP XP formula.
   it("full HP + fastest turn returns the max (15)", () => {
     expect(calculatePvPExp(30, 3)).toBe(15);
   });

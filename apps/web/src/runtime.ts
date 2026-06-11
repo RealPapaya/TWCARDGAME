@@ -1960,7 +1960,7 @@ function pendingHeroHp(seat: Seat): number | undefined {
 /**
  * A non-interactive minion shown on the board while its battlecry is being
  * aimed. Uses the exact same `<button class="minion">` markup as `renderMinion`
- * (LEGACY v1 parity: a battlecry card is no different from any other) so it is
+ * (v1 parity: a battlecry card is no different from any other) so it is
  * pixel-identical to a real minion — just without target / attacker / hover
  * hooks. `pointer-events: none` keeps it out of the way of target hit-tests.
  */
@@ -4096,7 +4096,7 @@ function bindPackOpeningActions(): void {
 function navigateToScreen(target: MenuScreen): void {
   if (view.matchmaking && target !== "battle") return;
   if (target === "test" && !devTestModeAvailable) target = "main";
-  // Entering the challenge (theme select) screen plays the LEGACY book-flip intro.
+  // Entering the challenge (theme select) screen plays the book-flip intro.
   if (target === "ai" && view.menuScreen !== "ai") playPveTransition();
   view.menuScreen = target;
   view.avatarPickerOpen = false;
@@ -6494,7 +6494,7 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   }
   const cardDef = cardCatalog.get(card.cardId);
   const isMinion = (cardDef?.type ?? card.type) === "MINION";
-  // Targeted-battlecry cards are played in two stages (LEGACY v1 parity): the
+  // Targeted-battlecry cards are played in two stages (v1 parity): the
   // drop just places the card; the effect target is aimed afterwards. The drag
   // is therefore always placement-only — no arrow snapping during the drag.
   const isTargeted = handCardNeedsTarget(card);
@@ -6590,7 +6590,7 @@ let battlecryLandEl: HTMLElement | null = null;
 let battlecryLocalLandingStartMs: number | undefined;
 
 /**
- * Stage 2 of a targeted-battlecry play (LEGACY v1 parity). A battlecry card is
+ * Stage 2 of a targeted-battlecry play (v1 parity). A battlecry card is
  * played exactly like any other card: drop → card-play animation → land on the
  * field. Only once it has landed is a separate targeting arrow shown. No
  * `playCard` command is sent until a legal target is clicked — see
@@ -8498,7 +8498,7 @@ function slamBoard(seat: Seat | undefined): HTMLElement | undefined {
   return board;
 }
 
-// Imperative dust puff ported from LEGACY's spawnDustEffect. It is appended to
+// Imperative dust puff ported from the v1 spawnDustEffect. It is appended to
 // body with a very high z-index so it remains visible over the card preview.
 function spawnBoardDust(anchor: HTMLElement, intensity = 1): void {
   const rect = anchor.getBoundingClientRect();
@@ -8610,9 +8610,9 @@ function playNextCardPlayCue(): void {
   if (typeof cue.playBaseEffectBonusValue === "number") resolvedPlay.baseEffectBonusValue = cue.playBaseEffectBonusValue;
   el.innerHTML = renderCardFace(resolvedPlay, "mulligan");
   overlay.appendChild(el);
-  // Two phases mirror LEGACY showCardPlayPreview: a 0.8s entrance + hold, then
+  // Two phases mirror the v1 showCardPlayPreview: a 0.8s entrance + hold, then
   // a staged shrink-and-fade slam. Minions fire smoke + shake during the slam,
-  // matching LEGACY's delayed board impact inside showCardPlayPreview.
+  // matching the v1 delayed board impact inside showCardPlayPreview.
   cardPlayTimers.push(window.setTimeout(() => {
     el.classList.add("card-play-slam");
     if (card.type === "MINION") {

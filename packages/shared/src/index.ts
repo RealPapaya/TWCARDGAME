@@ -6,9 +6,8 @@ export type AiDifficulty = "easy" | "normal" | "hard";
 
 export const AI_DIFFICULTIES: readonly AiDifficulty[] = ["easy", "normal", "hard"] as const;
 
-// Themed PvE opponents ported from the LEGACY v1 app
-// (LEGACY/js/data/default_decks.js). Each theme is a fixed 30-card deck the
-// bot plays; the hero card id is the theme's legendary, used by the web client
+// Themed PvE opponents ported from the v1 app. Each theme is a fixed 30-card
+// deck the bot plays; the hero card id is the theme's legendary, used by the web client
 // to render the opponent's portrait on the "進入戰鬥" screen.
 export type AiTheme = "dpp" | "dpp2" | "kmt" | "kmt2" | "tpp";
 
@@ -54,7 +53,7 @@ export const AI_THEMES: readonly AiThemeDefinition[] = [
   { id: "tpp", name: "柯文哲", label: "柯文哲 — 台大醫科", heroCardId: "TW011", partyTag: "民眾黨" }
 ] as const;
 
-// Fixed 30-card decks, ported verbatim from LEGACY DEFAULT_THEME_DECKS.
+// Fixed 30-card decks, ported verbatim from the v1 DEFAULT_THEME_DECKS.
 // Each deck is validated by `validateDeck` (30 cards, ≤2 copies, ≤2 legendary).
 export const AI_THEME_DECKS: Record<AiTheme, readonly string[]> = {
   dpp: [

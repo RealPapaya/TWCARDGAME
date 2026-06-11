@@ -138,7 +138,7 @@ export function playEventAudio(events: GameEvent[]): void {
     // together with the smoke and shake when the minion hits the board.
     let cue: SoundCue | undefined;
     if (event.type === "ATTACK") {
-      // Mirror LEGACY: heavy hit when the first DAMAGE from this attack is >= 7
+      // Mirror v1: heavy hit when the first DAMAGE from this attack is >= 7
       const nextDamage = events.slice(i + 1).find(e => e.type === "DAMAGE");
       const dmg = typeof nextDamage?.payload?.amount === "number" ? nextDamage.payload.amount : 0;
       cue = dmg >= 7 ? "attackHeavy" : "attack";

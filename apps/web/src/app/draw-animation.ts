@@ -1,12 +1,12 @@
 import { playSfx } from "./audio.js";
 
 /**
- * --- GOLD STANDARD DRAW ANIMATION (ported from LEGACY v1) ---
+ * --- GOLD STANDARD DRAW ANIMATION (ported from v1) ---
  *
  * When a card is drawn, a fixed-position clone of its destination element flies
  * from the deck pile to the card's slot in the hand, scaling 0.5x -> 1x with an
- * elastic overshoot. Faithful to LEGACY `animateCardFromDeck` in
- * `LEGACY/js/ui/app.js` — do not change the timing or bezier without request.
+ * elastic overshoot. Faithful to the v1 `animateCardFromDeck` — do not change
+ * the timing or bezier without request.
  *
  * V2 re-renders the whole hand on every sync, so the real destination card is
  * replaced mid-flight. We therefore track in-flight cards by `data-hand-id`
@@ -16,7 +16,7 @@ import { playSfx } from "./audio.js";
 
 type Side = "player" | "opponent";
 
-// LEGACY timing — see `animateCardFromDeck`.
+// v1 timing — see `animateCardFromDeck`.
 const FLIGHT_MS = 850;
 const FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
 const FAIL_SAFE_MS = 1400;
@@ -107,7 +107,7 @@ function playNextDrawAnimation(): void {
 
 /**
  * Clones the card at `slotIndex` and flies it from the deck pile, mirroring
- * LEGACY `animateCardFromDeck`. `handId` is set for the local player so the
+ * the v1 `animateCardFromDeck`. `handId` is set for the local player so the
  * real card can be re-found after a re-render; omitted for the opponent.
  */
 function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onDone?: () => void): void {

@@ -1,6 +1,6 @@
 import { playSfx } from "./audio.js";
 
-// Global battlefield click feedback ported from LEGACY/js/ui/click_effect.js:
+// Global battlefield click feedback ported from the v1 click effect:
 // clicking empty battlefield space plays a "heavy sandstone" thud and kicks up a
 // small puff of dust particles, giving the board a tactile feel. Only fires while
 // an actual match is on screen (the `.app-shell.in-match` shell) and never when

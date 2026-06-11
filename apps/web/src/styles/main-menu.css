@@ -1,6 +1,6 @@
 /* Main menu */
 
-/* Challenge-mode "book flip" intro — ported from LEGACY #video-overlay.
+/* Challenge-mode "book flip" intro — ported from the v1 video overlay.
    A full-screen video that plays over black, then fades out near the end. */
 .transition-video-overlay {
   position: fixed;

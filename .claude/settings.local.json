@@ -36,7 +36,6 @@
       "Bash(Get-ChildItem -Path \"d:\\\\Google AI\\\\TWCARDGAME\" -Depth 0)",
       "Bash(Select-Object Name, PSIsContainer)",
       "Bash(xargs ls -lh)",
-      "Bash(rg -n \"leaderboard\\\\|排行\\\\|榜\" LEGACY --include=\"*.js\" --include=\"*.html\" --include=\"*.css\" -l)",
       "Bash(Get-ChildItem -Path \"D:\\\\Google AI\\\\TWCARDGAME\" -Directory)",
       "Bash(Select-Object Name)",
       "Bash(powershell -Command \"Select-String -Path 'packages/cards/src/catalog.generated.ts' -Pattern '小草|謝長廷|大學生' | Select-Object LineNumber, Line -First 20\")",
@@ -50,7 +49,6 @@
       "Bash(SETTLE=1000 node .tmp-repro-aura-death.mjs)",
       "Bash(SETTLE=1600 node .tmp-repro-aura-death.mjs)",
       "Bash(sed -n '1,5p')",
-      "Bash(sed -n '365,470p' LEGACY/js/ui/app.js)",
       "Bash(npx tsc *)"
     ],
     "additionalDirectories": [

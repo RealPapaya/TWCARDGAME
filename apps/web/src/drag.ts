@@ -407,7 +407,7 @@ function hideGhost(): void {
 }
 
 /**
- * --- BATTLECRY TARGETING (LEGACY v1 parity) ---
+ * --- BATTLECRY TARGETING (v1 parity) ---
  *
  * After a targeted-battlecry card is dropped onto the field, the player aims a
  * *separate* arrow at the effect's target. Unlike a hand/attack drag, this is a

@@ -8,7 +8,7 @@ Last updated: 2026-05-20
 Phase Overview
 | Phase | Name | Status |
 | --- | --- | --- |
-| 0 | Architecture Setup & Legacy Isolation | Complete |
+| 0 | Architecture Setup & v1 Isolation | Complete |
 | 1 | PvP Core Scaffold | Complete |
 | 2 | Rules Parity | Complete |
 | 3 | Multiplayer Reliability | Complete |
@@ -16,11 +16,11 @@ Phase Overview
 | 5 | Real UI / UX | Complete |
 | 6 | Production Launch | Pending |
 
-Phase 0 — Architecture Setup & Legacy Isolation
+Phase 0 — Architecture Setup & v1 Isolation
 Status: ✅ Complete
 What was done
 
-Moved all v1 source code into legacy/ (preserved for reference, not touched)
+Isolated the original v1 source out of the active workspace (since removed)
 Established v2 monorepo with apps/, packages/, docs/ separation
 Set up Claude Code / Codex agent skills under .agent/skills/
 Committed clean architecture baseline
@@ -35,9 +35,7 @@ Folder structure established
   /shared     Commands, events, public DTOs, shared types
   /db         Supabase migrations, typed queries, RLS policies
   /test-utils Fixtures, seeded RNG helpers, replay harness
-/legacy       v1 original source (reference only)
 /docs         Architecture notes, ADRs, this roadmap
-/assets       Card art, audio, UI media (shared between v1 and v2)
 
 Phase 1 — PvP Core Scaffold
 Status: ✅ Complete
@@ -88,7 +86,7 @@ Testing requirements
 
  Every battlecry/effect type has at least one golden test
  Every card in the 104-card catalog has a corresponding behavior test or is covered by its effect type test
- Cross-reference legacy/js/engine/game_engine.js line by line for behavioral parity
+ Cross-reference the original v1 engine line by line for behavioral parity
  Replay determinism test: same seed + same command log → identical final state and event sequence
 
 What was completed
@@ -96,7 +94,7 @@ What was completed
  Golden coverage expanded for supported handlers, including currently-unused catalog-safe handlers
  Phase 2 parity mechanics tests added for deathrattles, auras, enrage, quests, lock/death timers, discard triggers, newsPower, and NEWS cost reduction
  Catalog coverage assertion added for all 104 current cards
- Legacy parity audit documented in docs/phase2-rules-parity-audit.md
+ v1 parity audit documented in docs/phase2-rules-parity-audit.md
  BOUNCE_SELF deathrattle parity fixed so returned hand cards use original catalog stats
  Validation passed: npm run validate:cards, npm test, npm run check
 
@@ -159,9 +157,7 @@ Goal: the game looks and feels like 寶島保護戰, not a developer scaffold.
 
 Visual reference
 
-legacy/css/ — v1 color system, card frame styles, board layout (safe to port)
-legacy/js/ — v1 rendering logic (do not port logic; use only as visual reference)
-assets/ — card art, audio (shared, already in place)
+assets/ — card art, audio (already in place under apps/web/public)
 
 What was completed (commit 2b07d36)
 
@@ -190,7 +186,7 @@ Main menu & navigation
 
 Battle UI polish
  Audio system — background music and sound effects for attacks, plays, deaths, turn change, rejects, and pack opening
- Custom cursor — webp cursor sprite on desktop (see legacy/css/style.css); optional / desktop-only
+ Custom cursor — webp cursor sprite on desktop; optional / desktop-only
 
 Account & profile
  Player profile page — level display, XP bar, win/loss stats, avatar, title
@@ -230,7 +226,7 @@ Tasks
  Structured logging and error monitoring (e.g. Sentry or Fly.io logs)
  Load test — simulate concurrent rooms, verify memory and CPU under load
  Closed beta test with real players, collect feedback
- Rollback plan — v1 remains in legacy/ and can be re-deployed if critical issues found
+ Rollback plan — promote a previous Vercel/Fly deployment if critical issues found
  DNS cutover — point production domain to v2 Vercel deployment
 
 Repo artifacts completed
@@ -261,4 +257,4 @@ Architecture Constraints (always enforced)
 RuleDetailServer is authoritativeClients send commands only; server mutates and broadcasts statepackages/rules is pureNo DOM, no Colyseus, no Supabase, no timers inside the rules enginePrivate state never leaves the serverOpponent hand contents are never sent to the clientNo Math.random() in rulesAll randomness via seeded PRNG stored in private room stateCard additions require only packages/cards changesNew cards do not require touching engine or UI modulesAll DB tables use RLSNo table exposed to browser without row-level security policy
 
 Key References
-ResourceURLColyseus conceptshttps://docs.colyseus.io/conceptsColyseus state synchttps://docs.colyseus.io/stateColyseus StateView (private state)https://docs.colyseus.io/state/viewColyseus scalabilityhttps://docs.colyseus.io/scalabilitySupabase RLShttps://supabase.com/docs/guides/database/postgres/row-level-securityv1 reference (legacy)legacy/ directory in this repoArchitecture notesdocs/v2-architecture.md
+ResourceURLColyseus conceptshttps://docs.colyseus.io/conceptsColyseus state synchttps://docs.colyseus.io/stateColyseus StateView (private state)https://docs.colyseus.io/state/viewColyseus scalabilityhttps://docs.colyseus.io/scalabilitySupabase RLShttps://supabase.com/docs/guides/database/postgres/row-level-securityArchitecture notesdocs/v2-architecture.md

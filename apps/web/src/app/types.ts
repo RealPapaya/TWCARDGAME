@@ -198,7 +198,7 @@ export type ClientViewState = {
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
   /**
-   * A targeted-battlecry card mid two-stage play (LEGACY v1 parity). It plays
+   * A targeted-battlecry card mid two-stage play (v1 parity). It plays
    * exactly like any other card — drop, card-play animation, land on the field —
    * and only then a targeting arrow is shown. No `playCard` command is sent
    * until a legal target is picked, so cancelling leaves the card untouched in

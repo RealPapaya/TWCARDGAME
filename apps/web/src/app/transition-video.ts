@@ -1,5 +1,5 @@
-// Full-screen "book flip" transition ported from LEGACY (btn-mode-ai handler +
-// #video-overlay in index.html): entering challenge mode plays PVE_Mode.mp4 in
+// Full-screen "book flip" transition ported from v1 (the challenge-mode video
+// overlay): entering challenge mode plays PVE_Mode.mp4 in
 // full over a black overlay, and only once it ends does the overlay slowly fade
 // to reveal the screen behind it. Clicking the overlay skips it.
 // The overlay lives on document.body, outside the patched `app` container, so the

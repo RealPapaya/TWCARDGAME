@@ -2,10 +2,10 @@ import type { GameEvent, Seat } from "@twcardgame/shared";
 import { cssEscape } from "./dom.js";
 
 /**
- * --- CARD DISCARD DISINTEGRATION (ported from LEGACY v1) ---
+ * --- CARD DISCARD DISINTEGRATION (ported from v1) ---
  *
  * When a hand card is discarded, it dissolves into ~80 drifting particles
- * (Thanos-style), faithful to LEGACY `animateDiscard` in `LEGACY/js/ui/app.js`.
+ * (Thanos-style), faithful to the v1 `animateDiscard`.
  * V2 signals a discard with a `DISCARD` game event carrying `{ cardId }` and a
  * `seat`. The discarded card's DOM node is still present when the events
  * handler runs — render() defers the hand rebuild to the next frame — so the
@@ -91,7 +91,7 @@ function spawnParticle(rect: DOMRect): void {
   p.style.width = `${size}px`;
   p.style.height = `${size}px`;
 
-  // Expanding sphere with a heavy upward bias, like LEGACY.
+  // Expanding sphere with a heavy upward bias, like v1.
   const angle = Math.random() * Math.PI * 2;
   const dist = 50 + Math.random() * 100;
   const dx = Math.cos(angle) * dist + (Math.random() - 0.5) * 100;

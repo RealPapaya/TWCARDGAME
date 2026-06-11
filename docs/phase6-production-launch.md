@@ -134,9 +134,6 @@ investigate room disposal before launch. Start at ~25 rooms, then ramp.
   `fly releases rollback` (or `fly machine update` to a known-good image).
 - **Web**: in the Vercel dashboard, promote a previous deployment (instant
   rollback) — no rebuild required.
-- **Whole-game fallback**: v1 is preserved verbatim under `LEGACY/` and is a
-  standalone static app. If v2 has a critical issue, re-serve `LEGACY/` and revert
-  the DNS record (step 8) to the v1 host.
 
 ---
 

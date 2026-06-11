@@ -1,4 +1,4 @@
--- Deck cover art, LEGACY deck-rule parity (max 2 legendary cards total),
+-- Deck cover art, v1 deck-rule parity (max 2 legendary cards total),
 -- and card disenchant / craft RPCs backed by the voucher currency.
 
 alter table public.decks
@@ -8,7 +8,7 @@ alter table public.decks
 -- signature, so drop the old overload before recreating it.
 drop function if exists public.save_user_deck(uuid, text, text, text[]);
 
--- save_user_deck: persists cover_card_id and enforces the LEGACY deck rules:
+-- save_user_deck: persists cover_card_id and enforces the v1 deck rules:
 --   * each card id capped at 2 copies
 --   * the deck holds at most 2 LEGENDARY cards in total
 create or replace function public.save_user_deck(
@@ -129,7 +129,7 @@ $$;
 
 grant execute on function public.save_user_deck(uuid, text, text, text[], text) to authenticated;
 
--- Voucher rates per rarity, matching LEGACY collection_manager.js.
+-- Voucher rates per rarity, matching the v1 collection manager.
 create or replace function public.card_voucher_rate(p_rarity text, p_op text)
 returns integer
 language sql
