@@ -7,6 +7,12 @@ export interface MatchPersistenceMetadata {
   isVsAi?: boolean;
   aiDifficulty?: AiDifficulty;
   aiTheme?: AiTheme;
+  /**
+   * Wall-clock time (ms) the match started, recorded server-side by the room.
+   * Stored as match_history.created_at so the client can show real match
+   * duration (finished_at − created_at). Absent for legacy rows.
+   */
+  startedAtMs?: number;
 }
 
 export interface MatchResultPersistence {
@@ -72,6 +78,9 @@ export function buildMatchHistoryRow(
     is_vs_ai: metadata?.isVsAi ?? false,
     ai_difficulty: metadata?.aiDifficulty ?? null,
     ai_theme: metadata?.aiTheme ?? null,
+    // Match start time so the client can derive duration. When absent the column
+    // falls back to its DB default (now()), matching legacy insert-time behaviour.
+    created_at: metadata?.startedAtMs ? new Date(metadata.startedAtMs).toISOString() : undefined,
     finished_at: finishedAt.toISOString()
   };
 }

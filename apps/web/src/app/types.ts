@@ -270,6 +270,8 @@ export type ClientViewState = {
   leaderboard: LeaderboardRow[];
   leaderboardLoading?: boolean;
   leaderboardSortBy: "wins" | "level";
+  /** Which match kind the profile 戰績統計 panel is showing (PvP vs PvE). */
+  statsMode: "pvp" | "pve";
   publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
@@ -389,6 +391,19 @@ export type MatchHistoryRow = {
   finished_at?: string;
   player1_user_id?: string | null;
   player2_user_id?: string | null;
+  /** True when the opponent was the AI (PvE); false/absent for human PvP matches. */
+  is_vs_ai?: boolean | null;
+  /** AI persona theme id (PvE only), e.g. "dpp". */
+  ai_theme?: string | null;
+  /** AI difficulty (PvE only): "easy" | "normal" | "hard". */
+  ai_difficulty?: string | null;
+  /** Display names recovered from final_state.players (PvP opponent name lookup). */
+  players_view?: {
+    player1?: { displayName?: string } | null;
+    player2?: { displayName?: string } | null;
+  } | null;
+  /** final_state.turn — used to recover the number of turns played. */
+  turn_view?: { number?: number | string } | null;
 };
 
 /**

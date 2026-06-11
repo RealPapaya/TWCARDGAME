@@ -12,6 +12,15 @@ import {
 } from "@twcardgame/shared";
 import type { AmplificationTier, AiDifficulty } from "@twcardgame/shared";
 import { getXPRequiredForLevel, getPveXpReward, getPveFirstVictoryGold } from "@twcardgame/shared";
+import {
+  QUEST_DEFINITIONS_SEED,
+  QUEST_RECURRENCE_OPTIONS,
+  KNOWN_EVENT_TYPES,
+  generateQuestSeedSql,
+  validateQuestDrafts,
+  type QuestDefinitionDraft,
+  type QuestRecurrence
+} from "./balance-editor-quests.js";
 
 // ── deep clone helpers ──────────────────────────────────────────────
 function deepClone<T>(obj: T): T {
@@ -24,6 +33,7 @@ const amps: AmplificationDbEntry[] = deepClone(AMPLIFICATION_DB);
 const votes: VoteEventDbEntry[] = deepClone(VOTE_EVENT_DB);
 const aiDecks: Record<string, string[]> = deepClone(AI_THEME_DECKS as Record<string, string[]>);
 const aiThemes = deepClone(AI_THEMES as any[]);
+const quests: QuestDefinitionDraft[] = deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]);
 
 // progression constants (mutable copies)
 const prog = {
@@ -461,16 +471,18 @@ body {
 document.head.appendChild(style);
 
 // ── tab IDs ─────────────────────────────────────────────────────────
-type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks";
+type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks" | "tasks";
 const TABS: { id: TabId; label: string }[] = [
   { id: "cards", label: "卡牌" },
   { id: "amps", label: "增幅" },
   { id: "votes", label: "事件" },
   { id: "progression", label: "進度" },
-  { id: "aidecks", label: "AI牌組" }
+  { id: "aidecks", label: "AI牌組" },
+  { id: "tasks", label: "任務/成就" }
 ];
 let activeTab: TabId = "cards";
 let expandedThemeId: string | null = null;
+let expandedQuestId: string | null = null;
 
 // ── utility helpers ─────────────────────────────────────────────────
 function h<K extends keyof HTMLElementTagNameMap>(
@@ -682,8 +694,9 @@ function render() {
   const expVotes = h("button", { class: "be-dropdown-item" }, "事件 TS (voteEventDb.ts)");
   const expAi = h("button", { class: "be-dropdown-item" }, "AI 牌組 TS (aiDecks.generated.ts)");
   const expProg = h("button", { class: "be-dropdown-item" }, "進度 TS (progression.generated.ts)");
+  const expTasks = h("button", { class: "be-dropdown-item" }, "任務/成就 SQL (tasks_achievements_seed.sql)");
 
-  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg);
+  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg, expTasks);
   dropdown.append(exportTsBtn, dropdownMenu);
 
   const resetBtn = h("button", { class: "be-btn be-btn--danger" }, "🔄 重置");
@@ -710,7 +723,8 @@ function render() {
     amps: renderAmpsPanel(),
     votes: renderVotesPanel(),
     progression: renderProgressionPanel(),
-    aidecks: renderAiDecksPanel()
+    aidecks: renderAiDecksPanel(),
+    tasks: renderTasksPanel()
   };
   for (const [id, panel] of Object.entries(panels)) {
     panel.classList.add("be-panel");
@@ -734,6 +748,7 @@ function render() {
   expVotes.addEventListener("click", exportVotesTs);
   expAi.addEventListener("click", exportAiDecksTs);
   expProg.addEventListener("click", exportProgressionTs);
+  expTasks.addEventListener("click", exportTasksSql);
 
   resetBtn.addEventListener("click", () => {
     if (!confirm("確定要重置所有修改？")) return;
@@ -745,6 +760,8 @@ function render() {
       delete aiDecks[key];
     }
     Object.assign(aiDecks, deepClone(AI_THEME_DECKS as Record<string, string[]>));
+    quests.splice(0, quests.length, ...deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]));
+    expandedQuestId = null;
     prog.MAX_LEVEL = MAX_LEVEL;
     prog.LEVEL_UP_GOLD = LEVEL_UP_GOLD;
     prog.MAX_LEVEL_XP_REQUIREMENT = MAX_LEVEL_XP_REQUIREMENT;
@@ -1661,6 +1678,222 @@ function renderAiDecksPanel(): HTMLElement {
   return panel;
 }
 
+// ── TASKS / ACHIEVEMENTS PANEL ──────────────────────────────────────
+function nextQuestId(prefix: string): string {
+  const existing = new Set(quests.map((q) => q.id));
+  let i = 1;
+  while (existing.has(`${prefix}_${i}`)) i++;
+  return `${prefix}_${i}`;
+}
+
+function addQuest(recurrence: QuestRecurrence) {
+  const prefix = recurrence === "once" ? "ach_new" : recurrence === "weekly" ? "weekly_new" : "daily_new";
+  const id = nextQuestId(prefix);
+  quests.push({
+    id,
+    display_name: "新任務",
+    description: "",
+    event_type: recurrence === "once" ? "pve_win" : "match_played",
+    target_count: 1,
+    recurrence,
+    rewardGold: recurrence === "once" ? 100 : 40,
+    active: true
+  });
+  expandedQuestId = id;
+  bumpChanges();
+  render();
+}
+
+function deleteQuest(id: string) {
+  const index = quests.findIndex((q) => q.id === id);
+  if (index === -1) return;
+  quests.splice(index, 1);
+  if (expandedQuestId === id) expandedQuestId = null;
+  bumpChanges();
+  render();
+}
+
+function renderTasksPanel(): HTMLElement {
+  const panel = h("div");
+
+  // shared datalist of known server-emitted event types
+  const datalist = h("datalist", { id: "quest-event-types" });
+  for (const et of KNOWN_EVENT_TYPES) datalist.append(h("option", { value: et.value }, et.label));
+  panel.append(datalist);
+
+  // stats
+  const onceCount = quests.filter((q) => q.recurrence === "once").length;
+  const dailyCount = quests.filter((q) => q.recurrence === "daily").length;
+  const weeklyCount = quests.filter((q) => q.recurrence === "weekly").length;
+  const activeCount = quests.filter((q) => q.active).length;
+  const stats = h("div", { class: "be-stats" });
+  stats.innerHTML = `
+    <div class="be-stat">總數 <b>${quests.length}</b></div>
+    <div class="be-stat">成就 <b>${onceCount}</b></div>
+    <div class="be-stat">每日 <b>${dailyCount}</b></div>
+    <div class="be-stat">每週 <b>${weeklyCount}</b></div>
+    <div class="be-stat" style="color:var(--success)">啟用 <b>${activeCount}</b></div>
+  `;
+  panel.append(stats);
+
+  // validation banner (empty / duplicate ids would break the exported SQL)
+  const issues = validateQuestDrafts(quests);
+  if (issues.length) {
+    const warn = h("div", {
+      style: "margin-bottom:16px;padding:10px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--danger);font-size:0.8rem;"
+    });
+    const lines = issues.map((issue) =>
+      issue.type === "empty_id" ? `第 ${issue.index + 1} 列的 ID 為空` : `重複的 ID：${issue.id}`
+    );
+    warn.innerHTML = `⚠ 匯出前請修正：${lines.join("；")}`;
+    panel.append(warn);
+  }
+
+  for (const { value: recurrence, label } of QUEST_RECURRENCE_OPTIONS) {
+    const group = quests.filter((q) => q.recurrence === recurrence);
+
+    const titleRow = h("div", { style: "display:flex;align-items:center;gap:12px;margin:24px 0 12px;" });
+    titleRow.append(h("div", { class: "be-section-title", style: "margin:0;border:none;flex:1;" }, `${label}（${group.length}）`));
+    const addBtn = h("button", { class: "be-btn be-btn--primary", type: "button" }, `＋ 新增`);
+    addBtn.addEventListener("click", () => addQuest(recurrence));
+    titleRow.append(addBtn);
+    panel.append(titleRow);
+
+    const table = h("table", { class: "be-table" });
+    const thead = h("thead");
+    thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>事件類型</th><th>目標</th><th>獎勵</th><th>啟用</th></tr>`;
+    table.append(thead);
+    const tbody = h("tbody");
+
+    if (group.length === 0) {
+      const emptyRow = h("tr");
+      emptyRow.innerHTML = `<td colspan="6" style="color:var(--text-muted);padding:16px 12px;">尚無項目，點「＋ 新增」建立。</td>`;
+      tbody.append(emptyRow);
+    }
+
+    for (const quest of group) {
+      const expanded = expandedQuestId === quest.id;
+      const tr = h("tr", { class: `be-row ${expanded ? "be-row--expanded" : ""}` });
+      tr.innerHTML = `
+        <td style="font-family:monospace;color:var(--text-muted)">${escapeHtmlText(quest.id)}</td>
+        <td style="font-weight:600">${escapeHtmlText(quest.display_name)}</td>
+        <td style="font-size:0.8rem;color:var(--text-dim)">${escapeHtmlText(quest.event_type)}</td>
+        <td><span style="color:var(--primary);font-weight:700">${quest.target_count}</span></td>
+        <td style="color:var(--warning);font-weight:600">💰${quest.rewardGold}</td>
+        <td>${quest.active ? '<span style="color:var(--success)">啟用</span>' : '<span style="color:var(--text-muted)">停用</span>'}</td>
+      `;
+      tr.addEventListener("click", () => {
+        expandedQuestId = expanded ? null : quest.id;
+        render();
+      });
+      tbody.append(tr);
+
+      if (expanded) {
+        const edRow = h("tr", { class: "be-editor be-editor--open" });
+        const edTd = h("td", { colspan: "6" });
+        edTd.append(buildQuestEditor(quest));
+        edRow.append(edTd);
+        tbody.append(edRow);
+      }
+    }
+    table.append(tbody);
+    panel.append(table);
+  }
+
+  return panel;
+}
+
+function escapeHtmlText(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+}
+
+function buildQuestEditor(q: QuestDefinitionDraft): HTMLElement {
+  const grid = h("div", { class: "be-editor-inner" });
+
+  // id (primary key — editable so new rows can be named)
+  const idF = h("div", { class: "be-field" });
+  idF.append(h("label", {}, "ID（主鍵）"));
+  const idI = h("input", { type: "text", value: q.id });
+  idI.addEventListener("change", () => {
+    q.id = idI.value.trim();
+    if (expandedQuestId !== q.id) expandedQuestId = q.id;
+    bumpChanges();
+    render();
+  });
+  idF.append(idI);
+  grid.append(idF);
+
+  // display_name
+  const nameF = h("div", { class: "be-field" });
+  nameF.append(h("label", {}, "名稱"));
+  const nameI = h("input", { type: "text", value: q.display_name });
+  nameI.addEventListener("change", () => { q.display_name = nameI.value; bumpChanges(); render(); });
+  nameF.append(nameI);
+  grid.append(nameF);
+
+  // event_type with datalist suggestions
+  const evF = h("div", { class: "be-field" });
+  evF.append(h("label", {}, "事件類型"));
+  const evI = h("input", { type: "text", value: q.event_type, list: "quest-event-types" });
+  evI.addEventListener("change", () => { q.event_type = evI.value.trim(); bumpChanges(); render(); });
+  evF.append(evI);
+  grid.append(evF);
+
+  // recurrence
+  const recF = h("div", { class: "be-field" });
+  recF.append(h("label", {}, "重複類型"));
+  const recSel = h("select");
+  for (const opt of QUEST_RECURRENCE_OPTIONS) {
+    const o = h("option", { value: opt.value }, opt.label);
+    if (opt.value === q.recurrence) o.selected = true;
+    recSel.append(o);
+  }
+  recSel.addEventListener("change", () => { q.recurrence = recSel.value as QuestRecurrence; bumpChanges(); render(); });
+  recF.append(recSel);
+  grid.append(recF);
+
+  // target_count
+  const tgtF = h("div", { class: "be-field" });
+  tgtF.append(h("label", {}, "目標次數"));
+  tgtF.append(numInput(q.target_count, (v) => { q.target_count = v; render(); }, 1, 9999));
+  grid.append(tgtF);
+
+  // reward gold
+  const goldF = h("div", { class: "be-field" });
+  goldF.append(h("label", {}, "獎勵金幣"));
+  goldF.append(numInput(q.rewardGold, (v) => { q.rewardGold = v; render(); }, 0, 9999));
+  grid.append(goldF);
+
+  // active toggle
+  const actF = h("div", { class: "be-field" });
+  actF.append(h("label", {}, "啟用"));
+  const actToggles = h("div", { class: "be-toggles" });
+  const actBtn = h("button", { class: `be-toggle ${q.active ? "be-toggle--on" : ""}`, type: "button" }, q.active ? "啟用中" : "已停用");
+  actBtn.addEventListener("click", () => { q.active = !q.active; bumpChanges(); render(); });
+  actToggles.append(actBtn);
+  actF.append(actToggles);
+  grid.append(actF);
+
+  // description
+  const descF = h("div", { class: "be-field", style: "grid-column: 1 / -1;" });
+  descF.append(h("label", {}, "描述"));
+  const descI = h("textarea", {}, q.description);
+  descI.addEventListener("change", () => { q.description = descI.value; bumpChanges(); });
+  descF.append(descI);
+  grid.append(descF);
+
+  // delete
+  const delF = h("div", { class: "be-field", style: "grid-column: 1 / -1;align-items:flex-start;" });
+  const delBtn = h("button", { class: "be-btn be-btn--danger", type: "button" }, "🗑️ 刪除此項目");
+  delBtn.addEventListener("click", () => {
+    if (confirm(`確定要刪除「${q.display_name || q.id}」？`)) deleteQuest(q.id);
+  });
+  delF.append(delBtn);
+  grid.append(delF);
+
+  return grid;
+}
+
 // ── EXPORT ──────────────────────────────────────────────────────────
 function exportJson() {
   const data = {
@@ -1669,7 +1902,8 @@ function exportJson() {
     voteEvents: votes,
     progression: prog,
     aiThemes,
-    aiDecks
+    aiDecks,
+    quests
   };
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
   downloadBlob(blob, "balance-data.json");
@@ -1772,6 +2006,11 @@ function exportProgressionTs() {
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain" });
   downloadBlob(blob, "progression.generated.ts");
+}
+
+function exportTasksSql() {
+  const blob = new Blob([generateQuestSeedSql(quests)], { type: "text/plain" });
+  downloadBlob(blob, "tasks_achievements_seed.sql");
 }
 
 function downloadBlob(blob: Blob, filename: string) {
