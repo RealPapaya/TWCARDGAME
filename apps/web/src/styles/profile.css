@@ -55,6 +55,16 @@
   margin: 0;
 }
 
+/* 讓登入紀錄與戰績統計的標題列等高、下緣對齊，
+   使左側登入資料列與右側勝率列水平對齊。 */
+.profile-section--login > h3,
+.profile-section--stats .stats-header {
+  min-height: 32px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+}
+
 .profile-header {
   grid-area: header;
   display: grid;

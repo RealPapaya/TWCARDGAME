@@ -72,7 +72,7 @@ When adding a new effect type:
 
 1. Add the effect type to `packages/cards/src/types.ts`.
 2. Validate it in `packages/cards/src/validation.ts` if needed.
-3. Implement the handler in the matching domain file under `packages/rules/src/effects/` (`damage-heal.ts`, `hand.ts`, `summon-destroy-bounce.ts`, `buff-keyword-lock.ts`, `core.ts`) and register it in `effects/registry.ts` so `resolveEffect` can dispatch it. An unregistered type throws `Unhandled effect type`.
+3. Implement the handler in the matching domain file under `packages/rules/src/effects/` (`core.ts`, `damage-heal.ts`, `hand.ts`, `summon-destroy-bounce.ts`, `buff-keyword-lock.ts`, `channel.ts`, `environment.ts`, `voteEvents.ts`) and register it in `effects/registry.ts` so `resolveEffect` can dispatch it. An unregistered type throws `Unhandled effect type`.
 4. Add catalog/rules tests.
 5. Run `npm run validate:cards`, `npm test`, and `npm run check`.
 
