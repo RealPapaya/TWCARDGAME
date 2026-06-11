@@ -451,57 +451,24 @@
   gap: 14px;
 }
 
-.pinned-card-content .card {
+/* The enlarged card must be the SAME card render as everywhere else (grid tile,
+   hand, board) — render the canonical 128x184 card and scale it up uniformly so
+   every proportion is identical, instead of re-specifying each element's size. */
+.pinned-card-content .pinned-card-stage {
+  flex: 0 0 auto;
+  /* 128 * 2.5 x 184 * 2.5, matching the scale below so layout reserves the
+     card's full visual footprint. */
   width: 320px;
-  height: 468px;
-  padding: 16px 18px;
+  height: 460px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.pinned-card-content .card-cost {
-  top: 10px;
-  left: 10px;
-  width: 42px;
-  height: 42px;
-  border-width: 3px;
-  border-radius: 7px;
-  font-size: 22px;
-}
-
-.pinned-card-content .card-title {
-  min-height: 38px;
-  margin: 34px 0 10px;
-  font-size: 18px;
-  line-height: 1.15;
-}
-
-.pinned-card-content .card-art-box {
-  height: 168px;
-  border-radius: 8px;
-}
-
-.pinned-card-content .card-category {
-  margin: 8px 0 6px;
-  padding: 3px 8px;
-  font-size: 12px;
-}
-
-.pinned-card-content .card-desc {
-  height: 92px;
-  font-size: 13px;
-  line-height: 1.28;
-}
-
-.pinned-card-content .card .minion-stats {
-  left: 10px;
-  right: 10px;
-  bottom: -14px;
-}
-
-.pinned-card-content .stat-atk,
-.pinned-card-content .stat-hp {
-  width: 52px;
-  height: 52px;
-  font-size: 24px;
+.pinned-card-content .card {
+  margin: 0;
+  transform: scale(2.5);
+  transform-origin: center;
 }
 
 /* Keyword glossary inside the enlarge modal's side column (not scaled, so normal sizes). */

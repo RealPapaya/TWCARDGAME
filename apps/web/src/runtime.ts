@@ -1540,8 +1540,10 @@ function renderPinnedCardDetail(cardId: string): string {
           <button id="pinned-card-close" class="settings-close-btn" title="關閉" aria-label="關閉">✕</button>
         </header>
         <div class="card-op-body">
-          <div class="card rarity-${resolved.rarity.toLowerCase()}">
-            ${renderCardFace(resolved, "mulligan")}
+          <div class="pinned-card-stage">
+            <div class="card rarity-${resolved.rarity.toLowerCase()}">
+              ${renderCardFace(resolved, "mulligan")}
+            </div>
           </div>
           <div class="card-op-side">
             ${renderKeywordGlossary(card.id, "right")}
