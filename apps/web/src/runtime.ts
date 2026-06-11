@@ -537,7 +537,7 @@ function renderComputerPlaceholderScreen(): string {
     { value: "hard", label: "困難" }
   ];
   const deckSlots = accountMode
-    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    ? view.decks.map((d) => renderSavedDeck(d, true)).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
     : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
         <button class="deck-select" type="button">
           <h3>Dev Deck</h3>
@@ -586,7 +586,7 @@ function renderPvpPlaceholderScreen(): string {
   const accountMode = Boolean(supabase);
   const findDisabled = view.joining || Boolean(view.matchmaking) || (accountMode && (!view.session || !view.selectedDeckId));
   const deckSlots = accountMode
-    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    ? view.decks.map((d) => renderSavedDeck(d, true)).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
     : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
         <button class="deck-select" type="button">
           <h3>Dev Deck</h3>
@@ -1022,7 +1022,7 @@ function renderChallengeSetupScreen(): string {
   const accountMode = Boolean(supabase);
   const startDisabled = view.joining || (accountMode && (!view.session || !view.selectedDeckId));
   const deckSlots = accountMode
-    ? view.decks.map(renderSavedDeck).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
+    ? view.decks.map((d) => renderSavedDeck(d, true)).join("") || `<p class="battle-empty-note">尚未建立牌組，請先新增一組。</p>`
     : `<div class="deck-slot saved-deck selected dev-deck-slot" data-dom-key="deck-dev">
         <button class="deck-select" type="button">
           <h3>Dev Deck</h3>
@@ -1562,7 +1562,7 @@ function renderDeckEditorScreen(): string {
   return renderCollectionWorkspace("battle", "編輯牌組");
 }
 
-function renderSavedDeck(deck: DeckRow): string {
+function renderSavedDeck(deck: DeckRow, hideActions = false): string {
   const selected = deck.id === view.selectedDeckId;
   const incomplete = deck.card_ids.length !== 30;
   return `
@@ -1571,10 +1571,11 @@ function renderSavedDeck(deck: DeckRow): string {
         <h3>${escapeHtml(deck.name)}</h3>
         <span>${incomplete ? "⚠ " : ""}${deck.card_ids.length}/30 張</span>
       </button>
+      ${hideActions ? "" : `
       <div class="deck-slot-actions">
         <button type="button" data-edit-deck="${escapeAttr(deck.id)}">編輯</button>
         <button type="button" class="danger btn-delete-deck" data-delete-deck="${escapeAttr(deck.id)}">×</button>
-      </div>
+      </div>`}
     </div>
   `;
 }
@@ -3859,6 +3860,20 @@ function bindStaticActions(): void {
       if (id) void claimShopItem(id);
     });
   }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-shop-thumb]")) {
+    on(el, "click", "shop-thumb", () => {
+      view.selectedShopItemId = el.dataset.shopThumb;
+      render();
+    });
+  }
+  on(document.querySelector<HTMLElement>("#shop-modal-close"), "click", "shop-modal-close", () => {
+    view.selectedShopItemId = undefined;
+    render();
+  });
+  on(document.querySelector<HTMLElement>("#shop-item-modal"), "click", "shop-modal-backdrop", (e) => {
+    if (e.target === e.currentTarget) { view.selectedShopItemId = undefined; render(); }
+  });
+
   for (const el of document.querySelectorAll<HTMLElement>("[data-claim-task]")) {
     on(el, "click", "claim-task", () => {
       const id = el.dataset.claimTask;
@@ -4516,6 +4531,9 @@ function renderLegacyShopScreen(): string {
     return signInRequiredScreen("商店");
   }
   const gold = view.profile?.gold ?? 0;
+  const selectedItem = view.selectedShopItemId
+    ? view.shopItems.find((i) => i.id === view.selectedShopItemId)
+    : undefined;
   return `
     <section class="screen shop-screen" data-screen="shop">
       <div class="shop-container">
@@ -4527,18 +4545,77 @@ function renderLegacyShopScreen(): string {
             <span id="shop-gold-amount">${gold}</span>
           </div>
         </header>
-        <div class="shop-products" data-preserve-scroll>
+        <div class="shop-grid" data-preserve-scroll>
           ${view.shopLoading
-            ? `<p class="muted">載入商店中...</p>`
+            ? `<p class="muted" style="grid-column:1/-1">載入商店中...</p>`
             : view.shopItems.length === 0
-              ? `<p class="muted">目前沒有可購買的商品。</p>`
-              : view.shopItems.map(renderLegacyShopItem).join("")}
+              ? `<p class="muted" style="grid-column:1/-1">目前沒有可購買的商品。</p>`
+              : view.shopItems.map(renderLegacyShopThumb).join("")}
         </div>
       </div>
+      ${selectedItem ? renderShopItemModal(selectedItem) : ""}
     </section>
   `;
 }
 
+/** Compact thumbnail shown in the shop grid — click to open detail modal. */
+function renderLegacyShopThumb(item: ShopItemRow): string {
+  const icon = shopItemIcon(item);
+  const affordable = (view.profile?.gold ?? 0) >= item.price_gold;
+  return `
+    <button class="shop-thumb" data-shop-thumb="${escapeAttr(item.id)}" data-testid="shop-item" aria-label="${escapeAttr(item.display_name)}">
+      <div class="shop-thumb-icon ${affordable ? "" : "unaffordable"}">${icon}</div>
+      <span class="shop-thumb-name">${escapeHtml(item.display_name)}</span>
+      <div class="shop-thumb-price">
+        <img src="/images/ui/Coin.webp" alt="" onerror="this.style.display='none'">
+        <span>${item.price_gold}</span>
+      </div>
+    </button>
+  `;
+}
+
+/** Full-detail modal overlay for a single shop item. */
+function renderShopItemModal(item: ShopItemRow): string {
+  const isCardPack = item.kind === "CARD_PACK";
+  const affordable = (view.profile?.gold ?? 0) >= item.price_gold;
+  const icon = shopItemIcon(item);
+  const rates = item.contents?.dropRates ?? legacyShopDropRates(item.kind);
+  const ratesHtml = rates.length > 0 ? `
+    <div class="modal-rates">
+      <div class="rates-title">${isCardPack ? "獲得機率" : "內容機率"}</div>
+      <div class="product-drop-rates">
+        ${rates.map((rate) => `
+          <div class="rate-row ${rate.rarity?.toLowerCase() ?? rate.type ?? ""}">
+            <span>${escapeHtml(rate.label)}</span>
+            <span class="rate-val">${rate.rate}%</span>
+          </div>
+        `).join("")}
+      </div>
+      ${item.contents?.note ? `<small class="product-note">${escapeHtml(item.contents.note)}</small>` : ""}
+    </div>
+  ` : "";
+
+  return `
+    <div class="shop-modal-backdrop" id="shop-item-modal" data-testid="shop-modal">
+      <div class="shop-modal-box">
+        <button class="shop-modal-close" id="shop-modal-close" aria-label="關閉">✕</button>
+        <div class="shop-modal-icon">${icon}</div>
+        <h3 class="shop-modal-name">${escapeHtml(item.display_name)}</h3>
+        ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
+        ${ratesHtml}
+        <div class="shop-modal-footer">
+          <div class="product-price">
+            <img class="price-coin" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">
+            <span>${item.price_gold}</span>
+          </div>
+          <button class="btn-buy" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop" ${affordable ? "" : "disabled"}>購買</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/** @deprecated kept for non-legacy shop screen (renderShopScreen) */
 function renderLegacyShopItem(item: ShopItemRow): string {
   const isCardPack = item.kind === "CARD_PACK";
   const affordable = (view.profile?.gold ?? 0) >= item.price_gold;

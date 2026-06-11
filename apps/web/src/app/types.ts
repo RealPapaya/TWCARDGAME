@@ -275,6 +275,7 @@ export type ClientViewState = {
   publicPlayerProfile?: PublicPlayerProfile;
   shopItems: ShopItemRow[];
   shopLoading?: boolean;
+  selectedShopItemId?: string;
   tasks: TaskView[];
   tasksLoading?: boolean;
   packOpeningCards?: Array<{ cardId: string; name: string; rarity: string; image: string }>;
