@@ -96,9 +96,13 @@ describe("effect golden tests", () => {
     const foe = enemy(seat);
     const m = placeMinion(state, foe);
     const before = state.players[foe].hand.length;
-    const { state: next } = play(state, catalog, card, { type: "MINION", side: foe, instanceId: m.instanceId });
+    const { state: next, events } = play(state, catalog, card, { type: "MINION", side: foe, instanceId: m.instanceId });
     expect(next.players[foe].board).toHaveLength(0);
     expect(next.players[foe].hand.length).toBe(before + 1);
+    // BOUNCE carries the casting seat so quest detection credits the actor, not
+    // the bounced minion's owner.
+    const bounce = events.find((e) => e.type === "BOUNCE");
+    expect(bounce?.payload?.actorSeat).toBe(seat);
   });
 
   it("BOUNCE_ALL_CATEGORY — returns all minions of a category to their owners' hands", () => {

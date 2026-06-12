@@ -62,8 +62,10 @@ export interface BattleLogCardRef {
   name: string;
   /** Resolved card art URL; absent for heroes or unknown cards. */
   thumb?: string;
-  /** True when this references a hero rather than a card (no art available). */
+  /** True when this references a hero rather than a card. */
   hero?: boolean;
+  /** Avatar image URL for hero refs — shown as a circular portrait instead of the shield icon. */
+  avatarUrl?: string;
 }
 
 export interface BattleLogEntry {
@@ -144,6 +146,14 @@ export type AnimationCue = {
   playBaseEffectBonusValue?: number;
   attackerInstanceId?: string;
   amount?: number;
+  /**
+   * Authoritative post-effect health of the damage/heal target, taken from the
+   * engine's DAMAGE/HEAL event (`remainingHealth`). An ABSOLUTE value — the render
+   * shows it at impact so the HP digit drops in lockstep with the `-N`/`+N` number,
+   * without depending on (or racing) the held publicSync flush. Idempotent, so it
+   * stays correct after the flush too (no double-subtraction).
+   */
+  resultingHealth?: number;
   delayMs?: number;
   readyAtMs?: number;
   /** Board minion instanceIds an `augmentGlow` should light up (units the 增幅 changed). */

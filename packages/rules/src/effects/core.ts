@@ -197,7 +197,9 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
     }
     minion.currentHealth -= amount;
     updateEnrage(minion);
-    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount }, ref.owner.seat);
+    // Carry the authoritative post-hit health so the client can drop the HP digit
+    // AT impact without waiting for (or racing) the held publicSync flush.
+    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth }, ref.owner.seat);
   } else {
     // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
     const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
@@ -206,7 +208,7 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAX_CUT" }, ref.owner.seat);
     }
     ref.owner.hero.hp -= dealt;
-    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt }, ref.owner.seat);
+    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp }, ref.owner.seat);
     if (unlockLowHpManaCap(ref.owner)) {
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, ref.owner.seat);
     }
@@ -220,12 +222,12 @@ export function healUnit(state: MatchState, ref: TargetUnitRef, amount: number, 
     const healed = Math.max(0, Math.min(amount, minion.health - minion.currentHealth));
     minion.currentHealth += healed;
     updateEnrage(minion);
-    addEvent(state, events, "HEAL", { target: minion.instanceId, amount: healed }, ref.owner.seat);
+    addEvent(state, events, "HEAL", { target: minion.instanceId, amount: healed, remainingHealth: minion.currentHealth }, ref.owner.seat);
     return healed;
   }
   const healed = Math.max(0, Math.min(amount, ref.owner.hero.maxHp - ref.owner.hero.hp));
   ref.owner.hero.hp += healed;
-  addEvent(state, events, "HEAL", { target: `${ref.owner.seat}:hero`, amount: healed }, ref.owner.seat);
+  addEvent(state, events, "HEAL", { target: `${ref.owner.seat}:hero`, amount: healed, remainingHealth: ref.owner.hero.hp }, ref.owner.seat);
   return healed;
 }
 
@@ -788,7 +790,7 @@ export function swapAttackHealth(_effect: EffectDefinition, context: EffectConte
 
 export function bounceTarget(_effect: EffectDefinition, context: EffectContext): void {
   const ref = getTargetUnit(context.state, context.activeSeat, context.target);
-  if (ref?.kind === "MINION") bounceMinion(context.state, ref.owner, ref.unit as RuntimeMinion, context.catalog, context.events);
+  if (ref?.kind === "MINION") bounceMinion(context.state, ref.owner, ref.unit as RuntimeMinion, context.catalog, context.events, { actorSeat: context.activeSeat });
 }
 
 export function bounceCategory(effect: EffectDefinition, context: EffectContext): void {
@@ -796,14 +798,14 @@ export function bounceCategory(effect: EffectDefinition, context: EffectContext)
   if (ref?.kind !== "MINION") return;
   const minion = ref.unit as RuntimeMinion;
   if (effect.target_category_includes && !minion.category.includes(effect.target_category_includes)) return;
-  bounceMinion(context.state, ref.owner, minion, context.catalog, context.events);
+  bounceMinion(context.state, ref.owner, minion, context.catalog, context.events, { actorSeat: context.activeSeat });
 }
 
 export function bounceAllCategory(effect: EffectDefinition, context: EffectContext): void {
   for (const player of Object.values(context.state.players)) {
     for (const minion of [...player.board]) {
       if (minion.category.includes(effect.target_category_includes ?? "")) {
-        bounceMinion(context.state, player, minion, context.catalog, context.events);
+        bounceMinion(context.state, player, minion, context.catalog, context.events, { actorSeat: context.activeSeat });
       }
     }
   }
@@ -811,7 +813,7 @@ export function bounceAllCategory(effect: EffectDefinition, context: EffectConte
 
 export function bounceAllEnemy(effect: EffectDefinition, context: EffectContext): void {
   const enemy = context.state.players[opponentOf(context.activeSeat)];
-  for (const minion of [...enemy.board]) bounceMinion(context.state, enemy, minion, context.catalog, context.events);
+  for (const minion of [...enemy.board]) bounceMinion(context.state, enemy, minion, context.catalog, context.events, { actorSeat: context.activeSeat });
 
   const source = sourceMinionInPlay(context);
   const player = context.state.players[context.activeSeat];
@@ -831,7 +833,7 @@ export function bounceRandomEnemy(_effect: EffectDefinition, context: EffectCont
   if (enemy.board.length === 0) return;
   const next = nextInt(context.state.private.rngState, enemy.board.length);
   context.state.private.rngState = next.state;
-  bounceMinion(context.state, enemy, enemy.board[next.value], context.catalog, context.events);
+  bounceMinion(context.state, enemy, enemy.board[next.value], context.catalog, context.events, { actorSeat: context.activeSeat });
 }
 
 function completeQuest(state: MatchState, player: PlayerState, minion: RuntimeMinion, events: EffectContext["events"]): void {
@@ -974,6 +976,13 @@ function handleDiscard(state: MatchState, player: PlayerState, discarded: Runtim
 
 interface BounceMinionOptions {
   transformReturnedCard?: (card: RuntimeCard, removed: RuntimeMinion) => void;
+  /**
+   * The seat that CAUSED the bounce (the caster), distinct from the bounced
+   * minion's owner. Recorded on the BOUNCE event so quest detection can credit
+   * "回手隨從" to the acting player. Omitted for ownerless/global effects
+   * (e.g. environment board wipes), which then aren't attributed to anyone.
+   */
+  actorSeat?: Seat;
 }
 
 export function bounceMinion(
@@ -997,7 +1006,9 @@ export function bounceMinion(
   }
   options.transformReturnedCard?.(card, removed);
   if (owner.hand.length < 10) owner.hand.push(card);
-  addEvent(state, events, "BOUNCE", { target: removed.instanceId, cardId: removed.cardId }, owner.seat);
+  const bouncePayload: Record<string, unknown> = { target: removed.instanceId, cardId: removed.cardId };
+  if (options.actorSeat) bouncePayload.actorSeat = options.actorSeat;
+  addEvent(state, events, "BOUNCE", bouncePayload, owner.seat);
 }
 
 export function summonCard(state: MatchState, player: PlayerState, card: CardDefinition, events: EffectContext["events"], index?: number, temporaryTurns?: number): RuntimeMinion | undefined {

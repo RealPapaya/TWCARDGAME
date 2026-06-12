@@ -398,6 +398,7 @@ export type GameEventType =
   | "BUFF"
   | "SHIELD_POPPED"
   | "DESTROY"
+  | "RESURRECT"
   | "BOUNCE"
   | "DISCARD"
   | "AURA_UPDATED"
@@ -427,3 +428,4 @@ export interface GameEvent {
 
 export * from "./animationTiming.js";
 export * from "./progression.js";
+export * from "./questEvents.js";

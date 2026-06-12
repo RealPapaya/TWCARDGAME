@@ -1338,7 +1338,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "battlecry": {
         "type": "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS",
-        "value": 3,
+        "value": 2,
         "bonus_value": 2,
         "target_category_includes": "勞工",
         "target": {

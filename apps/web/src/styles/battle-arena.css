@@ -138,8 +138,14 @@
   display: block;
   width: 100%;
   height: auto;
+  /* 預留正確高度，避免首次進入（圖片尚未載入）因 translate(-50%) 依賴自身高度而瞬間跳位 */
+  aspect-ratio: 1448 / 1086;
   user-select: none;
   pointer-events: none;
+}
+
+.battle-map-hotspot--pvp > img {
+  aspect-ratio: 1122 / 1402;
 }
 
 .battle-map-hotspot:hover,
@@ -1216,11 +1222,15 @@
 
 .battle-surface .minion.taunt {
   border-radius: 10px 10px 50% 50% / 10% 10% 20% 20%;
-  border-width: 4px;
-  border-color: #c0c0c0;
+  border-width: 2px;
+  border-color: #737c88;
+  border-style: solid;
   box-shadow:
-    0 0 20px rgba(192, 192, 192, 0.6),
-    inset 0 0 15px rgba(192, 192, 192, 0.3);
+    0 0 0 2px #dce2e8,
+    0 0 0 5px #87919d,
+    0 0 15px 3px rgba(198, 222, 246, 0.72),
+    0 0 30px 8px rgba(116, 145, 180, 0.28),
+    inset 0 0 15px rgba(222, 232, 242, 0.32);
 }
 
 .battle-surface .minion.taunt:not(.lunging) {
@@ -1228,10 +1238,13 @@
 }
 
 .battle-surface.attacking-board .minion.taunt.valid-target {
-  border-color: #c0c0c0;
+  border-color: #737c88;
   box-shadow:
-    0 0 20px rgba(192, 192, 192, 0.6),
-    inset 0 0 15px rgba(192, 192, 192, 0.3);
+    0 0 0 2px #dce2e8,
+    0 0 0 5px #87919d,
+    0 0 15px 3px rgba(198, 222, 246, 0.72),
+    0 0 30px 8px rgba(116, 145, 180, 0.28),
+    inset 0 0 15px rgba(222, 232, 242, 0.32);
 }
 
 .battle-surface .minion.taunt.can-attack {
@@ -1265,13 +1278,17 @@
   0%,
   100% {
     box-shadow:
-      0 0 10px rgba(192, 192, 192, 0.3),
-      0 0 20px rgba(192, 192, 192, 0.2);
+      0 0 0 2px #dce2e8,
+      0 0 0 5px #87919d,
+      0 0 14px 2px rgba(198, 222, 246, 0.56),
+      0 0 24px 6px rgba(116, 145, 180, 0.2);
   }
   50% {
     box-shadow:
-      0 0 15px rgba(192, 192, 192, 0.5),
-      0 0 30px rgba(192, 192, 192, 0.3);
+      0 0 0 2px #f1f6fb,
+      0 0 0 5px #9aa5b2,
+      0 0 18px 4px rgba(214, 232, 250, 0.82),
+      0 0 36px 10px rgba(116, 145, 180, 0.34);
   }
 }
 
@@ -2114,6 +2131,12 @@
   width: 13px;
   height: 13px;
   color: var(--wood-dark, #5d2e17);
+}
+
+/* Hero log tile backed by a player avatar photo — centre-crop, circular-ish feel. */
+.log-card-hero-avatar {
+  background-position: center center;
+  border-radius: 50%;
 }
 
 /* Placeholder glyph (shield for heroes, star for unknown cards) inside an art block. */

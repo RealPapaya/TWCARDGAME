@@ -200,6 +200,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       const costReduction = effect.costReduction ?? 0;
       for (const minion of [...player.board]) {
         bounceMinion(state, player, minion, CATALOG_MAP, events, {
+          actorSeat: player.seat,
           transformReturnedCard: (card) => {
             card.attack = (card.attack ?? 0) + value;
             card.health = (card.health ?? 0) + value;
@@ -475,6 +476,8 @@ export function tryReviveMinion(state: MatchState, player: PlayerState, deadMini
   };
   player.board.push(token);
   addEvent(state, events, "MINION_SUMMONED", { target: token.instanceId, cardId: token.cardId }, player.seat);
+  // Distinct from a normal summon so quest detection can count "復活隨從".
+  addEvent(state, events, "RESURRECT", { target: token.instanceId, cardId: token.cardId }, player.seat);
   applyMinionSummonedAugments(state, player.seat, token, events);
   addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_PUDU", targets: [token.instanceId] }, player.seat);
 }

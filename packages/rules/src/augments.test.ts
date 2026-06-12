@@ -1,5 +1,5 @@
 import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, type AmplificationDbEntry } from "@twcardgame/cards";
-import type { CommandEnvelope, Seat } from "@twcardgame/shared";
+import type { CommandEnvelope, GameEvent, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch, reduce } from "./engine.js";
 import {
@@ -262,6 +262,23 @@ describe("faction nuclear augments", () => {
 
     expect(state.players[seat].board).toHaveLength(1);
     expect(state.players[foe].board.filter((minion) => minion.cardId === "TW077")).toHaveLength(1);
+  });
+
+  it("普渡 emits a RESURRECT event so revives can be detected for quests", () => {
+    const state = startInProgress(811);
+    const seat = state.turn.activeSeat;
+    applyAugmentSelection(state, seat, entry("AMP_PUDU"), []);
+    state.players[seat].board.push(makeMinion({
+      ownerSeat: seat,
+      category: "test",
+      currentHealth: 0
+    }));
+
+    const events: GameEvent[] = [];
+    resolveDeaths(state, events, catalogMap);
+
+    const resurrect = events.filter((e) => e.type === "RESURRECT" && e.seat === seat);
+    expect(resurrect).toHaveLength(1);
   });
 
   it("九二共識 reduces KMT politician costs and shuffles them into deck after death", () => {
@@ -857,7 +874,7 @@ describe("new hero and resource augments", () => {
     expect(player.hero.hp).toBe(47);
   });
 
-  it("loses 5 HP now and grants 5 current crystals at the start of the next own turn", () => {
+  it("loses 5 HP now and grants 3 current crystals at the start of the next own turn", () => {
     const state = startInProgress(26);
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
@@ -868,11 +885,11 @@ describe("new hero and resource augments", () => {
 
     applyAugmentSelection(state, seat, entry("AMP_BLOOD_DONATION_VOUCHER"), []);
     expect(player.hero.hp).toBe(15);
-    expect(player.augmentFlags.bonusCrystalsNextTurn).toBe(5);
+    expect(player.augmentFlags.bonusCrystalsNextTurn).toBe(3);
 
     startTurn(state, 2000, []);
     expect(player.mana.max).toBe(5);
-    expect(player.mana.current).toBe(10);
+    expect(player.mana.current).toBe(8);
     expect(player.augmentFlags.bonusCrystalsNextTurn).toBeUndefined();
   });
 

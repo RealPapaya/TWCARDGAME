@@ -226,6 +226,68 @@ export async function emitUserProgressEvent(client: SupabaseClient, input: EmitU
   if (error) throw error;
 }
 
+export interface EmitUserSnapshotInput {
+  userId: string;
+  eventType: string;
+  /** The CURRENT owned total. Matching snapshot quests take max(progress, value). */
+  value: number;
+  sourceType?: string | null;
+  sourceId?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+/**
+ * Server-only. Records a user_event and advances matching active quests to a
+ * snapshot `value` (high-watermark per quest period). Wraps the
+ * service_role-only `emit_user_progress_snapshot` RPC — clients cannot call this.
+ */
+export async function emitUserProgressSnapshot(client: SupabaseClient, input: EmitUserSnapshotInput): Promise<void> {
+  const { error } = await client.rpc("emit_user_progress_snapshot", {
+    p_user_id: input.userId,
+    p_event_type: input.eventType,
+    p_value: input.value,
+    p_source_type: input.sourceType ?? null,
+    p_source_id: input.sourceId ?? null,
+    p_metadata: input.metadata ?? {}
+  });
+  if (error) throw error;
+}
+
+/**
+ * Server-only READY hook for the (not-yet-built) card-pack flow. Records
+ * `pack_opened` progress. Card grants go through the collection writers
+ * separately. Wraps the service_role-only `record_pack_opened` RPC.
+ */
+export async function recordPackOpened(
+  client: SupabaseClient,
+  input: { userId: string; count?: number; packId?: string | null }
+): Promise<void> {
+  const { error } = await client.rpc("record_pack_opened", {
+    p_user_id: input.userId,
+    p_count: input.count ?? 1,
+    p_pack_id: input.packId ?? null
+  });
+  if (error) throw error;
+}
+
+/**
+ * Server-only READY hook for the (not-yet-built) challenge mode. Emits both the
+ * plain `challenge_win` and the qualified `challenge_win:<stage>:<level>`.
+ * Wraps the service_role-only `record_challenge_win` RPC.
+ */
+export async function recordChallengeWin(
+  client: SupabaseClient,
+  input: { userId: string; stage: string; level: string; sourceId?: string | null }
+): Promise<void> {
+  const { error } = await client.rpc("record_challenge_win", {
+    p_user_id: input.userId,
+    p_stage: input.stage,
+    p_level: input.level,
+    p_source_id: input.sourceId ?? null
+  });
+  if (error) throw error;
+}
+
 export interface ApplyMatchRewardsInput {
   userId: string;
   matchId: string;

@@ -1943,6 +1943,27 @@ function pendingMinionCurrentHealth(seat: Seat, instanceId: string): number | un
   return pendingPublicBoardForSeat(seat)?.find(m => m.instanceId === instanceId)?.currentHealth;
 }
 
+/**
+ * Post-effect health to display for a unit (minion or `seat:hero` key) right at
+ * impact, read from the latest READY damage/heal cue's `resultingHealth`. This is
+ * the engine's authoritative absolute value, carried on the cue itself — so the HP
+ * digit drops in lockstep with the `-N`/`+N` number and never waits on (or races)
+ * the held publicSync flush. Absolute + idempotent: still correct after the flush.
+ * Returns undefined when no such cue is ready, so callers fall back to the synced
+ * value. (Overkill can make this negative; callers clamp for display.)
+ */
+function readyResultingHealth(targetKey: string): number | undefined {
+  let best: { seq: number; health: number } | undefined;
+  for (const cue of view.animationCues) {
+    if (cue.targetKey !== targetKey || cue.resultingHealth === undefined) continue;
+    if (cue.kind !== "damage" && cue.kind !== "heal" && cue.kind !== "effectStrike") continue;
+    if (!cueIsReady(cue)) continue;
+    const seq = cue.seq ?? -1;
+    if (!best || seq >= best.seq) best = { seq, health: cue.resultingHealth };
+  }
+  return best?.health;
+}
+
 function pendingHeroHp(seat: Seat): number | undefined {
   const sync = pendingPublicSync as typeof view.publicSync | undefined;
   return sync?.players?.[seat]?.hero?.hp;
@@ -2023,7 +2044,12 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
   const targetKey = targetKeyFor(targetRef);
   // Show post-damage/heal HP immediately when the cue fires, same as renderMinion.
   const hasHeroDmgHealCue = hasCue(targetKey, "damage") || hasCue(targetKey, "heal");
-  const hp = (hasHeroDmgHealCue ? pendingHeroHp(seat) : undefined) ?? player?.hero?.hp ?? 0;
+  // Authoritative post-hit HP from the cue first (drops at impact), then the held
+  // sync, then the live value — same lockstep treatment as renderMinion.
+  const cueHeroHp = readyResultingHealth(targetKey);
+  const hp = cueHeroHp !== undefined
+    ? Math.max(0, cueHeroHp)
+    : ((hasHeroDmgHealCue ? pendingHeroHp(seat) : undefined) ?? player?.hero?.hp ?? 0);
   const heroClasses = classNames([
     "hero",
     role === "player" ? "player-hero" : "opponent-hero",
@@ -2181,8 +2207,13 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   // Show post-damage/heal HP immediately when the cue fires (at impact, ~560ms into
   // the lunge) instead of waiting for the full publicSync flush at ~920ms.
   const hasDmgHealCue = hasCue(minion.instanceId, "damage") || hasCue(minion.instanceId, "heal");
+  // Prefer the authoritative post-hit health carried on the cue (drops at impact,
+  // no sync-timing race); fall back to the held publicSync value, then the live one.
+  const cueHealth = readyResultingHealth(minion.instanceId);
   const pendingHealth = hasDmgHealCue ? pendingMinionCurrentHealth(seat, minion.instanceId) : undefined;
-  const shownHealth = holdBaseStat ? catalogCard!.health : (pendingHealth ?? minion.currentHealth);
+  const shownHealth = holdBaseStat
+    ? catalogCard!.health
+    : (cueHealth !== undefined ? Math.max(0, cueHealth) : (pendingHealth ?? minion.currentHealth));
   const attackClass = classNames([
     "stat-atk",
     holdBaseStat ? "" : valueDeltaClass(minion.attack, minion.baseAttack ?? catalogCard?.attack)
@@ -3371,7 +3402,10 @@ function logIcon(name: keyof typeof BATTLE_LOG_SVG): string {
 function renderLogCardArt(ref: BattleLogCardRef, size: "tile" | "big"): string {
   const cls = size === "big" ? "log-card-art log-card-art-big" : "log-card-art";
   if (ref.thumb) return `<span class="${cls}" style="background-image:url('${escapeAttr(ref.thumb)}')" aria-hidden="true"></span>`;
-  if (ref.hero) return `<span class="${cls} log-card-hero" aria-hidden="true">${logIcon("shield")}</span>`;
+  if (ref.hero) {
+    if (ref.avatarUrl) return `<span class="${cls} log-card-hero log-card-hero-avatar" style="background-image:url('${escapeAttr(ref.avatarUrl)}')" aria-hidden="true"></span>`;
+    return `<span class="${cls} log-card-hero" aria-hidden="true">${logIcon("shield")}</span>`;
+  }
   return `<span class="${cls} log-card-empty" aria-hidden="true">${logIcon("star")}</span>`;
 }
 
@@ -7105,7 +7139,7 @@ async function loadAccountData(): Promise<void> {
     view.profile = profileResult.data as ProfileRow;
     view.decks = (decksResult.data ?? []) as DeckRow[];
     view.collection = (collectionResult.data ?? []) as CollectionRow[];
-    view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+    view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
     syncRemoteTrainingCompletions(trainingResult.data);
     if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
       view.selectedDeckId = view.decks[0]?.id;
@@ -7169,7 +7203,7 @@ async function loadAccountDataRaw(): Promise<void> {
   view.profile = profileResult.data as ProfileRow;
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
-  view.matchHistory = (historyResult.data ?? []) as MatchHistoryRow[];
+  view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
   syncRemoteTrainingCompletions(trainingResult.data);
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;
@@ -7621,6 +7655,17 @@ function battleLogHeroName(seat: Seat | undefined): string {
   return readPlayer(seat)?.displayName || (seat === view.mySeat ? "You" : "Opponent");
 }
 
+/** Avatar image URL to show for a hero ref in the battle log. */
+function heroAvatarForSeat(seat: Seat | undefined): string {
+  if (seat && seat === view.mySeat) return view.profile?.avatar_url || FALLBACK_PROFILE_AVATAR_URL;
+  return DEFAULT_AVATAR_URL;
+}
+
+/** A BattleLogCardRef for a hero of the given seat, including avatar. */
+function battleLogHeroRef(seat: Seat | undefined): BattleLogCardRef {
+  return { name: battleLogHeroName(seat), hero: true, avatarUrl: heroAvatarForSeat(seat) };
+}
+
 /** Resolve a minion `instanceId` to a name + card id, using the live board then the summon cache. */
 function battleLogUnit(instanceId: string): { name: string; cardId?: string } {
   const minion = findMinion(instanceId);
@@ -7643,7 +7688,7 @@ function logUnitRef(instanceId: string): BattleLogCardRef {
 
 /** A card ref for a damage/heal/buff target string (`instanceId` or `"{seat}:hero"`). */
 function logTargetRef(target: string): BattleLogCardRef {
-  if (target.endsWith(":hero")) return { name: battleLogHeroName(target.split(":")[0] as Seat), hero: true };
+  if (target.endsWith(":hero")) return battleLogHeroRef(target.split(":")[0] as Seat);
   return logUnitRef(target);
 }
 
@@ -7732,11 +7777,11 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
     }
     case "ATTACK": {
       const attackerId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
-      const tile = attackerId ? logUnitRef(attackerId) : { name: battleLogHeroName(event.seat), hero: true };
+      const tile = attackerId ? logUnitRef(attackerId) : battleLogHeroRef(event.seat);
       const ref = payload.target as TargetRef | undefined;
       const flowTo = ref
         ? ref.type === "HERO"
-          ? { name: battleLogHeroName(ref.side), hero: true }
+          ? battleLogHeroRef(ref.side)
           : logUnitRef(ref.instanceId ?? "")
         : undefined;
       const dealt = ctx.attackTargetDamage.get(event.seq);
@@ -9167,7 +9212,8 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     // Battlecry damage and selected NEWS damage can carry a sourceKey so the
     // imperative blade sprite knows where to fly from.
     const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
-    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq };
+    const resultingHealth = typeof payload.remainingHealth === "number" ? payload.remainingHealth : undefined;
+    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq, resultingHealth };
   }
   if (event.type === "QUEST_COMPLETED") {
     const source = typeof payload.source === "string" ? payload.source : undefined;

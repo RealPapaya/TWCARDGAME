@@ -947,12 +947,14 @@ body.hand-dragging .hand-row .card {
 }
 
 .minion.taunt {
-  border-width: 4px;
+  border-width: 2px;
   border-radius: 10px 10px 50% 50% / 10% 10% 20% 20%;
-  border-color: #c0c0c0;
+  border-color: #7f8792;
   box-shadow:
-    0 0 20px rgba(192, 192, 192, 0.6),
-    inset 0 0 15px rgba(192, 192, 192, 0.3);
+    0 0 0 2px #d8dde4,
+    0 0 0 4px #8a929c,
+    0 0 18px rgba(196, 218, 242, 0.62),
+    inset 0 0 15px rgba(214, 225, 238, 0.28);
 }
 
 .minion.taunt:not(.lunging) {
@@ -960,10 +962,12 @@ body.hand-dragging .hand-row .card {
 }
 
 .attacking-board .minion.taunt.valid-target {
-  border-color: #c0c0c0;
+  border-color: #7f8792;
   box-shadow:
-    0 0 20px rgba(192, 192, 192, 0.6),
-    inset 0 0 15px rgba(192, 192, 192, 0.3);
+    0 0 0 2px #d8dde4,
+    0 0 0 4px #8a929c,
+    0 0 18px rgba(196, 218, 242, 0.62),
+    inset 0 0 15px rgba(214, 225, 238, 0.28);
 }
 
 .minion.taunt.can-attack {
@@ -2600,13 +2604,17 @@ body.hand-dragging .hand-row .card {
   0%,
   100% {
     box-shadow:
-      0 0 10px rgba(192, 192, 192, 0.3),
-      0 0 20px rgba(192, 192, 192, 0.2);
+      0 0 0 2px #d8dde4,
+      0 0 0 4px #8a929c,
+      0 0 14px rgba(196, 218, 242, 0.42),
+      0 0 22px rgba(126, 154, 188, 0.22);
   }
   50% {
     box-shadow:
-      0 0 15px rgba(192, 192, 192, 0.5),
-      0 0 30px rgba(192, 192, 192, 0.3);
+      0 0 0 2px #f0f4f8,
+      0 0 0 4px #9ca6b2,
+      0 0 18px rgba(214, 232, 250, 0.68),
+      0 0 32px rgba(126, 154, 188, 0.34);
   }
 }
 
