@@ -44,6 +44,28 @@ export function calculatePvPExp(winnerHp: number, turnCount: number): number {
   return exp;
 }
 
+/**
+ * PvP gold reward.
+ * Winner base: 20 + turn bonus (1 per turn, capped at 20) + damage-sustained bonus (1 per 3 HP lost), then ×2.
+ * Loser receives floor(winner / 3).
+ */
+export function calculatePvPGold(
+  winnerHp: number,
+  loserHp: number,
+  turnCount: number
+): { winnerGold: number; loserGold: number } {
+  const turns = Math.max(1, turnCount);
+  const turnBonus = Math.min(20, turns);
+  const hpLost = Math.max(0, 30 - Math.max(0, winnerHp));
+  const damageSustainedBonus = Math.floor(hpLost / 3);
+  const loserHpLost = Math.max(0, 30 - Math.max(0, loserHp));
+  const loserDamageBonus = Math.floor(loserHpLost / 3);
+  const base = 20 + turnBonus + damageSustainedBonus;
+  const winnerGold = base * 2;
+  const loserGold = Math.floor(winnerGold / 3) + loserDamageBonus;
+  return { winnerGold, loserGold };
+}
+
 export function getPveXpReward(difficulty: AiDifficulty, isFirstVictory: boolean): number {
   const table = PVE_XP[difficulty];
   return isFirstVictory ? table.first : table.repeat;
@@ -111,6 +133,6 @@ export interface RewardSummary {
     before: number;
     after: number;
     gained: number;
-    breakdown: { firstVictory?: number; levelUps?: number };
+    breakdown: { matchWin?: number; firstVictory?: number; levelUps?: number };
   };
 }

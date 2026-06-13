@@ -53,8 +53,8 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     id: "VE_MORAKOT",
     name: "莫拉克風災",
     tierWeight: 20,
-    options: ["摧毀場上所有隨從", "摧毀場上所有隨從", "摧毀場上所有隨從"],
-    apply: { mode: "IMMEDIATE", effect: { type: "DESTROY_ALL_MINIONS" } }
+    options: ["摧毀場上所有隨從（無法復活）", "摧毀場上所有隨從（無法復活）", "摧毀場上所有隨從（無法復活）"],
+    apply: { mode: "IMMEDIATE", effect: { type: "DESTROY_ALL_MINIONS", suppressRevive: true } }
   },
   {
     id: "VE_KAOHSIUNG_BLAST",

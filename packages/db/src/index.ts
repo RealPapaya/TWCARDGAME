@@ -295,6 +295,8 @@ export interface ApplyMatchRewardsInput {
   aiTheme?: AiTheme | null;
   aiDifficulty?: AiDifficulty | null;
   pvpXp?: number;
+  /** Pre-computed gold grant for this player's PvP result (winner or loser). 0 for PvE. */
+  pvpGold?: number;
 }
 
 /**
@@ -312,7 +314,8 @@ export async function applyMatchRewards(
     p_mode: input.mode,
     p_ai_theme: input.aiTheme ?? null,
     p_ai_difficulty: input.aiDifficulty ?? null,
-    p_pvp_xp: input.pvpXp ?? 0
+    p_pvp_xp: input.pvpXp ?? 0,
+    p_pvp_gold: input.pvpGold ?? 0
   });
   if (error) throw error;
   return data as Omit<RewardSummary, "result"> & { idempotent: boolean };

@@ -42,6 +42,8 @@ export interface EffectDefinition {
   health?: number;
   /** Augment returned-card cost reduction. */
   costReduction?: number;
+  /** DESTROY_ALL_MINIONS: when true, killed minions cannot be revived by 普渡. */
+  suppressRevive?: boolean;
   /** Augment durations: turns a deferred/passive augment effect lasts. */
   durationTurns?: number;
   /** Augment mana ramp: global turn at which the ramp becomes active. */

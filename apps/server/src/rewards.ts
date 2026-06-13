@@ -2,6 +2,7 @@ import { applyMatchRewards, createSupabaseServerClient } from "@twcardgame/db";
 import type { MatchState } from "@twcardgame/rules";
 import {
   calculatePvPExp,
+  calculatePvPGold,
   SEATS,
   type RewardSummary,
   type Seat
@@ -50,13 +51,35 @@ export function createMatchRewardsWithClient(
       const winnerSeat = state.result?.winnerSeat;
       const mode: "pvp" | "pve" = metadata?.isVsAi ? "pve" : "pvp";
 
+      // Pre-compute PvP gold for both players when there is a winner.
+      let pvpGoldByResult: { winnerGold: number; loserGold: number } | undefined;
+      if (mode === "pvp" && winnerSeat) {
+        const winner = state.players[winnerSeat];
+        const loserSeat = winnerSeat === "player1" ? "player2" : "player1";
+        const loser = state.players[loserSeat];
+        pvpGoldByResult = calculatePvPGold(winner.hero.hp, loser.hero.hp, state.turn.number);
+      }
+
       for (const seat of SEATS) {
         const player = state.players[seat];
         const isWinner = seat === winnerSeat;
-        if (!isHumanUser(player.userId) || !isWinner) {
+        if (!isHumanUser(player.userId)) {
           summaries.set(seat, zeroSummary(state, metadata, seat, winnerSeat));
           continue;
         }
+
+        // PvE: only the winner gets rewards.
+        if (mode === "pve" && !isWinner) {
+          summaries.set(seat, zeroSummary(state, metadata, seat, winnerSeat));
+          continue;
+        }
+
+        const pvpGold =
+          mode === "pvp" && pvpGoldByResult
+            ? isWinner
+              ? pvpGoldByResult.winnerGold
+              : pvpGoldByResult.loserGold
+            : 0;
 
         try {
           const payload = await rpc({
@@ -65,12 +88,10 @@ export function createMatchRewardsWithClient(
             mode,
             aiTheme: metadata?.aiTheme ?? null,
             aiDifficulty: metadata?.aiDifficulty ?? null,
-            pvpXp:
-              mode === "pvp"
-                ? calculatePvPExp(player.hero.hp, state.turn.number)
-                : 0
+            pvpXp: mode === "pvp" && isWinner ? calculatePvPExp(player.hero.hp, state.turn.number) : 0,
+            pvpGold
           });
-          summaries.set(seat, { result: "win", ...payload });
+          summaries.set(seat, { result: isWinner ? "win" : "loss", ...payload });
         } catch (error) {
           matchLogger.warn("match.rewards.failed", {
             matchId: state.matchId,

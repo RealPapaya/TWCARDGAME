@@ -1,6 +1,6 @@
 import { CARD_CATALOG, CARD_CATALOG_VERSION } from "@twcardgame/cards";
 import { createInitialMatch, type MatchState } from "@twcardgame/rules";
-import { calculatePvPExp, type Seat } from "@twcardgame/shared";
+import { calculatePvPExp, calculatePvPGold, type Seat } from "@twcardgame/shared";
 import { describe, expect, it, vi } from "vitest";
 import type { ApplyMatchRewardsInput } from "@twcardgame/db";
 import { createMatchRewardsWithClient, isHumanUser, noopMatchRewards } from "./rewards.js";
@@ -156,9 +156,12 @@ describe("createMatchRewardsWithClient", () => {
     expect(winner.levelUps).toHaveLength(0);
   });
 
-  it("PvP: passes computed calculatePvPExp value, no PvE fields", async () => {
+  it("PvP: calls RPC for both players; winner gets pvpXp and winnerGold, loser gets loserGold", async () => {
     const state = finishedMatch({ winnerSeat: "player2", winnerHp: 21, turnNumber: 8 });
     const expectedXp = calculatePvPExp(21, 8); // = 8 + floor((21/30)*4)=2 + 2 = 12
+    // In the test state, the loser's hp is still 30 (finishedMatch only sets winnerHp).
+    // The real game would have loser at ≤0, but reward.ts reads whatever hp is on state.
+    const { winnerGold, loserGold } = calculatePvPGold(21, 30, 8);
     const { rpc, calls } = makeRpc((input) => ({
       mode: "pvp",
       source: "pvp",
@@ -167,19 +170,28 @@ describe("createMatchRewardsWithClient", () => {
       xp: { before: 10, after: 10 + input.pvpXp!, gained: input.pvpXp! },
       level: { before: 2, after: 2 },
       levelUps: [],
-      gold: { before: 200, after: 200, gained: 0, breakdown: {} },
+      gold: { before: 200, after: 200 + input.pvpGold!, gained: input.pvpGold!, breakdown: { matchWin: input.pvpGold } },
       idempotent: false
     }));
     const dispatcher = createMatchRewardsWithClient(rpc);
     const summaries = await dispatcher.grantForMatch(state, { isVsAi: false });
-    expect(rpc).toHaveBeenCalledOnce();
-    expect(calls[0]!.input.mode).toBe("pvp");
-    expect(calls[0]!.input.pvpXp).toBe(expectedXp);
+    expect(rpc).toHaveBeenCalledTimes(2);
+    // winner call
+    const winnerCall = calls.find((c) => c.input.userId === HUMAN_USER_2)!;
+    expect(winnerCall.input.mode).toBe("pvp");
+    expect(winnerCall.input.pvpXp).toBe(expectedXp);
+    expect(winnerCall.input.pvpGold).toBe(winnerGold);
+    // loser call
+    const loserCall = calls.find((c) => c.input.userId === HUMAN_USER_1)!;
+    expect(loserCall.input.pvpXp).toBe(0);
+    expect(loserCall.input.pvpGold).toBe(loserGold);
     const winner = summaries.get("player2")!;
     expect(winner.result).toBe("win");
     expect(winner.source).toBe("pvp");
     expect(winner.xp.gained).toBe(expectedXp);
-    expect(summaries.get("player1")?.result).toBe("loss");
+    const loser = summaries.get("player1")!;
+    expect(loser.result).toBe("loss");
+    expect(loser.gold.gained).toBe(loserGold);
   });
 
   it("falls back to zero summary if the RPC throws and logs the failure", async () => {

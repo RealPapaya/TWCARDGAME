@@ -451,12 +451,12 @@ export const CARD_CATALOG_GENERATED = [
     "health": 5,
     "type": "MINION",
     "rarity": "EPIC",
-    "description": "持續效果:賦予我方兩側「國民黨政治人物」沙包+1生命值",
+    "description": "持續效果:賦予我方兩側「國民黨政治人物」沙包+2生命值",
     "keywords": {
       "ongoing": {
         "type": "ADJACENT_BUFF_CATEGORY_ATTRS",
         "target_category": "國民黨政治人物",
-        "value": 1,
+        "value": 2,
         "keyword": "taunt"
       }
     },
@@ -487,7 +487,7 @@ export const CARD_CATALOG_GENERATED = [
     "id": "TW028",
     "name": "京華城",
     "category": "建築",
-    "cost": 6,
+    "cost": 4,
     "attack": 0,
     "health": 6,
     "type": "MINION",
@@ -838,7 +838,7 @@ export const CARD_CATALOG_GENERATED = [
     "id": "S003",
     "name": "大罷免",
     "category": "新聞",
-    "cost": 2,
+    "cost": 1,
     "type": "NEWS",
     "rarity": "COMMON",
     "description": "將一個政治人物放回手牌中",

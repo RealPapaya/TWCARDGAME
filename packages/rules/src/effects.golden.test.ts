@@ -309,6 +309,18 @@ describe("effect golden tests", () => {
     expect(next.players[enemy(seat)].board).toHaveLength(0);
   });
 
+  it("DESTROY_ALL_MINIONS suppressRevive — 普渡 revive is blocked", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "DESTROY_ALL_MINIONS", suppressRevive: true } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    // Enable 普渡 for the active player.
+    state.players[seat].augmentFlags.reviveOnceAsVanilla = true;
+    placeMinion(state, seat);
+    const { state: next } = play(state, catalog, card);
+    // Board must be empty — 普渡 must not have revived the destroyed minion.
+    expect(next.players[seat].board).toHaveLength(0);
+  });
+
   it("DESTROY_DAMAGED — destroys target only if it is damaged", () => {
     const card = NEWS_CARD("C", { battlecry: { type: "DESTROY_DAMAGED", target: { side: "ENEMY", type: "MINION" } } });
     const { state, catalog } = makeMatch([card]);

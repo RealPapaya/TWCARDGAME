@@ -359,13 +359,14 @@ function renderRewardDiagnostic(summary: RewardSummary): string {
 }
 
 function renderGoldSourceText(summary: RewardSummary | undefined): string {
-  if (!summary || summary.result !== "win") return "";
+  if (!summary || summary.gold.gained === 0) return "";
   const parts: string[] = [];
+  const match = summary.gold.breakdown.matchWin;
   const first = summary.gold.breakdown.firstVictory;
   const level = summary.gold.breakdown.levelUps;
+  if (match) parts.push(`對戰獎勵 +${match}`);
   if (first) parts.push(`首勝獎勵 +${first}`);
   if (level) parts.push(`升級獎勵 +${level}`);
-  if (parts.length === 0 && summary.gold.gained === 0) return "";
   return parts.join("　·　");
 }
 

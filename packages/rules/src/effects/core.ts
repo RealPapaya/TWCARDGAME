@@ -666,9 +666,11 @@ export function destroyTarget(effect: EffectDefinition, context: EffectContext):
   if (ref?.kind === "MINION") (ref.unit as RuntimeMinion).currentHealth = 0;
 }
 
-export function destroyAllMinions(_effect: EffectDefinition, context: EffectContext): void {
+export function destroyAllMinions(effect: EffectDefinition, context: EffectContext): void {
   forEachMinion(context.state, (_player, minion) => {
     minion.currentHealth = 0;
+    // suppressRevive: unconditional wipe (莫拉克) — mark so 普渡 cannot revive any of them.
+    if (effect.suppressRevive) minion.revivedByPurdo = true;
   });
 }
 
