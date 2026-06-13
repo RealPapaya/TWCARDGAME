@@ -45,6 +45,8 @@ import {
   setSfxVolume,
   sfxMutedKey,
   sfxVolumeKey,
+  startTrainingBgm,
+  stopTrainingBgm,
   toggleBgmMute,
   toggleSfxMute,
   type SoundCue
@@ -955,22 +957,37 @@ function renderTrainingLevelCards(): string {
     const unlocked = trainingLevelUnlocked(level.id);
     const completed = trainingLevelCompleted(level.id);
     const disabled = view.joining || Boolean(view.room) || !unlocked;
-    const title = `第${index + 1}關：${level.name}`;
-    const description = level.description;
-    const status = completed ? "已完成" : unlocked ? "可開始" : "完成前一關後解鎖";
+    const title = `第${index + 1}關`;
+    const stateClass = completed ? "training-card--completed" : unlocked ? "training-card--unlocked" : "training-card--locked";
+    const rewardHtml = !completed && unlocked
+      ? `<div class="training-reward-badge">
+           <img src="/images/ui/gold_coin.webp" alt="金幣" class="training-reward-coin" />
+           <span class="training-reward-amount">${level.rewardGold}</span>
+           <span class="training-reward-label">首通獎勵</span>
+         </div>`
+      : completed
+        ? `<div class="training-complete-badge">✓ 已完成</div>`
+        : `<div class="training-lock-icon">🔒</div>`;
     return `
-      <div class="battle-training-card">
-        <strong>${escapeHtml(title)}</strong>
-        <span>${escapeHtml(description)}</span>
-        <span class="battle-training-note">${escapeHtml(status)}</span>
-        <button
-          class="neon-button battle-start-btn"
-          data-start-training="${escapeAttr(level.id)}"
-          data-testid="start-training-${escapeAttr(level.id)}"
-          ${disabled ? "disabled" : ""}
-        >
-          ${completed ? "再次訓練" : "開始訓練"}
-        </button>
+      <div class="battle-training-card ${stateClass}" data-training-level="${escapeAttr(level.id)}">
+        <div class="training-card-header">
+          <span class="training-card-level-num">${escapeHtml(title)}</span>
+          <span class="training-card-name">${escapeHtml(level.name)}</span>
+        </div>
+        <div class="training-card-body">
+          <p class="training-card-desc">${escapeHtml(level.description)}</p>
+          ${rewardHtml}
+        </div>
+        <div class="training-card-footer">
+          <button
+            class="neon-button battle-start-btn"
+            data-start-training="${escapeAttr(level.id)}"
+            data-testid="start-training-${escapeAttr(level.id)}"
+            ${disabled ? "disabled" : ""}
+          >
+            ${completed ? "再次訓練" : unlocked ? "開始訓練" : "尚未解鎖"}
+          </button>
+        </div>
       </div>
     `;
   }).join("");
@@ -5234,6 +5251,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   resetMinionVisualTracking();
   resetBattleLog();
   trainingSession = createTrainingSession(levelId, view.profile?.display_name ?? "玩家");
+  startTrainingBgm();
   view.room = undefined;
   view.mySeat = "player1";
   view.hand = [];
@@ -5379,9 +5397,10 @@ function trainingLevelCompleted(levelId: string): boolean {
   return remoteTrainingCompletions.has(levelId) || isLocalTrainingComplete(levelId);
 }
 
-function trainingLevelUnlocked(_levelId: TrainingLevelId): boolean {
-  // Training levels are teaching content — every level is freely selectable.
-  return true;
+function trainingLevelUnlocked(levelId: TrainingLevelId): boolean {
+  const idx = TRAINING_LEVELS.findIndex((l) => l.id === levelId);
+  if (idx <= 0) return true;
+  return trainingLevelCompleted(TRAINING_LEVELS[idx - 1].id);
 }
 
 function isLocalTrainingComplete(levelId: string): boolean {
@@ -5604,6 +5623,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
 }
 
 function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?: string } = {}): void {
+  stopTrainingBgm();
   trainingSession = undefined;
   view.room = joined;
   resetMinionVisualTracking();
@@ -6537,8 +6557,9 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   }
   const cardDef = cardCatalog.get(card.cardId);
   const isMinion = (cardDef?.type ?? card.type) === "MINION";
-  // News cards ("新聞牌") only count as played when dropped onto the player's
-  // own hero avatar (黃色區域); releasing anywhere else returns them to hand.
+  // News cards ("新聞牌") play like minions: they only count as played when
+  // dropped onto the player's own board; releasing off-board returns them to
+  // hand. (Targeted news cards then go on to aim their effect arrow.)
   const isNews = (cardDef?.type ?? card.type) === "NEWS";
   // Targeted-battlecry cards are played in two stages (v1 parity): the
   // drop just places the card; the effect target is aimed afterwards. The drag
@@ -6568,9 +6589,6 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
     const refreshedSource =
       document.querySelector<HTMLElement>(`[data-hand-id="${cssEscape(handId)}"]`) ?? sourceEl;
     const playerBoardEl = document.querySelector<HTMLElement>('[data-testid="player-board"]');
-    const heroDropEl = isNews
-      ? document.querySelector<HTMLElement>('[data-testid="player-hero"]')
-      : null;
 
     beginHandDrag({
       pointerId,
@@ -6581,8 +6599,7 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
       needsTarget: false,
       isMinion,
       playerBoardEl,
-      needsHeroDrop: isNews,
-      heroDropEl,
+      needsBoardDrop: isNews,
       isEligibleTarget: () => false,
       onResolve: ({ insertionIndex, overDropZone }) => {
         if (isBattleActionLocked() || view.pendingBattlecry) {
@@ -6594,8 +6611,8 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
           finalizeHandDrag(undefined);
           return;
         }
-        // News cards must land on the player's own hero avatar; releasing
-        // anywhere else returns the card to hand without playing it.
+        // News cards must land on the player's own board, like a minion;
+        // releasing off-board returns the card to hand without playing it.
         if (isNews && !overDropZone) {
           finalizeHandDrag(undefined);
           return;
@@ -6928,6 +6945,7 @@ async function backToLobby(): Promise<void> {
     rewardFallbackTimer = undefined;
   }
   resetRewardScreen(view);
+  stopTrainingBgm();
   trainingSession = undefined;
   view.room = undefined;
   view.mySeat = undefined;

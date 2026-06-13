@@ -19,10 +19,14 @@ const BGM_TRACKS = [
   "/audio/bgm/Battle 1.mp3",
   "/audio/bgm/Battle 2.mp3",
   "/audio/bgm/Battle 3.mp3",
+  "/audio/bgm/Battle 4.mp3",
 ];
+
+const TRAINING_BGM_PATH = "/audio/bgm/Training.mp3";
 
 let currentTrackIndex = Math.floor(Math.random() * BGM_TRACKS.length);
 let bgmTrack = new Audio(BGM_TRACKS[currentTrackIndex]);
+let trainingBgmActive = false;
 
 function pickNextTrack(): void {
   let next: number;
@@ -87,6 +91,24 @@ export function ensureBgm(): void {
   void bgmTrack.play().catch(() => {
     // Browsers may still block playback until a stronger user gesture.
   });
+}
+
+export function startTrainingBgm(): void {
+  trainingBgmActive = true;
+  bgmTrack.loop = true;
+  bgmTrack.src = TRAINING_BGM_PATH;
+  const view = audioView;
+  if (view) bgmTrack.volume = view.bgmMuted ? 0 : view.bgmVolume;
+  if (audioUnlocked && view && !view.bgmMuted) {
+    void bgmTrack.play().catch(() => {});
+  }
+}
+
+export function stopTrainingBgm(): void {
+  if (!trainingBgmActive) return;
+  trainingBgmActive = false;
+  bgmTrack.loop = false;
+  pickNextTrack();
 }
 
 export function playSfx(cue: SoundCue, volume?: number): void {

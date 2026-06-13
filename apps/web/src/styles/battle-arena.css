@@ -581,35 +581,156 @@
   box-shadow: 0 0 20px rgba(255, 215, 0, 0.36);
 }
 
-.battle-training-note {
-  color: #f4e4bc;
-  font-weight: 900;
-  font-size: 18px;
-  text-shadow: 0 2px 6px #000;
-}
 
 .battle-training-card {
-  display: grid;
-  justify-items: center;
-  gap: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
   max-width: 440px;
-  padding: 18px 22px;
-  border: 3px solid rgba(244, 228, 188, 0.62);
-  border-radius: 8px;
-  background: linear-gradient(180deg, rgba(28, 47, 45, 0.9), rgba(25, 23, 28, 0.9));
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.32);
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(244, 228, 188, 0.28);
   color: #f4e4bc;
   text-align: center;
+  transition: filter 0.25s, opacity 0.25s, transform 0.15s;
+  position: relative;
 }
 
-.battle-training-card strong {
-  font-size: 24px;
+/* ── State: locked ── */
+.battle-training-card.training-card--locked {
+  filter: grayscale(1) brightness(0.55);
+  opacity: 0.72;
+  pointer-events: none;
+}
+
+/* ── State: completed ── */
+.battle-training-card.training-card--completed {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(120, 220, 140, 0.55);
+}
+
+/* ── State: unlocked (not yet completed) ── */
+.battle-training-card.training-card--unlocked {
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55), 0 0 0 2px rgba(255, 200, 60, 0.72), 0 0 18px rgba(255, 200, 60, 0.22);
+}
+
+/* ── Card header strip ── */
+.training-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 18px;
+  background: linear-gradient(135deg, rgba(60, 35, 10, 0.98), rgba(90, 55, 18, 0.98));
+  border-bottom: 2px solid rgba(244, 228, 188, 0.28);
+}
+
+.training-card-level-num {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #c89a28, #7a4f08);
+  border: 2px solid #f4d070;
+  font-size: 13px;
+  font-weight: 900;
   color: #fff8d8;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.45);
 }
 
-.battle-training-card span {
-  font-size: 15px;
-  line-height: 1.45;
+.training-card-name {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff8d8;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.7);
+}
+
+/* ── Card body ── */
+.training-card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 18px;
+  background: linear-gradient(180deg, rgba(20, 38, 36, 0.97), rgba(18, 16, 22, 0.97));
+}
+
+.training-card-desc {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #c8b894;
+}
+
+/* ── Reward badge (scroll-style) ── */
+.training-reward-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, rgba(120, 80, 10, 0.92), rgba(80, 48, 6, 0.92));
+  border: 1.5px solid rgba(244, 204, 60, 0.7);
+  box-shadow: 0 2px 10px rgba(200, 140, 0, 0.28), inset 0 1px 0 rgba(255, 240, 120, 0.18);
+}
+
+.training-reward-coin {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 4px rgba(255, 200, 0, 0.55));
+}
+
+.training-reward-amount {
+  font-size: 22px;
+  font-weight: 900;
+  color: #ffd84a;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  letter-spacing: 1px;
+}
+
+.training-reward-label {
+  font-size: 12px;
+  color: #e8c870;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* ── Completed badge ── */
+.training-complete-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(60, 160, 80, 0.28);
+  border: 1.5px solid rgba(80, 200, 100, 0.6);
+  font-size: 14px;
+  font-weight: 700;
+  color: #78dc8c;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Lock icon ── */
+.training-lock-icon {
+  font-size: 28px;
+  filter: grayscale(1);
+  opacity: 0.55;
+}
+
+/* ── Card footer ── */
+.training-card-footer {
+  padding: 12px 18px;
+  background: linear-gradient(180deg, rgba(18, 16, 22, 0.97), rgba(28, 20, 10, 0.97));
+  border-top: 1.5px solid rgba(244, 228, 188, 0.14);
+}
+
+.training-card-footer .neon-button {
+  width: 100%;
 }
 
 /* Dedicated 訓練場 level-select page (reached from the battle screen's 訓練場 tile). */
@@ -627,7 +748,7 @@
 
 .training-level-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 360px));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 340px));
   justify-content: center;
   gap: 18px;
   padding-bottom: 24px;
