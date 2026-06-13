@@ -1489,10 +1489,10 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   const effectiveOwned = usesDbCollectionOwnership() || hasCollectionRows() ? quantity : limit;
   const legendaryOk = canAddLegendary(card, view.editingDeck?.card_ids ?? []);
   const canAdd = Boolean(view.editingDeck) && owned && selectedTotal < 30 && selectedCount < limit && selectedCount < effectiveOwned && legendaryOk;
-  const disabled = Boolean(view.editingDeck) && !canAdd;
+  const disabled = Boolean(view.editingDeck) && owned && !canAdd;
   const resolved = resolveCatalogCard(card, `collection-${card.id}`);
   return `
-    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-owned="${owned ? "1" : "0"}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
       <span class="card-count-badge">x${quantity}</span>
       ${selectedCount > 0 ? `<span class="deck-count-badge">${selectedCount}/${limit}</span>` : ""}
       <div class="card rarity-${card.rarity.toLowerCase()}">
@@ -1518,7 +1518,6 @@ function renderPinnedCardDetail(cardId: string): string {
   if (!card) return "";
   const resolved = resolveCatalogCard(card, `pinned-${card.id}`);
   const owned = buildCollectionMap(view.collection).get(cardId) ?? 0;
-  if (usesDbCollectionOwnership() && owned <= 0) return "";
   const vouchers = view.profile?.vouchers ?? 0;
   const rate = voucherRate(card.rarity);
   const collectible = card.collectible !== false;
@@ -1541,7 +1540,7 @@ function renderPinnedCardDetail(cardId: string): string {
           </div>
           <div class="card-op-side">
             ${renderKeywordGlossary(card.id, "right")}
-            <p class="card-op-count">擁有數量：<strong>${owned}</strong></p>
+            <p class="card-op-count">${owned > 0 ? `擁有數量：<strong>${owned}</strong>` : `<span class="card-op-unowned">未擁有</span>`}</p>
             ${collectible ? `
               <div class="card-op-actions">
                 <button type="button" id="card-op-disenchant" class="card-op-btn disenchant" data-card-id="${escapeAttr(card.id)}" ${canDisenchant ? "" : "disabled"}>
@@ -3649,7 +3648,7 @@ function bindStaticActions(): void {
   }
   for (const el of document.querySelectorAll<HTMLElement>("[data-add-card]")) {
     on(el, "click", "add-card", () => {
-      if (view.editingDeck) {
+      if (view.editingDeck && el.dataset.owned !== "0") {
         addCardToEditor(el.dataset.addCard);
       } else {
         view.pinnedCollectionCardId = el.dataset.addCard;
@@ -6538,6 +6537,9 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
   }
   const cardDef = cardCatalog.get(card.cardId);
   const isMinion = (cardDef?.type ?? card.type) === "MINION";
+  // News cards ("新聞牌") only count as played when dropped onto the player's
+  // own hero avatar (黃色區域); releasing anywhere else returns them to hand.
+  const isNews = (cardDef?.type ?? card.type) === "NEWS";
   // Targeted-battlecry cards are played in two stages (v1 parity): the
   // drop just places the card; the effect target is aimed afterwards. The drag
   // is therefore always placement-only — no arrow snapping during the drag.
@@ -6566,6 +6568,9 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
     const refreshedSource =
       document.querySelector<HTMLElement>(`[data-hand-id="${cssEscape(handId)}"]`) ?? sourceEl;
     const playerBoardEl = document.querySelector<HTMLElement>('[data-testid="player-board"]');
+    const heroDropEl = isNews
+      ? document.querySelector<HTMLElement>('[data-testid="player-hero"]')
+      : null;
 
     beginHandDrag({
       pointerId,
@@ -6576,14 +6581,22 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
       needsTarget: false,
       isMinion,
       playerBoardEl,
+      needsHeroDrop: isNews,
+      heroDropEl,
       isEligibleTarget: () => false,
-      onResolve: ({ insertionIndex }) => {
+      onResolve: ({ insertionIndex, overDropZone }) => {
         if (isBattleActionLocked() || view.pendingBattlecry) {
           finalizeHandDrag(undefined);
           return;
         }
         // Minions must land on the board; dropping off-board returns to hand.
         if (isMinion && insertionIndex < 0) {
+          finalizeHandDrag(undefined);
+          return;
+        }
+        // News cards must land on the player's own hero avatar; releasing
+        // anywhere else returns the card to hand without playing it.
+        if (isNews && !overDropZone) {
           finalizeHandDrag(undefined);
           return;
         }

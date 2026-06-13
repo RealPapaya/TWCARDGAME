@@ -9,8 +9,16 @@ export interface HandDragOptions {
   needsTarget: boolean;
   isMinion: boolean;
   playerBoardEl: HTMLElement | null;
+  /**
+   * News cards must be dropped onto the player's own hero ("黃色區域") to count
+   * as played. When set, the hero lights up as a drop zone for the duration of
+   * the drag and `onResolve` reports whether the drop landed on it via
+   * `overDropZone`.
+   */
+  needsHeroDrop: boolean;
+  heroDropEl: HTMLElement | null;
   isEligibleTarget: (el: HTMLElement) => boolean;
-  onResolve: (result: { insertionIndex: number; targetEl: HTMLElement | null }) => void;
+  onResolve: (result: { insertionIndex: number; targetEl: HTMLElement | null; overDropZone: boolean }) => void;
   onCancel: () => void;
 }
 
@@ -31,13 +39,16 @@ interface Session {
   needsTarget: boolean;
   lineKind: DragLineKind;
   playerBoardEl: HTMLElement | null;
+  needsHeroDrop: boolean;
+  heroDropEl: HTMLElement | null;
+  overHeroDrop: boolean;
   isEligibleTarget: (el: HTMLElement) => boolean;
   ghostEl: HTMLElement | null;
   indicator: HTMLDivElement | null;
   insertionIndex: number;
   snappedTargetEl: HTMLElement | null;
   resolved: boolean;
-  onResolve: (data: { insertionIndex: number; targetEl: HTMLElement | null }) => void;
+  onResolve: (data: { insertionIndex: number; targetEl: HTMLElement | null; overDropZone: boolean }) => void;
   onCancel: () => void;
 }
 
@@ -119,6 +130,9 @@ export function beginHandDrag(opts: HandDragOptions): void {
     needsTarget: opts.needsTarget,
     lineKind: opts.lineKind,
     playerBoardEl: opts.playerBoardEl,
+    needsHeroDrop: opts.needsHeroDrop,
+    heroDropEl: opts.heroDropEl,
+    overHeroDrop: false,
     isEligibleTarget: opts.isEligibleTarget,
     ghostEl: createGhost(opts.sourceEl),
     indicator: null,
@@ -133,6 +147,10 @@ export function beginHandDrag(opts: HandDragOptions): void {
   // those cards up (the held card "occupies" the pointer). The body flag lets
   // CSS neutralize the hand-card hover state for the duration of the drag.
   document.body.classList.add("hand-dragging");
+
+  // News cards are only played when dropped on the player's own hero — light it
+  // up as a drop zone for the whole drag so the target is obvious.
+  if (opts.needsHeroDrop && opts.heroDropEl) opts.heroDropEl.classList.add("news-drop-zone");
 
   showLine(opts.lineKind, opts.startX, opts.startY);
   positionGhost(opts.startX, opts.startY);
@@ -156,6 +174,9 @@ export function beginAttackDrag(opts: AttackDragOptions): void {
     needsTarget: true,
     lineKind: "damage",
     playerBoardEl: null,
+    needsHeroDrop: false,
+    heroDropEl: null,
+    overHeroDrop: false,
     isEligibleTarget: opts.isEligibleTarget,
     ghostEl: null,
     indicator: null,
@@ -236,9 +257,28 @@ function onPointerMove(event: PointerEvent): void {
 
   if (session.needsTarget || session.kind === "attack") {
     updateSnappedTarget(x, y);
+  } else if (session.needsHeroDrop) {
+    updateHeroDropZone(x, y);
   } else {
     drawLineTo(x, y);
   }
+}
+
+function updateHeroDropZone(x: number, y: number): void {
+  if (!session) return;
+  const hero = session.heroDropEl;
+  if (!hero) {
+    session.overHeroDrop = false;
+    drawLineTo(x, y);
+    return;
+  }
+  const rect = hero.getBoundingClientRect();
+  const inside = x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom;
+  const hit = document.elementFromPoint(x, y);
+  const over = inside || Boolean(hit?.closest('[data-testid="player-hero"]')) || hero.contains(hit);
+  session.overHeroDrop = over;
+  hero.classList.toggle("news-drop-hot", over);
+  drawLineTo(x, y);
 }
 
 function onPointerUp(event: PointerEvent): void {
@@ -357,7 +397,11 @@ function drawLineTo(x: number, y: number): void {
 
 function resolveSession(): void {
   if (!session) return;
-  const data = { insertionIndex: session.insertionIndex, targetEl: session.snappedTargetEl };
+  const data = {
+    insertionIndex: session.insertionIndex,
+    targetEl: session.snappedTargetEl,
+    overDropZone: session.overHeroDrop
+  };
   const cb = session.onResolve;
   finishSession(false);
   cb(data);
@@ -383,6 +427,9 @@ function finishSession(silent: boolean): void {
     board.classList.remove("placing");
     const indicator = board.querySelector(".placement-indicator");
     if (indicator) indicator.remove();
+  }
+  if (session.heroDropEl) {
+    session.heroDropEl.classList.remove("news-drop-zone", "news-drop-hot");
   }
   hideLine();
   hideGhost();
