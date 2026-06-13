@@ -177,6 +177,9 @@ const HERO_SHATTER_MS = 1600;
 const RESULT_OVERLAY_PAUSE_MS = 400;
 const APP_VERSION = "v1.1.0";
 const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
+const MINION_DEATH_FADE_MS = 780;
+const SUMMON_POP_MS = 600;
+const DEATHRATTLE_EFFECT_MS = 1200;
 /** Pause inserted between a quest-complete flash and its downstream effects (damage/destroy/summon). */
 const QUEST_COMPLETE_EFFECT_DELAY_MS = 700;
 const PUBLIC_SYNC_EVENT_GRACE_MS = 50;
@@ -1943,6 +1946,19 @@ function pendingMinionCurrentHealth(seat: Seat, instanceId: string): number | un
   return pendingPublicBoardForSeat(seat)?.find(m => m.instanceId === instanceId)?.currentHealth;
 }
 
+function readySummonStatOverride(instanceId: string): { attack?: number; health?: number } | undefined {
+  let best: { seq: number; attack?: number; health?: number } | undefined;
+  for (const cue of view.animationCues) {
+    if (cue.kind !== "summon" || cue.targetKey !== instanceId || !cueIsReady(cue)) continue;
+    if (cue.summonAttack === undefined && cue.summonHealth === undefined) continue;
+    const seq = cue.seq ?? -1;
+    if (!best || seq >= best.seq) {
+      best = { seq, attack: cue.summonAttack, health: cue.summonHealth };
+    }
+  }
+  return best;
+}
+
 /**
  * Post-effect health to display for a unit (minion or `seat:hero` key) right at
  * impact, read from the latest READY damage/heal cue's `resultingHealth`. This is
@@ -1998,6 +2014,8 @@ function renderBattlecryPreview(cardId: string): string {
 function renderSummonPreview(cue: AnimationCue): string {
   const card = cue.cardId ? cardCatalog.get(cue.cardId) : undefined;
   if (!card || !cue.targetKey || !cue.seat) return "";
+  const attack = cue.summonAttack ?? card.attack ?? 0;
+  const health = cue.summonHealth ?? card.health ?? 0;
   const target: TargetRef = { type: "MINION", side: cue.seat, instanceId: cue.targetKey };
   const targetKey = targetKeyFor(target);
   const classes = classNames([
@@ -2028,8 +2046,8 @@ function renderSummonPreview(cue: AnimationCue): string {
       <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <div class="minion-stats">
-        <span class="stat-atk"><span>${card.attack ?? 0}</span></span>
-        <span class="stat-hp">${card.health ?? 0}</span>
+        <span class="stat-atk"><span>${attack}</span></span>
+        <span class="stat-hp">${health}</span>
       </div>
       <span class="sr-e2e"></span>
     </button>
@@ -2197,13 +2215,14 @@ function renderHandCard(card: HandCardView, index: number, total: number): strin
 
 function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const catalogCard = cardCatalog.get(minion.cardId);
+  const summonStats = readySummonStatOverride(minion.instanceId);
   // Hold a freshly-summoned, augment-buffed minion at its printed base stats until
   // the glow reveal lands, so the buff reads as a distinct beat AFTER the glow.
   const holdBaseStat =
     augmentHoldBaseStatIds.has(minion.instanceId) &&
-    typeof catalogCard?.attack === "number" &&
-    typeof catalogCard?.health === "number";
-  const shownAttack = holdBaseStat ? catalogCard!.attack : minion.attack;
+    ((typeof summonStats?.attack === "number" && typeof summonStats?.health === "number") ||
+      (typeof catalogCard?.attack === "number" && typeof catalogCard?.health === "number"));
+  const shownAttack = holdBaseStat ? (summonStats?.attack ?? catalogCard!.attack) : minion.attack;
   // Show post-damage/heal HP immediately when the cue fires (at impact, ~560ms into
   // the lunge) instead of waiting for the full publicSync flush at ~920ms.
   const hasDmgHealCue = hasCue(minion.instanceId, "damage") || hasCue(minion.instanceId, "heal");
@@ -2212,7 +2231,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
   const cueHealth = readyResultingHealth(minion.instanceId);
   const pendingHealth = hasDmgHealCue ? pendingMinionCurrentHealth(seat, minion.instanceId) : undefined;
   const shownHealth = holdBaseStat
-    ? catalogCard!.health
+    ? (summonStats?.health ?? catalogCard!.health)
     : (cueHealth !== undefined ? Math.max(0, cueHealth) : (pendingHealth ?? minion.currentHealth));
   const attackClass = classNames([
     "stat-atk",
@@ -8704,7 +8723,9 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   insertAoeSweepCues(rawCues, aoeClusters);
   // Keep battlecry effects visually behind their card-play cue. The helper also
   // consumes local targeted-battlecry echoes that already animated before send.
-  const cues = applyPostAttackEffectDelays(applyPostPlayEffectDelays(applyPostQuestEffectDelays(rawCues), multiHitSeqs));
+  const cues = applyPostDeathExitDelays(
+    applyPostAttackEffectDelays(applyPostPlayEffectDelays(applyPostQuestEffectDelays(rawCues), multiHitSeqs))
+  );
   if (cues.length === 0) return [];
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push
   // the board-effect cues out until the roulette reveals the winner, so e.g.
@@ -8745,12 +8766,12 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
       : cue.kind === "damage" ? 1150
       : cue.kind === "heal" ? 1500
       : cue.kind === "effectStrike" ? 1150
-      : cue.kind === "deathrattle" ? 1150
+      : cue.kind === "deathrattle" ? DEATHRATTLE_EFFECT_MS
       : cue.kind === "aoeSweep" ? 1100
       : cue.kind === "lock" ? 900
       : cue.kind === "shieldPop" ? 700
       : cue.kind === "bounce" ? 900
-      : cue.kind === "destroy" ? 700
+      : cue.kind === "destroy" ? MINION_DEATH_FADE_MS
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
       : cue.kind === "augmentGlow" ? AUGMENT_GLOW_MAX_DEFER_MS + AUGMENT_GLOW_REVEAL_DELAY_MS
       : cue.kind === "questComplete" ? QUEST_COMPLETE_EFFECT_DELAY_MS + 200
@@ -9011,6 +9032,7 @@ function applyPostPlayEffectDelays(rawCues: AnimationCue[], multiHitSeqs: Set<nu
       const syncLag =
         cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS
         : cue.kind === "destroy" ? DESTROY_EFFECT_SYNC_LAG_MS
+        : cue.kind === "summon" ? SUMMON_POP_MS
         : POST_PLAY_STATE_SYNC_LAG_MS;
       holdPendingPublicSyncFor(currentPostPlayDelay + syncLag);
       if (cue.kind === "bounce") holdPlayerHandSyncFor(currentPostPlayDelay + syncLag, { suppressNewIds: true });
@@ -9084,8 +9106,70 @@ function isPostAttackEffectCue(cue: AnimationCue): boolean {
     || cue.kind === "buff"
     || cue.kind === "bounce"
     || cue.kind === "destroy"
+    || cue.kind === "summon"
     || cue.kind === "effectStrike"
     || cue.kind === "deathrattle"
+    || cue.kind === "shieldPop"
+    || cue.kind === "lock"
+    || cue.kind === "aoeSweep";
+}
+
+function applyPostDeathExitDelays(rawCues: AnimationCue[]): AnimationCue[] {
+  const cues: AnimationCue[] = [];
+  let deathFollowupDelayMs = 0;
+
+  for (const cue of rawCues) {
+    if (cue.kind === "play" || cue.kind === "attackerMoves") {
+      deathFollowupDelayMs = 0;
+      cues.push(cue);
+      continue;
+    }
+
+    if (cue.kind === "destroy") {
+      const destroyDelayMs = cue.delayMs ?? 0;
+      deathFollowupDelayMs = Math.max(deathFollowupDelayMs, destroyDelayMs + MINION_DEATH_FADE_MS);
+      holdPendingPublicSyncFor(destroyDelayMs + MINION_DEATH_FADE_MS);
+      cues.push(cue);
+      continue;
+    }
+
+    if (deathFollowupDelayMs > 0 && isPostDeathFollowupCue(cue)) {
+      const delayMs = Math.max(cue.delayMs ?? 0, deathFollowupDelayMs);
+      if (cue.kind === "bounce") {
+        holdPendingPublicSyncFor(delayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
+        holdPlayerHandSyncFor(delayMs + BOUNCE_EFFECT_SYNC_LAG_MS, { suppressNewIds: true });
+      } else if (cue.kind === "summon") {
+        holdPendingPublicSyncFor(delayMs + SUMMON_POP_MS);
+      } else if (isPostPlayEffectCue(cue)) {
+        holdPendingPublicSyncFor(delayMs + POST_PLAY_STATE_SYNC_LAG_MS);
+      }
+      cues.push({
+        ...cue,
+        delayMs,
+        readyAtMs: performance.now() + delayMs
+      });
+      continue;
+    }
+
+    if (cue.kind === "summon") {
+      holdPendingPublicSyncFor((cue.delayMs ?? 0) + SUMMON_POP_MS);
+    }
+
+    cues.push(cue);
+  }
+
+  return cues;
+}
+
+function isPostDeathFollowupCue(cue: AnimationCue): boolean {
+  return cue.kind === "deathrattle"
+    || cue.kind === "bounce"
+    || cue.kind === "summon"
+    || cue.kind === "augmentGlow"
+    || cue.kind === "damage"
+    || cue.kind === "heal"
+    || cue.kind === "buff"
+    || cue.kind === "effectStrike"
     || cue.kind === "shieldPop"
     || cue.kind === "lock"
     || cue.kind === "aoeSweep";
@@ -9112,6 +9196,7 @@ function applyPostQuestEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
       const syncLag =
         cue.kind === "destroy" ? DESTROY_EFFECT_SYNC_LAG_MS
         : cue.kind === "bounce" ? BOUNCE_EFFECT_SYNC_LAG_MS
+        : cue.kind === "summon" ? SUMMON_POP_MS
         : POST_PLAY_STATE_SYNC_LAG_MS;
       holdPendingPublicSyncFor(pendingQuestDelay + syncLag);
       if (cue.kind === "bounce") holdPlayerHandSyncFor(pendingQuestDelay + syncLag, { suppressNewIds: true });
@@ -9165,7 +9250,17 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     };
   }
   if (event.type === "MINION_SUMMONED") {
-    return { id, kind: "summon", text: "Summoned", seat: event.seat, targetKey: target, cardId };
+    return {
+      id,
+      kind: "summon",
+      text: "Summoned",
+      seat: event.seat,
+      targetKey: target,
+      cardId,
+      summonAttack: typeof payload.attack === "number" ? payload.attack : undefined,
+      summonHealth: typeof payload.health === "number" ? payload.health : undefined,
+      seq: event.seq
+    };
   }
   if (event.type === "AUGMENT_TRIGGERED") {
     // The augment indicator pulse is applied imperatively (applyAugmentGlow) off

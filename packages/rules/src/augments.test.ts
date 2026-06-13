@@ -277,7 +277,9 @@ describe("faction nuclear augments", () => {
     const events: GameEvent[] = [];
     resolveDeaths(state, events, catalogMap);
 
+    const summon = events.find((e) => e.type === "MINION_SUMMONED" && e.seat === seat);
     const resurrect = events.filter((e) => e.type === "RESURRECT" && e.seat === seat);
+    expect(summon?.payload).toMatchObject({ attack: 1, health: 1 });
     expect(resurrect).toHaveLength(1);
   });
 
@@ -546,14 +548,15 @@ describe("augment combat / persistent effects", () => {
     expect(player.hero.hp).toBe(before - 2);
   });
 
-  it("颱風假 grants +1/+1 to a summoned 勞工 minion", () => {
+  it("颱風假 grants +1 attack to a summoned 勞工 minion", () => {
     const state = startInProgress(8);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_TYPHOON_DAY"), []);
     const minion = makeMinion({ category: "勞工", attack: 2, health: 3, currentHealth: 3 });
     applyPersistentMinionAugments(state, seat, minion, []);
     expect(minion.attack).toBe(3);
-    expect(minion.health).toBe(4);
+    expect(minion.health).toBe(3);
+    expect(minion.currentHealth).toBe(3);
   });
 
   it("基本工資調漲 gives +2 attack only to printed-cost 1-3 minions", () => {

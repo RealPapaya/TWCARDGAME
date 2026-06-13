@@ -114,7 +114,8 @@ describe("phase 2 parity mechanics", () => {
     const source = placeMinion(state, foe, "TW036", { attack: 7, health: 7, currentHealth: 2 });
     const before = state.players[foe].hand.length;
 
-    const next = playCard(state, "S006", { type: "MINION", side: foe, instanceId: source.instanceId }).state;
+    const result = playCard(state, "S006", { type: "MINION", side: foe, instanceId: source.instanceId });
+    const next = result.state;
     const returned = next.players[foe].hand.find((card) => card.cardId === "TW036");
     const original = card("TW036");
 
@@ -122,6 +123,11 @@ describe("phase 2 parity mechanics", () => {
     expect(next.players[foe].hand.length).toBe(before + 1);
     expect(returned?.attack).toBe(original.attack);
     expect(returned?.health).toBe(original.health);
+    expect(result.events).toContainEqual(expect.objectContaining({
+      type: "BOUNCE",
+      seat: foe,
+      payload: expect.objectContaining({ target: source.instanceId, cardId: "TW036" })
+    }));
   });
 
   it("SUMMON and DRAW deathrattles resolve from lethal damage", () => {
@@ -209,7 +215,7 @@ describe("phase 2 parity mechanics", () => {
 
     updateAuras(state, []);
     expect(target.keywords.taunt).toBe(true);
-    expect(target.health).toBe(card("TW016").health! + 1);
+    expect(target.health).toBe(card("TW016").health! + 2);
 
     state.players[seat].board = [target];
     updateAuras(state, []);

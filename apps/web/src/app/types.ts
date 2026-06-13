@@ -140,6 +140,8 @@ export type AnimationCue = {
    */
   playAttack?: number;
   playHealth?: number;
+  summonAttack?: number;
+  summonHealth?: number;
   playEffectValue?: number;
   playBaseEffectValue?: number;
   playEffectBonusValue?: number;

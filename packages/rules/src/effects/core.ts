@@ -873,7 +873,10 @@ function resolveDeathrattle(
   if (deathrattle.type === "BOUNCE_SELF") {
     const original = catalog.get(deadMinion.cardId);
     const card = original ? createCardForHand(state, original, player.seat) : minionToCard(state, deadMinion);
-    if (player.hand.length < 10) player.hand.push(card);
+    if (player.hand.length < 10) {
+      player.hand.push(card);
+      addEvent(state, events, "BOUNCE", { target: deadMinion.instanceId, cardId: deadMinion.cardId }, player.seat);
+    }
   }
   if (deathrattle.type === "DRAW") {
     drawCards(state, player, deathrattle.value ?? 1, events);

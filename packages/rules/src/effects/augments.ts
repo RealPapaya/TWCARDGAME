@@ -120,10 +120,11 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
       break;
     case "AUG_PERSIST_CATEGORY_BUFF": {
       const value = effect.value ?? 0;
-      flags.categoryBuff = { category: effect.target_category ?? "", value };
+      const stat = effect.stat ?? "ALL";
+      flags.categoryBuff = { category: effect.target_category ?? "", value, stat };
       for (const minion of player.board) {
         if (minion.category === effect.target_category) {
-          addStats(minion, value, value);
+          addStatsForStat(minion, stat, value);
           glowTargets.push(minion.instanceId);
         }
       }
@@ -356,7 +357,7 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
     changed = true;
   }
   if (flags.categoryBuff && minion.category === flags.categoryBuff.category) {
-    addStats(minion, flags.categoryBuff.value, flags.categoryBuff.value);
+    addStatsForStat(minion, flags.categoryBuff.stat, flags.categoryBuff.value);
     changed = true;
   }
   if (flags.doubleCategory && minion.category === flags.doubleCategory) {
@@ -475,7 +476,7 @@ export function tryReviveMinion(state: MatchState, player: PlayerState, deadMini
     revivedByPurdo: true
   };
   player.board.push(token);
-  addEvent(state, events, "MINION_SUMMONED", { target: token.instanceId, cardId: token.cardId }, player.seat);
+  addEvent(state, events, "MINION_SUMMONED", { target: token.instanceId, cardId: token.cardId, attack: 1, health: 1 }, player.seat);
   // Distinct from a normal summon so quest detection can count "復活隨從".
   addEvent(state, events, "RESURRECT", { target: token.instanceId, cardId: token.cardId }, player.seat);
   applyMinionSummonedAugments(state, player.seat, token, events);
@@ -491,6 +492,18 @@ function addStats(minion: RuntimeMinion, attack: number, health: number): void {
     minion.currentHealth += health;
   }
   updateEnrage(minion);
+}
+
+function addStatsForStat(minion: RuntimeMinion, stat: "ATTACK" | "HEALTH" | "ALL", value: number): void {
+  if (stat === "ATTACK") {
+    addStats(minion, value, 0);
+    return;
+  }
+  if (stat === "HEALTH") {
+    addStats(minion, 0, value);
+    return;
+  }
+  addStats(minion, value, value);
 }
 
 function doubleMinionHealth(minion: RuntimeMinion): void {

@@ -91,8 +91,8 @@ export interface AugmentFlags {
   costMultiplierAfterTurn?: number;
   /** 股東紀念品: the next drawn card is half-costed, then this clears. */
   nextDrawHalfCost: boolean;
-  /** 颱風假: +value/+value to summoned minions of a category (and current board). */
-  categoryBuff?: { category: string; value: number };
+  /** 颱風假: persistent stat buff to summoned minions of a category (and current board). */
+  categoryBuff?: { category: string; value: number; stat: "ATTACK" | "HEALTH" | "ALL" };
   /** 基本工資調漲: +attack to summoned minions of printed cost 1-3. */
   lowCostMinionAttackBuff: number;
   /** 育兒津貼: +maxHP to every minion this player plays. */

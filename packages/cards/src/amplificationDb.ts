@@ -108,10 +108,10 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   {
     id: "AMP_TYPHOON_DAY",
     name: "颱風假",
-    description: "所有勞工永久 +1/+1（含之後打出，整局有效）。",
+    description: "所有勞工永久 +1攻擊（含之後打出，整局有效）。",
     tier: "加減賺",
     factionTags: ["勞工"],
-    effect: { type: "AUG_PERSIST_CATEGORY_BUFF", target_category: "勞工", stat: "ALL", value: 1 }
+    effect: { type: "AUG_PERSIST_CATEGORY_BUFF", target_category: "勞工", stat: "ATTACK", value: 1 }
   },
   {
     id: "AMP_ENERGY_TRANSITION",

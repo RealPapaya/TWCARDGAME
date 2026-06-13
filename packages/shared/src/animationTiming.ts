@@ -17,6 +17,8 @@ export const ANIMATION_COSTS = {
   DISCARD_CARD_BODY_MS: 1500,
   ATTACK_LUNGE_MS: 800,
   POST_ATTACK_STATE_SYNC_LAG_MS: 120,
+  MINION_DEATH_FADE_MS: 780,
+  SUMMON_POP_MS: 600,
   STANDALONE_EFFECT_MS: 1150,
   STANDALONE_BOUNCE_MS: 900,
   STANDALONE_DESTROY_MS: 700,
@@ -36,11 +38,14 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
   let currentPostPlayDelay = 0;
   let latestDiscardBodyEnd = 0;
   let latestDrawEnd = 0;
+  let latestDeathExit = 0;
   let inAttack = false;
 
   for (const event of events) {
     switch (event.type) {
       case "CARD_PLAYED": {
+        inAttack = false;
+        latestDeathExit = 0;
         const postPlayDelay =
           playSlots * C.CARD_PLAY_CUE_TOTAL_MS + C.CARD_PLAY_EFFECT_DELAY_MS;
         currentPostPlayDelay = postPlayDelay;
@@ -49,15 +54,15 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
         const tail = postPlayDelay + C.POST_PLAY_STATE_SYNC_LAG_MS;
         if (tail > total) total = tail;
         playSlots += 1;
-        inAttack = false;
         break;
       }
       case "MINION_SUMMONED": {
-        if (currentPostPlayDelay > 0) {
-          const tail = currentPostPlayDelay + C.POST_PLAY_STATE_SYNC_LAG_MS;
+        const start = Math.max(currentPostPlayDelay, latestDeathExit);
+        if (start > 0) {
+          const tail = start + (latestDeathExit > currentPostPlayDelay ? C.SUMMON_POP_MS : C.POST_PLAY_STATE_SYNC_LAG_MS);
           if (tail > total) total = tail;
         } else {
-          const tail = C.CARD_PLAY_EFFECT_DELAY_MS + C.POST_PLAY_STATE_SYNC_LAG_MS;
+          const tail = C.SUMMON_POP_MS;
           if (tail > total) total = tail;
         }
         break;
@@ -67,6 +72,7 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
         currentPostPlayDelay = 0;
         latestDiscardBodyEnd = 0;
         latestDrawEnd = 0;
+        latestDeathExit = 0;
         const tail = C.ATTACK_LUNGE_MS + C.POST_ATTACK_STATE_SYNC_LAG_MS;
         if (tail > total) total = tail;
         break;
@@ -87,25 +93,31 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
       }
       case "BOUNCE": {
         let tail: number;
+        let start: number;
         if (currentPostPlayDelay > 0) {
-          tail = currentPostPlayDelay + C.BOUNCE_EFFECT_SYNC_LAG_MS;
+          start = currentPostPlayDelay;
         } else if (inAttack) {
-          tail = C.ATTACK_LUNGE_MS + C.BOUNCE_EFFECT_SYNC_LAG_MS;
+          start = C.ATTACK_LUNGE_MS;
         } else {
-          tail = C.STANDALONE_BOUNCE_MS + C.BOUNCE_EFFECT_SYNC_LAG_MS;
+          start = C.STANDALONE_BOUNCE_MS;
         }
+        start = Math.max(start, latestDeathExit);
+        tail = start + C.BOUNCE_EFFECT_SYNC_LAG_MS;
         if (tail > total) total = tail;
         break;
       }
       case "DESTROY": {
         let tail: number;
+        let start: number;
         if (currentPostPlayDelay > 0) {
-          tail = currentPostPlayDelay + C.DESTROY_EFFECT_SYNC_LAG_MS;
+          start = currentPostPlayDelay;
         } else if (inAttack) {
-          tail = C.ATTACK_LUNGE_MS + C.DESTROY_EFFECT_SYNC_LAG_MS;
+          start = C.ATTACK_LUNGE_MS;
         } else {
-          tail = C.STANDALONE_DESTROY_MS + C.DESTROY_EFFECT_SYNC_LAG_MS;
+          start = C.STANDALONE_DESTROY_MS;
         }
+        tail = start + C.DESTROY_EFFECT_SYNC_LAG_MS;
+        latestDeathExit = Math.max(latestDeathExit, start + C.MINION_DEATH_FADE_MS);
         if (tail > total) total = tail;
         break;
       }
@@ -113,13 +125,16 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
         // The plume starts when its destroy/play/attack delay clears, then
         // runs DEATHRATTLE_EFFECT_MS. Mirror the BOUNCE/DESTROY shape.
         let tail: number;
+        let start: number;
         if (currentPostPlayDelay > 0) {
-          tail = currentPostPlayDelay + C.DEATHRATTLE_EFFECT_MS;
+          start = currentPostPlayDelay;
         } else if (inAttack) {
-          tail = C.ATTACK_LUNGE_MS + C.DEATHRATTLE_EFFECT_MS;
+          start = C.ATTACK_LUNGE_MS;
         } else {
-          tail = C.STANDALONE_DEATHRATTLE_MS;
+          start = 0;
         }
+        start = Math.max(start, latestDeathExit);
+        tail = start > 0 ? start + C.DEATHRATTLE_EFFECT_MS : C.STANDALONE_DEATHRATTLE_MS;
         if (tail > total) total = tail;
         break;
       }

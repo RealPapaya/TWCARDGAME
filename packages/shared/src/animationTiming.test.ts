@@ -107,12 +107,22 @@ describe("estimateEventAnimationMs", () => {
       ev("DESTROY"),
       ev("DEATHRATTLE")
     ]);
-    expect(tail).toBe(C.ATTACK_LUNGE_MS + C.DEATHRATTLE_EFFECT_MS);
+    expect(tail).toBe(C.ATTACK_LUNGE_MS + C.MINION_DEATH_FADE_MS + C.DEATHRATTLE_EFFECT_MS);
   });
 
   it("battlecry-triggered DEATHRATTLE waits past the play effect point", () => {
     const tail = estimateEventAnimationMs([ev("CARD_PLAYED"), ev("DESTROY"), ev("DEATHRATTLE")]);
-    expect(tail).toBe(C.CARD_PLAY_EFFECT_DELAY_MS + C.DEATHRATTLE_EFFECT_MS);
+    expect(tail).toBe(C.CARD_PLAY_EFFECT_DELAY_MS + C.MINION_DEATH_FADE_MS + C.DEATHRATTLE_EFFECT_MS);
+  });
+
+  it("deathrattle BOUNCE waits until the minion death fade completes", () => {
+    const tail = estimateEventAnimationMs([ev("ATTACK"), ev("DAMAGE"), ev("DESTROY"), ev("DEATHRATTLE"), ev("BOUNCE")]);
+    expect(tail).toBe(C.ATTACK_LUNGE_MS + C.MINION_DEATH_FADE_MS + C.DEATHRATTLE_EFFECT_MS);
+  });
+
+  it("post-death revive summon waits for the death fade and summon pop", () => {
+    const tail = estimateEventAnimationMs([ev("ATTACK"), ev("DAMAGE"), ev("DESTROY"), ev("MINION_SUMMONED")]);
+    expect(tail).toBe(C.ATTACK_LUNGE_MS + C.MINION_DEATH_FADE_MS + C.SUMMON_POP_MS);
   });
 
   it("is deterministic across repeated calls", () => {
