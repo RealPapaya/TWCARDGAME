@@ -261,14 +261,16 @@ export function trainingPrompt(session: TrainingSession): TrainingPrompt | undef
     case "play_rookie_intro":
       return {
         title: "隨從是什麼",
-        body: "隨從是可以被召喚到戰場上的角色。把這張隨從打出去吧。",
+        body: "隨從是可以被召喚到戰場上的角色。按下一步，我會先示範一次怎麼把牌打出去，再換你動手。",
         allowedAction: "next",
         highlights: [{ type: "hand", instanceId: ROOKIE_HAND_ID }]
       };
     case "play_rookie":
+      // No coach text shows on a gated step; the looping ghost-hand demo
+      // (runtime syncTrainingDemo) teaches the press → drag → drop gesture.
       return {
-        title: "隨從是什麼",
-        body: "把這張隨從打出去吧。",
+        title: "召喚隨從",
+        body: "照著示範，按住這張隨從拖到戰場黃色區域再放開。",
         allowedAction: "play_rookie",
         highlights: [{ type: "hand", instanceId: ROOKIE_HAND_ID }]
       };
@@ -331,14 +333,16 @@ export function trainingPrompt(session: TrainingSession): TrainingPrompt | undef
     case "attack_hero_intro":
       return {
         title: "攻擊敵方英雄",
-        body: "發亮的隨從可以攻擊。選它，然後選敵方英雄。",
+        body: "發亮的隨從可以攻擊了。按下一步，我會示範一次怎麼攻擊，再換你動手。",
         allowedAction: "next",
         highlights: [{ type: "unit", seat: PLAYER, instanceId: ROOKIE_MINION_ID }, { type: "hero", seat: OPPONENT }]
       };
     case "attack_hero":
+      // No coach text shows on a gated step; the looping ghost demo (runtime
+      // syncTrainingDemo) drags the glowing minion onto the enemy hero.
       return {
         title: "攻擊敵方英雄",
-        body: "選發亮的隨從，然後選敵方英雄。",
+        body: "照著示範，按住發亮的隨從拖到敵方英雄再放開。",
         allowedAction: "attack_hero",
         highlights: [{ type: "unit", seat: PLAYER, instanceId: ROOKIE_MINION_ID }, { type: "hero", seat: OPPONENT }]
       };

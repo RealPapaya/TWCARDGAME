@@ -145,6 +145,7 @@ import {
   type TrainingLevelId,
   type TrainingSession
 } from "./app/training.js";
+import { startDragDemo, stopDragDemo } from "./app/training-demo.js";
 
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
@@ -512,6 +513,7 @@ function renderNow(): void {
     restoreRenderSnapshot(snapshot);
   }
   applyPostRenderEffects();
+  syncTrainingDemo();
   syncTurnCountdownTick(status);
   ensureBgm();
 }
@@ -961,7 +963,7 @@ function renderTrainingLevelCards(): string {
     const stateClass = completed ? "training-card--completed" : unlocked ? "training-card--unlocked" : "training-card--locked";
     const rewardHtml = !completed && unlocked
       ? `<div class="training-reward-badge">
-           <img src="/images/ui/gold_coin.webp" alt="金幣" class="training-reward-coin" />
+           <img src="/images/ui/Coin.webp" alt="金幣" class="training-reward-coin" />
            <span class="training-reward-amount">${level.rewardGold}</span>
            <span class="training-reward-label">首通獎勵</span>
          </div>`
@@ -1234,7 +1236,7 @@ function renderProfileScreen(): string {
               <span>${profile?.gold ?? 0}</span>
             </div>
             <div class="profile-currency-badge" title="消費券">
-              <img src="/images/ui/voucher.webp" alt="消費券" class="profile-currency-icon" />
+              <img src="/images/ui/coupon.webp" alt="消費券" class="profile-currency-icon" />
               <span>${profile?.vouchers ?? 0}</span>
             </div>
           </div>
@@ -2959,6 +2961,56 @@ function renderTrainingOverlay(): string {
 
 function trainingHighlightClass(highlight: TrainingHighlight): string | undefined {
   return trainingHasHighlight(trainingSession, highlight) ? "training-highlight" : undefined;
+}
+
+/**
+ * Drive the ghost-hand drag demo. On the gated drag steps we show the
+ * press → drag → release gesture in a loop with a mouse cursor following along,
+ * then hand control to the player — the demo stops the moment they begin the
+ * real interaction or the step advances. Keyed off the step's highlights so it
+ * stays data-driven:
+ *  - "play_rookie"  → drag the highlighted hand card onto the player board.
+ *  - "attack_hero"  → drag the highlighted minion onto the enemy hero.
+ */
+function syncTrainingDemo(): void {
+  const prompt = trainingSession ? trainingPrompt(trainingSession) : undefined;
+  if (!prompt || readStatus() === "finished" || view.pendingBattlecry) {
+    stopDragDemo();
+    return;
+  }
+
+  if (prompt.allowedAction === "play_rookie" && !view.draggingHandId) {
+    const hand = prompt.highlights.find(
+      (h): h is Extract<TrainingHighlight, { type: "hand" }> => h.type === "hand"
+    );
+    if (hand) {
+      startDragDemo({
+        key: `card:${hand.instanceId}`,
+        sourceSelector: `[data-hand-id="${cssEscape(hand.instanceId)}"]`,
+        targetSelector: '[data-testid="player-board"]',
+        highlightDropZone: true,
+        clampToTargetTop: true
+      });
+      return;
+    }
+  }
+
+  if (prompt.allowedAction === "attack_hero" && !view.selectedAttackerId) {
+    const unit = prompt.highlights.find(
+      (h): h is Extract<TrainingHighlight, { type: "unit" }> =>
+        h.type === "unit" && h.seat === "player1" && Boolean(h.instanceId)
+    );
+    if (unit?.instanceId) {
+      startDragDemo({
+        key: `attack:${unit.instanceId}`,
+        sourceSelector: `[data-attacker-id="${cssEscape(unit.instanceId)}"]`,
+        targetSelector: '[data-testid="opponent-hero"]'
+      });
+      return;
+    }
+  }
+
+  stopDragDemo();
 }
 
 let rewardFallbackTimer: number | undefined;
@@ -6579,6 +6631,10 @@ function attachHandPointerDrag(event: PointerEvent, sourceEl: HTMLElement): void
     window.removeEventListener("pointerup", onCancel);
     window.removeEventListener("pointercancel", onCancel);
 
+    // The player has taken over — clear the tutorial demo before the real ghost
+    // appears so the two don't overlap.
+    stopDragDemo();
+
     view.selectedHandId = handId;
     view.draggingHandId = handId;
     view.selectedAttackerId = undefined;
@@ -6876,6 +6932,10 @@ function attachAttackerPointerDrag(event: PointerEvent, sourceEl: HTMLElement): 
     window.removeEventListener("pointermove", onMove);
     window.removeEventListener("pointerup", onCancel);
     window.removeEventListener("pointercancel", onCancel);
+
+    // The player has taken over — clear the tutorial demo before the real
+    // attack arrow appears so the two don't overlap.
+    stopDragDemo();
 
     view.selectedAttackerId = attackerId;
     view.selectedHandId = undefined;

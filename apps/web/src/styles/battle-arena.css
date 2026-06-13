@@ -2586,6 +2586,87 @@
   }
 }
 
+/* Ghost-hand drag demo (Social Rookie drag steps). The container spans the
+   viewport but never intercepts pointer input — the player still drags the real
+   card/minion underneath. It carries the `battle-surface` class so the cloned
+   minion/card inherit their scoped styles; these id rules reset the arena's own
+   visuals so only the ghost shows. Ghost/cursor transforms are driven by the
+   Web Animations API in training-demo.ts; only static styling lives here. */
+#training-drag-demo.battle-surface {
+  position: fixed;
+  inset: 0;
+  z-index: 130;
+  pointer-events: none;
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  overflow: visible;
+  background: none;
+  box-shadow: none;
+}
+
+.training-demo-ghost {
+  position: absolute;
+  left: 0;
+  top: 0;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.5));
+  will-change: transform, opacity;
+}
+
+.training-demo-ghost .card,
+.training-demo-ghost .minion {
+  margin: 0;
+  width: 100%;
+  opacity: 0.96;
+}
+
+/* Mouse cursor that follows the gesture. Uses the same pointer art the game
+   shows on clickable elements so the demo reads as a real cursor. Its transform
+   is driven by the Web Animations API (tip tracks the drag point); the inner
+   `::before` provides the click-pulse. */
+.training-demo-cursor {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 30px;
+  height: 30px;
+  background: url("/images/cursors/cursor_pointer.webp") top left / contain no-repeat;
+  filter: drop-shadow(0 3px 5px rgba(0, 0, 0, 0.55));
+  will-change: transform, opacity;
+}
+
+.training-demo-cursor::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 2px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 244, 170, 0.9);
+  box-shadow: 0 0 12px rgba(255, 210, 77, 0.75);
+  animation: training-demo-press 1.1s ease-in-out infinite;
+}
+
+@keyframes training-demo-press {
+  0%, 100% {
+    transform: scale(0.78);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #training-drag-demo.battle-surface {
+    display: none;
+  }
+}
+
 .training-active .battle-gear-btn,
 .training-active .battle-log-panel,
 .training-active .battle-player-info {
