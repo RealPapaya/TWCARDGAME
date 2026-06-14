@@ -35,6 +35,47 @@ const aiDecks: Record<string, string[]> = deepClone(AI_THEME_DECKS as Record<str
 const aiThemes = deepClone(AI_THEMES as any[]);
 const quests: QuestDefinitionDraft[] = deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]);
 
+const KNOWN_AUGMENT_IMAGE_IDS = new Set([
+  "AMP_INVOICE_200",
+  "AMP_SHAREHOLDER_GIFT",
+  "AMP_FRIES_BOGO",
+  "AMP_MIN_WAGE",
+  "AMP_LIFE_INSURANCE",
+  "AMP_BANQUET",
+  "AMP_THREE_WAY_RACE",
+  "AMP_ENERGY_TRANSITION"
+]);
+
+const KNOWN_VOTE_EVENT_IMAGE_IDS = new Set([
+  "VE_BLACKOUT",
+  "VE_UTILITY_HIKE",
+  "VE_MORAKOT",
+  "VE_KAOHSIUNG_BLAST",
+  "VE_MARTIAL_LAW",
+  "VE_PARLIAMENT_STAR_BRAWL",
+  "VE_MAZU",
+  "VE_PARTY_INFIGHTING",
+  "VE_GHOST_GATE",
+  "VE_FINANCIAL_CRISIS",
+  "VE_BASEBALL_CHAMPION",
+  "VE_CASH_HANDOUT",
+  "VE_CURFEW_TIME",
+  "VE_SOCIAL_DISTANCING",
+  "VE_EQUALITY_FOR_ALL",
+  "VE_TECH_ENFORCEMENT"
+]);
+
+function applyKnownImageFlags() {
+  for (const amp of amps) {
+    if (amp.hasImage == null && KNOWN_AUGMENT_IMAGE_IDS.has(amp.id)) amp.hasImage = true;
+  }
+  for (const vote of votes) {
+    if (vote.hasImage == null && KNOWN_VOTE_EVENT_IMAGE_IDS.has(vote.id)) vote.hasImage = true;
+  }
+}
+
+applyKnownImageFlags();
+
 // progression constants (mutable copies)
 const prog = {
   MAX_LEVEL: MAX_LEVEL as number,
@@ -641,6 +682,16 @@ function balanceLabel(ratio: number): string {
   return "極弱";
 }
 
+function imageStatusHtml(hasImage: boolean): string {
+  return hasImage
+    ? '<span style="color:var(--success)">有</span>'
+    : '<span style="color:var(--text-muted)">無</span>';
+}
+
+function cardHasImage(card: CardDefinition): boolean {
+  return card.image.trim().length > 0;
+}
+
 function numInput(value: number, onChange: (v: number) => void, min = 0, max = 99): HTMLElement {
   const wrap = h("div", { class: "be-num-group" });
   const dec = h("button", { class: "be-num-btn", type: "button" }, "−");
@@ -755,6 +806,7 @@ function render() {
     cards.splice(0, cards.length, ...deepClone(CARD_CATALOG as CardDefinition[]));
     amps.splice(0, amps.length, ...deepClone(AMPLIFICATION_DB));
     votes.splice(0, votes.length, ...deepClone(VOTE_EVENT_DB));
+    applyKnownImageFlags();
     aiThemes.splice(0, aiThemes.length, ...deepClone(AI_THEMES as any[]));
     for (const key of Object.keys(aiDecks)) {
       delete aiDecks[key];
@@ -821,7 +873,7 @@ function renderCardsPanel(): HTMLElement {
   const tableWrap = h("div", { style: "overflow-x: auto;" });
   const table = h("table", { class: "be-table" });
   const thead = h("thead");
-  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>費用</th><th>攻/血</th><th>平衡</th><th>類型</th><th>稀有度</th><th>分類</th><th>關鍵字</th></tr>`;
+  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>是否有圖片</th><th>費用</th><th>攻/血</th><th>平衡</th><th>類型</th><th>稀有度</th><th>分類</th><th>關鍵字</th></tr>`;
   table.append(thead);
   const tbody = h("tbody");
   table.append(tbody);
@@ -849,6 +901,7 @@ function renderCardsPanel(): HTMLElement {
       tr.innerHTML = `
         <td style="font-family:monospace;color:var(--text-muted)">${card.id}</td>
         <td style="font-weight:600">${card.name}</td>
+        <td>${imageStatusHtml(cardHasImage(card))}</td>
         <td><span style="color:var(--primary);font-weight:700">${card.cost}</span></td>
         <td>${card.type === "MINION" ? `${card.attack ?? 0}/${card.health ?? 0}` : "—"}</td>
         <td><span class="be-balance" style="color:${bClr};background:${bClr}15" title="力量${bal.power} / 期望${bal.expected}">${balPct}% ${balanceLabel(bal.ratio)}</span></td>
@@ -865,7 +918,7 @@ function renderCardsPanel(): HTMLElement {
 
       if (expandedId === card.id) {
         const edRow = h("tr", { class: "be-editor be-editor--open" });
-        const edTd = h("td", { colspan: "9" });
+        const edTd = h("td", { colspan: "10" });
         edTd.append(buildCardEditor(card, () => rebuildRows()));
         edRow.append(edTd);
         tbody.append(edRow);
@@ -944,6 +997,17 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
   catField.append(catInp);
   grid.append(catField);
+
+  const imageField = h("div", { class: "be-field" });
+  imageField.append(h("label", {}, "圖片路徑"));
+  const imageInp = h("input", { type: "text", value: card.image });
+  imageInp.addEventListener("change", () => {
+    card.image = imageInp.value.trim();
+    bumpChanges();
+    refresh();
+  });
+  imageField.append(imageInp);
+  grid.append(imageField);
 
   // description
   const descField = h("div", { class: "be-field", style: "grid-column: span 2;" });
@@ -1093,7 +1157,7 @@ function renderAmpsPanel(): HTMLElement {
         <td style="font-family:monospace;color:var(--text-muted)">${amp.id}</td>
         <td style="font-weight:600" class="${tierClass(tier)}">${amp.name}</td>
         <td style="color:var(--text-dim);max-width:300px">${amp.description}</td>
-        <td>${amp.hasImage ? '<span style="color:var(--success)">有</span>' : '<span style="color:var(--text-muted)">無</span>'}</td>
+        <td>${imageStatusHtml(Boolean(amp.hasImage))}</td>
         <td>${amp.factionTags.length ? amp.factionTags.join(", ") : "通用"}</td>
         <td style="font-size:0.75rem">${effectSummary(amp.effect)}</td>
         <td>${amp.firstPhaseOnly ? "✓" : ""}</td>
@@ -1153,7 +1217,7 @@ function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
   const imgToggles = h("div", { class: "be-toggles" });
   const imgBtn = h("button", { class: `be-toggle ${amp.hasImage ? "be-toggle--on" : ""}`, type: "button" }, amp.hasImage ? "有圖片" : "無圖片");
   imgBtn.addEventListener("click", () => {
-    amp.hasImage = !amp.hasImage;
+    amp.hasImage = !Boolean(amp.hasImage);
     bumpChanges();
     render();
   });
@@ -1187,7 +1251,7 @@ function renderVotesPanel(): HTMLElement {
     tr.innerHTML = `
       <td style="font-family:monospace;color:var(--text-muted)">${ve.id}</td>
       <td style="font-weight:600">${ve.name}</td>
-      <td>${ve.hasImage ? '<span style="color:var(--success)">有</span>' : '<span style="color:var(--text-muted)">無</span>'}</td>
+      <td>${imageStatusHtml(Boolean(ve.hasImage))}</td>
       <td style="font-weight:700;color:var(--primary)">${ve.tierWeight}</td>
       <td><div class="be-weight-bar"><div class="be-weight-bar-fill" style="width:${pct}%"></div></div></td>
       <td><span class="be-type be-type--${ve.apply.mode === "ENVIRONMENT" ? "MINION" : "NEWS"}">${ve.apply.mode}</span></td>
@@ -1237,7 +1301,7 @@ function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
   const imgToggles = h("div", { class: "be-toggles" });
   const imgBtn = h("button", { class: `be-toggle ${ve.hasImage ? "be-toggle--on" : ""}`, type: "button" }, ve.hasImage ? "有圖片" : "無圖片");
   imgBtn.addEventListener("click", () => {
-    ve.hasImage = !ve.hasImage;
+    ve.hasImage = !Boolean(ve.hasImage);
     bumpChanges();
     render();
   });

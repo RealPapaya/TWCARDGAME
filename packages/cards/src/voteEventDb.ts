@@ -39,6 +39,7 @@ export interface VoteEventDbEntry {
 export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   {
     id: "VE_BLACKOUT",
+    hasImage: true,
     name: "大停電",
     tierWeight: 35,
     options: ["全場隨從沉默 4 回合", "全場隨從沉默 4 回合", "全場隨從沉默 4 回合"],
@@ -46,6 +47,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_UTILITY_HIKE",
+    hasImage: true,
     name: "物價通膨",
     tierWeight: 35,
     options: ["所有卡牌費用 +2（上限 10）", "所有卡牌費用 +2（上限 10）", "所有卡牌費用 +2（上限 10）"],
@@ -53,6 +55,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_MORAKOT",
+    hasImage: true,
     name: "莫拉克風災",
     tierWeight: 20,
     options: ["摧毀場上所有隨從（無法復活）", "摧毀場上所有隨從（無法復活）", "摧毀場上所有隨從（無法復活）"],
@@ -60,6 +63,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_KAOHSIUNG_BLAST",
+    hasImage: true,
     name: "高雄氣爆",
     tierWeight: 35,
     options: ["雙方最右邊的隨從死亡", "雙方最右邊的隨從死亡", "雙方最右邊的隨從死亡"],
@@ -67,6 +71,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_MAZU",
+    hasImage: true,
     name: "媽祖大繞境",
     tierWeight: 30,
     options: ["全場隨從獲得光盾", "全場隨從獲得光盾", "全場隨從獲得光盾"],
@@ -74,6 +79,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_PARTY_INFIGHTING",
+    hasImage: true,
     name: "黨內鬥爭",
     tierWeight: 20,
     options: ["雙方場上只留下費用最高的隨從，其餘死亡", "雙方場上只留下費用最高的隨從，其餘死亡", "雙方場上只留下費用最高的隨從，其餘死亡"],
@@ -81,6 +87,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_PARLIAMENT_STAR_BRAWL",
+    hasImage: true,
     name: "議會明星大亂鬥",
     tierWeight: 20,
     options: ["場上所有隨從隨機留下一名，其餘死亡", "場上所有隨從隨機留下一名，其餘死亡", "場上所有隨從隨機留下一名，其餘死亡"],
@@ -88,6 +95,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_MARTIAL_LAW",
+    hasImage: true,
     name: "戒嚴",
     tierWeight: 20,
     options: ["場上隨從全部回到手牌，費用全部改為 10", "場上隨從全部回到手牌，費用全部改為 10", "場上隨從全部回到手牌，費用全部改為 10"],
@@ -95,6 +103,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_GHOST_GATE",
+    hasImage: true,
     name: "鬼門開",
     tierWeight: 25,
     options: ["雙方同時從墓場隨機復活 2 隻隨從", "雙方同時從墓場隨機復活 2 隻隨從", "雙方同時從墓場隨機復活 2 隻隨從"],
@@ -102,6 +111,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_FINANCIAL_CRISIS",
+    hasImage: true,
     name: "金融海嘯",
     tierWeight: 20,
     options: ["雙方水晶歸 1 重新累加", "雙方水晶歸 1 重新累加", "雙方水晶歸 1 重新累加"],
@@ -109,6 +119,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_BASEBALL_CHAMPION",
+    hasImage: true,
     name: "歡慶 12 強冠軍",
     tierWeight: 20,
     options: ["雙方英雄血量回滿", "雙方英雄血量回滿", "雙方英雄血量回滿"],
@@ -116,6 +127,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_CASH_HANDOUT",
+    hasImage: true,
     name: "普發現金",
     tierWeight: 30,
     options: ["下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0"],
@@ -123,6 +135,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_CURFEW_TIME",
+    hasImage: true,
     name: "宵禁時間",
     tierWeight: 25,
     options: ["雙方回合時間永久變為 15 秒", "雙方回合時間永久變為 15 秒", "雙方回合時間永久變為 15 秒"],
@@ -130,6 +143,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_SOCIAL_DISTANCING",
+    hasImage: true,
     name: "社交距離",
     tierWeight: 20,
     options: [
@@ -141,6 +155,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_EQUALITY_FOR_ALL",
+    hasImage: true,
     name: "人人平等",
     tierWeight: 25,
     options: ["所有隨從效果永久無效", "所有隨從效果永久無效", "所有隨從效果永久無效"],
@@ -148,6 +163,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
   },
   {
     id: "VE_TECH_ENFORCEMENT",
+    hasImage: true,
     name: "科技執法",
     tierWeight: 20,
     options: ["發動攻擊的隨從在攻擊結算後受到 1 點傷害。", "發動攻擊的隨從在攻擊結算後受到 1 點傷害。", "發動攻擊的隨從在攻擊結算後受到 1 點傷害。"],

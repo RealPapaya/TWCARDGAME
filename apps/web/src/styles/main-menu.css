@@ -46,7 +46,7 @@
   align-items: center;
   gap: 0;
   width: 100%;
-  max-width: 600px;
+  max-width: 1200px;
   margin-top: 0;
 }
 
@@ -171,6 +171,94 @@
   min-height: 50px;
   padding: 10px 25px;
   opacity: 0.85;
+}
+
+/* Image+label entry tiles — top/middle/bottom five-tile grid:
+   top = Battle (spans both columns), middle = Collection / Shop,
+   bottom = Quests / Achievements. Tiles sit flush (no gap). The icon art
+   already has a wood frame baked in, so the tile has no background/border,
+   and the label is overlaid inside the lower edge of the frame. */
+.menu-tile-grid {
+  display: grid;
+  grid-template-columns: repeat(2, auto);
+  justify-content: center;
+  align-items: start;
+  gap: 0;
+  width: 100%;
+}
+
+.menu-tile {
+  position: relative;
+  display: block;
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+  color: inherit;
+  padding: 0;
+  line-height: 0;
+  text-shadow: none;
+  cursor: pointer;
+  transition: transform 0.18s ease;
+}
+
+.menu-tile-battle {
+  grid-column: 1 / -1;
+  justify-self: center;
+}
+
+.menu-tile-icon {
+  width: 188px;
+  height: 188px;
+  object-fit: contain;
+  display: block;
+  pointer-events: none;
+}
+
+/* Label overlaid inside the frame, near the bottom — outlined text.
+   No -webkit-text-stroke: it thins/muddies dense CJK serif glyphs into blobs.
+   A light 1px four-way dark outline keeps the parchment text readable. */
+.menu-tile-label {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 22px;
+  text-align: center;
+  line-height: 1;
+  font-family: "Noto Serif TC", var(--font-display);
+  font-weight: 700;
+  font-size: 23px;
+  letter-spacing: 0.06em;
+  color: #f6ecd8;
+  text-shadow:
+    -1px -1px 0 #2a1a0e,
+    1px -1px 0 #2a1a0e,
+    -1px 1px 0 #2a1a0e,
+    1px 1px 0 #2a1a0e,
+    0 2px 4px rgba(0, 0, 0, 0.8);
+  pointer-events: none;
+}
+
+.menu-tile:hover:not(:disabled) {
+  filter: none;
+  transform: scale(1.06);
+  box-shadow: none;
+}
+
+.menu-tile:active:not(:disabled) {
+  transform: scale(0.97);
+  box-shadow: none;
+}
+
+/* Locked tiles stay fully opaque (a translucent tile lets the map show
+   through its square and reads as a ghostly frame). Desaturate + darken
+   instead so the wood frame is solid and the tile just looks disabled. */
+.menu-tile:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+  filter: grayscale(0.8) brightness(0.72);
+  box-shadow: none;
 }
 
 /* Right-side icon rail: top-right, vertical, parchment ovals — matches V1 */

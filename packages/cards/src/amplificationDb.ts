@@ -35,6 +35,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   // ---- 加減賺（低增幅）----------------------------------------------------
   {
     id: "AMP_INVOICE_200",
+    hasImage: true,
     name: "發票中200",
     description: "額外獲得一顆水晶，水晶上限 +1。",
     tier: "加減賺",
@@ -51,6 +52,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_SHAREHOLDER_GIFT",
+    hasImage: true,
     name: "股東紀念品",
     description: "抽到的下一張卡費用永久減半。",
     tier: "加減賺",
@@ -77,6 +79,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_THREE_WAY_RACE",
+    hasImage: true,
     name: "政壇三腳督",
     description: "從牌組抽一張民眾黨政治人物。",
     tier: "加減賺",
@@ -85,6 +88,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_MIN_WAGE",
+    hasImage: true,
     name: "基本工資調漲",
     description: "費用 1-3 的隨從 攻擊 +2（含之後打出，整局有效）。",
     tier: "加減賺",
@@ -93,6 +97,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_FRIES_BOGO",
+    hasImage: true,
     name: "大薯買一送一",
     description: "接下來 2 回合 都可以多抽一張牌。",
     tier: "加減賺",
@@ -117,6 +122,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_ENERGY_TRANSITION",
+    hasImage: true,
     name: "能源轉型",
     description: "在對手場上放置 3 個核廢料。",
     relatedCardIds: ["TW077"],
@@ -126,6 +132,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_LIFE_INSURANCE",
+    hasImage: true,
     name: "壽險理賠",
     description: "英雄生命降至 5 或以下時，永久解鎖水晶上限 20。",
     tier: "加減賺",
@@ -150,6 +157,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_BANQUET",
+    hasImage: true,
     name: "流水席",
     description: "自己目前場上隨從立刻回到手牌，並且獲得 +1/+1。",
     tier: "加減賺",

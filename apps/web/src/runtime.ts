@@ -773,12 +773,29 @@ function renderMainMenu(): string {
       </div>
       <div class="main-menu-center">
         <h1 class="game-title">寶島遊戲王</h1>
-        <nav class="menu-buttons" aria-label="Main menu">
-          <button class="menu-button" data-menu-screen="profile" data-testid="menu-profile" ${accountMode ? "" : "disabled title='Sign in required'"}>個人頁面</button>
-          <button class="menu-button menu-primary" data-menu-screen="battle" data-testid="menu-battle">進入戰鬥</button>
-          <button class="menu-button menu-patch" id="changelog-open" data-testid="menu-patch">更新內容</button>
-          ${devTestModeAvailable && devTestPanel ? `<button class="menu-button" data-menu-screen="test">${escapeHtml(devTestPanel.menuLabel)}</button>` : ""}
+        <nav class="menu-tile-grid" aria-label="Main menu">
+          <button class="menu-tile menu-tile-battle" data-menu-screen="battle" data-testid="menu-battle">
+            <img class="menu-tile-icon" src="/images/ui/MenuBattle.webp" alt="" />
+            <span class="menu-tile-label">進入戰鬥</span>
+          </button>
+          <button class="menu-tile" data-menu-screen="collection" data-testid="menu-collection">
+            <img class="menu-tile-icon" src="/images/ui/MenuCollection.webp" alt="" />
+            <span class="menu-tile-label">收藏庫</span>
+          </button>
+          <button class="menu-tile" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
+            <img class="menu-tile-icon" src="/images/ui/MenuShop.webp" alt="" />
+            <span class="menu-tile-label">商店</span>
+          </button>
+          <button class="menu-tile" data-menu-screen="tasks" data-testid="menu-tasks" ${accountMode ? "" : "disabled"}>
+            <img class="menu-tile-icon" src="/images/ui/MenuQuest.webp" alt="" />
+            <span class="menu-tile-label">任務</span>
+          </button>
+          <button class="menu-tile" data-menu-screen="achievements" data-testid="menu-achievements" ${accountMode ? "" : "disabled"}>
+            <img class="menu-tile-icon" src="/images/ui/MenuAchievement.webp" alt="" />
+            <span class="menu-tile-label">成就</span>
+          </button>
         </nav>
+        ${devTestModeAvailable && devTestPanel ? `<button class="menu-button" data-menu-screen="test">${escapeHtml(devTestPanel.menuLabel)}</button>` : ""}
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
         <button id="settings-toggle" class="menu-icon-btn menu-image-btn" data-testid="menu-settings" title="設定">
@@ -803,28 +820,6 @@ function renderMainMenu(): string {
             <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
           </div>
         </aside>
-        <nav class="menu-corner-rail" aria-label="底部功能">
-          <button class="menu-corner-btn" data-menu-screen="collection" data-testid="menu-collection">
-            <img class="corner-icon" src="/images/ui/Vault.webp" alt="收藏庫" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-            <span class="corner-icon-emoji" style="display:none">🃏</span>
-            <span class="corner-label">收藏庫</span>
-          </button>
-          <button class="menu-corner-btn" data-menu-screen="shop" data-testid="menu-shop" ${accountMode ? "" : "disabled"}>
-            <img class="corner-icon" src="/images/ui/Shop.webp" alt="商店" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-            <span class="corner-icon-emoji" style="display:none">💰</span>
-            <span class="corner-label">商店</span>
-          </button>
-          <button class="menu-corner-btn" data-menu-screen="tasks" data-testid="menu-tasks" ${accountMode ? "" : "disabled"}>
-            <img class="corner-icon" src="/images/ui/Quest.webp" alt="任務" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-            <span class="corner-icon-emoji" style="display:none">📋</span>
-            <span class="corner-label">任務</span>
-          </button>
-          <button class="menu-corner-btn" data-menu-screen="achievements" data-testid="menu-achievements" ${accountMode ? "" : "disabled"}>
-            <img class="corner-icon" src="/images/ui/Achievement.webp" alt="成就" onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
-            <span class="corner-icon-emoji" style="display:none">🏆</span>
-            <span class="corner-label">成就</span>
-          </button>
-        </nav>
       </div>
       ${view.settingsOpen ? renderSettingsModal() : ""}
       ${view.changelogOpen ? renderChangelogModal() : ""}
