@@ -62,6 +62,14 @@ export function environmentDisablesMinionEffects(state: MatchState, seat: Seat):
   return !state.players[seat].augmentFlags.referendumImmune;
 }
 
+export function environmentAttackerDamage(state: MatchState, seat: Seat): number {
+  const env = state.currentEnvironment;
+  if (!env || !isEnvironmentActive(state, env)) return 0;
+  if (env.effect.type !== "ENV_ATTACKER_TAKES_DAMAGE") return 0;
+  if (state.players[seat].augmentFlags.referendumImmune) return 0;
+  return env.effect.value ?? 1;
+}
+
 export function isEnvironmentActive(state: MatchState, env: ActiveEnvironment): boolean {
   return env.expiresTurn === undefined || state.turn.number <= env.expiresTurn;
 }
@@ -148,6 +156,7 @@ export const environmentHandlers: Record<string, EffectHandler> = {
   ENV_COST_PLUS_CAPPED: () => {},
   ENV_SILENCE_ALL: (_effect: EffectDefinition, context: EffectContext) => silenceAllMinions(context.state),
   ENV_TURN_TIME_LIMIT_MS: () => {},
+  ENV_ATTACKER_TAKES_DAMAGE: () => {},
   // Passive: the cap is read in boardLimit() while the environment is active; the
   // one-time board trim runs from applyVoteEventEffect when the event installs.
   ENV_BOARD_LIMIT: () => {},

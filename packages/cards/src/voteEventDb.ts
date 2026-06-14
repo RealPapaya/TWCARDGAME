@@ -148,8 +148,8 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     id: "VE_TECH_ENFORCEMENT",
     name: "科技執法",
     tierWeight: 20,
-    options: ["科技執法內容尚未實作。", "科技執法內容尚未實作。", "科技執法內容尚未實作。"],
-    apply: { mode: "IMMEDIATE", effect: { type: "NOOP" } }
+    options: ["發動攻擊的隨從在攻擊結算後受到 1 點傷害。", "發動攻擊的隨從在攻擊結算後受到 1 點傷害。", "發動攻擊的隨從在攻擊結算後受到 1 點傷害。"],
+    apply: { mode: "ENVIRONMENT", effect: { type: "ENV_ATTACKER_TAKES_DAMAGE", value: 1 } }
   }
 ];
 

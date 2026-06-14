@@ -131,7 +131,8 @@ describe("turn-20 vote-event handlers", () => {
       "ENV_COST_ZERO",
       "ENV_TURN_TIME_LIMIT_MS",
       "ENV_BOARD_LIMIT",
-      "ENV_DISABLE_ALL_MINION_EFFECTS"
+      "ENV_DISABLE_ALL_MINION_EFFECTS",
+      "ENV_ATTACKER_TAKES_DAMAGE"
     ]) {
       expect(effectHandlers[type]).toBeTypeOf("function");
     }

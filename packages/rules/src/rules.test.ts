@@ -577,3 +577,57 @@ describe("教召 / Discover (CHANNEL)", () => {
     expect(state.private.pendingChoice).toBeUndefined();
   });
 });
+
+describe("tech enforcement vote environment", () => {
+  it("damages an attacking minion after it attacks a hero", () => {
+    const { state, catalog } = targetLegalityMatch();
+    const seat = state.turn.activeSeat;
+    const enemy = seat === "player1" ? "player2" : "player1";
+    const attacker = { instanceId: "tech_attacker", cardId: "TL_F0", ownerSeat: seat as Seat, name: "A", category: "test", cost: 1, type: "MINION" as const, rarity: "COMMON" as const, attack: 2, baseAttack: 2, health: 2, currentHealth: 2, keywords: {}, sleeping: false, canAttack: true, isEnraged: false, lockedTurns: 0, auraAttack: 0, auraHealth: 0, auraTaunt: false, tempBuffs: [] };
+    state.players[seat].board = [attacker];
+    state.currentEnvironment = {
+      id: "VE_TECH_ENFORCEMENT",
+      name: "科技執法",
+      appliedTurn: state.turn.number,
+      effect: { type: "ENV_ATTACKER_TAKES_DAMAGE", value: 1 }
+    };
+
+    const result = reduce(
+      state,
+      { commandId: "tech-hero", seat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "tech_attacker", target: { type: "HERO", side: enemy } } },
+      catalog
+    );
+
+    expect(result.state.players[seat].board[0].currentHealth).toBe(1);
+    const damageTargets = result.events.filter((event) => event.type === "DAMAGE").map((event) => event.payload?.target);
+    expect(damageTargets).toEqual([`${enemy}:hero`, "tech_attacker"]);
+  });
+
+  it("resolves after combat and counterattack damage", () => {
+    const { state, catalog } = targetLegalityMatch();
+    const seat = state.turn.activeSeat;
+    const enemy = seat === "player1" ? "player2" : "player1";
+    const attacker = { instanceId: "tech_attacker", cardId: "TL_F0", ownerSeat: seat as Seat, name: "A", category: "test", cost: 1, type: "MINION" as const, rarity: "COMMON" as const, attack: 1, baseAttack: 1, health: 2, currentHealth: 2, keywords: {}, sleeping: false, canAttack: true, isEnraged: false, lockedTurns: 0, auraAttack: 0, auraHealth: 0, auraTaunt: false, tempBuffs: [] };
+    const defender = { instanceId: "tech_defender", cardId: "TL_F1", ownerSeat: enemy as Seat, name: "D", category: "test", cost: 1, type: "MINION" as const, rarity: "COMMON" as const, attack: 1, baseAttack: 1, health: 3, currentHealth: 3, keywords: {}, sleeping: false, canAttack: true, isEnraged: false, lockedTurns: 0, auraAttack: 0, auraHealth: 0, auraTaunt: false, tempBuffs: [] };
+    state.players[seat].board = [attacker];
+    state.players[enemy].board = [defender];
+    state.currentEnvironment = {
+      id: "VE_TECH_ENFORCEMENT",
+      name: "科技執法",
+      appliedTurn: state.turn.number,
+      effect: { type: "ENV_ATTACKER_TAKES_DAMAGE", value: 1 }
+    };
+
+    const result = reduce(
+      state,
+      { commandId: "tech-minion", seat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "tech_attacker", target: { type: "MINION", side: enemy, instanceId: "tech_defender" } } },
+      catalog
+    );
+
+    expect(result.state.players[seat].board).toHaveLength(0);
+    expect(result.state.players[enemy].board[0].currentHealth).toBe(2);
+    const damageEvents = result.events.filter((event) => event.type === "DAMAGE");
+    expect(damageEvents.map((event) => event.payload?.target)).toEqual(["tech_defender", "tech_attacker", "tech_attacker"]);
+    expect(damageEvents.map((event) => event.payload?.remainingHealth)).toEqual([2, 1, 0]);
+  });
+});

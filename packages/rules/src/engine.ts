@@ -26,7 +26,7 @@ import {
   phaseTriggerForTurn,
   rollAugmentTiers
 } from "./phases.js";
-import { boardLimit, suppressRuntimeCardMinionEffects } from "./effects/environment.js";
+import { boardLimit, environmentAttackerDamage, suppressRuntimeCardMinionEffects } from "./effects/environment.js";
 import { nextInt, normalizeSeed, shuffleInPlace } from "./rng.js";
 import {
   activePlayer,
@@ -430,6 +430,10 @@ function attack(
   addEvent(state, events, "ATTACK", { attackerInstanceId, target }, seat);
   applyDamage(state, ref, attacker.attack, events);
   if (ref.kind === "MINION") applyDamage(state, attackerRef, targetAttack, events);
+  const attackerEnvironmentDamage = environmentAttackerDamage(state, seat);
+  if (attackerEnvironmentDamage > 0 && attacker.currentHealth > 0) {
+    applyDamage(state, attackerRef, attackerEnvironmentDamage, events);
+  }
   attacker.canAttack = false;
   resolvePostAction(state, events, catalog);
   finishIfHeroDead(state, events);
