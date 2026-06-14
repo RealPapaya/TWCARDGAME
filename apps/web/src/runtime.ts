@@ -2922,7 +2922,15 @@ const voteEventImageById: Record<string, string> = {
   VE_MARTIAL_LAW: "ve_martial_law",
   VE_PARLIAMENT_STAR_BRAWL: "ve_parliament_star_brawl",
   VE_MAZU: "ve_mazu",
-  VE_PARTY_INFIGHTING: "ve_party_infighting"
+  VE_PARTY_INFIGHTING: "ve_party_infighting",
+  VE_GHOST_GATE: "ve_ghost_gate",
+  VE_FINANCIAL_CRISIS: "ve_financial_crisis",
+  VE_BASEBALL_CHAMPION: "ve_baseball_champion",
+  VE_CASH_HANDOUT: "ve_cash_handout",
+  VE_CURFEW_TIME: "ve_curfew_time",
+  VE_SOCIAL_DISTANCING: "ve_social_distancing",
+  VE_EQUALITY_FOR_ALL: "ve_equality_for_all",
+  VE_TECH_ENFORCEMENT: "ve_tech_enforcement"
 };
 
 function voteEventImageSrc(eventId: string): string | undefined {

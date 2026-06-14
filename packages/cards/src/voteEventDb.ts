@@ -143,6 +143,13 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     tierWeight: 25,
     options: ["所有隨從效果永久無效", "所有隨從效果永久無效", "所有隨從效果永久無效"],
     apply: { mode: "ENVIRONMENT", effect: { type: "ENV_DISABLE_ALL_MINION_EFFECTS" } }
+  },
+  {
+    id: "VE_TECH_ENFORCEMENT",
+    name: "科技執法",
+    tierWeight: 20,
+    options: ["科技執法內容尚未實作。", "科技執法內容尚未實作。", "科技執法內容尚未實作。"],
+    apply: { mode: "IMMEDIATE", effect: { type: "NOOP" } }
   }
 ];
 
