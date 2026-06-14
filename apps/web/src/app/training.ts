@@ -489,7 +489,7 @@ export function advanceTraining(session: TrainingSession): TrainingCommandResult
   }
   switch (session.step) {
     case "welcome":
-      session.hand = [handCard(ROOKIE_HAND_ID, ROOKIE_CARD_ID, 1, "MINION", 1, 2)];
+      session.hand = [handCard(ROOKIE_HAND_ID, ROOKIE_CARD_ID, 1, "MINION", 1, 3)];
       session.players[PLAYER] = { ...session.players[PLAYER], handCount: session.hand.length };
       session.step = "draw_first";
       return update(session, [event(session, "CARD_DRAWN", PLAYER, { cardId: ROOKIE_CARD_ID })]);
@@ -668,7 +668,7 @@ export function createTrainingRewardSummary(input: {
 
 function playRookie(session: TrainingSession): TrainingCommandResult {
   const player = session.players[PLAYER];
-  const rookie = minion(ROOKIE_MINION_ID, ROOKIE_CARD_ID, PLAYER, 1, 2, { sleeping: true, canAttack: false });
+  const rookie = minion(ROOKIE_MINION_ID, ROOKIE_CARD_ID, PLAYER, 1, 3, { sleeping: true, canAttack: false });
   session.hand = session.hand.filter((card) => card.instanceId !== ROOKIE_HAND_ID);
   session.players[PLAYER] = {
     ...player,

@@ -2914,7 +2914,12 @@ function renderVotingOverlay(): string {
   `;
 }
 
+function voteEventImageSrc(eventId: string): string {
+  return `/images/events/${eventId.toLowerCase()}.webp`;
+}
+
 function renderVoteOption(event: { id: string; name: string; options: string[] }, index: number, disabled: boolean): string {
+  const imgSrc = voteEventImageSrc(event.id);
   return `
     <button
       class="card mulligan-card vote-option"
@@ -2923,6 +2928,7 @@ function renderVoteOption(event: { id: string; name: string; options: string[] }
       ${disabled ? "disabled" : ""}
     >
       <span class="vote-option-name">${escapeHtml(event.name)}</span>
+      <img class="vote-option-art" src="${imgSrc}" alt="${escapeAttr(event.name)}" draggable="false" loading="eager" onerror="this.style.display='none'" />
       <span class="vote-option-desc">${escapeHtml(event.options[0] ?? "")}</span>
     </button>
   `;

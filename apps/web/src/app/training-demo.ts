@@ -43,11 +43,11 @@ export interface DragDemoOptions {
 }
 
 const CONTAINER_ID = "training-drag-demo";
-const PRESS_MS = 620;
-const DRAG_MS = 1000;
-const SETTLE_MS = 360;
-const RELEASE_MS = 340;
-const LOOP_GAP_MS = 760;
+const PRESS_MS = 900;
+const DRAG_MS = 1700;
+const SETTLE_MS = 620;
+const RELEASE_MS = 520;
+const LOOP_GAP_MS = 950;
 /** The held card/minion floats above the cursor, like a real grab. */
 const GHOST_LIFT_PX = 38;
 /** Held size relative to the real element (before app-scale). */
@@ -121,7 +121,7 @@ function runLoop(opts: DragDemoOptions, myToken: number): void {
   const targetRect = targetEl.getBoundingClientRect();
   const from = { x: sourceRect.left + sourceRect.width / 2, y: sourceRect.top + sourceRect.height / 2 };
 
-  const { container, ghost, cursor } = buildContainer(sourceEl);
+  const { container, ghost, cursor, label } = buildContainer(sourceEl);
   const halfRendered = (ghost.offsetHeight * scale * DRAG_SCALE) / 2;
 
   // The drag point (where the cursor tip rests). The card floats above it.
@@ -135,6 +135,9 @@ function runLoop(opts: DragDemoOptions, myToken: number): void {
   const ghostAt = (x: number, y: number, s: number) =>
     `translate(${x}px, ${y - GHOST_LIFT_PX}px) translate(-50%, -50%) scale(${scale * s})`;
   const cursorAt = (x: number, y: number) => `translate(${x - 6}px, ${y - 3}px)`;
+  // The label sits just below the held card, centred and following the gesture.
+  const labelAt = (x: number, y: number) =>
+    `translate(${x}px, ${y - GHOST_LIFT_PX + halfRendered + 8}px) translate(-50%, 0)`;
 
   const dur = total();
   const pressEnd = PRESS_MS / dur;
@@ -164,7 +167,27 @@ function runLoop(opts: DragDemoOptions, myToken: number): void {
     ],
     { duration: dur, easing: "ease-in-out" }
   );
-  animations.push(ghostMove, cursorMove);
+  const labelMove = label.animate(
+    [
+      { transform: labelAt(from.x, from.y), opacity: 0, offset: 0 },
+      { transform: labelAt(from.x, from.y), opacity: 1, offset: pressEnd },
+      { transform: labelAt(from.x, from.y), opacity: 1, offset: grab },
+      { transform: labelAt(to.x, to.y), opacity: 1, offset: dragEnd },
+      { transform: labelAt(to.x, to.y), opacity: 1, offset: settleEnd },
+      { transform: labelAt(to.x, to.y), opacity: 0, offset: 1 }
+    ],
+    { duration: dur, easing: "ease-in-out" }
+  );
+  animations.push(ghostMove, cursorMove, labelMove);
+
+  // "按住拖曳" while moving, then "放開" once it reaches the target.
+  label.textContent = "按住拖曳";
+  label.classList.remove("is-release");
+  later(() => {
+    if (myToken !== token) return;
+    label.textContent = "放開";
+    label.classList.add("is-release");
+  }, PRESS_MS + DRAG_MS);
 
   if (opts.highlightDropZone) {
     // Light up the yellow drop zone for the dragging + settle portion, mirroring
@@ -189,6 +212,7 @@ function buildContainer(sourceEl: HTMLElement): {
   container: HTMLElement;
   ghost: HTMLElement;
   cursor: HTMLElement;
+  label: HTMLElement;
 } {
   const container = document.createElement("div");
   container.id = CONTAINER_ID;
@@ -213,8 +237,12 @@ function buildContainer(sourceEl: HTMLElement): {
   const cursor = document.createElement("div");
   cursor.className = "training-demo-cursor";
 
+  const label = document.createElement("div");
+  label.className = "training-demo-label";
+
   container.appendChild(ghost);
+  container.appendChild(label);
   container.appendChild(cursor);
   document.body.appendChild(container);
-  return { container, ghost, cursor };
+  return { container, ghost, cursor, label };
 }

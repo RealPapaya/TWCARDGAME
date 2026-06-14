@@ -1466,6 +1466,16 @@ body.hand-dragging .hand-row .card {
   text-shadow: 0 2px 8px #000;
 }
 
+.vote-option-art {
+  display: block;
+  width: 100%;
+  max-height: 140px;
+  object-fit: contain;
+  border-radius: 6px;
+  pointer-events: none;
+  flex: 0 1 auto;
+}
+
 .amp-option-desc,
 .vote-option-desc {
   font-size: 13px;
