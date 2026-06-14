@@ -807,17 +807,17 @@ function renderMainMenu(): string {
         </button>
       </nav>
       <div class="main-menu-bottom">
-        <aside class="player-info-card" data-testid="player-chip">
+        <button type="button" class="player-info-card" data-menu-screen="profile" data-testid="player-chip" aria-label="查看個人資訊">
           <img class="player-avatar" src="${escapeAttr(avatarUrl)}" alt="" onerror="this.src='${DEFAULT_AVATAR_URL}'" />
-          <div class="player-info-text">
+          <span class="player-info-text">
             <strong>${escapeHtml(displayName)}</strong>
             <span class="player-title-text">${escapeHtml(playerTitle)}</span>
             <span class="player-level-row">Lv.${level}</span>
-            <div class="xp-bar-track"><div class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></div></div>
+            <span class="xp-bar-track"><span class="xp-bar-fill" style="width:${Math.round(xpFraction * 100)}%"></span></span>
             <span class="player-xp-readout">${xpDisplay}</span>
             <span class="player-stats">W ${stats.wins} · L ${stats.losses}</span>
-          </div>
-        </aside>
+          </span>
+        </button>
       </div>
       ${view.settingsOpen ? renderSettingsModal() : ""}
       ${view.changelogOpen ? renderChangelogModal() : ""}
