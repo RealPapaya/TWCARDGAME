@@ -786,26 +786,24 @@ function renderMainMenu(): string {
             <img class="menu-tile-icon" src="/images/ui/MenuShop.webp" alt="" />
             <span class="menu-tile-label">商店</span>
           </button>
-          <button class="menu-tile" data-menu-screen="tasks" data-testid="menu-tasks" ${accountMode ? "" : "disabled"}>
-            <img class="menu-tile-icon" src="/images/ui/MenuQuest.webp" alt="" />
-            <span class="menu-tile-label">任務</span>
-          </button>
-          <button class="menu-tile" data-menu-screen="achievements" data-testid="menu-achievements" ${accountMode ? "" : "disabled"}>
-            <img class="menu-tile-icon" src="/images/ui/MenuAchievement.webp" alt="" />
-            <span class="menu-tile-label">成就</span>
-          </button>
         </nav>
         ${devTestModeAvailable && devTestPanel ? `<button class="menu-button" data-menu-screen="test">${escapeHtml(devTestPanel.menuLabel)}</button>` : ""}
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
         <button id="settings-toggle" class="menu-icon-btn menu-image-btn" data-testid="menu-settings" title="設定">
-          <img class="rail-icon-image" src="/images/ui/Setting.webp" alt="設定" />
+          <img class="rail-icon-image" src="/images/ui/RailSettings.webp" alt="設定" />
         </button>
         <button class="menu-icon-btn menu-image-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">
-          <img class="rail-icon-image" src="/images/ui/Dashboard.webp" alt="排行榜" />
+          <img class="rail-icon-image" src="/images/ui/RailLeaderboard.webp" alt="排行榜" />
         </button>
         <button class="menu-icon-btn menu-image-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>
-          <img class="rail-icon-image" src="/images/ui/Friend.webp" alt="好友" />
+          <img class="rail-icon-image" src="/images/ui/RailFriends.webp" alt="好友" />
+        </button>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="tasks" data-testid="menu-tasks" title="任務" ${accountMode ? "" : "disabled"}>
+          <img class="rail-icon-image" src="/images/ui/RailTasks.webp" alt="任務" />
+        </button>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="achievements" data-testid="menu-achievements" title="成就" ${accountMode ? "" : "disabled"}>
+          <img class="rail-icon-image" src="/images/ui/RailAchievements.webp" alt="成就" />
         </button>
       </nav>
       <div class="main-menu-bottom">

@@ -261,75 +261,48 @@
   box-shadow: none;
 }
 
-/* Right-side icon rail: top-right, vertical, parchment ovals — matches V1 */
+/* Right-side icon rail: image-only round buttons from the 5x4 UI sheet. */
 .menu-icon-rail {
   position: absolute;
   right: 60px;
   top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   z-index: 100;
 }
 
 .menu-icon-btn {
-  width: 110px;
-  height: 110px;
-  background: #e6ccb2;
-  border: 6px solid #5d2e17;
-  font-size: 60px;
+  width: 108px;
+  height: 108px;
+  background: transparent;
+  border: 0;
+  border-radius: 50%;
+  font-size: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #5d2e17;
-  filter: drop-shadow(6px 8px 0px #3d1e0f);
-  transition: all 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  filter: drop-shadow(5px 7px 0 rgba(61, 30, 15, 0.72));
+  transition:
+    transform 0.18s ease,
+    filter 0.18s ease,
+    opacity 0.18s ease;
   text-shadow: none;
   padding: 0;
   position: relative;
 }
 
-/* Side rail icons */
-.menu-icon-btn:nth-child(1) {
-  border-radius: 50% 50% 46% 54% / 50% 46% 54% 50%;
-}
-
-.menu-icon-btn:nth-child(1):hover:not(:disabled) {
-  background-color: #ede0d4;
-  transform: scale(1.1);
-  border-color: #8b4513;
-  filter: drop-shadow(8px 10px 0px #3d1e0f);
-}
-
-.menu-icon-btn:nth-child(2) {
-  border-radius: 48% 52% 45% 55% / 55% 45% 52% 48%;
-}
-
 .menu-image-btn {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .rail-icon-image {
-  width: 86px;
-  height: 86px;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   display: block;
-  filter: drop-shadow(2px 3px 2px rgba(0, 0, 0, 0.45));
   pointer-events: none;
-}
-
-.menu-icon-btn:nth-child(3) {
-  border-radius: 52% 48% 55% 45% / 45% 55% 48% 52%;
-}
-
-.menu-icon-btn:nth-child(4) {
-  border-radius: 50%;
-  width: 66px;
-  height: 66px;
-  font-size: 34px;
-  align-self: flex-end;
-  filter: drop-shadow(4px 5px 0px #3d1e0f);
 }
 
 .audio-toggle.audio-off {
@@ -337,24 +310,20 @@
   filter: grayscale(0.6) drop-shadow(4px 5px 0px #3d1e0f);
 }
 
-.menu-icon-btn:nth-child(1):hover:not(:disabled),
-.menu-icon-btn:nth-child(2):hover:not(:disabled),
-.menu-icon-btn:nth-child(3):hover:not(:disabled),
-.menu-icon-btn:nth-child(4):hover:not(:disabled) {
-  background-color: #ede0d4;
-  transform: scale(1.1);
-  border-color: #8b4513;
-  filter: drop-shadow(8px 10px 0px #3d1e0f);
+.menu-icon-btn:hover:not(:disabled) {
+  transform: scale(1.08);
+  filter: drop-shadow(7px 9px 0 rgba(61, 30, 15, 0.78));
 }
 
 .menu-icon-btn:active:not(:disabled) {
-  transform: rotate(-10deg) scale(0.95);
-  filter: drop-shadow(2px 3px 0px #3d1e0f);
+  transform: scale(0.96);
+  filter: drop-shadow(3px 4px 0 rgba(61, 30, 15, 0.72));
 }
 
 .menu-icon-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.42;
   cursor: not-allowed;
+  filter: grayscale(0.75) drop-shadow(4px 5px 0 rgba(61, 30, 15, 0.62));
 }
 
 /* Bottom bar — wraps player-info-card (left) and corner-rail (right), pinned to bottom */
