@@ -361,6 +361,32 @@ describe("voting phase (turn 20)", () => {
     };
     expect(run()).toBe(run());
   });
+
+  it("emits VOTE_EVENT_GLOW carrying the units a winning event changes (heal / shield)", () => {
+    let state = advanceToTurn(startMatch(123), 20);
+    // Damage both heroes so the full-heal event has something to heal, then rig the
+    // ballot so that event wins regardless of the inverse-HP roulette outcome.
+    state.players.player1.hero.hp = 10;
+    state.players.player2.hero.hp = 12;
+    const heal = VOTE_EVENT_DB.find((e) => e.id === "VE_BASEBALL_CHAMPION")!;
+    const ballot = { id: heal.id, name: heal.name, options: heal.options };
+    state.specialPhase!.voteEvents = [ballot, ballot, ballot];
+    state = reduce(state, env("g1", "player1", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG).state;
+    const result = reduce(state, env("g2", "player2", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG);
+    const glow = result.events.find((e) => e.type === "VOTE_EVENT_GLOW");
+    expect(glow).toBeDefined();
+    expect(glow?.payload?.targets).toEqual(expect.arrayContaining(["player1:hero", "player2:hero"]));
+  });
+
+  it("omits VOTE_EVENT_GLOW when a winning event changes no on-board units", () => {
+    let state = advanceToTurn(startMatch(123), 20);
+    const mana = VOTE_EVENT_DB.find((e) => e.id === "VE_FINANCIAL_CRISIS")!;
+    const ballot = { id: mana.id, name: mana.name, options: mana.options };
+    state.specialPhase!.voteEvents = [ballot, ballot, ballot];
+    state = reduce(state, env("n1", "player1", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG).state;
+    const result = reduce(state, env("n2", "player2", { type: "submitVote", optionIndex: 0 }), CARD_CATALOG);
+    expect(result.events.some((e) => e.type === "VOTE_EVENT_GLOW")).toBe(false);
+  });
 });
 
 describe("environment effects", () => {

@@ -8735,6 +8735,9 @@ function resetCardPlayCues(): void {
   augmentGlowDeadlines.clear();
   augmentGlowHoldsSync = false;
   appliedAugmentGlow.clear();
+  appliedVoteGlow.clear();
+  voteGlowDeadlines.clear();
+  voteGlowDone.clear();
   clearPendingHandSyncHold();
   if (pendingPublicSyncFlushTimer !== undefined) {
     window.clearTimeout(pendingPublicSyncFlushTimer);
@@ -8816,7 +8819,10 @@ const DEFERRED_VOTE_CUE_KINDS = new Set<AnimationCue["kind"]>([
   "deathrattle",
   "damage",
   "effectStrike",
-  "aoeSweep"
+  "aoeSweep",
+  // The referendum purple glow also waits for the roulette to reveal its winner,
+  // so it surges through the affected units in step with the effect landing.
+  "voteGlow"
 ]);
 
 function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
@@ -8892,6 +8898,7 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
       : cue.kind === "destroy" ? MINION_DEATH_FADE_MS
       : cue.kind === "summon" ? CARD_PLAY_EFFECT_DELAY_MS + POST_PLAY_STATE_SYNC_LAG_MS
       : cue.kind === "augmentGlow" ? AUGMENT_GLOW_MAX_DEFER_MS + AUGMENT_GLOW_REVEAL_DELAY_MS
+      : cue.kind === "voteGlow" ? VOTE_GLOW_MAX_WAIT_MS + 1600
       : cue.kind === "questComplete" ? QUEST_COMPLETE_EFFECT_DELAY_MS + 200
       : 900;
     window.setTimeout(() => {
@@ -9401,6 +9408,16 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
       augmentTargets: stringList(payload.targets),
       augmentCards: stringList(payload.cards)
     };
+  }
+  if (event.type === "VOTE_EVENT_GLOW") {
+    // Turn-20 referendum effect glow: a purple sibling of augmentGlow. `targets`
+    // are the board minion / hero data-target-keys the winning vote event changed
+    // (heal / divine shield / buff / resurrect). Reuses `augmentTargets` so it
+    // rides the same per-unit glow machinery, tinted purple via the "vote" kind.
+    const targets = Array.isArray(payload.targets)
+      ? payload.targets.filter((item): item is string => typeof item === "string")
+      : [];
+    return { id, kind: "voteGlow", text: "", seat: event.seat, augmentTargets: targets };
   }
   if (event.type === "ATTACK") {
     const attackerInstanceId = typeof payload.attackerInstanceId === "string" ? payload.attackerInstanceId : undefined;
@@ -10149,6 +10166,9 @@ function applyPostRenderEffects(): void {
       // attacker returns, THEN the augment glows. The pump (re)drives this check.
       applyAugmentGlow(cue);
     }
+    if (cue.kind === "voteGlow" && cueIsReady(cue)) {
+      applyVoteGlow(cue);
+    }
   }
   if (eventLayer) {
     for (const node of eventLayer.querySelectorAll<HTMLElement>("[data-anchor-key]")) {
@@ -10277,11 +10297,12 @@ function spawnAugmentGlow(dot: HTMLElement): void {
  * affected-unit/card augment flash (NOT a CSS-`animation-delay` class, which the
  * morph render would reset — see web-animation skill).
  */
-function spawnUnitAugmentGlow(el: HTMLElement): void {
+function spawnUnitAugmentGlow(el: HTMLElement, variant: "augment" | "vote" = "augment"): void {
   const rect = el.getBoundingClientRect();
   if (rect.width === 0 && rect.height === 0) return;
+  const voteCls = variant === "vote" ? " is-vote" : "";
   const glow = document.createElement("div");
-  glow.className = "augment-glow-fx is-unit";
+  glow.className = `augment-glow-fx is-unit${voteCls}`;
   glow.style.left = `${rect.left + rect.width / 2}px`;
   glow.style.top = `${rect.top + rect.height / 2}px`;
   glow.style.width = `${Math.round(rect.width)}px`;
@@ -10289,7 +10310,57 @@ function spawnUnitAugmentGlow(el: HTMLElement): void {
   document.body.appendChild(glow);
   window.setTimeout(() => glow.remove(), 1450);
   el.classList.add("augment-affected-glow");
-  window.setTimeout(() => el.classList.remove("augment-affected-glow"), 1450);
+  if (variant === "vote") el.classList.add("is-vote");
+  window.setTimeout(() => {
+    el.classList.remove("augment-affected-glow");
+    if (variant === "vote") el.classList.remove("is-vote");
+  }, 1450);
+}
+
+const appliedVoteGlow = new Set<string>();
+const voteGlowDeadlines = new Map<string, number>();
+const voteGlowDone = new Map<string, Set<string>>();
+/** Cap on how long a vote glow retries waiting for late-appearing targets (e.g.
+ * 鬼門開 resurrected minions only enter the DOM after the public sync flush). */
+const VOTE_GLOW_MAX_WAIT_MS = 900;
+
+/**
+ * Purple sibling of `applyAugmentGlow`: pulses each unit a turn-20 referendum
+ * event changed. Targets are board-minion / hero `data-target-key`s carried on
+ * `augmentTargets`. Resurrected minions land only after the public sync flush, so
+ * each not-yet-found target keeps re-rendering until it appears or the wait cap
+ * passes; already-glowed targets are remembered so retries don't double-flash them.
+ */
+function applyVoteGlow(cue: AnimationCue): void {
+  if (appliedVoteGlow.has(cue.id)) return;
+  const targetIds = cue.augmentTargets ?? [];
+  if (targetIds.length === 0) {
+    appliedVoteGlow.add(cue.id);
+    return;
+  }
+  let done = voteGlowDone.get(cue.id);
+  if (!done) {
+    done = new Set<string>();
+    voteGlowDone.set(cue.id, done);
+  }
+  for (const id of targetIds) {
+    if (done.has(id)) continue;
+    const el = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(id)}"]`);
+    if (el) {
+      spawnUnitAugmentGlow(el, "vote");
+      done.add(id);
+    }
+  }
+  const now = performance.now();
+  if (!voteGlowDeadlines.has(cue.id)) voteGlowDeadlines.set(cue.id, now + VOTE_GLOW_MAX_WAIT_MS);
+  const expired = now >= (voteGlowDeadlines.get(cue.id) ?? 0);
+  if (done.size < targetIds.length && !expired) {
+    window.setTimeout(render, 90);
+    return;
+  }
+  appliedVoteGlow.add(cue.id);
+  voteGlowDeadlines.delete(cue.id);
+  voteGlowDone.delete(cue.id);
 }
 
 /** Adds a one-shot "pop" to the just-revealed cost/stat numbers of affected nodes. */

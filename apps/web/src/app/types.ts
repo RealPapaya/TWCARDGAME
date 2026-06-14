@@ -44,6 +44,7 @@ export type AnimationKind =
   | "lock" // silence / lock (split out of "buff")
   | "aoeSweep" // one board-wide overlay drawn per AOE cluster
   | "augmentGlow" // 增幅 indicator pulse when a bound augment fires
+  | "voteGlow" // 公投事件影響賽局時的紫光,打在受影響/新登場的單位上
   | "questComplete"; // quest countdown reaches zero — golden ring before effects fire
 
 /** Whether an effect hit a single target or swept the whole board (全場). */

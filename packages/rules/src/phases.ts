@@ -562,8 +562,10 @@ function resolveVotingPhase(
     // effect types are unaffected. Persistent referendum environments separately
     // skip immune seats (silence tick + getCardActualCost).
     const immuneSnapshot = snapshotReferendumImmune(state);
+    const glowFromIndex = events.length;
     applyVoteEventEffect(state, dbEntry.apply, winningEvent.id, winningEvent.name, winningSeat, events, catalog);
     restoreReferendumImmune(state, immuneSnapshot);
+    emitVoteEventGlow(state, events, glowFromIndex);
   }
 
   const winnerName = state.players[winningSeat].displayName;
@@ -586,6 +588,35 @@ function resolveVotingPhase(
   );
 
   endSpecialPhase(state, nowMs, "VOTING_PHASE", events);
+}
+
+/**
+ * 公投事件影響賽局時,額外發一個 `VOTE_EVENT_GLOW`,讓客戶端在輪盤結束後對「受影響
+ * 且仍留場/新登場」的單位打上紫光(增幅發光的紫色變體)。只收會留在場上或之後才登場的
+ * 目標(治療/光盾/增益/召喚);死亡與回手的單位已各有碎裂/收回動畫,故排除,避免客戶端
+ * 對不存在的節點空轉重試。無受影響單位(例如純水晶/環境事件)則不發光。
+ */
+const VOTE_GLOW_EVENT_TYPES = new Set<string>([
+  "HEAL",
+  "BUFF",
+  "DAMAGE",
+  "MINION_SUMMONED",
+  "SHIELD_POPPED"
+]);
+
+function emitVoteEventGlow(state: MatchState, events: GameEvent[], fromIndex: number): void {
+  const targets: string[] = [];
+  const seen = new Set<string>();
+  for (let i = fromIndex; i < events.length; i++) {
+    const event = events[i];
+    if (!VOTE_GLOW_EVENT_TYPES.has(event.type)) continue;
+    const target = event.payload?.target;
+    if (typeof target !== "string" || seen.has(target)) continue;
+    seen.add(target);
+    targets.push(target);
+  }
+  if (targets.length === 0) return;
+  addEvent(state, events, "VOTE_EVENT_GLOW", { targets });
 }
 
 function applyVoteEventEffect(
