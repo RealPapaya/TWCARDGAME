@@ -2918,7 +2918,11 @@ const voteEventImageById: Record<string, string> = {
   VE_BLACKOUT: "ve_blackout",
   VE_UTILITY_HIKE: "ve_utility_hike",
   VE_MORAKOT: "ve_morakot",
-  VE_KAOHSIUNG_BLAST: "ve_kaohsiung_blast"
+  VE_KAOHSIUNG_BLAST: "ve_kaohsiung_blast",
+  VE_MARTIAL_LAW: "ve_martial_law",
+  VE_PARLIAMENT_STAR_BRAWL: "ve_parliament_star_brawl",
+  VE_MAZU: "ve_mazu",
+  VE_PARTY_INFIGHTING: "ve_party_infighting"
 };
 
 function voteEventImageSrc(eventId: string): string | undefined {
