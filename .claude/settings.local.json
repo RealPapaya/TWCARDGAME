@@ -49,7 +49,12 @@
       "Bash(SETTLE=1000 node .tmp-repro-aura-death.mjs)",
       "Bash(SETTLE=1600 node .tmp-repro-aura-death.mjs)",
       "Bash(sed -n '1,5p')",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Read(//r//**)",
+      "Bash(python -c \"import PIL; print\\('PIL', PIL.__version__\\)\")",
+      "Bash(magick --version)",
+      "Bash(python -c ' *)",
+      "Bash(python scripts/cut_augment_icons.py)"
     ],
     "additionalDirectories": [
       "\\tmp"

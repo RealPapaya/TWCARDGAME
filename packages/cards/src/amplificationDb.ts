@@ -14,6 +14,8 @@ export interface AmplificationDbEntry {
   id: string;
   name: string;
   description: string;
+  /** Whether this amplification currently has a prepared image asset. */
+  hasImage?: boolean;
   /** Cards explicitly named by the description and previewable from the UI. */
   relatedCardIds?: string[];
   tier: AmplificationTier;

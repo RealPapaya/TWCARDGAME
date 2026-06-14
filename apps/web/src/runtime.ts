@@ -2683,6 +2683,22 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
 
 const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 穩穩仔賺: "amp-tier-mid", 卯死: "amp-tier-high" };
 
+/** Augment ids with a cut-out icon under /images/augments/<id lowercased>.webp. */
+const AUGMENT_IMAGE_IDS = new Set([
+  "AMP_INVOICE_200",
+  "AMP_SHAREHOLDER_GIFT",
+  "AMP_FRIES_BOGO",
+  "AMP_MIN_WAGE",
+  "AMP_LIFE_INSURANCE",
+  "AMP_BANQUET",
+  "AMP_THREE_WAY_RACE",
+  "AMP_ENERGY_TRANSITION"
+]);
+
+function augmentImageSrc(id: string): string | undefined {
+  return AUGMENT_IMAGE_IDS.has(id) ? `/images/augments/${id.toLowerCase()}.webp` : undefined;
+}
+
 function renderPhaseCountdown(label: string): string {
   const seconds = phaseCountdownSeconds();
   if (seconds === undefined) return "";
@@ -2833,6 +2849,7 @@ function currentPromptChoice(): PromptChoiceOffer | undefined {
 
 function renderAmplificationOption(option: AmplificationOption, disabled: boolean): string {
   const tierClass = AMP_TIER_CLASS[option.tier] ?? "amp-tier-low";
+  const imgSrc = augmentImageSrc(option.id);
   return `
     <button
       class="card mulligan-card amp-option ${tierClass}"
@@ -2841,6 +2858,7 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
       ${disabled ? "disabled" : ""}
     >
       <span class="amp-tier-badge">${escapeHtml(option.tier)}</span>
+      ${imgSrc ? `<img class="amp-option-art" src="${escapeAttr(imgSrc)}" alt="${escapeAttr(option.name)}" draggable="false" loading="eager" onerror="this.hidden=true" />` : ""}
       <span class="amp-option-name">${escapeHtml(option.name)}</span>
       <span class="amp-option-desc">${renderDescriptionWithRelatedCards(option.description, option.relatedCardIds)}</span>
     </button>

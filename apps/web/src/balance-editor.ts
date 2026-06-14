@@ -1082,7 +1082,7 @@ function renderAmpsPanel(): HTMLElement {
 
     const table = h("table", { class: "be-table" });
     const thead = h("thead");
-    thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>描述</th><th>派系</th><th>效果</th><th>Phase1?</th></tr>`;
+    thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>描述</th><th>是否有圖片</th><th>派系</th><th>效果</th><th>Phase1?</th></tr>`;
     table.append(thead);
     const tbody = h("tbody");
 
@@ -1093,6 +1093,7 @@ function renderAmpsPanel(): HTMLElement {
         <td style="font-family:monospace;color:var(--text-muted)">${amp.id}</td>
         <td style="font-weight:600" class="${tierClass(tier)}">${amp.name}</td>
         <td style="color:var(--text-dim);max-width:300px">${amp.description}</td>
+        <td>${amp.hasImage ? '<span style="color:var(--success)">有</span>' : '<span style="color:var(--text-muted)">無</span>'}</td>
         <td>${amp.factionTags.length ? amp.factionTags.join(", ") : "通用"}</td>
         <td style="font-size:0.75rem">${effectSummary(amp.effect)}</td>
         <td>${amp.firstPhaseOnly ? "✓" : ""}</td>
@@ -1103,7 +1104,7 @@ function renderAmpsPanel(): HTMLElement {
         if (expanded) {
           tr.classList.add("be-row--expanded");
           const edRow = h("tr", { class: "be-editor be-editor--open" });
-          const edTd = h("td", { colspan: "6" });
+          const edTd = h("td", { colspan: "7" });
           edTd.append(buildAmpEditor(amp));
           edRow.append(edTd);
           tr.after(edRow);
@@ -1147,6 +1148,19 @@ function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
   tagsF.append(tagsI);
   grid.append(tagsF);
 
+  const imgF = h("div", { class: "be-field" });
+  imgF.append(h("label", {}, "是否有圖片"));
+  const imgToggles = h("div", { class: "be-toggles" });
+  const imgBtn = h("button", { class: `be-toggle ${amp.hasImage ? "be-toggle--on" : ""}`, type: "button" }, amp.hasImage ? "有圖片" : "無圖片");
+  imgBtn.addEventListener("click", () => {
+    amp.hasImage = !amp.hasImage;
+    bumpChanges();
+    render();
+  });
+  imgToggles.append(imgBtn);
+  imgF.append(imgToggles);
+  grid.append(imgF);
+
   // effect
   const efDiv = h("div", { class: "be-field", style: "grid-column: 1 / -1;" });
   efDiv.append(h("label", {}, "效果"));
@@ -1163,7 +1177,7 @@ function renderVotesPanel(): HTMLElement {
 
   const table = h("table", { class: "be-table" });
   const thead = h("thead");
-  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>權重</th><th style="min-width:120px">權重視覺</th><th>模式</th><th>選項</th><th>效果</th></tr>`;
+  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>是否有圖片</th><th>權重</th><th style="min-width:120px">權重視覺</th><th>模式</th><th>選項</th><th>效果</th></tr>`;
   table.append(thead);
   const tbody = h("tbody");
 
@@ -1173,6 +1187,7 @@ function renderVotesPanel(): HTMLElement {
     tr.innerHTML = `
       <td style="font-family:monospace;color:var(--text-muted)">${ve.id}</td>
       <td style="font-weight:600">${ve.name}</td>
+      <td>${ve.hasImage ? '<span style="color:var(--success)">有</span>' : '<span style="color:var(--text-muted)">無</span>'}</td>
       <td style="font-weight:700;color:var(--primary)">${ve.tierWeight}</td>
       <td><div class="be-weight-bar"><div class="be-weight-bar-fill" style="width:${pct}%"></div></div></td>
       <td><span class="be-type be-type--${ve.apply.mode === "ENVIRONMENT" ? "MINION" : "NEWS"}">${ve.apply.mode}</span></td>
@@ -1186,7 +1201,7 @@ function renderVotesPanel(): HTMLElement {
       if (expanded) {
         tr.classList.add("be-row--expanded");
         const edRow = h("tr", { class: "be-editor be-editor--open" });
-        const edTd = h("td", { colspan: "7" });
+        const edTd = h("td", { colspan: "8" });
         edTd.append(buildVoteEditor(ve));
         edRow.append(edTd);
         tr.after(edRow);
@@ -1216,6 +1231,19 @@ function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
   weightF.append(h("label", {}, "權重"));
   weightF.append(numInput(ve.tierWeight, (v) => { ve.tierWeight = v; }, 1, 100));
   grid.append(weightF);
+
+  const imgF = h("div", { class: "be-field" });
+  imgF.append(h("label", {}, "是否有圖片"));
+  const imgToggles = h("div", { class: "be-toggles" });
+  const imgBtn = h("button", { class: `be-toggle ${ve.hasImage ? "be-toggle--on" : ""}`, type: "button" }, ve.hasImage ? "有圖片" : "無圖片");
+  imgBtn.addEventListener("click", () => {
+    ve.hasImage = !ve.hasImage;
+    bumpChanges();
+    render();
+  });
+  imgToggles.append(imgBtn);
+  imgF.append(imgToggles);
+  grid.append(imgF);
 
   // options
   for (let i = 0; i < 3; i++) {
@@ -1931,6 +1959,7 @@ function exportAmpsTs() {
     '  id: string;',
     '  name: string;',
     '  description: string;',
+    '  hasImage?: boolean;',
     '  tier: AmplificationTier;',
     '  factionTags: string[];',
     '  firstPhaseOnly?: boolean;',
@@ -1958,6 +1987,7 @@ function exportVotesTs() {
     'export interface VoteEventDbEntry {',
     '  id: string;',
     '  name: string;',
+    '  hasImage?: boolean;',
     '  tierWeight: number;',
     '  options: [string, string, string];',
     '  apply: EnvironmentDescriptor;',

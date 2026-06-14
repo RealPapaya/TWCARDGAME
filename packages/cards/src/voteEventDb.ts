@@ -21,6 +21,8 @@ export interface EnvironmentDescriptor {
 export interface VoteEventDbEntry {
   id: string;
   name: string;
+  /** Whether this referendum event currently has a prepared image asset. */
+  hasImage?: boolean;
   /** Relative draw weight (higher = more common). */
   tierWeight: number;
   options: [string, string, string];
