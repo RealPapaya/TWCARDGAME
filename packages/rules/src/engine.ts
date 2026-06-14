@@ -432,7 +432,7 @@ function attack(
   if (ref.kind === "MINION") applyDamage(state, attackerRef, targetAttack, events);
   const attackerEnvironmentDamage = environmentAttackerDamage(state, seat);
   if (attackerEnvironmentDamage > 0 && attacker.currentHealth > 0) {
-    applyDamage(state, attackerRef, attackerEnvironmentDamage, events);
+    applyDamage(state, attackerRef, attackerEnvironmentDamage, events, { source: "TECH_ENFORCEMENT" });
   }
   attacker.canAttack = false;
   resolvePostAction(state, events, catalog);

@@ -4,8 +4,8 @@ import type { GameEvent, GameEventType } from "./index.js";
 
 const C = ANIMATION_COSTS;
 
-function ev(type: GameEventType, seq = 0): GameEvent {
-  return { seq, type };
+function ev(type: GameEventType, seq = 0, payload?: GameEvent["payload"]): GameEvent {
+  return { seq, type, payload };
 }
 
 describe("estimateEventAnimationMs", () => {
@@ -79,6 +79,19 @@ describe("estimateEventAnimationMs", () => {
   it("ATTACK + DAMAGE matches lunge tail (no over-count)", () => {
     const tail = estimateEventAnimationMs([ev("ATTACK"), ev("DAMAGE")]);
     expect(tail).toBe(C.ATTACK_LUNGE_MS + C.POST_ATTACK_STATE_SYNC_LAG_MS);
+  });
+
+  it("ATTACK + tech-enforcement DAMAGE reserves the follow-up gap", () => {
+    const tail = estimateEventAnimationMs([
+      ev("ATTACK"),
+      ev("DAMAGE"),
+      ev("DAMAGE", 0, { source: "TECH_ENFORCEMENT" })
+    ]);
+    expect(tail).toBe(
+      Math.round(C.ATTACK_LUNGE_MS * 0.7) +
+      C.TECH_ENFORCEMENT_DAMAGE_GAP_MS +
+      C.POST_ATTACK_STATE_SYNC_LAG_MS
+    );
   });
 
   it("ATTACK with DESTROY uses lunge + destroy sync lag", () => {

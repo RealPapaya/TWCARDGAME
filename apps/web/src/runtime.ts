@@ -173,6 +173,7 @@ const TITLE_LABELS: Record<string, string> = {
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 800;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
+const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
 // Hero death shatter is deliberately slower than the minion one (0.78s) for a
 // dramatic finish; the victory/defeat overlay is held until it finishes plus a
 // short settle pause.
@@ -9199,11 +9200,15 @@ function applyPostAttackEffectDelays(rawCues: AnimationCue[]): AnimationCue[] {
       continue;
     }
     if (pendingAttackEffectDelayMs > 0 && isPostAttackEffectCue(cue)) {
-      const delayMs = cue.kind === "destroy" ? ATTACK_LUNGE_MS : pendingAttackEffectDelayMs;
+      const delayMs = cue.kind === "destroy"
+        ? ATTACK_LUNGE_MS
+        : pendingAttackEffectDelayMs + (cue.postAttackDelayBonusMs ?? 0);
       const effectDelayMs = Math.max(cue.delayMs ?? 0, delayMs);
       if (cue.kind === "bounce") {
         holdPendingPublicSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS);
         holdPlayerHandSyncFor(effectDelayMs + BOUNCE_EFFECT_SYNC_LAG_MS, { suppressNewIds: true });
+      } else if ((cue.postAttackDelayBonusMs ?? 0) > 0) {
+        holdPendingPublicSyncFor(effectDelayMs + POST_ATTACK_STATE_SYNC_LAG_MS);
       }
       cues.push({
         ...cue,
@@ -9425,7 +9430,8 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     // imperative blade sprite knows where to fly from.
     const sourceKey = effectKind === "effectStrike" ? findEffectSourceKey(events, index) : undefined;
     const resultingHealth = typeof payload.remainingHealth === "number" ? payload.remainingHealth : undefined;
-    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq, resultingHealth };
+    const postAttackDelayBonusMs = payload.source === "TECH_ENFORCEMENT" ? TECH_ENFORCEMENT_DAMAGE_GAP_MS : undefined;
+    return { id, kind: effectKind, text, seat: event.seat, targetKey: effectTargetKey, sourceKey, cardId, amount, seq: event.seq, resultingHealth, postAttackDelayBonusMs };
   }
   if (event.type === "QUEST_COMPLETED") {
     const source = typeof payload.source === "string" ? payload.source : undefined;

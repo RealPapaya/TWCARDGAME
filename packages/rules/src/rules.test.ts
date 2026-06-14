@@ -601,6 +601,7 @@ describe("tech enforcement vote environment", () => {
     expect(result.state.players[seat].board[0].currentHealth).toBe(1);
     const damageTargets = result.events.filter((event) => event.type === "DAMAGE").map((event) => event.payload?.target);
     expect(damageTargets).toEqual([`${enemy}:hero`, "tech_attacker"]);
+    expect(result.events.find((event) => event.type === "DAMAGE" && event.payload?.target === "tech_attacker")?.payload?.source).toBe("TECH_ENFORCEMENT");
   });
 
   it("resolves after combat and counterattack damage", () => {
@@ -629,5 +630,6 @@ describe("tech enforcement vote environment", () => {
     const damageEvents = result.events.filter((event) => event.type === "DAMAGE");
     expect(damageEvents.map((event) => event.payload?.target)).toEqual(["tech_defender", "tech_attacker", "tech_attacker"]);
     expect(damageEvents.map((event) => event.payload?.remainingHealth)).toEqual([2, 1, 0]);
+    expect(damageEvents[2].payload?.source).toBe("TECH_ENFORCEMENT");
   });
 });

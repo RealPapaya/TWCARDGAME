@@ -157,6 +157,8 @@ export type AnimationCue = {
    */
   resultingHealth?: number;
   delayMs?: number;
+  /** Extra delay added after the normal attack impact timing for follow-up effects. */
+  postAttackDelayBonusMs?: number;
   readyAtMs?: number;
   /** Board minion instanceIds an `augmentGlow` should light up (units the 增幅 changed). */
   augmentTargets?: string[];

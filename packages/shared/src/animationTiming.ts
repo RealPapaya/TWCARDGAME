@@ -17,6 +17,7 @@ export const ANIMATION_COSTS = {
   DISCARD_CARD_BODY_MS: 1500,
   ATTACK_LUNGE_MS: 800,
   POST_ATTACK_STATE_SYNC_LAG_MS: 120,
+  TECH_ENFORCEMENT_DAMAGE_GAP_MS: 360,
   MINION_DEATH_FADE_MS: 780,
   SUMMON_POP_MS: 600,
   STANDALONE_EFFECT_MS: 1150,
@@ -142,6 +143,11 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
       case "HEAL":
       case "BUFF":
       case "SHIELD_POPPED": {
+        if (event.type === "DAMAGE" && inAttack && event.payload?.source === "TECH_ENFORCEMENT") {
+          const impactDelay = Math.round(C.ATTACK_LUNGE_MS * 0.7);
+          const tail = impactDelay + C.TECH_ENFORCEMENT_DAMAGE_GAP_MS + C.POST_ATTACK_STATE_SYNC_LAG_MS;
+          if (tail > total) total = tail;
+        }
         if (currentPostPlayDelay === 0 && !inAttack) {
           if (C.STANDALONE_EFFECT_MS > total) total = C.STANDALONE_EFFECT_MS;
         }

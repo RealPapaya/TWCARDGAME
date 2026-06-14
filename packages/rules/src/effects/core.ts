@@ -186,7 +186,13 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
   }
 }
 
-export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: number, events: EffectContext["events"]): void {
+export function applyDamage(
+  state: MatchState,
+  ref: TargetUnitRef,
+  amount: number,
+  events: EffectContext["events"],
+  payload: Record<string, unknown> = {}
+): void {
   if (amount <= 0) return;
   if (ref.kind === "MINION") {
     const minion = ref.unit as RuntimeMinion;
@@ -199,7 +205,7 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
     updateEnrage(minion);
     // Carry the authoritative post-hit health so the client can drop the HP digit
     // AT impact without waiting for (or racing) the held publicSync flush.
-    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth }, ref.owner.seat);
+    addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth, ...payload }, ref.owner.seat);
   } else {
     // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
     const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
@@ -208,7 +214,7 @@ export function applyDamage(state: MatchState, ref: TargetUnitRef, amount: numbe
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAX_CUT" }, ref.owner.seat);
     }
     ref.owner.hero.hp -= dealt;
-    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp }, ref.owner.seat);
+    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp, ...payload }, ref.owner.seat);
     if (unlockLowHpManaCap(ref.owner)) {
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, ref.owner.seat);
     }
