@@ -48,6 +48,8 @@ const DRAG_MS = 1700;
 const SETTLE_MS = 620;
 const RELEASE_MS = 520;
 const LOOP_GAP_MS = 950;
+const LABEL_DRAG = "按住拖曳";
+const LABEL_RELEASE = "放開";
 /** The held card/minion floats above the cursor, like a real grab. */
 const GHOST_LIFT_PX = 38;
 /** Held size relative to the real element (before app-scale). */
@@ -90,7 +92,11 @@ export function stopDragDemo(): void {
 }
 
 function later(fn: () => void, delay: number): void {
-  timers.push(window.setTimeout(fn, delay));
+  const id = window.setTimeout(() => {
+    timers = timers.filter((timer) => timer !== id);
+    fn();
+  }, delay);
+  timers.push(id);
 }
 
 function total(): number {
@@ -181,11 +187,11 @@ function runLoop(opts: DragDemoOptions, myToken: number): void {
   animations.push(ghostMove, cursorMove, labelMove);
 
   // "按住拖曳" while moving, then "放開" once it reaches the target.
-  label.textContent = "按住拖曳";
+  label.textContent = LABEL_DRAG;
   label.classList.remove("is-release");
   later(() => {
     if (myToken !== token) return;
-    label.textContent = "放開";
+    label.textContent = LABEL_RELEASE;
     label.classList.add("is-release");
   }, PRESS_MS + DRAG_MS);
 
@@ -198,7 +204,10 @@ function runLoop(opts: DragDemoOptions, myToken: number): void {
         highlightedEl = targetEl;
       }
     }, PRESS_MS + 40);
-    later(() => targetEl.classList.remove("drop-highlight"), PRESS_MS + DRAG_MS + SETTLE_MS);
+    later(() => {
+      targetEl.classList.remove("drop-highlight");
+      if (highlightedEl === targetEl) highlightedEl = null;
+    }, PRESS_MS + DRAG_MS + SETTLE_MS);
   }
 
   ghostMove.onfinish = () => {

@@ -2914,8 +2914,16 @@ function renderVotingOverlay(): string {
   `;
 }
 
-function voteEventImageSrc(eventId: string): string {
-  return `/images/events/${eventId.toLowerCase()}.webp`;
+const voteEventImageById: Record<string, string> = {
+  VE_BLACKOUT: "ve_blackout",
+  VE_UTILITY_HIKE: "ve_utility_hike",
+  VE_MORAKOT: "ve_morakot",
+  VE_KAOHSIUNG_BLAST: "ve_kaohsiung_blast"
+};
+
+function voteEventImageSrc(eventId: string): string | undefined {
+  const imageName = voteEventImageById[eventId.toUpperCase()];
+  return imageName ? `/images/events/${imageName}.webp` : undefined;
 }
 
 function renderVoteOption(event: { id: string; name: string; options: string[] }, index: number, disabled: boolean): string {
@@ -2928,7 +2936,7 @@ function renderVoteOption(event: { id: string; name: string; options: string[] }
       ${disabled ? "disabled" : ""}
     >
       <span class="vote-option-name">${escapeHtml(event.name)}</span>
-      <img class="vote-option-art" src="${imgSrc}" alt="${escapeAttr(event.name)}" draggable="false" loading="eager" onerror="this.style.display='none'" />
+      ${imgSrc ? `<img class="vote-option-art" src="${escapeAttr(imgSrc)}" alt="${escapeAttr(event.name)}" draggable="false" loading="eager" onerror="this.hidden=true" />` : ""}
       <span class="vote-option-desc">${escapeHtml(event.options[0] ?? "")}</span>
     </button>
   `;

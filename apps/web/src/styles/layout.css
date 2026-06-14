@@ -1469,11 +1469,13 @@ body.hand-dragging .hand-row .card {
 .vote-option-art {
   display: block;
   width: 100%;
-  max-height: 140px;
+  max-height: min(180px, 28vh);
   object-fit: contain;
   border-radius: 6px;
   pointer-events: none;
   flex: 0 1 auto;
+  align-self: center;
+  justify-self: center;
 }
 
 .amp-option-desc,
@@ -1527,6 +1529,9 @@ body.hand-dragging .hand-row .card {
 }
 
 .vote-card-area .vote-option {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  align-items: center;
   width: clamp(220px, 24vw, 290px);
   height: auto;
   min-height: clamp(290px, 44vh, 420px);
@@ -1538,6 +1543,7 @@ body.hand-dragging .hand-row .card {
 }
 
 .vote-card-area .vote-option-desc {
+  align-self: end;
   font-size: clamp(13px, 1.3vw, 16px);
 }
 
