@@ -7973,7 +7973,17 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
     }
     case "DESTROY": {
       const tile = cardId ? logCardRef(cardId) : target ? logUnitRef(target) : { name: "隨從" };
-      return { ...base, kind: "death", tile, label: `${tile.name} 陣亡` };
+      const reason = typeof payload.reason === "string" ? payload.reason : undefined;
+      const eventName = typeof payload.eventName === "string" ? payload.eventName : undefined;
+      // Spell out *why* the minion died when the engine tagged a cause: a full hand
+      // that couldn't take a bounce (滿手死亡) or a referendum/environment event.
+      const label =
+        reason === "FULL_HAND"
+          ? `${tile.name} 滿手死亡`
+          : reason === "EVENT" && eventName
+            ? `${tile.name} 因【${eventName}】死亡`
+            : `${tile.name} 陣亡`;
+      return { ...base, kind: "death", tile, label };
     }
     case "HEAL": {
       if (!target) return undefined;
@@ -8215,6 +8225,22 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
   if (notice) {
     if (voteResolved) setTimeout(() => showBattleToast(notice), VOTE_ROULETTE_TOTAL_MS);
     else showBattleToast(notice);
+  }
+  // A bounce that couldn't return to a full hand kills the minion instead — prompt
+  // it so the loss isn't silent (the battle log already records 滿手死亡).
+  const fullHandDeaths = message.filter(
+    (item) => item.type === "DESTROY" && item.payload?.reason === "FULL_HAND"
+  );
+  if (fullHandDeaths.length > 0 && !notice) {
+    const first = fullHandDeaths[0];
+    const firstCardId = typeof first.payload?.cardId === "string" ? first.payload.cardId : undefined;
+    const firstName = cardName(firstCardId) ?? "隨從";
+    const fullHandToast =
+      fullHandDeaths.length === 1
+        ? `手牌已滿，${firstName} 無法回手而死亡`
+        : `手牌已滿，${fullHandDeaths.length} 個隨從無法回手而死亡`;
+    if (voteResolved) setTimeout(() => showBattleToast(fullHandToast), VOTE_ROULETTE_TOTAL_MS);
+    else showBattleToast(fullHandToast);
   }
   render();
   return cues;

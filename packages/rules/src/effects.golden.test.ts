@@ -105,6 +105,27 @@ describe("effect golden tests", () => {
     expect(bounce?.payload?.actorSeat).toBe(seat);
   });
 
+  it("BOUNCE into a full hand kills the minion (滿手死亡) and fires its deathrattle", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "BOUNCE_TARGET", target: { side: "ENEMY", type: "MINION" } } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    const foe = enemy(seat);
+    // Fill the foe's hand to the 10-card cap so the bounce has nowhere to land.
+    state.players[foe].hand = Array.from({ length: 10 }, () =>
+      createRuntimeCard(FILLER_MINION("F0"), foe, nextInstanceId(state, "card")),
+    );
+    const m = placeMinion(state, foe, { keywords: { deathrattle: { type: "DRAW", value: 1 } } });
+    const { state: next, events } = play(state, catalog, card, { type: "MINION", side: foe, instanceId: m.instanceId });
+    // Did not return to hand; died on the board instead.
+    expect(next.players[foe].board).toHaveLength(0);
+    expect(next.players[foe].hand.length).toBe(10);
+    expect(events.some((e) => e.type === "BOUNCE")).toBe(false);
+    const destroy = events.find((e) => e.type === "DESTROY" && e.payload?.target === m.instanceId);
+    expect(destroy?.payload?.reason).toBe("FULL_HAND");
+    // A true death: the deathrattle resolves like any other death.
+    expect(events.some((e) => e.type === "DEATHRATTLE")).toBe(true);
+  });
+
   it("BOUNCE_ALL_CATEGORY — returns all minions of a category to their owners' hands", () => {
     const card = NEWS_CARD("C", { battlecry: { type: "BOUNCE_ALL_CATEGORY", target_category_includes: "test" } });
     const { state, catalog } = makeMatch([card]);

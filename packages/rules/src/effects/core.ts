@@ -321,7 +321,12 @@ export function resolveDeaths(state: MatchState, events: EffectContext["events"]
         );
         player.board.splice(i, 1);
         player.graveyard.push(minionToCard(state, minion));
-        addEvent(state, events, "DESTROY", { target: minion.instanceId, cardId: minion.cardId }, player.seat);
+        const destroyPayload: Record<string, unknown> = { target: minion.instanceId, cardId: minion.cardId };
+        if (minion.deathReason) {
+          destroyPayload.reason = minion.deathReason.kind;
+          if (minion.deathReason.kind === "EVENT") destroyPayload.eventName = minion.deathReason.label;
+        }
+        addEvent(state, events, "DESTROY", destroyPayload, player.seat);
         grantDestroyedMinionCostRebate(state, minion, events, catalog);
         grantCategoryDeathMana(state, minion, events);
         resolveDeathrattle(state, player, minion, deathTimeNeighbors, events, catalog);
@@ -1004,6 +1009,17 @@ export function bounceMinion(
   events: EffectContext["events"],
   options: BounceMinionOptions = {}
 ): void {
+  // Hand already full: the minion can't return, so it dies on the board. Tag the
+  // reason and settle it through `resolveDeaths` so 遺志 (deathrattle) and other
+  // death effects fire exactly like any other death, then surface a labelled
+  // DESTROY (滿手死亡 / 因事件死亡). Settle inline because some callers (e.g. the
+  // augment phase) don't run `resolvePostAction` afterward.
+  if (owner.hand.length >= 10 && owner.board.includes(minion)) {
+    minion.deathReason = { kind: "FULL_HAND" };
+    minion.currentHealth = 0;
+    resolveDeaths(state, events, catalog);
+    return;
+  }
   const removed = removeMinion(owner, minion);
   if (!removed) return;
   const original = catalog.get(removed.cardId);

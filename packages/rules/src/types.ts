@@ -44,6 +44,15 @@ export interface TempBuff {
   health: number;
 }
 
+/**
+ * The cause of a minion's death, surfaced in the `DESTROY` event payload so the
+ * client can show a clear battle-log line:
+ * - `FULL_HAND` — a bounce had nowhere to go (hand already at 10) so the minion
+ *   died on the board instead of returning to hand → "滿手死亡".
+ * - `EVENT` — a referendum / environment event killed it → "因【label】死亡".
+ */
+export type DeathReason = { kind: "FULL_HAND" } | { kind: "EVENT"; label: string };
+
 export interface RuntimeMinion {
   instanceId: string;
   cardId: string;
@@ -64,6 +73,13 @@ export interface RuntimeMinion {
   lockedTurns: number;
   deathTimer?: number;
   temporaryUntilTurn?: number;
+  /**
+   * Why this minion is about to die, read by `resolveDeaths` to tag the `DESTROY`
+   * event so the battle log can explain the cause (滿手死亡 / 因某事件死亡) rather
+   * than a generic 陣亡. Transient: set just before `currentHealth` hits 0 and
+   * cleared when the death is settled.
+   */
+  deathReason?: DeathReason;
   questTurns?: number;
   auraAttack: number;
   auraHealth: number;

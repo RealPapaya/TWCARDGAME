@@ -74,7 +74,10 @@ export function destroyRightmostMinions(_effect: EffectDefinition, context: Effe
   for (const seat of SEATS) {
     const board = context.state.players[seat].board;
     const rightmost = board[board.length - 1];
-    if (rightmost) rightmost.currentHealth = 0;
+    if (rightmost) {
+      rightmost.deathReason = { kind: "EVENT", label: "高雄氣爆" };
+      rightmost.currentHealth = 0;
+    }
   }
 }
 
@@ -98,7 +101,10 @@ export function keepRandomHighestCostPerSide(_effect: EffectDefinition, context:
       survivor = candidates[next.value];
     }
     for (const minion of board) {
-      if (minion.instanceId !== survivor?.instanceId) minion.currentHealth = 0;
+      if (minion.instanceId !== survivor?.instanceId) {
+        minion.deathReason = { kind: "EVENT", label: "黨內鬥爭" };
+        minion.currentHealth = 0;
+      }
     }
   }
 }
@@ -113,7 +119,10 @@ export function keepRandomOneBoardMinion(_effect: EffectDefinition, context: Eff
   const survivor = candidates[next.value];
   for (const seat of SEATS) {
     for (const minion of state.players[seat].board) {
-      if (minion.instanceId !== survivor.instanceId) minion.currentHealth = 0;
+      if (minion.instanceId !== survivor.instanceId) {
+        minion.deathReason = { kind: "EVENT", label: "議會明星大亂鬥" };
+        minion.currentHealth = 0;
+      }
     }
   }
 }
@@ -124,6 +133,7 @@ export function martialLawBounceAllCost10(_effect: EffectDefinition, context: Ef
     const player = context.state.players[seat];
     for (const minion of [...player.board]) {
       if (player.hand.length >= 10) {
+        minion.deathReason = { kind: "EVENT", label: "戒嚴" };
         minion.currentHealth = 0;
         continue;
       }
@@ -151,6 +161,7 @@ export function enforceBoardLimit(_effect: EffectDefinition, context: EffectCont
     // Keep the leftmost `limit` minions; the rightmost surplus returns to hand.
     for (const minion of player.board.slice(limit)) {
       if (player.hand.length >= 10) {
+        minion.deathReason = { kind: "EVENT", label: "社交距離" };
         minion.currentHealth = 0;
         continue;
       }

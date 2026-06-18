@@ -149,8 +149,10 @@ describe("turn-20 vote-event handlers", () => {
 
     expect(state.players.player1.board.map((m) => m.instanceId)).toEqual(["p1-left"]);
     expect(state.players.player2.board.map((m) => m.instanceId)).toEqual(["p2-left", "p2-middle"]);
-    const destroyedTargets = context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target);
-    expect(destroyedTargets).toEqual(["p1-right", "p2-right"]);
+    const destroyed = context.events.filter((e) => e.type === "DESTROY");
+    expect(destroyed.map((e) => e.payload?.target)).toEqual(["p1-right", "p2-right"]);
+    // The death is attributed to the referendum so the battle log reads 因【高雄氣爆】死亡.
+    expect(destroyed.every((e) => e.payload?.reason === "EVENT" && e.payload?.eventName === "高雄氣爆")).toBe(true);
   });
 
   it("高雄氣爆 DESTROY_RIGHTMOST_MINIONS skips sides with no minions", () => {
@@ -259,7 +261,10 @@ describe("turn-20 vote-event handlers", () => {
     expect(state.players.player2.hand.every((card) => card.cost === 10)).toBe(true);
     expect(state.players.player1.graveyard.length).toBe(p1GraveBefore + 2);
     expect(context.events.filter((e) => e.type === "BOUNCE")).toHaveLength(3);
-    expect(context.events.filter((e) => e.type === "DESTROY").map((e) => e.payload?.target)).toEqual(["p1-overflow-b", "p1-overflow-a"]);
+    const destroyed = context.events.filter((e) => e.type === "DESTROY");
+    expect(destroyed.map((e) => e.payload?.target)).toEqual(["p1-overflow-b", "p1-overflow-a"]);
+    // Overflow that can't return to a full hand is attributed to 戒嚴, not generic 陣亡.
+    expect(destroyed.every((e) => e.payload?.reason === "EVENT" && e.payload?.eventName === "戒嚴")).toBe(true);
   });
 
   describe("社交距離 ENV_BOARD_LIMIT", () => {
