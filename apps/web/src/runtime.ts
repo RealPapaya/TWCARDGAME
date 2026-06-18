@@ -74,6 +74,7 @@ import { cssEscape } from "./app/dom.js";
 import { classifyBatchScopes, findEffectSourceKey, mapEventToCueKind, type AoeCluster } from "./app/cue-scope.js";
 import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
+import { renderCardFaceMarkup, renderAugmentOptionMarkup, renderVoteOptionMarkup } from "./app/card-markup.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import {
   clearActiveMatch,
@@ -2377,18 +2378,19 @@ function renderCardFace(card: ResolvedCardView, _size?: "hand" | "mulligan"): st
   ]);
   const attackClass = classNames(["stat-atk", valueDeltaClass(card.attack, card.baseAttack)]);
   const healthClass = classNames(["stat-hp", valueDeltaClass(card.health, card.baseHealth)]);
-  return `
-    <span class="${costClass}"><span>${shownCost}</span></span>
-    <strong class="card-title">${escapeHtml(card.name)}</strong>
-    <img class="card-art-box" src="${escapeAttr(assetUrl(card.image))}" alt="" loading="lazy" draggable="false" />
-    <span class="card-category">${escapeHtml(card.category)}</span>
-    <span class="card-desc">${renderCardDescription(card)}</span>
-    ${
-      card.type === "MINION"
-        ? `<span class="minion-stats"><span class="${attackClass}"><span>${card.attack ?? 0}</span></span><span class="${healthClass}">${card.health ?? 0}</span></span>`
-        : ""
-    }
-  `;
+  return renderCardFaceMarkup({
+    costClass,
+    shownCost,
+    name: card.name,
+    image: card.image,
+    category: card.category,
+    descriptionHtml: renderCardDescription(card),
+    type: card.type,
+    attack: card.attack,
+    health: card.health,
+    attackClass,
+    healthClass
+  });
 }
 
 function renderCardDescription(card: ResolvedCardView): string {
@@ -2876,19 +2878,15 @@ function currentPromptChoice(): PromptChoiceOffer | undefined {
 function renderAmplificationOption(option: AmplificationOption, disabled: boolean): string {
   const tierClass = AMP_TIER_CLASS[option.tier] ?? "amp-tier-low";
   const imgSrc = augmentImageSrc(option.id);
-  return `
-    <button
-      class="card mulligan-card amp-option ${tierClass}"
-      data-amp-id="${escapeAttr(option.id)}"
-      data-dom-key="amp-${escapeAttr(option.id)}"
-      ${disabled ? "disabled" : ""}
-    >
-      <span class="amp-tier-badge">${escapeHtml(option.tier)}</span>
-      ${imgSrc ? `<img class="amp-option-art" src="${escapeAttr(imgSrc)}" alt="${escapeAttr(option.name)}" draggable="false" loading="eager" onerror="this.hidden=true" />` : ""}
-      <span class="amp-option-name">${escapeHtml(option.name)}</span>
-      <span class="amp-option-desc">${renderDescriptionWithRelatedCards(option.description, option.relatedCardIds)}</span>
-    </button>
-  `;
+  return renderAugmentOptionMarkup({
+    tier: option.tier,
+    tierClass,
+    name: option.name,
+    descriptionHtml: renderDescriptionWithRelatedCards(option.description, option.relatedCardIds),
+    imgSrc,
+    extraAttrs: `data-amp-id="${escapeAttr(option.id)}"\n      data-dom-key="amp-${escapeAttr(option.id)}"`,
+    disabled
+  });
 }
 
 function renderDescriptionWithRelatedCards(description: string, relatedCardIds: readonly string[] | undefined): string {
@@ -2985,18 +2983,13 @@ function voteEventImageSrc(eventId: string): string | undefined {
 
 function renderVoteOption(event: { id: string; name: string; options: string[] }, index: number, disabled: boolean): string {
   const imgSrc = voteEventImageSrc(event.id);
-  return `
-    <button
-      class="card mulligan-card vote-option"
-      data-vote-index="${index}"
-      data-dom-key="vote-${escapeAttr(event.id)}"
-      ${disabled ? "disabled" : ""}
-    >
-      <span class="vote-option-name">${escapeHtml(event.name)}</span>
-      ${imgSrc ? `<img class="vote-option-art" src="${escapeAttr(imgSrc)}" alt="${escapeAttr(event.name)}" draggable="false" loading="eager" onerror="this.hidden=true" />` : ""}
-      <span class="vote-option-desc">${escapeHtml(event.options[0] ?? "")}</span>
-    </button>
-  `;
+  return renderVoteOptionMarkup({
+    name: event.name,
+    optionLabel: event.options[0] ?? "",
+    imgSrc,
+    extraAttrs: `data-vote-index="${index}"\n      data-dom-key="vote-${escapeAttr(event.id)}"`,
+    disabled
+  });
 }
 
 function renderResultOverlay(status: GameStatus | ""): string {

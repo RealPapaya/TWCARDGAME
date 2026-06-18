@@ -58,7 +58,10 @@
       "Bash(python -c 'from PIL import Image; import os; [print\\(f, Image.open\\('\\\\''R:/'\\\\''+f\\).size\\) for f in ['\\\\''ChatGPT Image 2026年6月14日 上午12_04_57-Photoroom.png'\\\\'','\\\\''ChatGPT Image 2026年6月14日 上午12_21_15-Photoroom.png'\\\\'']]')",
       "Bash(ls scripts *)",
       "Bash(ls apps/web/scripts)",
-      "Bash(python -c \"import PIL, numpy; print\\('ok'\\)\")"
+      "Bash(python -c \"import PIL, numpy; print\\('ok'\\)\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/balance-editor.html)",
+      "Bash(node -e \"require.resolve\\('playwright'\\); console.log\\('ok'\\)\")",
+      "Bash(node -e \"require.resolve\\('@playwright/test'\\); console.log\\('pwtest'\\)\")"
     ],
     "additionalDirectories": [
       "\\tmp"
