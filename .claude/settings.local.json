@@ -62,7 +62,10 @@
       "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/balance-editor.html)",
       "Bash(node -e \"require.resolve\\('playwright'\\); console.log\\('ok'\\)\")",
       "Bash(node -e \"require.resolve\\('@playwright/test'\\); console.log\\('pwtest'\\)\")",
-      "Bash(python -c \"from PIL import Image; im=Image.open\\('scripts/augment_sources/BUFF-BRONZE2-Photoroom.png'\\); print\\('size', im.size\\)\")"
+      "Bash(python -c \"from PIL import Image; im=Image.open\\('scripts/augment_sources/BUFF-BRONZE2-Photoroom.png'\\); print\\('size', im.size\\)\")",
+      "WebSearch",
+      "WebFetch(domain:docs.partykit.io)",
+      "Bash(git *)"
     ],
     "additionalDirectories": [
       "\\tmp"

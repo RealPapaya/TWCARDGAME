@@ -84,3 +84,11 @@ Validation cadence:
 - Card or rules changes: update or add tests before declaring done — rules behavior is exercised in [packages/rules/src/rules.test.ts](packages/rules/src/rules.test.ts) and the catalog in [packages/cards/src/catalog.test.ts](packages/cards/src/catalog.test.ts).
 
 The Chinese build guide is [docs/製作.md](docs/製作.md), and the architecture overview is [docs/v2-architecture.md](docs/v2-architecture.md).
+
+## Cloudflare migration (multi-session project)
+
+There is an active, multi-session plan to move hosting from Colyseus-on-Railway + Vercel to a near-free Cloudflare stack (Durable Objects/PartyKit + Pages + R2), **keeping Supabase for Auth + DB** (Plan B). If a task touches hosting, the realtime transport, deployment, or asks "continue the migration", READ the roadmap first — it has the locked decisions, per-phase work, the Colyseus→Durable Object mapping, and a live progress tracker that each session updates:
+
+- [docs/cloudflare-migration-roadmap.md](docs/cloudflare-migration-roadmap.md)
+
+Invariant for this migration: `packages/rules` / `shared` / `cards` move **untouched** — only the transport/room/persistence plumbing changes. Gameplay logic and balance must stay byte-identical.
