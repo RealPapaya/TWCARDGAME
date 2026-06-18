@@ -692,6 +692,39 @@ function cardHasImage(card: CardDefinition): boolean {
   return card.image.trim().length > 0;
 }
 
+// ── image URL resolution (mirrors apps/web/src/runtime.ts conventions) ──
+function assetUrl(path: string): string {
+  if (!path) return "";
+  if (/^https?:\/\//.test(path) || path.startsWith("/")) return path;
+  return `/${path.replace(/^assets\//, "").replace(/\\/g, "/")}`;
+}
+
+/** Augment icon path by convention: /images/augments/<id lowercased>.webp */
+function augmentImageSrc(id: string): string {
+  return `/images/augments/${id.toLowerCase()}.webp`;
+}
+
+/** Vote-event image path by convention: /images/events/<id lowercased>.webp */
+function voteEventImageSrc(id: string): string {
+  return `/images/events/${id.toLowerCase()}.webp`;
+}
+
+/**
+ * A thumbnail that hides itself (and flips the row's image status to "無") if the
+ * file 404s — so the displayed state reflects what actually ships in public/images.
+ */
+function imageThumbHtml(src: string, size = 40): string {
+  if (!src) return "";
+  const px = `${size}px`;
+  return `<img class="be-thumb" src="${escapeAttr(src)}" alt="" loading="lazy"
+    style="width:${px};height:${px};object-fit:cover;border-radius:6px;background:#0003"
+    onerror="this.dataset.missing='1';this.style.display='none';const c=this.closest('.be-row');if(c)c.dataset.noimage='1'" />`;
+}
+
+function escapeAttr(value: string): string {
+  return value.replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]!);
+}
+
 function numInput(value: number, onChange: (v: number) => void, min = 0, max = 99): HTMLElement {
   const wrap = h("div", { class: "be-num-group" });
   const dec = h("button", { class: "be-num-btn", type: "button" }, "−");
@@ -901,7 +934,7 @@ function renderCardsPanel(): HTMLElement {
       tr.innerHTML = `
         <td style="font-family:monospace;color:var(--text-muted)">${card.id}</td>
         <td style="font-weight:600">${card.name}</td>
-        <td>${imageStatusHtml(cardHasImage(card))}</td>
+        <td style="display:flex;align-items:center;gap:6px">${cardHasImage(card) ? imageThumbHtml(assetUrl(card.image)) : ""}${imageStatusHtml(cardHasImage(card))}</td>
         <td><span style="color:var(--primary);font-weight:700">${card.cost}</span></td>
         <td>${card.type === "MINION" ? `${card.attack ?? 0}/${card.health ?? 0}` : "—"}</td>
         <td><span class="be-balance" style="color:${bClr};background:${bClr}15" title="力量${bal.power} / 期望${bal.expected}">${balPct}% ${balanceLabel(bal.ratio)}</span></td>
@@ -1007,6 +1040,9 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
     refresh();
   });
   imageField.append(imageInp);
+  const cardPreview = h("div", { style: "margin-top:6px" });
+  cardPreview.innerHTML = card.image.trim() ? imageThumbHtml(assetUrl(card.image), 96) : "";
+  imageField.append(cardPreview);
   grid.append(imageField);
 
   // description
@@ -1157,7 +1193,7 @@ function renderAmpsPanel(): HTMLElement {
         <td style="font-family:monospace;color:var(--text-muted)">${amp.id}</td>
         <td style="font-weight:600" class="${tierClass(tier)}">${amp.name}</td>
         <td style="color:var(--text-dim);max-width:300px">${amp.description}</td>
-        <td>${imageStatusHtml(Boolean(amp.hasImage))}</td>
+        <td style="display:flex;align-items:center;gap:6px">${imageThumbHtml(augmentImageSrc(amp.id))}${imageStatusHtml(Boolean(amp.hasImage))}</td>
         <td>${amp.factionTags.length ? amp.factionTags.join(", ") : "通用"}</td>
         <td style="font-size:0.75rem">${effectSummary(amp.effect)}</td>
         <td>${amp.firstPhaseOnly ? "✓" : ""}</td>
@@ -1223,6 +1259,9 @@ function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
   });
   imgToggles.append(imgBtn);
   imgF.append(imgToggles);
+  const ampPreview = h("div", { style: "margin-top:6px" });
+  ampPreview.innerHTML = imageThumbHtml(augmentImageSrc(amp.id), 96);
+  imgF.append(ampPreview);
   grid.append(imgF);
 
   // effect
@@ -1251,7 +1290,7 @@ function renderVotesPanel(): HTMLElement {
     tr.innerHTML = `
       <td style="font-family:monospace;color:var(--text-muted)">${ve.id}</td>
       <td style="font-weight:600">${ve.name}</td>
-      <td>${imageStatusHtml(Boolean(ve.hasImage))}</td>
+      <td style="display:flex;align-items:center;gap:6px">${imageThumbHtml(voteEventImageSrc(ve.id))}${imageStatusHtml(Boolean(ve.hasImage))}</td>
       <td style="font-weight:700;color:var(--primary)">${ve.tierWeight}</td>
       <td><div class="be-weight-bar"><div class="be-weight-bar-fill" style="width:${pct}%"></div></div></td>
       <td><span class="be-type be-type--${ve.apply.mode === "ENVIRONMENT" ? "MINION" : "NEWS"}">${ve.apply.mode}</span></td>
@@ -1307,6 +1346,9 @@ function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
   });
   imgToggles.append(imgBtn);
   imgF.append(imgToggles);
+  const vePreview = h("div", { style: "margin-top:6px" });
+  vePreview.innerHTML = imageThumbHtml(voteEventImageSrc(ve.id), 96);
+  imgF.append(vePreview);
   grid.append(imgF);
 
   // options

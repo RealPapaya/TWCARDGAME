@@ -264,18 +264,18 @@
 /* Right-side icon rail: image-only round buttons from the 5x4 UI sheet. */
 .menu-icon-rail {
   position: absolute;
-  right: 60px;
-  top: 20px;
+  right: 42px;
+  top: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 0;
   z-index: 100;
 }
 
 .menu-icon-btn {
   appearance: none;
-  width: 108px;
-  height: 108px;
+  width: 124px;
+  height: 124px;
   background: transparent;
   border: 0;
   border-radius: 50%;
@@ -300,6 +300,10 @@
   overflow: visible;
 }
 
+.menu-icon-btn + .menu-icon-btn {
+  margin-top: -8px;
+}
+
 .rail-icon-image {
   width: 100%;
   height: 100%;
@@ -315,7 +319,7 @@
 }
 
 .menu-icon-btn:hover:not(:disabled) {
-  transform: scale(1.08);
+  transform: scale(1.05);
 }
 
 .menu-icon-btn:active:not(:disabled) {

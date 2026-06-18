@@ -44,6 +44,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_VOUCHER_3600",
+    hasImage: true,
     name: "消費券3600",
     description: "下一回合獲得 2 顆水晶（僅一回合）。",
     tier: "加減賺",
@@ -61,6 +62,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_0050",
+    hasImage: true,
     name: "蹲得越低",
     description: "下一次增幅的等級提升一階。",
     tier: "加減賺",
@@ -70,6 +72,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_GO_FOR_BROKE",
+    hasImage: true,
     name: "要拚",
     description: "下一次增幅可以多重抽一次增幅。",
     tier: "加減賺",
@@ -106,6 +109,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_FLEE_ABROAD",
+    hasImage: true,
     name: "潛逃國外",
     description: "此局必定不會受第 20 回合公投事件影響。",
     tier: "加減賺",
@@ -114,6 +118,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_TYPHOON_DAY",
+    hasImage: true,
     name: "颱風假",
     description: "所有勞工永久 +1攻擊（含之後打出，整局有效）。",
     tier: "加減賺",
@@ -141,6 +146,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_VILLAGE_LUNCHBOX",
+    hasImage: true,
     name: "里長的愛心便當",
     description: "英雄生命上限 +5。",
     tier: "加減賺",
@@ -149,6 +155,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_BLOOD_DONATION_VOUCHER",
+    hasImage: true,
     name: "捐血送禮券",
     description: "英雄生命 -5，下回合獲得 +3 水晶（僅一回合）。",
     tier: "加減賺",
@@ -168,6 +175,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   // ---- 穩穩仔賺（中增幅）------------------------------------------------------
   {
     id: "AMP_DIVIDEND",
+    hasImage: true,
     name: "股利分紅",
     description: "手上所有卡牌費用 -2（僅當下手牌）。",
     tier: "穩穩仔賺",
@@ -176,6 +184,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_INVOICE_1000",
+    hasImage: true,
     name: "發票中1000",
     description: "額外獲得兩顆水晶，水晶上限 +2。",
     tier: "穩穩仔賺",
@@ -184,6 +193,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_TAX_CUT",
+    hasImage: true,
     name: "減稅",
     description: "此局英雄每次受到傷害 -1。",
     tier: "穩穩仔賺",
@@ -192,6 +202,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_CHILDCARE",
+    hasImage: true,
     name: "育兒津貼",
     description: "每當打出隨從牌 該隨從最大生命 +1。",
     tier: "穩穩仔賺",
@@ -200,6 +211,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_FREE_SPEECH",
+    hasImage: true,
     name: "言論自由",
     description: "新聞費用永久 -2。",
     tier: "穩穩仔賺",
@@ -208,6 +220,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_NEW_HOUSING",
+    hasImage: true,
     name: "新青年安心成家貸款",
     description: "建築費用永久 -4。",
     tier: "穩穩仔賺",
@@ -216,6 +229,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_BETEL_NUT_500",
+    hasImage: true,
     name: "林北檳榔擠剛攏哺500啦",
     description: "獲得 3 張檳榔到手牌。",
     relatedCardIds: ["S029"],
@@ -225,6 +239,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_BEGGAR_HERO",
+    hasImage: true,
     name: "乞丐超人",
     description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
     tier: "穩穩仔賺",
@@ -233,6 +248,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_DCA",
+    hasImage: true,
     name: "定期定額",
     description: "第 10 回合起，每回合水晶成長 +2，上限提升至 15。",
     tier: "穩穩仔賺",
@@ -241,6 +257,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_PARTY_ASSET_SUPPLEMENT",
+    hasImage: true,
     name: "黨產大補丸",
     description: "英雄生命上限 +10。",
     tier: "穩穩仔賺",
@@ -249,6 +266,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_NATIONAL_HOLIDAY",
+    hasImage: true,
     name: "國定假日",
     description: "自己目前場上隨從立刻回到手牌，並且獲得 +2/+2，費用 -1。",
     tier: "穩穩仔賺",
@@ -257,6 +275,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_NUCLEAR_FREE_HOMELAND",
+    hasImage: true,
     name: "非核家園",
     description: "每當召喚一名民進黨政治人物，在對手場上放置一個核廢料。",
     relatedCardIds: ["TW077"],
@@ -271,6 +290,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_RESTART_NUCLEAR_FOUR",
+    hasImage: true,
     name: "重啟核四",
     description: "在自己的場上放置 4 張核電廠。",
     relatedCardIds: ["TW063"],
@@ -280,6 +300,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_RETURN_COUNTRY_TO_YOU",
+    hasImage: true,
     name: "把國家還給你們",
     description: "整局我方民眾黨政治人物死亡時，治療死亡當下兩側仍存活隨從 2 點生命。",
     tier: "穩穩仔賺",
@@ -294,6 +315,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   // ---- 卯死（高增幅）------------------------------------------------------
   {
     id: "AMP_ISLAND_DAWN",
+    hasImage: true,
     name: "島嶼天光",
     description: "天色漸漸光 — 所有民進黨政治人物在此局生命變成兩倍。",
     tier: "卯死",
@@ -302,6 +324,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_DEFAULT_SETTLEMENT",
+    hasImage: true,
     name: "違約交割",
     description: "獲得 10 點水晶 但接下來 10 回合動彈不得（雙方合計）。",
     tier: "卯死",
@@ -311,6 +334,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_JACKPOT",
+    hasImage: true,
     name: "發票中頭獎",
     description: "額外獲得 3 顆水晶，水晶上限 +3。",
     tier: "卯死",
@@ -319,6 +343,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_VENDOR_KICKBACK",
+    hasImage: true,
     name: "廠商回扣",
     description: "本場比賽摧毀隨從後，可以立刻獲得該隨從原始費用的水晶。",
     tier: "卯死",
@@ -327,6 +352,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_ILLEGAL_MIGRANT_WORKERS",
+    hasImage: true,
     name: "非法移工",
     description: "隨機從牌組召喚三名勞工。本場每當有勞工死亡，本回合獲得 1 點臨時費用。",
     tier: "卯死",
@@ -340,6 +366,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_PUDU",
+    hasImage: true,
     name: "普渡",
     description: "本場我方隨從死後都會復活一次 但攻擊 / 生命只有 1。",
     tier: "卯死",
@@ -348,6 +375,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_TW_40000",
+    hasImage: true,
     name: "台股四萬點",
     description: "第 20 回合起，每回合水晶成長 +2，上限提升至 30。",
     tier: "卯死",
@@ -356,6 +384,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_FIRE_SALE",
+    hasImage: true,
     name: "跳樓大拍賣",
     description: "手上的牌 費用全部歸剩下 1（僅當下手牌）。",
     tier: "卯死",
@@ -364,6 +393,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_ONE_PARTY_DOMINANCE",
+    hasImage: true,
     name: "一黨獨大",
     description: "英雄生命上限 +20。",
     tier: "卯死",
@@ -372,6 +402,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_TAIJI_ELECTRIC_OFFER",
+    hasImage: true,
     name: "台雞電OFFER",
     description: "你的下個回合卡片費用改為血量。",
     tier: "卯死",
@@ -380,6 +411,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_1992_CONSENSUS",
+    hasImage: true,
     name: "九二共識",
     description: "所有國民黨政治人物費用永久 -1，並獲得「遺志：回到牌組堆」。",
     tier: "卯死",
@@ -393,6 +425,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
   },
   {
     id: "AMP_GARBAGE_NO_BLUE_GREEN",
+    hasImage: true,
     name: "垃圾不分藍綠",
     description: "立即賦予我方民眾黨政治人物光盾；整局每當我方民眾黨政治人物獲得光盾或帶著天生光盾上場時，攻擊 +3。",
     tier: "卯死",
