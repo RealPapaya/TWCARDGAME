@@ -405,9 +405,26 @@ describe("environment effects", () => {
     };
     expect(getCardActualCost(state, seat, card)).toBe(Math.min(10, base + 2));
 
-    // Past its window the penalty no longer applies.
-    state.turn.number = state.currentEnvironment.expiresTurn! + 1;
+    // At the first expired turn, the penalty no longer applies.
+    state.turn.number = state.currentEnvironment.expiresTurn!;
     expect(getCardActualCost(state, seat, card)).toBe(base);
+  });
+
+  it("projects environment countdown from 4 to 1, then hides it", () => {
+    const state = startMatch(31);
+    state.currentEnvironment = {
+      id: "VE_BLACKOUT",
+      name: "大停電",
+      appliedTurn: state.turn.number,
+      expiresTurn: state.turn.number + 4,
+      effect: { type: "ENV_SILENCE_ALL" }
+    };
+
+    expect(toPublicState(state).activeEnvironment?.remainingTurns).toBe(4);
+    state.turn.number = state.currentEnvironment.expiresTurn! - 1;
+    expect(toPublicState(state).activeEnvironment?.remainingTurns).toBe(1);
+    state.turn.number = state.currentEnvironment.expiresTurn!;
+    expect(toPublicState(state).activeEnvironment).toBeUndefined();
   });
 
   it("caps the cost penalty at 10", () => {

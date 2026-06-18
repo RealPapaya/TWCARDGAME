@@ -195,7 +195,7 @@ export type ClientViewState = {
     result?: any;
     players?: Partial<Record<Seat, PublicPlayer>>;
     boardLimit?: number;
-    activeEnvironment?: { id: string; name: string };
+    activeEnvironment?: { id: string; name: string; remainingTurns?: number };
   };
   /** This seat's privately-delivered amplification options (turn 6/14). */
   amplificationOptions?: AmplificationOption[];

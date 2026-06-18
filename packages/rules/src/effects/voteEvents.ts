@@ -81,7 +81,7 @@ export function destroyRightmostMinions(_effect: EffectDefinition, context: Effe
 /**
  * 普發現金：判斷目前是否處於「下一整輪卡牌費用 0」的環境。
  * 由 `getCardActualCost` 讀取。gate `turn.number > appliedTurn` 排除公投當下
- * (第 20 回合)，讓效果精準落在下一整輪 (第 21、22 回合，durationTurns 2)。
+ * (第 20 回合)，讓效果精準落在下一整輪 (第 21、22 回合；半開 expiry 下 durationTurns 3)。
  */
 /** 黨內鬥爭：雙方各自只保留一隻最高費用隨從；並列最高時隨機保留一隻。 */
 export function keepRandomHighestCostPerSide(_effect: EffectDefinition, context: EffectContext): void {

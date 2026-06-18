@@ -178,6 +178,7 @@ export class GameStateSchema extends Schema {
   boardLimit = 7;
   activeEnvironmentId = "";
   activeEnvironmentName = "";
+  activeEnvironmentRemainingTurns = 0;
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -197,4 +198,5 @@ defineTypes(GameStateSchema, {
   boardLimit: "number",
   activeEnvironmentId: "string",
   activeEnvironmentName: "string",
+  activeEnvironmentRemainingTurns: "number",
 });

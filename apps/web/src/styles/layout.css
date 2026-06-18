@@ -2082,6 +2082,7 @@ body.hand-dragging .hand-row .card {
   pointer-events: none;
 }
 .hero-event-dot {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2096,16 +2097,52 @@ body.hand-dragging .hand-row .card {
   background: #6c4bb0;
   border: 2px solid rgba(255, 255, 255, 0.85);
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
-  overflow: hidden;
   pointer-events: auto;
   cursor: help;
   text-shadow: none;
   transition: transform 0.14s ease, box-shadow 0.14s ease, filter 0.14s ease;
 }
+.hero-event-dot.has-turns {
+  flex-direction: column;
+  gap: 1px;
+  width: 32px;
+  height: 32px;
+}
+.hero-event-dot.urgent {
+  background: #b01f17;
+  border-color: #fff1c2;
+  box-shadow: 0 0 0 1px rgba(143, 29, 19, 0.65), 0 0 12px rgba(255, 74, 40, 0.78);
+}
 .hero-event-dot:hover {
   transform: scale(1.14);
   filter: brightness(1.1);
   box-shadow: 0 0 0 2px rgba(93, 46, 23, 0.45), 0 0 16px rgba(186, 150, 236, 0.78);
+}
+.hero-event-name {
+  display: block;
+  max-width: 20px;
+  overflow: hidden;
+}
+.hero-event-dot.has-turns .hero-event-name {
+  max-width: 26px;
+  font-size: 8px;
+}
+.hero-event-turns {
+  display: inline-grid;
+  place-items: center;
+  width: 18px;
+  height: 14px;
+  border-radius: 3px;
+  background: rgba(45, 22, 9, 0.92);
+  color: #ffef9d;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+.hero-event-dot.urgent .hero-event-turns {
+  background: #fff1c2;
+  color: #8f1d13;
 }
 .hero-augment-dot {
   display: flex;
@@ -3345,6 +3382,13 @@ body.hand-dragging .hand-row .card {
 .lock-countdown {
   border: 2px solid #ff6b6b;
   background: rgba(255, 107, 107, 0.2);
+}
+
+.lock-countdown.urgent {
+  border-color: #fff1c2;
+  background: rgba(176, 31, 23, 0.94);
+  color: #fff4d6;
+  box-shadow: 0 0 10px rgba(255, 74, 40, 0.78);
 }
 
 .quest-countdown {

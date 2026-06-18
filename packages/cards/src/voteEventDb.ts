@@ -131,7 +131,7 @@ export const VOTE_EVENT_DB: VoteEventDbEntry[] = [
     name: "普發現金",
     tierWeight: 30,
     options: ["下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0", "下一整輪雙方卡牌消耗為 0"],
-    apply: { mode: "ENVIRONMENT", durationTurns: 2, effect: { type: "ENV_COST_ZERO" } }
+    apply: { mode: "ENVIRONMENT", durationTurns: 3, effect: { type: "ENV_COST_ZERO" } }
   },
   {
     id: "VE_CURFEW_TIME",

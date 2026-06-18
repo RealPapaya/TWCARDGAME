@@ -201,7 +201,7 @@ export interface ActiveEnvironment {
   id: string;
   name: string;
   appliedTurn: number;
-  /** Turn number at which the effect lapses; omitted for permanent effects. */
+  /** First turn number where the effect is no longer active; omitted for permanent effects. */
   expiresTurn?: number;
   effect: EffectDefinition;
 }

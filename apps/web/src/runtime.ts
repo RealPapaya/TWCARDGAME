@@ -2116,7 +2116,17 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
 function renderHeroEventBadge(): string {
   const env = readActiveEnvironment();
   if (!env) return "";
-  return `<span class="hero-events" aria-hidden="false"><button class="hero-event-dot" type="button" data-event-id="${escapeAttr(env.id)}" aria-label="${escapeAttr(`公投場地效果：${env.name}`)}">${escapeHtml(env.name.slice(0, 2))}</button></span>`;
+  const turns = typeof env.remainingTurns === "number" ? Math.max(1, Math.floor(env.remainingTurns)) : undefined;
+  const dotClass = [
+    "hero-event-dot",
+    turns !== undefined && "has-turns",
+    turns !== undefined && turns <= 1 && "urgent"
+  ].filter(Boolean).join(" ");
+  const turnsHtml = turns === undefined
+    ? ""
+    : `<span class="hero-event-turns">${turns}</span>`;
+  const label = turns === undefined ? `公投場地效果：${env.name}` : `公投場地效果：${env.name}，剩餘 ${turns} 回合`;
+  return `<span class="hero-events" aria-hidden="false"><button class="${dotClass}" type="button" data-event-id="${escapeAttr(env.id)}" aria-label="${escapeAttr(label)}"><span class="hero-event-name">${escapeHtml(env.name.slice(0, 2))}</span>${turnsHtml}</button></span>`;
 }
 
 /**
@@ -5791,7 +5801,7 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
       result?: any;
       players?: Partial<Record<Seat, PublicPlayer>>;
       boardLimit?: number;
-      activeEnvironment?: { id: string; name: string };
+      activeEnvironment?: { id: string; name: string; remainingTurns?: number };
     }) => {
       applyPublicSync(message);
     }
@@ -9618,12 +9628,13 @@ function readBoardLimit(): number {
  * live. Prefers the live `publicSync` message, falling back to the synced schema
  * (`activeEnvironmentId`/`activeEnvironmentName`, empty strings → none).
  */
-function readActiveEnvironment(): { id: string; name: string } | undefined {
+function readActiveEnvironment(): { id: string; name: string; remainingTurns?: number } | undefined {
   const fromSync = view.publicSync?.activeEnvironment;
   if (fromSync?.id) return fromSync;
   const id = view.state?.activeEnvironmentId as string | undefined;
   const name = view.state?.activeEnvironmentName as string | undefined;
-  return id ? { id, name: name ?? id } : undefined;
+  const remainingTurns = view.state?.activeEnvironmentRemainingTurns as number | undefined;
+  return id ? { id, name: name ?? id, remainingTurns: remainingTurns && remainingTurns > 0 ? remainingTurns : undefined } : undefined;
 }
 
 function readPhaseDeadlineAtMs(): number {
@@ -10453,10 +10464,20 @@ const BADGE_ICON_QUEST =
 const BADGE_ICON_DEATH =
   `<svg class="badge-icon" viewBox="0 0 24 24" width="11" height="11" aria-hidden="true"><path fill="currentColor" d="M12 2C7 2 3 5.6 3 10c0 2.6 1.4 4.9 3.5 6.3V19a2 2 0 0 0 2 2h7a2 2 0 0 0 2-2v-2.7C20.6 14.9 22 12.6 22 10c0-4.4-4-8-9-8zM8.5 12a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm7 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3z"/></svg>`;
 
+function displayedLockTurns(minion: PublicMinion): number {
+  if (minion.lockedTurns <= 0) return 0;
+  const env = readActiveEnvironment();
+  if (env?.id === "VE_BLACKOUT" && typeof env.remainingTurns === "number") {
+    return Math.max(minion.lockedTurns, Math.floor(env.remainingTurns));
+  }
+  return minion.lockedTurns;
+}
+
 function renderCountdownBadges(minion: PublicMinion): string {
   let html = "";
-  if (minion.lockedTurns > 0) {
-    html += `<div class="countdown-badge lock-countdown">${BADGE_ICON_LOCK}<span>${minion.lockedTurns}</span></div>`;
+  const lockTurns = displayedLockTurns(minion);
+  if (lockTurns > 0) {
+    html += `<div class="countdown-badge lock-countdown ${lockTurns <= 1 ? "urgent" : ""}">${BADGE_ICON_LOCK}<span>${lockTurns}</span></div>`;
   }
   if (minion.questTurns !== undefined && minion.questTurns >= 0) {
     const questTotal = cardCatalog.get(minion.cardId)?.keywords?.quest?.turns ?? 1;

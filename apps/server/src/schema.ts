@@ -179,6 +179,7 @@ export class GameStateSchema extends Schema {
   boardLimit = 7;
   activeEnvironmentId = "";
   activeEnvironmentName = "";
+  activeEnvironmentRemainingTurns = 0;
 }
 defineTypes(GameStateSchema, {
   matchId: "string",
@@ -197,7 +198,8 @@ defineTypes(GameStateSchema, {
   resultReason: "string",
   boardLimit: "number",
   activeEnvironmentId: "string",
-  activeEnvironmentName: "string"
+  activeEnvironmentName: "string",
+  activeEnvironmentRemainingTurns: "number"
 });
 
 export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameState): void {
@@ -222,6 +224,7 @@ export function syncSchemaFromPublic(schema: GameStateSchema, state: PublicGameS
   schema.boardLimit = state.boardLimit;
   schema.activeEnvironmentId = state.activeEnvironment?.id ?? "";
   schema.activeEnvironmentName = state.activeEnvironment?.name ?? "";
+  schema.activeEnvironmentRemainingTurns = state.activeEnvironment?.remainingTurns ?? 0;
 }
 
 function syncSpecialPhase(target: SpecialPhaseSchema, sp: SpecialPhaseView | undefined): void {

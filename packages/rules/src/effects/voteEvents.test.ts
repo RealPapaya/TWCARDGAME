@@ -593,7 +593,7 @@ describe("turn-20 vote-event handlers", () => {
         id: "VE_CASH_HANDOUT",
         name: "普發現金",
         appliedTurn,
-        expiresTurn: appliedTurn + 2,
+        expiresTurn: appliedTurn + 3,
         effect: { type: "ENV_COST_ZERO" }
       };
 
