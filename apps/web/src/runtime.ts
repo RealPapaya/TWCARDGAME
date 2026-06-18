@@ -2116,17 +2116,7 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
 function renderHeroEventBadge(): string {
   const env = readActiveEnvironment();
   if (!env) return "";
-  const turns = typeof env.remainingTurns === "number" ? Math.max(1, Math.floor(env.remainingTurns)) : undefined;
-  const dotClass = [
-    "hero-event-dot",
-    turns !== undefined && "has-turns",
-    turns !== undefined && turns <= 1 && "urgent"
-  ].filter(Boolean).join(" ");
-  const turnsHtml = turns === undefined
-    ? ""
-    : `<span class="hero-event-turns">${turns}</span>`;
-  const label = turns === undefined ? `公投場地效果：${env.name}` : `公投場地效果：${env.name}，剩餘 ${turns} 回合`;
-  return `<span class="hero-events" aria-hidden="false"><button class="${dotClass}" type="button" data-event-id="${escapeAttr(env.id)}" aria-label="${escapeAttr(label)}"><span class="hero-event-name">${escapeHtml(env.name.slice(0, 2))}</span>${turnsHtml}</button></span>`;
+  return `<span class="hero-events" aria-hidden="false"><button class="hero-event-dot" type="button" data-event-id="${escapeAttr(env.id)}" aria-label="${escapeAttr(`公投場地效果：${env.name}`)}"><span class="hero-event-name">${escapeHtml(env.name.slice(0, 2))}</span></button></span>`;
 }
 
 /**
@@ -8189,6 +8179,7 @@ function handleEvents(message: GameEvent[]): AnimationCue[] {
   scheduleCueAudio(cues, message);
   playEventAudio(immediateAudioEvents(message));
   playDiscardAnimations(message, view.mySeat, { delayMs: handGate.discardDelayMs });
+  playBurnAnimations(message, view.mySeat);
   const rejection = message.find((item) => item.type === "COMMAND_REJECTED");
   if (rejection) {
     if (view.selectedHandId) view.rejectedHandIds.add(view.selectedHandId);
@@ -8795,6 +8786,7 @@ function resetCardPlayCues(): void {
   document.getElementById("card-play-overlay")?.replaceChildren();
   resetMinionVisualTracking();
   resetDrawTracking();
+  resetBurnTracking();
   resetVoteRoulette();
 }
 
@@ -10095,6 +10087,142 @@ function applyDeathShatter(cue: AnimationCue): void {
     container.remove();
     appliedDeathShatters.delete(cue.id);
   }, 800);
+}
+
+// --- OVERDRAW BURN (抽牌預覽 → 碎裂) -----------------------------------------
+// When a hand is already full (>= 10) and a card is still drawn, the rules
+// engine burns it instead of adding it to the hand, emitting CARD_BURNED. We
+// still honour the "draw preview": the card flies out of the deck and is
+// revealed — but instead of landing in the hand it shatters in place. The local
+// player sees the real card face; the opponent sees a face-down back so no
+// private info is implied on screen. This is imperative (no hand-sync diff can
+// drive it, since the card never enters a hand) and queued so several burns in
+// one batch play one at a time rather than stacking on the deck.
+const BURN_FLIGHT_MS = 620;
+const BURN_FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
+const BURN_HOLD_MS = 620;
+const BURN_SHATTER_MS = 780;
+const CARD_BACK_IMG = "/images/ui/card_back.webp";
+
+const burnQueue: Array<{ side: "player" | "opponent"; cardId: string }> = [];
+let burnQueueActive = false;
+
+/** Resets the overdraw-burn queue. Called alongside resetDrawTracking on teardown. */
+function resetBurnTracking(): void {
+  burnQueue.length = 0;
+  burnQueueActive = false;
+}
+
+/** Queues a fly-out + shatter for every CARD_BURNED event in the batch. */
+function playBurnAnimations(events: GameEvent[], mySeat: Seat | undefined): void {
+  for (const event of events) {
+    if (event.type !== "CARD_BURNED") continue;
+    const cardId = typeof event.payload?.cardId === "string" ? event.payload.cardId : undefined;
+    if (!cardId) continue;
+    const side = event.seat && event.seat === mySeat ? "player" : "opponent";
+    burnQueue.push({ side, cardId });
+  }
+  if (burnQueue.length > 0 && !burnQueueActive) runBurnQueue();
+}
+
+function runBurnQueue(): void {
+  const next = burnQueue.shift();
+  if (!next) {
+    burnQueueActive = false;
+    return;
+  }
+  burnQueueActive = true;
+  // onDone fires when this card begins to shatter (not after the fragments
+  // settle), so a streak of burns reads briskly rather than serialising fully.
+  playBurnAnimation(next.side, next.cardId, runBurnQueue);
+}
+
+/**
+ * Flies a single burned card out of the deck (the draw preview), holds it
+ * revealed, then shatters it in place. Mirrors the draw-animation flight
+ * (centre-anchored deck-pile launch, elastic overshoot) but ends in a
+ * spawnShatter instead of a hand landing.
+ */
+function playBurnAnimation(side: "player" | "opponent", cardId: string, onDone: () => void): void {
+  let done = false;
+  const finish = (): void => {
+    if (done) return;
+    done = true;
+    onDone();
+  };
+
+  // Wait two frames for stable layout, then re-query the deck pile (render()
+  // rebuilds the battle surface, so a node captured earlier would be detached).
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const deckEl = document.querySelector<HTMLElement>(`.deck-pile.battle-deck-pile.${side}-deck`);
+      if (!deckEl) {
+        finish();
+        return;
+      }
+      const deckRect = deckEl.getBoundingClientRect();
+      if (deckRect.width === 0 || (deckRect.left === 0 && deckRect.top === 0)) {
+        finish();
+        return;
+      }
+
+      const cloneW = 128;
+      const cloneH = 184;
+      const clone = document.createElement("div");
+      let artUrl: string;
+      if (side === "player") {
+        const catalogCard = cardCatalog.get(cardId);
+        clone.className = "card";
+        clone.innerHTML = catalogCard ? renderCardFace(resolveCatalogCard(catalogCard, `burn-${cardId}`)) : "";
+        artUrl = catalogCard ? assetUrl(catalogCard.image) : CARD_BACK_IMG;
+      } else {
+        // Opponent: a face-down back — don't reveal which card was burned.
+        clone.style.background = `url("${CARD_BACK_IMG}") center / 100% 100% no-repeat`;
+        clone.style.borderRadius = "10px";
+        clone.style.border = "2px solid #3b332b";
+        artUrl = CARD_BACK_IMG;
+      }
+
+      // Centre-anchor on the deck pile so the card visibly flies *out of* it,
+      // then rise clear of the deck toward the board (player up, opponent down).
+      const startX = deckRect.left + deckRect.width / 2 - cloneW / 2;
+      const startY = deckRect.top + deckRect.height / 2 - cloneH / 2;
+      const dir = side === "player" ? -1 : 1;
+      const endX = startX;
+      const endY = startY + dir * cloneH * 0.8;
+
+      clone.style.position = "fixed";
+      clone.style.left = "0";
+      clone.style.top = "0";
+      clone.style.width = `${cloneW}px`;
+      clone.style.height = `${cloneH}px`;
+      clone.style.margin = "0";
+      clone.style.zIndex = "9999";
+      clone.style.pointerEvents = "none";
+      clone.style.opacity = "1";
+      clone.style.transition = "none";
+      clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
+      document.body.appendChild(clone);
+
+      playSfx("cardDraw");
+
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          clone.style.transition = `transform ${BURN_FLIGHT_MS}ms ${BURN_FLIGHT_EASING}, opacity 0.25s ease`;
+          clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
+        });
+      });
+
+      window.setTimeout(() => {
+        const rect = clone.getBoundingClientRect();
+        const container = spawnShatter(rect, `url("${artUrl}")`, { durationMs: BURN_SHATTER_MS, cols: 4, rows: 5 });
+        clone.remove();
+        playSfx("death");
+        window.setTimeout(() => container.remove(), BURN_SHATTER_MS + 40);
+        finish();
+      }, BURN_FLIGHT_MS + BURN_HOLD_MS);
+    });
+  });
 }
 
 // Hero counterpart of applyDeathShatter: when a hero dies (GAME_FINISHED), the
