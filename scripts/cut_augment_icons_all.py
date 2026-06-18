@@ -24,8 +24,8 @@ VISIBILITY_TRIM = 16
 PAD = 14
 WEBP_QUALITY = 84
 
-COLS = [(87, 260), (350, 544), (614, 833), (889, 1083), (1144, 1376)]
-ROWS = [(64, 299), (330, 548), (587, 773), (797, 1006)]
+GRID_COLS = 5
+GRID_ROWS = 4
 
 SHEETS = {
     "bronze1": SRC / "BUFF-BRONZE-Photoroom.png",
@@ -68,7 +68,7 @@ AUGMENTS: list[tuple[str, str, int, int]] = [
     ("amp_free_speech", "silver2", 3, 3),
     ("amp_new_housing", "silver2", 0, 1),
     ("amp_betel_nut_500", "silver1", 3, 2),
-    ("amp_beggar_hero", "silver1", 2, 2),
+    ("amp_beggar_hero", "silver2", 2, 4),
     ("amp_dca", "silver2", 0, 4),
     ("amp_party_asset_supplement", "silver1", 0, 3),
     ("amp_national_holiday", "silver1", 3, 3),
@@ -155,17 +155,46 @@ def trim_icon(cell: Image.Image) -> Image.Image:
     return icon
 
 
-def cut_cell(sheet: Image.Image, row: int, col: int) -> Image.Image:
-    if sheet.size == (1448, 1086):
-        left, right = COLS[col]
-        top, bottom = ROWS[row]
-    else:
-        w, h = sheet.size
-        left = round(w * col / 5)
-        right = round(w * (col + 1) / 5)
-        top = round(h * row / 4)
-        bottom = round(h * (row + 1) / 4)
-    return trim_icon(sheet.crop((left, top, right, bottom)))
+def _bands(fill: np.ndarray) -> list[tuple[int, int]]:
+    """Contiguous spans where `fill` is True (filled rows / columns)."""
+    spans: list[tuple[int, int]] = []
+    start: int | None = None
+    for i, v in enumerate(fill):
+        if v and start is None:
+            start = i
+        elif not v and start is not None:
+            spans.append((start, i))
+            start = None
+    if start is not None:
+        spans.append((start, len(fill)))
+    return spans
+
+
+def _boundaries(bands: list[tuple[int, int]], extent: int, expected: int) -> list[int]:
+    """Cut lines for `expected` cells: sheet edges plus the midpoint of each
+    transparent gap between content bands. Falls back to even division when the
+    detected band count doesn't match the known grid (e.g. two icons touching).
+    Generous cells let `trim_icon`'s alpha bbox do the tight crop — so no icon is
+    clipped at a hardcoded cell edge."""
+    if len(bands) != expected:
+        return [round(extent * i / expected) for i in range(expected + 1)]
+    cuts = [0]
+    for (_, prev_end), (next_start, _) in zip(bands, bands[1:]):
+        cuts.append((prev_end + next_start) // 2)
+    cuts.append(extent)
+    return cuts
+
+
+def grid_lines(sheet: Image.Image) -> tuple[list[int], list[int]]:
+    arr = np.array(sheet.convert("RGBA"))
+    mask = (arr[:, :, 3] > ALPHA_TRIM) & (arr[:, :, :3].max(axis=2) > VISIBILITY_TRIM)
+    cols = _boundaries(_bands(mask.any(axis=0)), sheet.width, GRID_COLS)
+    rows = _boundaries(_bands(mask.any(axis=1)), sheet.height, GRID_ROWS)
+    return cols, rows
+
+
+def cut_cell(sheet: Image.Image, row: int, col: int, cols: list[int], rows: list[int]) -> Image.Image:
+    return trim_icon(sheet.crop((cols[col], rows[row], cols[col + 1], rows[row + 1])))
 
 
 def write_montage(names: list[str]) -> None:
@@ -189,11 +218,13 @@ def main() -> int:
         return 1
 
     sheets = {key: Image.open(path).convert("RGBA") for key, path in SHEETS.items()}
+    grids = {key: grid_lines(sheet) for key, sheet in sheets.items()}
     OUT.mkdir(parents=True, exist_ok=True)
 
     names: list[str] = []
     for name, sheet_key, row, col in AUGMENTS:
-        icon = cut_cell(sheets[sheet_key], row, col)
+        cols, rows = grids[sheet_key]
+        icon = cut_cell(sheets[sheet_key], row, col, cols, rows)
         path = OUT / f"{name}.webp"
         icon.save(path, "WEBP", quality=WEBP_QUALITY, method=6)
         names.append(name)

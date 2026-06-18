@@ -71,7 +71,7 @@ export function environmentAttackerDamage(state: MatchState, seat: Seat): number
 }
 
 export function isEnvironmentActive(state: MatchState, env: ActiveEnvironment): boolean {
-  return env.expiresTurn === undefined || state.turn.number <= env.expiresTurn;
+  return env.expiresTurn === undefined || state.turn.number < env.expiresTurn;
 }
 
 /**

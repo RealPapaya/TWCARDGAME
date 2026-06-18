@@ -75,7 +75,8 @@ export function toPublicState(state: MatchState): PublicGameState {
 function toActiveEnvironmentView(state: MatchState) {
   const env = state.currentEnvironment;
   if (!env || !isEnvironmentActive(state, env)) return undefined;
-  return { id: env.id, name: env.name };
+  const remainingTurns = env.expiresTurn === undefined ? undefined : Math.max(1, env.expiresTurn - state.turn.number);
+  return { id: env.id, name: env.name, remainingTurns };
 }
 
 /**

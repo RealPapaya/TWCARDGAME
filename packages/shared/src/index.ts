@@ -345,6 +345,7 @@ export interface PublicGameState {
 export interface ActiveEnvironmentView {
   id: string;
   name: string;
+  remainingTurns?: number;
 }
 
 export interface HandCardView {
