@@ -69,7 +69,37 @@
   left: 60px;
   top: 20px;
   z-index: 100;
-  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.version-corner .version-changelog-btn {
+  appearance: none;
+  cursor: pointer;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: #f6ecd8;
+  background: linear-gradient(to bottom, rgba(93, 46, 23, 0.85), rgba(45, 26, 14, 0.85));
+  border: 2px solid #8b4513;
+  border-radius: 8px;
+  padding: 6px 16px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.45);
+  transition: transform 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+}
+
+.version-corner .version-changelog-btn:hover {
+  transform: translateY(-2px);
+  background: linear-gradient(to bottom, rgba(139, 69, 19, 0.95), rgba(93, 46, 23, 0.95));
+  border-color: #d2691e;
+}
+
+.version-corner .version-changelog-btn:active {
+  transform: translateY(1px);
 }
 
 .version-corner .version-pill {
@@ -298,6 +328,35 @@
 
 .menu-image-btn {
   overflow: visible;
+}
+
+/* Custom tooltip below the round rail buttons (replaces native title). */
+.menu-icon-btn[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translate(-50%, -24px);
+  padding: 4px 12px;
+  white-space: nowrap;
+  font-family: var(--font-display);
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f6ecd8;
+  background: rgba(45, 26, 14, 0.92);
+  border: 2px solid #8b4513;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease, transform 0.16s ease;
+  z-index: 200;
+}
+
+.menu-icon-btn[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translate(-50%, -36px);
 }
 
 .menu-icon-btn + .menu-icon-btn {

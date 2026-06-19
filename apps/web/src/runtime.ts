@@ -773,6 +773,7 @@ function renderMainMenu(): string {
       ${renderCloudLayer()}
       <div class="version-corner">
         <span class="version-pill">${APP_VERSION}</span>
+        <button type="button" id="changelog-open" class="version-changelog-btn">更新資訊</button>
       </div>
       <div class="main-menu-center">
         <h1 class="game-title">寶島遊戲王</h1>
@@ -793,19 +794,19 @@ function renderMainMenu(): string {
         ${devTestModeAvailable && devTestPanel ? `<button class="menu-button" data-menu-screen="test">${escapeHtml(devTestPanel.menuLabel)}</button>` : ""}
       </div>
       <nav class="menu-icon-rail" aria-label="側邊功能">
-        <button id="settings-toggle" class="menu-icon-btn menu-image-btn" data-testid="menu-settings" title="設定">
+        <button id="settings-toggle" class="menu-icon-btn menu-image-btn" data-testid="menu-settings" data-tooltip="設定" aria-label="設定">
           <img class="rail-icon-image" src="/images/ui/RailSettings.webp" alt="設定" />
         </button>
-        <button class="menu-icon-btn menu-image-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" title="排行榜">
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="leaderboard" data-testid="menu-leaderboard" data-tooltip="排行榜" aria-label="排行榜">
           <img class="rail-icon-image" src="/images/ui/RailLeaderboard.webp" alt="排行榜" />
         </button>
-        <button class="menu-icon-btn menu-image-btn" data-menu-screen="friends" data-testid="menu-friends" title="好友" ${accountMode ? "" : "disabled"}>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="friends" data-testid="menu-friends" data-tooltip="好友" aria-label="好友" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailFriends.webp" alt="好友" />
         </button>
-        <button class="menu-icon-btn menu-image-btn" data-menu-screen="tasks" data-testid="menu-tasks" title="任務" ${accountMode ? "" : "disabled"}>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="tasks" data-testid="menu-tasks" data-tooltip="任務" aria-label="任務" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailTasks.webp" alt="任務" />
         </button>
-        <button class="menu-icon-btn menu-image-btn" data-menu-screen="achievements" data-testid="menu-achievements" title="成就" ${accountMode ? "" : "disabled"}>
+        <button class="menu-icon-btn menu-image-btn" data-menu-screen="achievements" data-testid="menu-achievements" data-tooltip="成就" aria-label="成就" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailAchievements.webp" alt="成就" />
         </button>
       </nav>
