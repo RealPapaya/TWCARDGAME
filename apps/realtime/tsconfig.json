@@ -1,0 +1,19 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "src",
+    "outDir": "dist",
+    // Workers run on workerd, not Node/DOM. Drop the DOM lib (whose WebSocket /
+    // Request / Response shapes clash with Cloudflare's) and pull the runtime
+    // globals from @cloudflare/workers-types instead.
+    "lib": ["ES2022"],
+    "types": ["@cloudflare/workers-types"]
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    { "path": "../../packages/shared" },
+    { "path": "../../packages/cards" },
+    { "path": "../../packages/rules" }
+  ]
+}

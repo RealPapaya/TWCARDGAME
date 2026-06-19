@@ -29,17 +29,30 @@
 
 ## §A. 進度追蹤(每個 session 完成後更新這裡)
 
-> **最後更新**:2026-06-19 — 規劃與研究完成,尚未開始實作(仍在 Railway/Colyseus 上正常運作)。
+> **最後更新**:2026-06-19 — Phase 0 PoC 完成,落在新分支 `feat/cloudflare-migration` 的
+> 新 workspace [`apps/realtime`](../apps/realtime/)(見其 README)。Railway/Colyseus 仍照常運作,尚未切換。
 
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 規劃 + 研究 + 鎖定方案 B | ✅ 完成 | 本文件 |
-| Phase 0 — 技術驗證 PoC | ⬜ 未開始 | 下一步;DO + `reduce` + 原生 WS 兩分頁對打 |
-| Phase 1 — 即時層平移 | ⬜ 未開始 | |
-| Phase 2 — 配對/私人房/重連 | ⬜ 未開始 | |
-| Phase 3 — 前端傳輸層替換 | ⬜ 未開始 | |
+| Phase 0 — 技術驗證 PoC | ✅ 完成 | `apps/realtime`:DO + `reduce` + 原生 WS;PvP 房號對打;回合/階段/重連倒數走單一 DO Alarm;Hibernation 持久化;`GameSession` 純核心 9 測試綠燈;`wrangler deploy --dry-run` 通過 |
+| Phase 1 — 即時層平移 | 🟡 進行中 | 即時核心已平移(`GameSession`);剩 PvE/BotRoom 用 Alarm pacing、Supabase 牌組解析 + 戰績/獎勵 hook(`onMatchComplete`) |
+| Phase 2 — 配對/私人房/重連 | ⬜ 未開始 | 下一步;Lobby DO 取代 matchmaking + `privateRooms.ts`;完整 reconnect token 流程 |
+| Phase 3 — 前端傳輸層替換 | ⬜ 未開始 | 傳輸面已測繪(見下方註);adapter 把 JSON 訊息轉回現有事件介面,並用 `state` 快照合成 `view.state` |
 | Phase 4 — Pages + R2 部署 | ⬜ 未開始 | |
 | Phase 5 — Supabase→D1(可選) | ⬜ 未開始 | 方案 B 預設**不做** |
+
+> **Phase 0 交付重點(給下一個 session):**
+> - 設計分層:`apps/realtime/src/GameSession.ts` = 純粹、可在 vitest 測試的 gameplay 編排(GameRoom 的搬遷);
+>   `GameDurableObject.ts` = 薄 adapter(Hibernation WebSocket + 單一 Alarm + storage 持久化)。遊戲邏輯零改動。
+> - 線路協定:JSON `{ type, payload }`,server→client 的 `type` 名稱**完全對齊**現有 web client 的
+>   `onMessage` 事件,外加一個 `state`(完整 `PublicGameState` 快照,對應舊 client 的 `room.onStateChange`)。
+> - **Phase 3 關鍵發現**(傳輸面測繪):web client 會直接讀 `room.state`,且整個對戰 UI 以 `view.state.matchId`
+>   是否存在來 gating;但只用 room 級 `onStateChange`(無 granular schema callback),所以 adapter 只要把
+>   整包 JSON 快照塞進 `view.state`(player1/player2 為 top-level 欄位、turn/specialPhase/pendingPromptId 等)即可,
+>   **不需**複刻 Colyseus delta。共 10 個 onMessage 事件、2 個 send 事件,已全數確認。
+> - 跑法見 `apps/realtime/README.md`:`npm run build -w @twcardgame/realtime && npm run dev -w @twcardgame/realtime`,
+>   開兩個分頁打 `apps/realtime/poc/client.html`。
 
 狀態圖例:⬜ 未開始 / 🟡 進行中 / ✅ 完成 / ⛔ 卡住(備註寫原因)
 

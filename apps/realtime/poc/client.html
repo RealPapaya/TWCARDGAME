@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TWCARDGAME · Durable Object PoC client</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, "Noto Sans TC", sans-serif; }
+      body { margin: 0; background: #11151c; color: #e6edf3; }
+      header { padding: 10px 14px; background: #161b22; border-bottom: 1px solid #30363d; display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+      header input { background: #0d1117; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 6px 8px; }
+      button { background: #21262d; color: #e6edf3; border: 1px solid #30363d; border-radius: 6px; padding: 6px 10px; cursor: pointer; }
+      button:hover { border-color: #58a6ff; }
+      button:disabled { opacity: 0.4; cursor: not-allowed; }
+      main { display: grid; grid-template-columns: 1fr 320px; gap: 12px; padding: 12px; }
+      .board { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; }
+      .row { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+      .hero { display: inline-flex; gap: 12px; align-items: center; padding: 8px 12px; border: 1px solid #30363d; border-radius: 8px; }
+      .hero.target { outline: 2px solid #f85149; cursor: pointer; }
+      .minion { min-width: 78px; padding: 6px 8px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; font-size: 12px; cursor: pointer; }
+      .minion.taunt { border-color: #d29922; }
+      .minion.can-attack { box-shadow: 0 0 0 2px #2ea043 inset; }
+      .minion.selected { outline: 2px solid #58a6ff; }
+      .minion.target { outline: 2px solid #f85149; }
+      .card { min-width: 92px; padding: 8px; border: 1px solid #30363d; border-radius: 8px; background: #0d1117; font-size: 12px; cursor: pointer; }
+      .card .cost { color: #58a6ff; font-weight: 700; }
+      .pill { font-size: 12px; color: #8b949e; }
+      .panel { background: #161b22; border: 1px solid #30363d; border-radius: 10px; padding: 12px; }
+      #log { height: 360px; overflow: auto; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+      .me { background: #12241a; }
+      h3 { margin: 4px 0 8px; font-size: 13px; color: #8b949e; text-transform: uppercase; letter-spacing: 0.05em; }
+      .hint { color: #d29922; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <header>
+      <input id="server" size="26" value="ws://127.0.0.1:8787" />
+      <input id="room" size="10" value="ROOM1" placeholder="room code" />
+      <input id="name" size="10" placeholder="name" />
+      <button id="connect">Connect</button>
+      <span id="status" class="pill">disconnected</span>
+      <span id="joincode" class="pill"></span>
+    </header>
+    <main>
+      <section>
+        <div class="board" id="opp"></div>
+        <div class="board me" id="self"></div>
+        <div class="row" id="controls"></div>
+        <div class="hint" id="hint"></div>
+      </section>
+      <aside class="panel">
+        <h3>Event log</h3>
+        <div id="log"></div>
+      </aside>
+    </main>
+
+    <script type="module">
+      const $ = (id) => document.getElementById(id);
+      const view = { ws: null, seat: null, full: null, pub: null, hand: [], ampOptions: [], promptChoice: null };
+      let pending = null; // { kind: "play"|"attack", ... }
+      let cmdSeq = 0;
+
+      function log(msg) {
+        const el = $("log");
+        el.textContent += msg + "\n";
+        el.scrollTop = el.scrollHeight;
+      }
+      const other = (seat) => (seat === "player1" ? "player2" : "player1");
+      function actionSeq() {
+        return view.pub?.actionSeq ?? view.full?.turn?.actionSeq ?? 0;
+      }
+      function send(command) {
+        if (!view.ws || view.ws.readyState !== WebSocket.OPEN) return;
+        const expectedActionSeq = actionSeq();
+        view.ws.send(JSON.stringify({
+          type: "command",
+          payload: { commandId: `${view.seat ?? "c"}-${cmdSeq++}`, expectedActionSeq, command }
+        }));
+        // Optimistic local bump, mirroring the real client (non-mulligan commands).
+        if (command.type !== "submitMulligan" && view.pub) view.pub.actionSeq = expectedActionSeq + 1;
+      }
+
+      function connect() {
+        const base = $("server").value.replace(/\/$/, "");
+        const room = encodeURIComponent($("room").value || "ROOM1");
+        const name = encodeURIComponent($("name").value || "");
+        const sessionId = sessionStorage.getItem("twcg-poc-sid") || crypto.randomUUID();
+        sessionStorage.setItem("twcg-poc-sid", sessionId);
+        const url = `${base}/pvp?room=${room}&name=${name}&sessionId=${sessionId}`;
+        const ws = new WebSocket(url);
+        view.ws = ws;
+        $("status").textContent = "connecting…";
+        ws.onopen = () => ($("status").textContent = "connected");
+        ws.onclose = () => ($("status").textContent = "closed");
+        ws.onerror = () => ($("status").textContent = "error");
+        ws.onmessage = (ev) => handle(JSON.parse(ev.data));
+      }
+
+      function handle({ type, payload }) {
+        switch (type) {
+          case "seat": view.seat = payload.seat; break;
+          case "joinCode": $("joincode").textContent = "code: " + payload.code; break;
+          case "state": view.full = payload; break;
+          case "publicSync": view.pub = payload; break;
+          case "hand": view.hand = payload.cards || []; break;
+          case "amplificationOptions": view.ampOptions = payload.options || []; break;
+          case "promptChoice": view.promptChoice = payload; break;
+          case "presence": log(`· ${payload.seat} ${payload.connected ? "connected" : "disconnected"}`); break;
+          case "events": (payload || []).forEach((e) => log(`  [${e.seq}] ${e.type}${e.seat ? " " + e.seat : ""}`)); break;
+          case "error": log("⚠ " + (payload.message || "error")); break;
+        }
+        render();
+      }
+
+      function targetRef(unit) { return unit; }
+      function onHeroClick(seat) {
+        if (pending?.kind === "attack") { send({ type: "attack", attackerInstanceId: pending.attacker, target: { type: "HERO", side: seat } }); pending = null; }
+        else if (pending?.kind === "play") { send({ type: "playCard", handInstanceId: pending.card, target: { type: "HERO", side: seat } }); pending = null; }
+        render();
+      }
+      function onMinionClick(seat, m) {
+        if (pending?.kind === "attack") { send({ type: "attack", attackerInstanceId: pending.attacker, target: { type: "MINION", side: seat, instanceId: m.instanceId } }); pending = null; render(); return; }
+        if (pending?.kind === "play") { send({ type: "playCard", handInstanceId: pending.card, target: { type: "MINION", side: seat, instanceId: m.instanceId } }); pending = null; render(); return; }
+        // start an attack with my own minion
+        if (seat === view.seat && m.canAttack) { pending = { kind: "attack", attacker: m.instanceId }; render(); }
+      }
+      function onCardClick(card) {
+        if (card.needsTarget) { pending = { kind: "play", card: card.instanceId }; render(); }
+        else { send({ type: "playCard", handInstanceId: card.instanceId }); }
+      }
+
+      function heroHtml(seat, player, clickable) {
+        const cls = "hero" + (clickable ? " target" : "");
+        return `<span class="${cls}" data-hero="${seat}">${seat === view.seat ? "🟢" : "🔴"} HP ${player.hero.hp}/${player.hero.maxHp} · 💧 ${player.mana.current}/${player.mana.max} · ✋ ${player.handCount} · 📚 ${player.deckCount}</span>`;
+      }
+      function minionHtml(seat, m) {
+        const classes = ["minion"];
+        if (m.taunt) classes.push("taunt");
+        if (seat === view.seat && m.canAttack) classes.push("can-attack");
+        if (pending?.kind === "attack" && pending.attacker === m.instanceId) classes.push("selected");
+        return `<span class="${classes.join(" ")}" data-minion="${seat}:${m.instanceId}">${m.cardId}<br>${m.attack}/${m.currentHealth}${m.taunt ? " 🛡" : ""}${m.divineShield ? " ✦" : ""}</span>`;
+      }
+
+      function render() {
+        const f = view.full;
+        if (!f || !view.seat) { $("opp").innerHTML = "<em>Waiting for opponent…</em>"; $("self").innerHTML = ""; $("controls").innerHTML = ""; return; }
+        const me = view.seat, opp = other(me);
+        const status = view.pub?.status ?? f.status, phase = view.pub?.phase ?? f.phase, active = view.pub?.activeSeat ?? f.turn.activeSeat;
+        const isMyTurn = active === me;
+
+        $("opp").innerHTML = `<h3>Opponent (${opp})</h3>${heroHtml(opp, f.players[opp], pending != null)}<div class="row">${f.players[opp].board.map((m) => minionHtml(opp, m)).join("") || "<span class='pill'>empty</span>"}</div>`;
+        $("self").innerHTML = `<h3>You (${me})</h3>${heroHtml(me, f.players[me], pending?.kind === "play")}<div class="row">${f.players[me].board.map((m) => minionHtml(me, m)).join("") || "<span class='pill'>empty</span>"}</div><h3>Hand</h3><div class="row" id="hand">${view.hand.map((c) => `<span class="card" data-card="${c.instanceId}"><span class="cost">${c.cost}</span> ${c.cardId}<br>${c.attack ?? "-"}/${c.health ?? "-"}${c.needsTarget ? " 🎯" : ""}</span>`).join("") || "<span class='pill'>empty</span>"}</div>`;
+
+        // Controls per phase.
+        const c = [];
+        c.push(`<span class="pill">status: <b>${status}</b> · phase: ${phase} · turn ${view.pub?.turnNumber ?? f.turn.number} · active: ${active}${isMyTurn ? " (you)" : ""}</span>`);
+        if (f.result) c.push(`<span class="pill">🏁 ${f.result.reason} — winner ${f.result.winnerSeat ?? "—"}</span>`);
+        if (status === "mulligan" && !f.players[me].mulliganReady) c.push(`<button data-act="mulligan">Mulligan: keep all</button>`);
+        if (status === "in_progress" && phase === "NORMAL_PLAY" && isMyTurn) c.push(`<button data-act="endturn">End turn</button>`);
+        if (status === "in_progress") c.push(`<button data-act="concede">Concede</button>`);
+        if (phase === "AMPLIFICATION_PHASE") {
+          view.ampOptions.forEach((o) => c.push(`<button data-amp="${o.id}">${o.tier}: ${o.name}</button>`));
+          c.push(`<button data-act="reroll">Reroll</button>`);
+        }
+        if (phase === "VOTING_PHASE") {
+          const ev = (f.specialPhase?.voteEvents || [])[0];
+          if (ev) ev.options.forEach((label, i) => c.push(`<button data-vote="${i}">${label}</button>`));
+        }
+        if (view.promptChoice) view.promptChoice.cards.forEach((card) => c.push(`<button data-prompt="${card.instanceId}">教召 ${card.cardId}</button>`));
+        $("controls").innerHTML = c.join(" ");
+        $("hint").textContent = pending?.kind === "attack" ? "Pick a target to attack (enemy minion/hero)." : pending?.kind === "play" ? "Pick a target for the card." : "";
+      }
+
+      // Event delegation.
+      document.addEventListener("click", (e) => {
+        const t = e.target.closest("[data-act],[data-amp],[data-vote],[data-prompt],[data-hero],[data-minion],[data-card]");
+        if (!t) return;
+        if (t.dataset.act === "mulligan") send({ type: "submitMulligan", replaceHandInstanceIds: [] });
+        else if (t.dataset.act === "endturn") send({ type: "endTurn" });
+        else if (t.dataset.act === "concede") send({ type: "concede" });
+        else if (t.dataset.act === "reroll") send({ type: "rerollAmplification" });
+        else if (t.dataset.amp) send({ type: "selectAmplification", optionId: t.dataset.amp });
+        else if (t.dataset.vote) send({ type: "submitVote", optionIndex: Number(t.dataset.vote) });
+        else if (t.dataset.prompt && view.promptChoice) { send({ type: "resolvePrompt", promptId: view.promptChoice.promptId, choiceInstanceId: t.dataset.prompt }); view.promptChoice = null; }
+        else if (t.dataset.hero) onHeroClick(t.dataset.hero);
+        else if (t.dataset.minion) { const [seat, id] = t.dataset.minion.split(":"); const board = view.full.players[seat].board; onMinionClick(seat, board.find((m) => m.instanceId === id)); }
+        else if (t.dataset.card) { onCardClick(view.hand.find((c) => c.instanceId === t.dataset.card)); }
+      });
+
+      $("connect").addEventListener("click", connect);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "name": "@twcardgame/realtime",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cloudflare Workers + Durable Objects realtime layer (Colyseus replacement, Plan B migration).",
+  "scripts": {
+    "build": "tsc -b",
+    "check": "tsc -b --pretty false",
+    "test": "vitest run",
+    "predev": "tsc -b",
+    "dev": "wrangler dev",
+    "predeploy": "tsc -b",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "@twcardgame/cards": "file:../../packages/cards",
+    "@twcardgame/rules": "file:../../packages/rules",
+    "@twcardgame/shared": "file:../../packages/shared"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "wrangler": "^4.20.0"
+  }
+}

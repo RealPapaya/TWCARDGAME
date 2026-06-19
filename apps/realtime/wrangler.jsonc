@@ -1,0 +1,22 @@
+{
+  // Cloudflare Workers config for the realtime layer. See the migration roadmap:
+  // docs/cloudflare-migration-roadmap.md (Plan B — only the realtime transport moves).
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "twcardgame-realtime",
+  // Wrangler bundles the already-emitted dist (the repo is NodeNext with explicit
+  // `.js` import specifiers, which esbuild only resolves cleanly against real .js
+  // files). `predeploy` / `predev` run `tsc -b` first to refresh dist.
+  "main": "dist/index.js",
+  "compatibility_date": "2025-06-01",
+  "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "GAME_ROOM", "class_name": "GameDurableObject" }
+    ]
+  },
+  // SQLite-backed Durable Objects are the ones included in the free tier (see the
+  // roadmap §1). The free tier requires `new_sqlite_classes`, NOT `new_classes`.
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["GameDurableObject"] }
+  ]
+}
