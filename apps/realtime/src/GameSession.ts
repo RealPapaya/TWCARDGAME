@@ -67,6 +67,8 @@ export interface GameSessionOptions {
 /** Serialisable session state, persisted to DO storage so it survives hibernation. */
 export interface GameSessionSnapshot {
   v: 1;
+  /** Discriminator so the host rebuilds the right subclass (see restore.ts). */
+  kind: "pvp" | "pve";
   matchId: string;
   joinCode?: string;
   reconnectWindowMs: number;
@@ -79,6 +81,8 @@ export interface GameSessionSnapshot {
   disconnectedAtMs: Partial<Record<Seat, number>>;
   matchStartedAtMs?: number;
   serverCommandSeq: number;
+  /** Subclass-specific persisted state (e.g. bot RNG / pacing — see BotGameSession). */
+  extra?: Record<string, unknown>;
 }
 
 /**
@@ -90,7 +94,7 @@ export interface GameSessionSnapshot {
  * guarantee is kept.
  */
 export class GameSession {
-  private match?: MatchState;
+  protected match?: MatchState;
   private readonly setup: Partial<Record<Seat, PlayerSetup>> = {};
   /** sessionId that currently owns each seat — used to recognise reconnects. */
   private readonly seatOwner: Partial<Record<Seat, string>> = {};
@@ -131,6 +135,42 @@ export class GameSession {
     return null; // room full
   }
 
+  /* --------------------------------- subclass hooks --------------------------------- */
+  // These mirror the protected hooks on apps/server/src/GameRoom.ts so a
+  // subclass (e.g. BotGameSession) can extend behaviour without touching the
+  // gameplay path. All default to GameRoom's PvP behaviour.
+
+  protected get kind(): "pvp" | "pve" {
+    return "pvp";
+  }
+  /** Injected clock — subclasses must not call Date.now() either. */
+  protected now(): number {
+    return this.host.now();
+  }
+  /** Pre-occupy a seat (e.g. the bot) so it is filled before the human joins. */
+  protected fillSeat(seat: Seat, owner: string, setup: PlayerSetup): void {
+    this.seatOwner[seat] = owner;
+    this.setup[seat] = setup;
+  }
+  /** PvP uses the turn/phase countdown; PvE (bot) disables it (BotRoom parity). */
+  protected usesActionDeadlines(): boolean {
+    return true;
+  }
+  protected afterMatchCreated(): void {}
+  protected afterCommandApplied(_envelope: CommandEnvelope, _events: GameEvent[]): void {}
+  protected afterReconnect(_seat: Seat): void {}
+  protected customizeInitialMatch(_state: MatchState, _events: GameEvent[]): void {}
+  /** Extra deadline folded into the single host alarm (e.g. bot-step pacing). */
+  protected additionalDeadline(): number | null {
+    return null;
+  }
+  /** Extra work to run when the alarm fires (e.g. take a bot step). */
+  protected additionalWake(_now: number): void {}
+  protected snapshotExtra(): Record<string, unknown> {
+    return {};
+  }
+  protected restoreExtra(_extra: Record<string, unknown>): void {}
+
   /* --------------------------------- lifecycle --------------------------------- */
 
   /**
@@ -167,11 +207,13 @@ export class GameSession {
         { seat: "player2", userId: player2.userId, displayName: player2.displayName, deckIds: player2.deckIds }
       ]
     });
+    this.customizeInitialMatch(created.state, created.events);
     this.match = created.state;
     this.broadcastPublicState();
     this.broadcast(serverMessage("events", created.events));
     this.sendAllPrivateState();
     this.scheduleWake();
+    this.afterMatchCreated();
   }
 
   /* --------------------------------- commands --------------------------------- */
@@ -211,12 +253,13 @@ export class GameSession {
     this.sendAllPrivateState();
     if (isMatchComplete(this.match)) {
       this.onComplete();
-      return;
+    } else {
+      this.scheduleWake();
     }
-    this.scheduleWake();
+    this.afterCommandApplied(envelope, result.events);
   }
 
-  private applyServerCommand(
+  protected applyServerCommand(
     seat: Seat,
     tag: string,
     command: CommandEnvelope["command"],
@@ -251,16 +294,22 @@ export class GameSession {
       }
     }
 
-    // 2) Special-phase deadline (mirrors handlePhaseDeadline).
-    if (this.match.phase !== "NORMAL_PLAY" && this.match.specialPhase) {
-      if (now >= this.match.specialPhase.phaseDeadlineAtMs) this.resolvePhaseTimeout();
-    } else if (
-      // 3) Mulligan / turn deadline (mirrors handleActionDeadline).
-      (this.match.status === "mulligan" || this.match.status === "in_progress") &&
-      now >= this.match.turn.deadlineAtMs
-    ) {
-      this.resolveTurnTimeout();
+    // 2) Phase / turn deadlines — only when this room uses them (PvP).
+    if (this.usesActionDeadlines()) {
+      if (this.match.phase !== "NORMAL_PLAY" && this.match.specialPhase) {
+        // Special-phase deadline (mirrors handlePhaseDeadline).
+        if (now >= this.match.specialPhase.phaseDeadlineAtMs) this.resolvePhaseTimeout();
+      } else if (
+        // Mulligan / turn deadline (mirrors handleActionDeadline).
+        (this.match.status === "mulligan" || this.match.status === "in_progress") &&
+        now >= this.match.turn.deadlineAtMs
+      ) {
+        this.resolveTurnTimeout();
+      }
     }
+
+    // 3) Subclass pacing (e.g. bot step) shares the same single alarm.
+    if (this.match && !isMatchComplete(this.match)) this.additionalWake(now);
 
     if (this.match && !isMatchComplete(this.match)) this.scheduleWake();
   }
@@ -297,15 +346,19 @@ export class GameSession {
       const player = this.match.players[seat];
       if (!player.connected && player.reconnectUntilMs !== undefined) candidates.push(player.reconnectUntilMs);
     }
-    if (this.match.phase !== "NORMAL_PLAY" && this.match.specialPhase) {
-      candidates.push(this.match.specialPhase.phaseDeadlineAtMs);
-    } else if (this.match.status === "mulligan" || this.match.status === "in_progress") {
-      candidates.push(this.match.turn.deadlineAtMs);
+    if (this.usesActionDeadlines()) {
+      if (this.match.phase !== "NORMAL_PLAY" && this.match.specialPhase) {
+        candidates.push(this.match.specialPhase.phaseDeadlineAtMs);
+      } else if (this.match.status === "mulligan" || this.match.status === "in_progress") {
+        candidates.push(this.match.turn.deadlineAtMs);
+      }
     }
+    const extra = this.additionalDeadline();
+    if (extra !== null) candidates.push(extra);
     return candidates.length > 0 ? Math.min(...candidates) : null;
   }
 
-  private scheduleWake(): void {
+  protected scheduleWake(): void {
     this.host.scheduleWake(this.nextDeadline());
   }
 
@@ -349,6 +402,7 @@ export class GameSession {
     this.sendStateToSeat(seat);
     this.sendPrivateState(seat);
     this.scheduleWake();
+    this.afterReconnect(seat);
   }
 
   private finishDisconnectTimeout(seat: Seat): void {
@@ -460,6 +514,7 @@ export class GameSession {
   toSnapshot(): GameSessionSnapshot {
     return {
       v: 1,
+      kind: this.kind,
       matchId: this.options.matchId,
       joinCode: this.options.joinCode,
       reconnectWindowMs: this.reconnectWindowMs,
@@ -471,10 +526,24 @@ export class GameSession {
       reconnectBudgetMs: { ...this.reconnectBudgetMs },
       disconnectedAtMs: { ...this.disconnectedAtMs },
       matchStartedAtMs: this.matchStartedAtMs,
-      serverCommandSeq: this.serverCommandSeq
+      serverCommandSeq: this.serverCommandSeq,
+      extra: this.snapshotExtra()
     };
   }
 
+  /** Restore base fields onto an already-constructed session (the host picks the subclass). */
+  applySnapshot(snapshot: GameSessionSnapshot): void {
+    this.match = snapshot.match;
+    Object.assign(this.setup, snapshot.setup);
+    Object.assign(this.seatOwner, snapshot.seatOwner);
+    Object.assign(this.reconnectBudgetMs, snapshot.reconnectBudgetMs);
+    Object.assign(this.disconnectedAtMs, snapshot.disconnectedAtMs);
+    this.matchStartedAtMs = snapshot.matchStartedAtMs;
+    this.serverCommandSeq = snapshot.serverCommandSeq;
+    this.restoreExtra(snapshot.extra ?? {});
+  }
+
+  /** Rebuild a base (PvP) session from a snapshot. PvE goes through restore.ts. */
   static fromSnapshot(host: SessionHost, snapshot: GameSessionSnapshot): GameSession {
     const session = new GameSession(host, {
       matchId: snapshot.matchId,
@@ -483,13 +552,7 @@ export class GameSession {
       mulliganTimeLimitMs: snapshot.mulliganTimeLimitMs,
       turnTimeLimitMs: snapshot.turnTimeLimitMs
     });
-    session.match = snapshot.match;
-    Object.assign(session.setup, snapshot.setup);
-    Object.assign(session.seatOwner, snapshot.seatOwner);
-    Object.assign(session.reconnectBudgetMs, snapshot.reconnectBudgetMs);
-    Object.assign(session.disconnectedAtMs, snapshot.disconnectedAtMs);
-    session.matchStartedAtMs = snapshot.matchStartedAtMs;
-    session.serverCommandSeq = snapshot.serverCommandSeq;
+    session.applySnapshot(snapshot);
     return session;
   }
 }

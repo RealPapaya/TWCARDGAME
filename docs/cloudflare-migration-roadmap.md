@@ -29,14 +29,14 @@
 
 ## §A. 進度追蹤(每個 session 完成後更新這裡)
 
-> **最後更新**:2026-06-19 — Phase 0 PoC 完成,落在新分支 `feat/cloudflare-migration` 的
+> **最後更新**:2026-06-19 — Phase 0 + Phase 1(PvE)完成,落在新分支 `feat/cloudflare-migration` 的
 > 新 workspace [`apps/realtime`](../apps/realtime/)(見其 README)。Railway/Colyseus 仍照常運作,尚未切換。
 
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 規劃 + 研究 + 鎖定方案 B | ✅ 完成 | 本文件 |
-| Phase 0 — 技術驗證 PoC | ✅ 完成 | `apps/realtime`:DO + `reduce` + 原生 WS;PvP 房號對打;回合/階段/重連倒數走單一 DO Alarm;Hibernation 持久化;`GameSession` 純核心 9 測試綠燈;`wrangler deploy --dry-run` 通過 |
-| Phase 1 — 即時層平移 | 🟡 進行中 | 即時核心已平移(`GameSession`);剩 PvE/BotRoom 用 Alarm pacing、Supabase 牌組解析 + 戰績/獎勵 hook(`onMatchComplete`) |
+| Phase 0 — 技術驗證 PoC | ✅ 完成 | `apps/realtime`:DO + `reduce` + 原生 WS;PvP 房號對打;回合/階段/重連倒數走單一 DO Alarm;Hibernation 持久化;`GameSession` 純核心測試綠燈;`wrangler deploy --dry-run` 通過 |
+| Phase 1 — 即時層平移 | 🟡 進行中 | **PvE 完成**:`BotGameSession`(`bot.decide` 不動,pacing 改用單一 DO Alarm)、`/pve` 路由、`bot` 訊息、Hibernation 持久化 bot RNG/pacing;整局對 AI 模擬測試綠燈 + `wrangler dev` 真機煙霧測試 PASS。**剩**:Supabase 牌組解析 + 戰績/獎勵/任務 hook(`onMatchComplete` 已留好接點) |
 | Phase 2 — 配對/私人房/重連 | ⬜ 未開始 | 下一步;Lobby DO 取代 matchmaking + `privateRooms.ts`;完整 reconnect token 流程 |
 | Phase 3 — 前端傳輸層替換 | ⬜ 未開始 | 傳輸面已測繪(見下方註);adapter 把 JSON 訊息轉回現有事件介面,並用 `state` 快照合成 `view.state` |
 | Phase 4 — Pages + R2 部署 | ⬜ 未開始 | |

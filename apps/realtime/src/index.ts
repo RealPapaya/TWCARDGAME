@@ -12,11 +12,12 @@ const CORS_HEADERS: Record<string, string> = {
 
 /**
  * Worker front door. It only routes — one match == one Durable Object, addressed
- * by `idFromName("<mode>:<room>")`. PvP-by-room-code is the Phase 0 flow: two
- * tabs hitting `wss://…/pvp?room=ABC` land in the same DO and play.
+ * by `idFromName("<mode>:<room>")`.
+ * - `/pvp?room=ABC` — two tabs with the same room code land in the same DO (Phase 0).
+ * - `/pve?difficulty=&theme=` — single human vs the bot; a fresh room per connection.
  *
- * Public matchmaking (joinOrCreate semantics) and PvE bot pacing are later
- * phases — see docs/cloudflare-migration-roadmap.md §6 (Phase 1/2).
+ * Public matchmaking (joinOrCreate semantics) is a later phase — see
+ * docs/cloudflare-migration-roadmap.md §6 (Phase 2).
  */
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
@@ -30,21 +31,21 @@ export default {
       return Response.json({ ok: true, service: "twcardgame-realtime" }, { headers: CORS_HEADERS });
     }
 
-    if (/^\/pve\/?$/.test(url.pathname)) {
-      return Response.json(
-        { ok: false, error: "PvE (bot) is not yet migrated to the realtime worker (roadmap Phase 1)." },
-        { status: 501, headers: CORS_HEADERS }
-      );
-    }
-
-    if (/^\/pvp\/?$/.test(url.pathname)) {
-      const room = url.searchParams.get("room") || url.searchParams.get("joinCode") || crypto.randomUUID();
-      const id = env.GAME_ROOM.idFromName(`pvp:${room}`);
+    const modeMatch = url.pathname.match(/^\/(pvp|pve)\/?$/);
+    if (modeMatch) {
+      const mode = modeMatch[1];
+      // PvE is single-human, so default to a unique room per connection; PvP
+      // matches by shared room code / join code.
+      const room =
+        url.searchParams.get("room") ||
+        (mode === "pvp" ? url.searchParams.get("joinCode") : null) ||
+        crypto.randomUUID();
+      const id = env.GAME_ROOM.idFromName(`${mode}:${room}`);
       const stub = env.GAME_ROOM.get(id);
-      // Normalise the room param so the DO sees a stable identity regardless of
-      // whether the caller passed `room` or `joinCode`.
+      // Normalise room + mode so the DO sees a stable identity and knows its kind.
       const forward = new URL(request.url);
       forward.searchParams.set("room", room);
+      forward.searchParams.set("mode", mode);
       return stub.fetch(new Request(forward.toString(), request));
     }
 

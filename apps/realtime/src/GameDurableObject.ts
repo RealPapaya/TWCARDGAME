@@ -1,4 +1,5 @@
-import type { Seat } from "@twcardgame/shared";
+import type { AiDifficulty, AiTheme, Seat } from "@twcardgame/shared";
+import { BotGameSession } from "./BotGameSession.js";
 import { defaultDeckIds } from "./decks.js";
 import {
   GameSession,
@@ -7,6 +8,7 @@ import {
   type SessionHost
 } from "./GameSession.js";
 import { serverMessage, type ClientMessage, type ServerMessage } from "./protocol.js";
+import { restoreSession } from "./restore.js";
 
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;
@@ -98,6 +100,10 @@ export class GameDurableObject {
     this.sendToSocket(server, serverMessage("seat", { seat }));
     if (session.joinCode && seat === "player1" && !reconnect) {
       this.sendToSocket(server, serverMessage("joinCode", { code: session.joinCode }));
+    }
+    if (session instanceof BotGameSession) {
+      // Mirror BotRoom.onJoin: client.send("bot", { seat, difficulty, theme }).
+      this.sendToSocket(server, serverMessage("bot", session.botInfo));
     }
 
     if (reconnect) {
@@ -193,11 +199,18 @@ export class GameDurableObject {
 
   private ensureSession(url: URL): void {
     if (this.session) return;
+    const matchId = this.state.id.toString();
     const joinCode = url.searchParams.get("joinCode") ?? undefined;
-    this.session = new GameSession(this.host, {
-      matchId: this.state.id.toString(),
-      joinCode
-    });
+    if (url.searchParams.get("mode") === "pve") {
+      this.session = new BotGameSession(this.host, {
+        matchId,
+        joinCode,
+        difficulty: (url.searchParams.get("difficulty") as AiDifficulty | null) ?? undefined,
+        theme: (url.searchParams.get("theme") as AiTheme | null) ?? undefined
+      });
+    } else {
+      this.session = new GameSession(this.host, { matchId, joinCode });
+    }
   }
 
   private parseSetup(url: URL, sessionId: string): PlayerSetup {
@@ -248,7 +261,7 @@ export class GameDurableObject {
   private async hydrate(): Promise<void> {
     const stored = await this.state.storage.get<StoredState>(STORAGE_KEY);
     if (stored?.session) {
-      this.session = GameSession.fromSnapshot(this.host, stored.session);
+      this.session = restoreSession(this.host, stored.session);
       this.cleanupAtMs = stored.cleanupAtMs;
     }
   }
