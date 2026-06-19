@@ -96,7 +96,7 @@ export const AMP_FIELD_TRAINING = {
   name: "增幅與場地",
   rewardGold: 100,
   heroHealth: HERO_HP,
-  description: "認識回合 6/14 的增幅與回合 20 的公投場地效果。"
+  description: "認識回合 7/14 的增幅與回合 20 的公投場地效果。"
 } as const;
 
 // ─── Generic engine ──────────────────────────────────────────────────────────
@@ -876,7 +876,7 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_amp_explain",
       title: "增幅",
-      body: "【增幅】：在第 6 與第 14 回合，你會依牌組陣營獲得三選一強化，分為三個等級——加減賺、穩穩仔賺、卯死，越高越強。按下一步，馬上跳出增幅選擇。",
+      body: "【增幅】：在第 7 與第 14 回合，你會依牌組陣營獲得三選一強化，分為三個等級——加減賺、穩穩仔賺、卯死，越高越強。按下一步，馬上跳出增幅選擇。",
       action: "next",
       apply: (session) => {
         session.phase = "AMPLIFICATION_PHASE";

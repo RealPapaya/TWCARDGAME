@@ -38,7 +38,7 @@ export interface VoteResolvedChoice {
 // --- Trigger configuration -------------------------------------------------
 
 /** Turns that open the deck-based amplification phase. */
-export const AMPLIFICATION_TURNS: readonly number[] = [6, 14];
+export const AMPLIFICATION_TURNS: readonly number[] = [7, 14];
 /** Turn that opens the inverse-HP referendum phase. */
 export const VOTING_TURN = 20;
 /** Independent countdown for both special phases (max 30s). */
@@ -163,7 +163,7 @@ function rollOneTier(state: number): { tier: AmplificationTier; state: number } 
 }
 
 /**
- * Rolls the two amplification-phase tiers (turn 6, turn 14) at match creation.
+ * Rolls the two amplification-phase tiers (turn 7, turn 14) at match creation.
  * Uses a seed derived from the match seed so the MAIN RNG stream (deck shuffle /
  * opening hands) is untouched — keeping existing seeded goldens stable. Both seats
  * share the result; only the per-seat option content differs.

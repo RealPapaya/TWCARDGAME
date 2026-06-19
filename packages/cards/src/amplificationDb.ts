@@ -21,7 +21,7 @@ export interface AmplificationDbEntry {
   tier: AmplificationTier;
   /** Card categories this amplification is offered for, e.g. "勞工". Empty = universal. */
   factionTags: string[];
-  /** Offered only in the FIRST amplification phase (turn 6), within its tier's pool. */
+  /** Offered only in the FIRST amplification phase (turn 7), within its tier's pool. */
   firstPhaseOnly?: boolean;
   effect: EffectDefinition;
 }

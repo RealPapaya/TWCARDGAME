@@ -39,8 +39,8 @@ export interface DevTestMatchSetup {
   turnNumber?: number;
   activeSeat?: Seat;
   phase?: Phase;
-  amplificationTiers?: Partial<Record<"turn6" | "turn14", AmplificationTier>>;
-  amplificationIds?: Partial<Record<"turn6" | "turn14", string>>;
+  amplificationTiers?: Partial<Record<"turn7" | "turn14", AmplificationTier>>;
+  amplificationIds?: Partial<Record<"turn7" | "turn14", string>>;
   voteEventId?: string;
   voteEventIds?: string[];
 }
@@ -194,7 +194,7 @@ export interface PublicMinion {
   hasOngoing?: boolean;
 }
 
-// --- Special phases: turn 6/14 deck amplification & turn 20 inverse-HP voting ---
+// --- Special phases: turn 7/14 deck amplification & turn 20 inverse-HP voting ---
 
 /**
  * Global battle phase, orthogonal to {@link GameStatus}. While the phase is not

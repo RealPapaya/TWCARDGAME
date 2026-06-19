@@ -197,7 +197,7 @@ export type ClientViewState = {
     boardLimit?: number;
     activeEnvironment?: { id: string; name: string; remainingTurns?: number };
   };
-  /** This seat's privately-delivered amplification options (turn 6/14). */
+  /** This seat's privately-delivered amplification options (turn 7/14). */
   amplificationOptions?: AmplificationOption[];
   /** This seat's privately-delivered 教召 / Discover candidate cards, while a choice prompt is open. */
   promptChoice?: PromptChoiceOffer;

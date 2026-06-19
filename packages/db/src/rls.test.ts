@@ -28,6 +28,7 @@ const betaResetMigration = readFileSync(new URL("../migrations/0017_beta_reset_a
 const trainingCompletionsMigration = readFileSync(new URL("../migrations/0019_training_completions.sql", import.meta.url), "utf8");
 const collisionTrainingMigration = readFileSync(new URL("../migrations/0020_training_collision_news.sql", import.meta.url), "utf8");
 const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_training_card_lessons.sql", import.meta.url), "utf8");
+const trainingLegendaryRewardMigration = readFileSync(new URL("../migrations/0028_training_legendary_reward.sql", import.meta.url), "utf8");
 const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
@@ -224,6 +225,19 @@ describe("Supabase RLS migration coverage", () => {
     expect(cardLessonsTrainingMigration).toContain("when 'advanced_keywords' then v_reward_gold := 100;");
     expect(cardLessonsTrainingMigration).toContain("when 'amp_field' then v_reward_gold := 100;");
     expect(cardLessonsTrainingMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
+  });
+
+  it("grants one random leader legendary on the level 5 first-clear reward", () => {
+    expect(trainingLegendaryRewardMigration).toContain("create or replace function public.complete_training_level(p_level_id text)");
+    expect(trainingLegendaryRewardMigration).toContain("on conflict (user_id, level_id) do nothing");
+    expect(trainingLegendaryRewardMigration).toContain("if p_level_id = 'amp_field' then");
+    expect(trainingLegendaryRewardMigration).toContain("array['TW020','TW046','TW011','TW038','TW032']::text[]");
+    expect(trainingLegendaryRewardMigration).toContain("card->>'rarity' = 'LEGENDARY'");
+    expect(trainingLegendaryRewardMigration).toContain("insert into public.card_collections");
+    expect(trainingLegendaryRewardMigration).toContain("'card_acquired'");
+    expect(trainingLegendaryRewardMigration).toContain("perform public.refresh_collection_quests(v_user_id, array[v_reward_card_id]);");
+    expect(trainingLegendaryRewardMigration).toContain("jsonb_build_object('type', 'card', 'cardId', v_reward_card_id)");
+    expect(trainingLegendaryRewardMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
   });
 });
 

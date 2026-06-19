@@ -23,7 +23,7 @@ type OnBinder = <T extends EventTarget>(
 ) => void;
 
 type DevCardSlot = "hand" | "opponentHand" | "playerDeck" | "opponentDeck" | "playerBoard" | "opponentBoard";
-type DevAmplificationSlot = "turn6" | "turn14";
+type DevAmplificationSlot = "turn7" | "turn14";
 
 type DevCardSlotConfig = {
   title: string;
@@ -169,7 +169,7 @@ export function renderDevTestPanel(busy: boolean): string {
           <div class="dev-test-panel dev-test-match-panel">
             <h3 class="dev-test-panel-title">PvE Setup</h3>
             <div class="dev-test-compact-grid">
-              ${renderSelectControl("dev-test-turn-preset", "Preset", `<option value="custom">Custom</option><option value="turn6">Turn 6 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option>`)}
+              ${renderSelectControl("dev-test-turn-preset", "Preset", `<option value="custom">Custom</option><option value="turn7">Turn 7 amp</option><option value="turn14">Turn 14 amp</option><option value="turn20">Turn 20 vote</option><option value="normal">Turn 1 normal</option>`)}
               ${renderSliderControl("dev-test-turn-number", "Turn", 1, 100, 1)}
               ${renderSelectControl("dev-test-phase", "Phase", devPhaseOptions.map((phase) => `<option value="${phase.value}">${phase.label}</option>`).join(""))}
               ${renderSelectControl("dev-test-active-seat", "Active", `<option value="player1">player1</option><option value="player2">player2</option>`)}
@@ -179,9 +179,9 @@ export function renderDevTestPanel(busy: boolean): string {
               ${renderSliderControl("dev-test-player-mana-max", "P max", 0, 30, 1)}
               ${renderSliderControl("dev-test-opponent-mana-current", "O mana", 0, 30, 1)}
               ${renderSliderControl("dev-test-opponent-mana-max", "O max", 0, 30, 1)}
-              ${renderSelectControl("dev-test-amp-tier-turn6", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
+              ${renderSelectControl("dev-test-amp-tier-turn7", "增幅1等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[0]))}
               ${renderSelectControl("dev-test-amp-tier-turn14", "增幅2等級", renderAmplificationTierOptions(AMPLIFICATION_TIERS[1]))}
-              ${renderSelectControl("dev-test-amp-id-turn6", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
+              ${renderSelectControl("dev-test-amp-id-turn7", "增幅1內容", renderAmplificationOptions(AMPLIFICATION_TIERS[0]), true)}
               ${renderSelectControl("dev-test-amp-id-turn14", "增幅2內容", renderAmplificationOptions(AMPLIFICATION_TIERS[1]), true)}
               ${renderSelectControl("dev-test-vote-event", "事件", renderVoteEventOptions(), true)}
               <label class="dev-test-control-box dev-test-toggle"><input id="dev-test-player-infinite-mana" type="checkbox" ${sc("dev-test-player-infinite-mana") ? "checked" : ""} /> <span class="dev-test-label-text">P infinite</span></label>
@@ -289,7 +289,7 @@ export function bindDevTestActions(opts: {
     const select = event.target instanceof HTMLSelectElement ? event.target : undefined;
     if (select?.id === "dev-test-turn-preset") applyDevTurnPreset(select.value);
     if (select?.id === "dev-test-phase") syncDevPhaseDefaults();
-    if (select?.id === "dev-test-amp-tier-turn6") updateDevAmplificationOptions("turn6");
+    if (select?.id === "dev-test-amp-tier-turn7") updateDevAmplificationOptions("turn7");
     if (select?.id === "dev-test-amp-tier-turn14") updateDevAmplificationOptions("turn14");
   });
   opts.on(screen, "input", "dev-test-turn-input", (event) => {
@@ -400,11 +400,11 @@ function readDevTestMatchSetup(): DevTestMatchSetup {
     activeSeat: activeSeatValue === "player2" ? "player2" : "player1",
     phase,
     amplificationTiers: {
-      turn6: readAmplificationTier("dev-test-amp-tier-turn6"),
+      turn7: readAmplificationTier("dev-test-amp-tier-turn7"),
       turn14: readAmplificationTier("dev-test-amp-tier-turn14")
     },
     amplificationIds: {
-      turn6: readAmplificationId("turn6"),
+      turn7: readAmplificationId("turn7"),
       turn14: readAmplificationId("turn14")
     },
     voteEventId: readVoteEventId()
@@ -586,8 +586,8 @@ function parseDevCardSlot(value: string | undefined): DevCardSlot | undefined {
 }
 
 function updateDevAmplificationOptions(slot: DevAmplificationSlot): void {
-  const tierId = slot === "turn6" ? "dev-test-amp-tier-turn6" : "dev-test-amp-tier-turn14";
-  const selectId = slot === "turn6" ? "dev-test-amp-id-turn6" : "dev-test-amp-id-turn14";
+  const tierId = slot === "turn7" ? "dev-test-amp-tier-turn7" : "dev-test-amp-tier-turn14";
+  const selectId = slot === "turn7" ? "dev-test-amp-id-turn7" : "dev-test-amp-id-turn14";
   const select = document.getElementById(selectId);
   if (!(select instanceof HTMLSelectElement)) return;
   const previous = select.value;
@@ -595,8 +595,8 @@ function updateDevAmplificationOptions(slot: DevAmplificationSlot): void {
 }
 
 function applyDevTurnPreset(value: string): void {
-  if (value === "turn6") {
-    setInputValue("dev-test-turn-number", "6");
+  if (value === "turn7") {
+    setInputValue("dev-test-turn-number", "7");
     setInputValue("dev-test-phase", "AMPLIFICATION_PHASE");
     return;
   }
@@ -619,9 +619,9 @@ function applyDevTurnPreset(value: string): void {
 function syncDevPhaseDefaults(): void {
   const phase = readInputValue("dev-test-phase");
   const turn = readNumberInput("dev-test-turn-number", 1);
-  if (phase === "AMPLIFICATION_PHASE" && turn !== 6 && turn !== 14) {
-    setInputValue("dev-test-turn-number", "6");
-    setInputValue("dev-test-turn-preset", "turn6");
+  if (phase === "AMPLIFICATION_PHASE" && turn !== 7 && turn !== 14) {
+    setInputValue("dev-test-turn-number", "7");
+    setInputValue("dev-test-turn-preset", "turn7");
   }
   if (phase === "VOTING_PHASE" && turn !== 20) {
     setInputValue("dev-test-turn-number", "20");
@@ -642,7 +642,7 @@ function readAmplificationTier(id: string): AmplificationTier {
 }
 
 function readAmplificationId(slot: DevAmplificationSlot): string | undefined {
-  const id = readInputValue(slot === "turn6" ? "dev-test-amp-id-turn6" : "dev-test-amp-id-turn14");
+  const id = readInputValue(slot === "turn7" ? "dev-test-amp-id-turn7" : "dev-test-amp-id-turn14");
   return AMPLIFICATION_DB.some((entry) => entry.id === id) ? id : undefined;
 }
 

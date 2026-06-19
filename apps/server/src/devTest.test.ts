@@ -80,7 +80,7 @@ describe("developer test mode helpers", () => {
       turnNumber: 14,
       phase: "AMPLIFICATION_PHASE",
       amplificationTiers: {
-        turn6: AMPLIFICATION_TIERS[0],
+        turn7: AMPLIFICATION_TIERS[0],
         turn14: AMPLIFICATION_TIERS[2]
       },
       amplificationIds: {
@@ -171,6 +171,6 @@ describe("developer test mode helpers", () => {
       expect(() => applyDevTestMatchSetup(createMatch(), { playerBoardCardIds: [news.id] })).toThrow(/must be a MINION/);
     }
     expect(() => applyDevTestMatchSetup(createMatch(), { voteEventIds: ["NOPE"] })).toThrow(/Unknown dev test vote event id/);
-    expect(() => applyDevTestMatchSetup(createMatch(), { amplificationIds: { turn6: "NOPE" } })).toThrow(/Unknown dev test amplification id/);
+    expect(() => applyDevTestMatchSetup(createMatch(), { amplificationIds: { turn7: "NOPE" } })).toThrow(/Unknown dev test amplification id/);
   });
 });

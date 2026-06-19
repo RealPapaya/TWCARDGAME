@@ -59,7 +59,7 @@ export function applyDevTestMatchSetup(state: MatchState, setup: DevTestMatchSet
     player2: setup.infiniteMana?.player2 === true
   };
   state.augmentTiers = [
-    setup.amplificationTiers?.turn6 ?? state.augmentTiers[0],
+    setup.amplificationTiers?.turn7 ?? state.augmentTiers[0],
     setup.amplificationTiers?.turn14 ?? state.augmentTiers[1]
   ];
 
@@ -143,13 +143,13 @@ function validateVoteEvents(ids: readonly string[]): void {
 }
 
 function validateAmplifications(ids: DevTestMatchSetup["amplificationIds"]): void {
-  for (const id of [ids?.turn6, ids?.turn14]) {
+  for (const id of [ids?.turn7, ids?.turn14]) {
     if (id !== undefined && !amplifications.has(id)) throw new Error(`Unknown dev test amplification id: ${id}`);
   }
 }
 
 function applyRequestedAmplificationOptions(state: MatchState, setup: DevTestMatchSetup): void {
-  const phaseKey = state.turn.number === 14 ? "turn14" : "turn6";
+  const phaseKey = state.turn.number === 14 ? "turn14" : "turn7";
   const entry = setup.amplificationIds?.[phaseKey] ? amplifications.get(setup.amplificationIds[phaseKey]!) : undefined;
   if (!entry || !state.specialPhase?.amplificationOptions) return;
   const option = toAmplificationOption(entry);

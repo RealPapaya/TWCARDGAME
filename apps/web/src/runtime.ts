@@ -409,6 +409,8 @@ let turnCountdownWakeDeadlineAtMs: number | undefined;
 let amplificationRerollTimer: number | undefined;
 let lastTurnAnnouncementKey: string | undefined;
 let trainingRewardAnimationTimer: number | undefined;
+let trainingCardRewardTimer: number | undefined;
+const TRAINING_CARD_REWARD_DELAY_MS = 1900;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
 // The losing hero's portrait shatters once per match on GAME_FINISHED; this gate
@@ -2481,14 +2483,14 @@ function visibleNewsPowerForSeat(seat: Seat): number {
 }
 
 function turnCounterTickClass(turn: number, offset: number): string {
-  const special = turn === 6 || turn === 14 ? " amplification" : turn === 20 ? " vote" : "";
+  const special = turn === 7 || turn === 14 ? " amplification" : turn === 20 ? " vote" : "";
   const current = offset === 0 ? " current" : "";
   const edge = Math.abs(offset) === 2 ? ` edge edge-${offset < 0 ? "left" : "right"}` : "";
   return `turn-counter-tick${current}${edge}${special}`;
 }
 
 function turnCounterSpecialKind(turn: number): "amplification" | "vote" | undefined {
-  if (turn === 6 || turn === 14) return "amplification";
+  if (turn === 7 || turn === 14) return "amplification";
   if (turn === 20) return "vote";
   return undefined;
 }
@@ -2738,7 +2740,7 @@ function renderPhaseCountdown(label: string): string {
   `;
 }
 
-/** Turn 6/14 deck-amplification chooser — presented mulligan-style with three highlighted picks. */
+/** Turn 7/14 deck-amplification chooser — presented mulligan-style with three highlighted picks. */
 function renderSpecialPhasePeekOverlay(kind: "amplification" | "vote"): string {
   const title = kind === "amplification" ? "增幅選擇中" : "公投事件選擇中";
   return `
@@ -2804,7 +2806,7 @@ function renderAmplificationOverlay(): string {
   const mySeat = view.mySeat;
   const sp = view.state?.specialPhase;
   // Use the per-phase "selected" flag, not the persistent bound amplification —
-  // the latter stays set from turn 6 and would wrongly hide the turn-14 options.
+  // the latter stays set from turn 7 and would wrongly hide the turn-14 options.
   const submitted = Boolean(sp && mySeat && (mySeat === "player1" ? sp.ampSelectedP1 : sp.ampSelectedP2)) || options.length === 0;
   const rerollUsed = Boolean(sp && mySeat && (mySeat === "player1" ? sp.ampRerollUsedP1 : sp.ampRerollUsedP2));
   const rerollRemaining = sp && mySeat ? (mySeat === "player1" ? sp.ampRerollRemainingP1 : sp.ampRerollRemainingP2) : undefined;
@@ -5362,6 +5364,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
     rewardFallbackTimer = undefined;
   }
   clearTrainingRewardAnimationTimer();
+  clearTrainingCardRewardTimer();
   resetRewardScreen(view);
   resetCardPlayCues();
   resetMinionVisualTracking();
@@ -5431,12 +5434,19 @@ async function completeTrainingReward(deferUntilMs?: number): Promise<void> {
     const payload = normalizeTrainingRewardRpc(data, optimistic);
     markLocalTrainingComplete(session.level.id);
     applyTrainingRewardSummary(payload, deferUntilMs);
+    if (payload.cardReward) {
+      await loadAccountDataRaw();
+      showTrainingCardReward(payload.cardReward, deferUntilMs);
+    }
   } catch (error) {
     console.warn("training reward persistence failed", error);
   }
 }
 
-function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: number; rewardGold: number }, deferUntilMs?: number): void {
+type TrainingCardReward = { type: "card"; cardId: string };
+type TrainingRewardResult = { goldBefore: number; goldAfter: number; rewardGold: number; cardReward?: TrainingCardReward };
+
+function applyTrainingRewardSummary(result: TrainingRewardResult, deferUntilMs?: number): void {
   view.rewardSummary = createTrainingRewardSummary(result);
   if (view.profile) {
     view.profile = {
@@ -5459,6 +5469,42 @@ function applyTrainingRewardSummary(result: { goldBefore: number; goldAfter: num
   render();
 }
 
+function showTrainingCardReward(reward: TrainingCardReward, deferUntilMs?: number): void {
+  clearTrainingCardRewardTimer();
+  const delayMs = Math.max(0, (deferUntilMs ? deferUntilMs - performance.now() : 0) + TRAINING_CARD_REWARD_DELAY_MS);
+  if (delayMs > 0) {
+    trainingCardRewardTimer = window.setTimeout(() => {
+      trainingCardRewardTimer = undefined;
+      mountTrainingCardReward(reward);
+    }, delayMs);
+    return;
+  }
+  mountTrainingCardReward(reward);
+}
+
+function mountTrainingCardReward(reward: TrainingCardReward): void {
+  const rewards = normalizeShopRewards({
+    itemId: "training_amp_field",
+    kind: "CARD_PACK",
+    priceGold: 0,
+    remainingGold: view.profile?.gold ?? 0,
+    rewards: [reward]
+  });
+  if (rewards.length === 0) return;
+  view.packOpeningRewards = rewards;
+  view.packOpeningKind = "card";
+  view.packOpeningFlipped = rewards.map(() => false);
+  view.packOpeningCards = undefined;
+  mountPackOpeningOverlay();
+  render();
+}
+
+function clearTrainingCardRewardTimer(): void {
+  if (trainingCardRewardTimer === undefined) return;
+  window.clearTimeout(trainingCardRewardTimer);
+  trainingCardRewardTimer = undefined;
+}
+
 function deferTrainingCompletionUntil(events: GameEvent[]): number | undefined {
   if (!trainingSession) return undefined;
   if (!events.some((event) => event.type === "GAME_FINISHED")) return undefined;
@@ -5475,7 +5521,7 @@ function clearTrainingRewardAnimationTimer(): void {
   trainingRewardAnimationTimer = undefined;
 }
 
-function localTrainingReward(levelId: string): { goldBefore: number; goldAfter: number; rewardGold: number } {
+function localTrainingReward(levelId: string): TrainingRewardResult {
   const goldBefore = view.profile?.gold ?? 0;
   const alreadyCompleted = isLocalTrainingComplete(levelId);
   const level = TRAINING_LEVELS.find((candidate) => candidate.id === levelId);
@@ -5489,15 +5535,24 @@ function localTrainingReward(levelId: string): { goldBefore: number; goldAfter: 
 
 function normalizeTrainingRewardRpc(
   data: unknown,
-  fallback: { goldBefore: number; goldAfter: number; rewardGold: number }
-): { goldBefore: number; goldAfter: number; rewardGold: number } {
+  fallback: TrainingRewardResult
+): TrainingRewardResult {
   const payload = Array.isArray(data) ? data[0] : data;
   if (!payload || typeof payload !== "object") return fallback;
   const record = payload as Record<string, unknown>;
   const goldBefore = numericValue(record.goldBefore, fallback.goldBefore);
   const goldAfter = numericValue(record.goldAfter, fallback.goldAfter);
   const rewardGold = numericValue(record.rewardGold, Math.max(0, goldAfter - goldBefore));
-  return { goldBefore, goldAfter, rewardGold };
+  const cardReward = normalizeTrainingCardReward(record.cardReward);
+  return { goldBefore, goldAfter, rewardGold, ...(cardReward ? { cardReward } : {}) };
+}
+
+function normalizeTrainingCardReward(value: unknown): TrainingCardReward | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as Record<string, unknown>;
+  return record.type === "card" && typeof record.cardId === "string"
+    ? { type: "card", cardId: record.cardId }
+    : undefined;
 }
 
 function numericValue(value: unknown, fallback: number): number {
@@ -5584,6 +5639,7 @@ function showDevTestRewardScreen(summary: RewardSummary): void {
     rewardFallbackTimer = undefined;
   }
   clearTrainingRewardAnimationTimer();
+  clearTrainingCardRewardTimer();
   resetRewardScreen(view);
   resetCardPlayCues();
   resetMinionVisualTracking();

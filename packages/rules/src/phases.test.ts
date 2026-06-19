@@ -48,7 +48,7 @@ function env(id: string, seat: Seat, command: CommandEnvelope["command"], opts: 
 
 /**
  * Drives the match toward `turn.number === target`. Any special phase opened on
- * the way (turns 6/14 before a target of 20) is force-resolved via server timeout
+ * the way (turns 7/14 before a target of 20) is force-resolved via server timeout
  * so play continues; the target turn's own phase is left OPEN for the caller.
  */
 function advanceToTurn(state: MatchState, target: number): MatchState {
@@ -176,10 +176,10 @@ describe("phase pure helpers", () => {
   });
 });
 
-describe("amplification phase (turn 6)", () => {
-  it("opens AMPLIFICATION_PHASE at turn 6 with three private options per seat", () => {
-    const state = advanceToTurn(startMatch(11), 6);
-    expect(state.turn.number).toBe(6);
+describe("amplification phase (turn 7)", () => {
+  it("opens AMPLIFICATION_PHASE at turn 7 with three private options per seat", () => {
+    const state = advanceToTurn(startMatch(11), 7);
+    expect(state.turn.number).toBe(7);
     expect(state.phase).toBe("AMPLIFICATION_PHASE");
     expect(state.specialPhase?.amplificationOptions?.player1).toHaveLength(3);
     expect(state.specialPhase?.amplificationOptions?.player2).toHaveLength(3);
@@ -192,14 +192,14 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("rejects normal play/attack/endTurn while the phase is open", () => {
-    const state = advanceToTurn(startMatch(12), 6);
+    const state = advanceToTurn(startMatch(12), 7);
     const result = reduce(state, env("p", state.turn.activeSeat, { type: "endTurn" }), CARD_CATALOG);
     expect(result.events.some((e) => e.type === "COMMAND_REJECTED")).toBe(true);
     expect(result.state.phase).toBe("AMPLIFICATION_PHASE");
   });
 
   it("binds the chosen amplification and resumes normal play once both seats select", () => {
-    let state = advanceToTurn(startMatch(13), 6);
+    let state = advanceToTurn(startMatch(13), 7);
     const optP1 = state.specialPhase!.amplificationOptions!.player1[0];
     const optP2 = state.specialPhase!.amplificationOptions!.player2[1];
     state = reduce(state, env("a1", "player1", { type: "selectAmplification", optionId: optP1.id }), CARD_CATALOG).state;
@@ -209,11 +209,11 @@ describe("amplification phase (turn 6)", () => {
     expect(state.specialPhase).toBeUndefined();
     expect(state.players.player1.amplification?.id).toBe(optP1.id);
     expect(state.players.player2.amplification?.id).toBe(optP2.id);
-    expect(state.turn.number).toBe(6); // the interrupted turn resumes, not re-run
+    expect(state.turn.number).toBe(7); // the interrupted turn resumes, not re-run
   });
 
   it("rerolls one seat's amplification options once, keeping the same tier and public flag", () => {
-    let state = advanceToTurn(startMatch(131), 6);
+    let state = advanceToTurn(startMatch(131), 7);
     const beforeP1 = state.specialPhase!.amplificationOptions!.player1.map((option) => option.id);
     const beforeP2 = state.specialPhase!.amplificationOptions!.player2.map((option) => option.id);
     const tier = state.specialPhase!.amplificationOptions!.player1[0].tier;
@@ -232,7 +232,7 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("rejects a second reroll and rejects rerolling after selecting an amplification", () => {
-    let state = advanceToTurn(startMatch(132), 6);
+    let state = advanceToTurn(startMatch(132), 7);
     state = reduce(state, env("reroll-once", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
     const second = reduce(state, env("reroll-twice", "player1", { type: "rerollAmplification" }), CARD_CATALOG);
     expect(second.events.some((event) => event.type === "COMMAND_REJECTED")).toBe(true);
@@ -243,7 +243,7 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("lets 要拚 add one extra reroll to the next amplification phase", () => {
-    let state = advanceToTurn(startMatch(134), 6);
+    let state = advanceToTurn(startMatch(134), 7);
     state = reduce(
       state,
       env("amp-timeout-before-extra", state.turn.activeSeat, { type: "selectAmplification", optionId: "" }, { serverTimeout: true }),
@@ -267,7 +267,7 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("uses the rerolled options for timeout fallback", () => {
-    let state = advanceToTurn(startMatch(133), 6);
+    let state = advanceToTurn(startMatch(133), 7);
     state = reduce(state, env("reroll-timeout", "player1", { type: "rerollAmplification" }), CARD_CATALOG).state;
     const fallback = state.specialPhase!.amplificationOptions!.player1[0];
 
@@ -282,7 +282,7 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("force-resolves to tier-1 defaults on a server timeout", () => {
-    let state = advanceToTurn(startMatch(14), 6);
+    let state = advanceToTurn(startMatch(14), 7);
     state = reduce(
       state,
       env("amp-timeout", state.turn.activeSeat, { type: "selectAmplification", optionId: "" }, { serverTimeout: true }),
@@ -295,8 +295,8 @@ describe("amplification phase (turn 6)", () => {
   });
 
   it("triggers again at turn 14 but not on the same turn twice", () => {
-    let state = advanceToTurn(startMatch(15), 6);
-    // resolve turn 6
+    let state = advanceToTurn(startMatch(15), 7);
+    // resolve turn 7
     state = reduce(state, env("t6a", "player1", { type: "selectAmplification", optionId: "" }, { serverTimeout: true }), CARD_CATALOG).state;
     expect(state.phase).toBe("NORMAL_PLAY");
     state = advanceToTurn(state, 14);
