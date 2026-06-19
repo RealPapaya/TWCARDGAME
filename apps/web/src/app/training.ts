@@ -59,7 +59,7 @@ export const SOCIAL_ROOKIE_TRAINING = {
 export const COLLISION_NEWS_TRAINING = {
   id: "collision_news",
   name: "拜碼頭",
-  rewardGold: 100,
+  rewardGold: 150,
   heroHealth: 10,
   description: "認識隨從碰撞、高端疫苗回復與砸雞蛋傷害。"
 } as const;

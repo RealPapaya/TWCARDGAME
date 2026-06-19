@@ -29,6 +29,7 @@ const trainingCompletionsMigration = readFileSync(new URL("../migrations/0019_tr
 const collisionTrainingMigration = readFileSync(new URL("../migrations/0020_training_collision_news.sql", import.meta.url), "utf8");
 const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_training_card_lessons.sql", import.meta.url), "utf8");
 const trainingLegendaryRewardMigration = readFileSync(new URL("../migrations/0028_training_legendary_reward.sql", import.meta.url), "utf8");
+const trainingRewardGoldTuningMigration = readFileSync(new URL("../migrations/0029_training_reward_gold_tuning.sql", import.meta.url), "utf8");
 const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
@@ -238,6 +239,18 @@ describe("Supabase RLS migration coverage", () => {
     expect(trainingLegendaryRewardMigration).toContain("perform public.refresh_collection_quests(v_user_id, array[v_reward_card_id]);");
     expect(trainingLegendaryRewardMigration).toContain("jsonb_build_object('type', 'card', 'cardId', v_reward_card_id)");
     expect(trainingLegendaryRewardMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
+  });
+
+  it("uses the tuned first-clear gold rewards for the current training RPC", () => {
+    expect(trainingRewardGoldTuningMigration).toContain("create or replace function public.complete_training_level(p_level_id text)");
+    expect(trainingRewardGoldTuningMigration).toContain("when 'social_rookie' then v_reward_gold := 100;");
+    expect(trainingRewardGoldTuningMigration).toContain("when 'collision_news' then v_reward_gold := 150;");
+    expect(trainingRewardGoldTuningMigration).toContain("when 'card_types' then v_reward_gold := 150;");
+    expect(trainingRewardGoldTuningMigration).toContain("when 'advanced_keywords' then v_reward_gold := 200;");
+    expect(trainingRewardGoldTuningMigration).toContain("when 'amp_field' then v_reward_gold := 200;");
+    expect(trainingRewardGoldTuningMigration).toContain("if p_level_id = 'amp_field' then");
+    expect(trainingRewardGoldTuningMigration).toContain("jsonb_build_object('type', 'card', 'cardId', v_reward_card_id)");
+    expect(trainingRewardGoldTuningMigration).toContain("grant execute on function public.complete_training_level(text) to authenticated;");
   });
 });
 

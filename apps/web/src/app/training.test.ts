@@ -7,10 +7,23 @@ import {
   createCollisionNewsTraining,
   createSocialRookieTraining,
   createTrainingSession,
+  TRAINING_LEVELS,
   handleTrainingCommand,
   trainingPrompt,
   type TrainingSession
 } from "./training.js";
+
+describe("training rewards", () => {
+  it("lists first-clear gold by tutorial level", () => {
+    expect(TRAINING_LEVELS.map((level) => [level.id, level.rewardGold])).toEqual([
+      ["social_rookie", 100],
+      ["collision_news", 150],
+      ["card_types", 150],
+      ["advanced_keywords", 200],
+      ["amp_field", 200]
+    ]);
+  });
+});
 
 describe("social rookie training", () => {
   it("starts without deck state or randomness", () => {

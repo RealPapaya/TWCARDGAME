@@ -78,7 +78,7 @@ export interface ScriptStepResult {
 export const CARD_TYPES_TRAINING = {
   id: "card_types",
   name: "卡牌種類介紹",
-  rewardGold: 100,
+  rewardGold: 150,
   heroHealth: HERO_HP,
   description: "認識沙包、光盾、觸發三種常見關鍵字。"
 } as const;
@@ -86,7 +86,7 @@ export const CARD_TYPES_TRAINING = {
 export const ADVANCED_KEYWORDS_TRAINING = {
   id: "advanced_keywords",
   name: "進階關鍵字",
-  rewardGold: 100,
+  rewardGold: 200,
   heroHealth: HERO_HP,
   description: "認識激怒、遺志、持續效果、回手牌。"
 } as const;
@@ -94,7 +94,7 @@ export const ADVANCED_KEYWORDS_TRAINING = {
 export const AMP_FIELD_TRAINING = {
   id: "amp_field",
   name: "增幅與場地",
-  rewardGold: 100,
+  rewardGold: 200,
   heroHealth: HERO_HP,
   description: "認識回合 7/14 的增幅與回合 20 的公投場地效果。"
 } as const;
