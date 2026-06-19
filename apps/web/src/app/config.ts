@@ -1,6 +1,14 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-export const defaultServerUrl = import.meta.env.VITE_COLYSEUS_URL || inferColyseusUrl();
+export type GameTransportKind = "realtime" | "colyseus";
+
+export const gameTransportKind: GameTransportKind =
+  import.meta.env.VITE_GAME_TRANSPORT === "colyseus" ? "colyseus" : "realtime";
+
+export const defaultServerUrl =
+  import.meta.env.VITE_REALTIME_URL ||
+  import.meta.env.VITE_COLYSEUS_URL ||
+  (gameTransportKind === "colyseus" ? inferColyseusUrl() : inferRealtimeUrl());
 export const betaDbResetEnabled = import.meta.env.VITE_BETA_DB_RESET_ENABLED === "true";
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string | undefined;
@@ -29,6 +37,12 @@ function inferColyseusUrl(): string {
   const protocol = location.protocol === "https:" ? "wss:" : "ws:";
   const hostname = formatHostnameForUrl(location.hostname || "localhost");
   return `${protocol}//${hostname}:2567`;
+}
+
+function inferRealtimeUrl(): string {
+  const protocol = location.protocol === "https:" ? "wss:" : "ws:";
+  const hostname = formatHostnameForUrl(location.hostname || "localhost");
+  return `${protocol}//${hostname}:8787`;
 }
 
 function formatHostnameForUrl(hostname: string): string {

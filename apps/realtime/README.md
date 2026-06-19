@@ -85,8 +85,9 @@ handled.)
 
 Current realtime-layer status: Phase 0 is complete; Phase 1 PvE is complete for
 the Worker/DO path; Phase 2 now has Lobby DO matchmaking, private join-code
-registry, and reconnect-token routing. Supabase deck resolution/finalization
-hooks and the Phase 3 web adapter remain separate follow-up work.
+registry, and reconnect-token routing. Phase 3 has started in `apps/web` with a
+native WebSocket transport adapter; the basic two-page browser smoke against
+`wrangler dev` + Vite passes. Full gameplay / visual QA remains.
 
 - ✅ **Phase 0** — DO + `reduce` + native WebSocket; PvP-by-room-code; turn /
   mulligan / special-phase deadlines on a DO Alarm; disconnect→reconnect window;
@@ -95,15 +96,15 @@ hooks and the Phase 3 web adapter remain separate follow-up work.
   + match persistence/rewards hooks (`onMatchComplete`).
 - ⬜ **Phase 2** — public matchmaking (Lobby DO) + private-room code registry +
   full reconnect-token flow.
-- ⬜ **Phase 3** — `apps/web` transport adapter: translate these JSON messages
+- 🟡 **Phase 3** — `apps/web` transport adapter: translate these JSON messages
   into the existing client event interface, and synthesise `view.state` from the
-  `state` snapshot (the renderer is otherwise untouched). The web transport map
-  is captured in the roadmap.
+  `state` snapshot (the renderer is otherwise untouched). Basic browser smoke
+  passes; full gameplay / visual QA remains.
 - ⬜ **Phase 4/5** — Pages + R2 deploy; optional Supabase → D1.
 
 ## Not yet wired (intentional, next phases)
 
 - No Supabase: connections use a default dev deck; `onMatchComplete` is a hook
   with no persistence/reward dispatch yet.
-- Phase 3 web adapter is not wired yet; use the PoC client or raw WebSocket
-  messages against the realtime Worker.
+- Phase 3 still needs full gameplay / visual QA against `wrangler dev` and the
+  Vite client.

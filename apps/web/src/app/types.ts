@@ -1,6 +1,6 @@
-import type { Room } from "@colyseus/sdk";
 import type { Session } from "@supabase/supabase-js";
 import type { DragLineKind } from "../drag.js";
+import type { GameTransportRoom } from "../transport.js";
 import type {
   AiDifficulty,
   AiTheme,
@@ -179,7 +179,7 @@ export type AnimationCue = {
 };
 
 export type ClientViewState = {
-  room?: Room;
+  room?: GameTransportRoom;
   mySeat?: Seat;
   hand: HandCardView[];
   state?: any;

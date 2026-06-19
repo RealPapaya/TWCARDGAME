@@ -1,4 +1,3 @@
-import { Client, type Room } from "@colyseus/sdk";
 import { AMPLIFICATION_DB, CARD_CATALOG, CARD_CATALOG_VERSION, VOTE_EVENT_DB, type CardDefinition } from "@twcardgame/cards";
 import { AI_THEMES, getXPRequiredForLevel, MAX_LEVEL } from "@twcardgame/shared";
 import type {
@@ -22,7 +21,12 @@ import type {
   Seat,
   TargetRef
 } from "@twcardgame/shared";
-import { GameStateSchema } from "./schema.js";
+import {
+  createGameRoom,
+  joinOrCreateGameRoom,
+  reconnectGameRoom,
+  type GameTransportRoom
+} from "./transport.js";
 import { assetUrl, classNames, escapeAttr, escapeHtml, fanStyle, opponentFanStyle } from "./ui.js";
 import {
   beginAttackDrag,
@@ -5610,16 +5614,14 @@ async function startDevTestPveMatch(devTest: DevTestMatchSetup): Promise<void> {
   view.joining = true;
   render();
   try {
-    const client = new Client(defaultServerUrl);
-    const room = await client.joinOrCreate(
+    const room = await joinOrCreateGameRoom(
       "pve",
       {
         displayName: view.profile?.display_name ?? "Player",
         difficulty: view.aiDifficulty,
         theme: view.aiTheme,
         devTest
-      },
-      GameStateSchema
+      }
     );
     bindRoomMessages(room, { persist: false });
   } catch (error) {
@@ -5703,7 +5705,6 @@ async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void
   view.joining = true;
   render();
   try {
-    const client = new Client(serverUrl);
     const joinOptions: Record<string, unknown> = supabase
       ? {
           displayName: view.profile?.display_name,
@@ -5718,7 +5719,7 @@ async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void
           difficulty: view.aiDifficulty,
           ...(withTheme ? { theme: view.aiTheme } : {})
         };
-    const room = await client.joinOrCreate("pve", joinOptions, GameStateSchema);
+    const room = await joinOrCreateGameRoom("pve", joinOptions, { serverUrl });
     bindRoomMessages(room);
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "Unable to start AI match.");
@@ -5737,7 +5738,6 @@ async function createPrivateChallenge(): Promise<void> {
   view.joining = true;
   render();
   try {
-    const client = new Client(defaultServerUrl);
     const joinOptions: Record<string, unknown> = supabase
       ? {
           displayName: view.profile?.display_name,
@@ -5746,7 +5746,7 @@ async function createPrivateChallenge(): Promise<void> {
           private: true
         }
       : { displayName: view.profile?.display_name ?? "Player", ...selectedDeckJoinOptions(), private: true };
-    const room = await client.create("pvp", joinOptions, GameStateSchema);
+    const room = await createGameRoom("pvp", joinOptions);
     bindRoomMessages(room);
     room.onMessage("joinCode", (message: { code: string }) => {
       view.privateJoinCode = message.code;
@@ -5777,7 +5777,6 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
   view.joining = true;
   render();
   try {
-    const client = new Client(defaultServerUrl);
     const joinOptions: Record<string, unknown> = supabase
       ? {
           displayName: view.profile?.display_name,
@@ -5786,7 +5785,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
           joinCode: code
         }
       : { displayName: view.profile?.display_name ?? "Player", ...selectedDeckJoinOptions(), joinCode: code };
-    const room = await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
+    const room = await joinOrCreateGameRoom("pvp", joinOptions);
     bindRoomMessages(room);
   } catch (error) {
     showAlert(error instanceof Error ? error.message : "找不到對應的房間代碼。");
@@ -5796,7 +5795,7 @@ async function joinPrivateByCode(rawCode: string): Promise<void> {
   }
 }
 
-function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?: string } = {}): void {
+function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolean; serverUrl?: string } = {}): void {
   stopTrainingBgm();
   trainingSession = undefined;
   view.room = joined;
@@ -5828,6 +5827,9 @@ function bindRoomMessages(joined: Room, options: { persist?: boolean; serverUrl?
   joined.onMessage("seat", (message: { seat: Seat }) => {
     view.mySeat = message.seat;
     render();
+  });
+  joined.onMessage("reconnectToken", () => {
+    if (options.persist !== false) persistActiveMatch(joined, options.serverUrl ?? defaultServerUrl);
   });
   joined.onMessage("hand", (message: { seat?: Seat; cards: HandCardView[] }) => {
     handleHandMessage(message);
@@ -5969,8 +5971,8 @@ function stopOpponentDisconnectTick(): void {
   }
 }
 
-function persistActiveMatch(joined: Room, serverUrl: string): void {
-  const token = (joined as any).reconnectionToken as string | undefined;
+function persistActiveMatch(joined: GameTransportRoom, serverUrl: string): void {
+  const token = joined.reconnectionToken;
   if (!token) return;
   const mode = joined.name === "pvp" ? "pvp" : "pve";
   rememberActiveMatch({ token, serverUrl, matchId: joined.roomId, mode });
@@ -6040,8 +6042,7 @@ async function resumeMatch(rec: ActiveMatchRecord): Promise<void> {
   view.joining = true;
   render();
   try {
-    const client = new Client(rec.serverUrl);
-    const joined: Room = await (client as any).reconnect(rec.token, GameStateSchema);
+    const joined = await reconnectGameRoom(rec.token, { mode: rec.mode, serverUrl: rec.serverUrl });
     bindRoomMessages(joined, { serverUrl: rec.serverUrl });
   } catch {
     // Window expired or room closed — the loss is already recorded server-side.
@@ -6059,8 +6060,7 @@ async function declineMatch(rec: ActiveMatchRecord): Promise<void> {
   // waiting PvP opponent is freed). If the room is gone, the server's disconnect
   // timeout has already recorded the loss.
   try {
-    const client = new Client(rec.serverUrl);
-    const joined: Room = await (client as any).reconnect(rec.token, GameStateSchema);
+    const joined = await reconnectGameRoom(rec.token, { mode: rec.mode, serverUrl: rec.serverUrl });
     await new Promise((resolve) => window.setTimeout(resolve, 200));
     const message: ClientCommandMessage = {
       commandId: `decline-${createClientId()}`,
@@ -7178,8 +7178,6 @@ async function joinRoom(event: Event): Promise<void> {
   view.joining = true;
   render();
 
-  const client = new Client(serverUrl);
-
   try {
     if (supabase && !view.session) throw new Error("Sign in before joining PvP.");
     if (supabase && !view.selectedDeckId) throw new Error("Select a saved deck before joining PvP.");
@@ -7191,9 +7189,9 @@ async function joinRoom(event: Event): Promise<void> {
           ...selectedDeckJoinOptions()
         }
       : { displayName, ...selectedDeckJoinOptions() };
-    const joined: Room = reconnectToken
-      ? await (client as any).reconnect(reconnectToken, GameStateSchema)
-      : await client.joinOrCreate("pvp", joinOptions, GameStateSchema);
+    const joined = reconnectToken
+      ? await reconnectGameRoom(reconnectToken, { mode: "pvp", serverUrl })
+      : await joinOrCreateGameRoom("pvp", joinOptions, { serverUrl });
 
     bindRoomMessages(joined, { serverUrl });
   } catch (error) {

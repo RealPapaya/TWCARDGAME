@@ -38,7 +38,7 @@
 | Phase 0 — 技術驗證 PoC | ✅ 完成 | `apps/realtime`:DO + `reduce` + 原生 WS;PvP 房號對打;回合/階段/重連倒數走單一 DO Alarm;Hibernation 持久化;`GameSession` 純核心測試綠燈;`wrangler deploy --dry-run` 通過 |
 | Phase 1 — 即時層平移 | 🟡 進行中 | **PvE 完成**:`BotGameSession`(`bot.decide` 不動,pacing 改用單一 DO Alarm)、`/pve` 路由、`bot` 訊息、Hibernation 持久化 bot RNG/pacing;整局對 AI 模擬測試綠燈 + `wrangler dev` 真機煙霧測試 PASS。**剩**:Supabase 牌組解析 + 戰績/獎勵/任務 hook(`onMatchComplete` 已留好接點) |
 | Phase 2 — 配對/私人房/重連 | 🟡 進行中 | `apps/realtime`:Lobby DO 已加入公開配對 queue、私人 joinCode registry、`/pvp?joinCode=` 解析、`reconnectToken` 發放與 `/pvp?token=` 路由;剩 Phase 3 web adapter 接 UI 流程與真機 smoke |
-| Phase 3 — 前端傳輸層替換 | ⬜ 未開始 | 傳輸面已測繪(見下方註);adapter 把 JSON 訊息轉回現有事件介面,並用 `state` 快照合成 `view.state` |
+| Phase 3 — 前端傳輸層替換 | 🟡 進行中 | `apps/web`:新增 native WebSocket transport adapter,保留 Colyseus fallback;runtime 改走 adapter,`state` 快照投影成既有 `view.state`;`wrangler dev` + Vite 雙頁 PvP browser smoke PASS;剩完整 gameplay / visual QA、私人房/重連/PvE UI flow 驗證 |
 | Phase 4 — Pages + R2 部署 | ⬜ 未開始 | |
 | Phase 5 — Supabase→D1(可選) | ⬜ 未開始 | 方案 B 預設**不做** |
 
