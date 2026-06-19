@@ -827,113 +827,260 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
 
 // ─── Lesson 5: 增幅與場地 (增幅 / 場地效果) ───────────────────────────────────
 
-const L5_MINION_A = "l5-minion-a";
-const L5_MINION_B = "l5-minion-b";
+const L5_FOUR_COST_HAND = "l5-four-cost-hand";
+const L5_FOUR_COST_MINION = "l5-four-cost-minion";
+const L5_ENEMY_PREFIX = "l5-enemy";
 
-function lessonAmpOptions(): AmplificationOption[] {
-  // Real ids / names / tiers from the live amplification DB, with tutorial-clear
-  // descriptions of what this lesson will demonstrate for each tier.
-  const desc: Record<string, string> = {
-    加減賺: "（示範）我方全體隨從 +1/+1。",
-    蕭貪: "（示範）我方全體隨從 +2/+2。",
-    卯死: "（示範）我方全體隨從 +3/+3。"
-  };
-  return AMPLIFICATION_DB.map((entry) => ({
+function ampOptionById(id: string, description?: string): AmplificationOption {
+  const entry = AMPLIFICATION_DB.find((candidate) => candidate.id === id);
+  if (!entry) throw new Error(`Missing training amplification ${id}`);
+  return {
     id: entry.id,
     tier: entry.tier,
     name: entry.name,
-    description: desc[entry.tier] ?? entry.description
-  }));
+    description: description ?? entry.description
+  };
+}
+
+function lessonLowAmpOptions(): AmplificationOption[] {
+  return [
+    ampOptionById("AMP_INVOICE_200", "立刻多 1 顆水晶，水晶上限 +1。"),
+    ampOptionById("AMP_SHAREHOLDER_GIFT", "下一張抽到的牌費用永久減半。"),
+    ampOptionById("AMP_FRIES_BOGO", "接下來 2 回合都可以多抽 1 張。")
+  ];
+}
+
+function lessonHighAmpOptions(): AmplificationOption[] {
+  return [
+    ampOptionById("AMP_ONE_PARTY_DOMINANCE", "英雄生命上限 +20，教學中會同步回復 20 點生命。"),
+    ampOptionById("AMP_JACKPOT", "立刻多 3 顆水晶，水晶上限 +3。"),
+    ampOptionById("AMP_FIRE_SALE", "手上的牌費用全部變成 1。")
+  ];
 }
 
 function lessonFieldEvents(): NonNullable<TrainingSpecialPhase["voteEvents"]> {
-  return ["VE_BLACKOUT", "VE_UTILITY_HIKE", "VE_MORAKOT"].map((id) => {
+  return ["VE_MORAKOT", "VE_KAOHSIUNG_BLAST", "VE_BLACKOUT"].map((id) => {
     const e = VOTE_EVENT_DB.find((entry) => entry.id === id)!;
     return { id: e.id, name: e.name, option0: e.options[0], option1: e.options[1], option2: e.options[2] };
   });
 }
 
+function setPlayerMana(session: TrainingSession, seat: Seat, current: number, max = current): void {
+  session.players[seat] = { ...session.players[seat], mana: { current, max } };
+}
+
+function setHero(session: TrainingSession, seat: Seat, hp: number, maxHp: number): void {
+  session.players[seat] = { ...session.players[seat], hero: { hp, maxHp } };
+}
+
+function bindAmplification(session: TrainingSession, option: AmplificationOption): void {
+  const player = session.players[PLAYER];
+  const selection = { id: option.id, tier: option.tier, name: option.name };
+  session.players[PLAYER] = {
+    ...player,
+    amplification: selection,
+    augments: [...(player.augments ?? []), selection]
+  };
+}
+
+function startAmplificationPhase(session: TrainingSession, options: AmplificationOption[]): GameEvent[] {
+  session.phase = "AMPLIFICATION_PHASE";
+  session.amplificationOptions = options;
+  session.specialPhase = { ampSelectedP1: false, ampSelectedP2: false };
+  return [ev(session, "PHASE_STARTED", PLAYER, { phase: "AMPLIFICATION_PHASE" })];
+}
+
+function endAmplificationPhase(session: TrainingSession): void {
+  session.phase = "NORMAL_PLAY";
+  session.amplificationOptions = undefined;
+  session.specialPhase = { ...session.specialPhase, ampSelectedP1: true, ampSelectedP2: true };
+}
+
+function l5EnemyBoard(): PublicMinion[] {
+  return Array.from({ length: 7 }, (_, index) =>
+    makeMinion(`${L5_ENEMY_PREFIX}-${index + 1}`, index % 2 === 0 ? "TW045" : "TW013", OPPONENT, index % 2 === 0 ? 4 : 3, 5)
+  );
+}
+
 const AMP_FIELD_SCRIPT: TrainingScript = {
   level: AMP_FIELD_TRAINING,
-  setup: () => ({
-    players: {
-      player1: makePlayer(PLAYER, "玩家", 10, [
-        makeMinion(L5_MINION_A, "TW045", PLAYER, 4, 5),
-        makeMinion(L5_MINION_B, "TW058", PLAYER, 1, 1)
-      ], 0),
-      player2: makePlayer(OPPONENT, "訓練教官", 0, [], 0)
-    },
-    hand: []
-  }),
+  setup: (playerName) => {
+    const player = {
+      ...makePlayer(PLAYER, playerName, 3, [], 1),
+      mana: { current: 3, max: 3 },
+      deckCount: 12
+    };
+    const opponent = {
+      ...makePlayer(OPPONENT, "訓練教官", 0, [], 0),
+      mana: { current: 3, max: 3 },
+      deckCount: 12
+    };
+    return {
+      players: { player1: player, player2: opponent },
+      hand: [handCard(L5_FOUR_COST_HAND, "TW013", 4, "MINION", 3, 5)]
+    };
+  },
   steps: [
     {
       id: "l5_intro",
-      title: "第五關：增幅與場地",
-      body: "這一關介紹兩個影響整場的特殊機制：增幅與場地效果。先介紹【增幅】。",
+      title: "第五關：回合、增幅與事件",
+      body: "先看左下角的回合計數器。第 7、14 回合會進入增幅，第 20 回合會進入公投事件；這些特殊回合常常決定勝負。",
       action: "next",
-      highlights: [{ type: "hero", seat: PLAYER }]
-    },
-    {
-      id: "l5_amp_explain",
-      title: "增幅",
-      body: "【增幅】：在第 7 與第 14 回合，你會依牌組陣營獲得三選一強化，分為三個等級——加減賺、蕭貪、卯死，越高越強。按下一步，馬上跳出增幅選擇。",
-      action: "next",
+      highlights: [{ type: "turnCounter" }],
       apply: (session) => {
-        session.phase = "AMPLIFICATION_PHASE";
-        session.amplificationOptions = lessonAmpOptions();
-        session.specialPhase = { ampSelectedP1: false, ampSelectedP2: false };
-        return [ev(session, "PHASE_STARTED", PLAYER, { phase: "AMPLIFICATION_PHASE" })];
+        session.turnNumber = 7;
+        session.activeSeat = PLAYER;
+        return [ev(session, "TURN_STARTED", PLAYER, { activeSeat: PLAYER, turn: 7 })];
       }
     },
     {
-      id: "l5_amp_pick",
-      title: "選擇增幅",
-      body: "從畫面上的三個增幅中挑一個。",
+      id: "l5_amp_explain",
+      title: "第七輪增幅",
+      body: "增幅有三種等級：加減賺、蕭貪、卯死。第 7 回合先示範最低階的加減賺，它也能把卡住的局面打開。",
+      action: "next",
+      highlights: [{ type: "turnCounter" }, { type: "mana", seat: PLAYER }, { type: "cardCost", instanceId: L5_FOUR_COST_HAND }],
+      apply: (session) => {
+        return startAmplificationPhase(session, lessonLowAmpOptions());
+      }
+    },
+    {
+      id: "l5_invoice_pick",
+      title: "選發票中200",
+      body: "你手上只有一張 4 費卡，但目前只有 3 顆水晶。選【發票中200】，多拿 1 顆水晶後就能打出來。",
       action: "script_amp",
-      match: (command) => command.type === "selectAmplification",
+      match: (command) => command.type === "selectAmplification" && command.optionId === "AMP_INVOICE_200",
       resolve: (session, command) => {
         const optionId = command.type === "selectAmplification" ? command.optionId : undefined;
         const option = (session.amplificationOptions ?? []).find((o) => o.id === optionId) ?? session.amplificationOptions?.[0];
-        const amount = option?.tier === "卯死" ? 3 : option?.tier === "蕭貪" ? 2 : 1;
-        const board = session.players[PLAYER].board.map((m) => ({
-          ...m,
-          attack: m.attack + amount,
-          baseAttack: m.baseAttack + amount,
-          health: m.health + amount,
-          currentHealth: m.currentHealth + amount
-        }));
-        session.players[PLAYER] = {
-          ...session.players[PLAYER],
-          board,
-          amplification: option ? { id: option.id, tier: option.tier, name: option.name } : undefined
-        };
-        session.phase = "NORMAL_PLAY";
-        session.amplificationOptions = undefined;
-        session.specialPhase = { ...session.specialPhase, ampSelectedP1: true };
-        const events = [ev(session, "AMPLIFICATION_SELECTED", PLAYER, { optionId: option?.id, tier: option?.tier })];
-        for (const m of board) events.push(ev(session, "BUFF", PLAYER, { target: m.instanceId, stat: "ATTACK", value: amount }));
+        if (option) bindAmplification(session, option);
+        setPlayerMana(session, PLAYER, 4, 4);
+        endAmplificationPhase(session);
+        const events = [
+          ev(session, "AMPLIFICATION_SELECTED", PLAYER, { optionId: option?.id, tier: option?.tier }),
+          ev(session, "AUGMENT_TRIGGERED", PLAYER, { augmentId: option?.id })
+        ];
         events.push(ev(session, "PHASE_ENDED", PLAYER, { phase: "AMPLIFICATION_PHASE" }));
         return events;
       }
     },
     {
-      id: "l5_amp_result",
-      title: "增幅生效",
-      body: "你選的增幅生效了！我方隨從獲得了強化（看攻擊與生命的變化）。增幅是逆轉戰局的關鍵，記得依等級挑最適合的。",
+      id: "l5_invoice_result",
+      title: "水晶補上了",
+      body: "發票中200讓水晶從 3 顆變成 4 顆。這就是增幅的威力：不是只有強化數字，也可能直接解開當回合的費用限制。",
       action: "next",
-      highlights: [{ type: "unit", seat: PLAYER }]
+      highlights: [{ type: "mana", seat: PLAYER }, { type: "cardCost", instanceId: L5_FOUR_COST_HAND }]
     },
     {
-      id: "l5_field_explain",
-      title: "場地效果",
-      body: "【場地效果】：在第 20 回合會舉行『公投』。三個公投案的中選率由弱勢方（血量較低）較高決定，中選的公投案會變成影響全場的場地效果。按下一步開始投票。",
+      id: "l5_play_after_invoice",
+      title: "打出 4 費卡",
+      body: "現在水晶足夠了。把手上的 4 費隨從打到場上。",
+      action: "script_play",
+      selectHandId: L5_FOUR_COST_HAND,
+      highlights: [{ type: "hand", instanceId: L5_FOUR_COST_HAND }, { type: "mana", seat: PLAYER }],
+      match: (command) => command.type === "playCard" && command.handInstanceId === L5_FOUR_COST_HAND,
+      resolve: (session) => {
+        removeHand(session, L5_FOUR_COST_HAND);
+        setPlayerMana(session, PLAYER, 0, 4);
+        setPlayerBoard(session, PLAYER, [makeMinion(L5_FOUR_COST_MINION, "TW013", PLAYER, 3, 5, { taunt: true, sleeping: true })]);
+        return [
+          ev(session, "CARD_PLAYED", PLAYER, { handInstanceId: L5_FOUR_COST_HAND, cardId: "TW013" }),
+          ev(session, "MINION_SUMMONED", PLAYER, { target: L5_FOUR_COST_MINION, cardId: "TW013" })
+        ];
+      }
+    },
+    {
+      id: "l5_jump_turn_13",
+      title: "跳到第 13 回合",
+      body: "接著看第二次增幅前的危急局面。現在直接跳到第 13 回合：你快被擊倒了。",
       action: "next",
+      apply: (session) => {
+        session.turnNumber = 13;
+        session.activeSeat = PLAYER;
+        setHero(session, PLAYER, 1, 30);
+        setHero(session, OPPONENT, 24, 30);
+        setPlayerMana(session, PLAYER, 10, 13);
+        setPlayerMana(session, OPPONENT, 10, 13);
+        setPlayerBoard(session, PLAYER, []);
+        setPlayerBoard(session, OPPONENT, [
+          makeMinion(`${L5_ENEMY_PREFIX}-lethal-a`, "TW045", OPPONENT, 4, 5, { canAttack: true }),
+          makeMinion(`${L5_ENEMY_PREFIX}-lethal-b`, "TW013", OPPONENT, 3, 5, { canAttack: true })
+        ]);
+        return [ev(session, "TURN_STARTED", PLAYER, { activeSeat: PLAYER, turn: 13 })];
+      }
+    },
+    {
+      id: "l5_lethal_warning",
+      title: "卯死增幅",
+      body: "你只剩 1 點生命，對手下一次攻擊就能結束比賽。第 14 回合會出現最高階的卯死增幅，選對就能逃過死劫。",
+      action: "next",
+      highlights: [{ type: "hero", seat: PLAYER }, { type: "unit", seat: OPPONENT }],
+      apply: (session) => {
+        session.turnNumber = 14;
+        return [
+          ev(session, "TURN_STARTED", PLAYER, { activeSeat: PLAYER, turn: 14 }),
+          ...startAmplificationPhase(session, lessonHighAmpOptions())
+        ];
+      }
+    },
+    {
+      id: "l5_one_party_pick",
+      title: "選一黨獨大",
+      body: "選【一黨獨大】。卯死等級的增幅很強，這次會把生命上限和目前生命一起拉高，讓你活下來。",
+      action: "script_amp",
+      match: (command) => command.type === "selectAmplification" && command.optionId === "AMP_ONE_PARTY_DOMINANCE",
+      resolve: (session, command) => {
+        const optionId = command.type === "selectAmplification" ? command.optionId : undefined;
+        const option = (session.amplificationOptions ?? []).find((o) => o.id === optionId) ?? session.amplificationOptions?.[0];
+        if (option) bindAmplification(session, option);
+        setHero(session, PLAYER, 21, 50);
+        endAmplificationPhase(session);
+        return [
+          ev(session, "AMPLIFICATION_SELECTED", PLAYER, { optionId: option?.id, tier: option?.tier }),
+          ev(session, "AUGMENT_TRIGGERED", PLAYER, { augmentId: option?.id, targets: ["player1:hero"] }),
+          ev(session, "HEAL", PLAYER, { target: "player1:hero", amount: 20, remainingHealth: 21 }),
+          ev(session, "PHASE_ENDED", PLAYER, { phase: "AMPLIFICATION_PHASE" })
+        ];
+      }
+    },
+    {
+      id: "l5_one_party_result",
+      title: "逃過死劫",
+      body: "生命從 1 拉到 21，對手原本的致命攻擊不再足夠。高階增幅常常不是小優勢，而是直接把敗局翻回可打。",
+      action: "next",
+      highlights: [{ type: "hero", seat: PLAYER }]
+    },
+    {
+      id: "l5_event_setup",
+      title: "第 20 回合事件",
+      body: "最後跳到公投事件。對手現在滿場隨從，你方場上沒有隨從；而且你血量比較低，會拿到比較高的中選率。",
+      action: "next",
+      highlights: [{ type: "turnCounter" }, { type: "hero", seat: PLAYER }],
+      apply: (session) => {
+        session.turnNumber = 20;
+        session.activeSeat = PLAYER;
+        setHero(session, PLAYER, 8, 50);
+        setHero(session, OPPONENT, 24, 30);
+        setPlayerMana(session, PLAYER, 10, 10);
+        setPlayerMana(session, OPPONENT, 10, 10);
+        setPlayerBoard(session, PLAYER, []);
+        return [
+          ev(session, "TURN_STARTED", PLAYER, { activeSeat: PLAYER, turn: 20 }),
+          ...setBoard(session, OPPONENT, l5EnemyBoard())
+        ];
+      }
+    },
+    {
+      id: "l5_vote_explain",
+      title: "低血量的優勢",
+      body: "公投輪盤會讓弱勢方，也就是血量較低的一方，有較高機率中選。按下一步，選【莫拉克風災】來清掉對手滿場。",
+      action: "next",
+      highlights: [{ type: "hero", seat: PLAYER }, { type: "unit", seat: OPPONENT }],
       apply: (session) => {
         session.phase = "VOTING_PHASE";
         session.specialPhase = {
           voteEvents: lessonFieldEvents(),
-          voteWeightP1: 60,
-          voteWeightP2: 40,
+          voteWeightP1: 70,
+          voteWeightP2: 30,
           voteSubmittedP1: false,
           voteSubmittedP2: false
         };
@@ -941,16 +1088,16 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
       }
     },
     {
-      id: "l5_field_vote",
-      title: "投票",
-      body: "從畫面上的三個公投案選一個投票。",
+      id: "l5_vote_morakot",
+      title: "選莫拉克風災",
+      body: "選【莫拉克風災】。輪盤開出你的公投案後，場上的隨從會全部被摧毀，你就能看見局勢逆轉。",
       action: "script_vote",
-      match: (command) => command.type === "submitVote",
+      match: (command) => command.type === "submitVote" && lessonFieldEvents()[command.optionIndex]?.id === "VE_MORAKOT",
       resolve: (session, command) => {
         const events = lessonFieldEvents();
         const index = command.type === "submitVote" ? command.optionIndex : 0;
         const chosen = events[index] ?? events[0];
-        const other = events[(index + 1) % events.length] ?? events[0];
+        const other = events.find((candidate) => candidate.id !== chosen.id) ?? events[1] ?? chosen;
         const result: GameEvent[] = [
           ev(session, "VOTE_RESOLVED", PLAYER, {
             choices: {
@@ -960,27 +1107,21 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
             winningSeat: PLAYER,
             eventId: chosen.id,
             eventName: chosen.name,
-            weights: { player1: 50, player2: 50 },
-            weightsInt: { player1: 1, player2: 1 },
-            rollMillionths: 250000,
-            processText: `公投開票：${chosen.name} 中選`
+            weights: { player1: 70, player2: 30 },
+            weightsInt: { player1: 7, player2: 3 },
+            rollMillionths: 180000,
+            processText: `公投開票：${chosen.name} 中選，對手滿場被清空`
           })
         ];
-        // Apply a representative environment effect to the board.
-        if (chosen.id === "VE_MORAKOT") {
-          for (const m of session.players[PLAYER].board) {
-            result.push(ev(session, "DESTROY", PLAYER, { target: m.instanceId, cardId: m.cardId }));
-          }
-          session.players[PLAYER] = {
-            ...session.players[PLAYER],
-            board: [],
-            graveyardCount: session.players[PLAYER].graveyardCount + session.players[PLAYER].board.length
-          };
-        } else if (chosen.id === "VE_BLACKOUT") {
-          const board = session.players[PLAYER].board.map((m) => ({ ...m, lockedTurns: 4 }));
-          setPlayerBoard(session, PLAYER, board);
-          for (const m of board) result.push(ev(session, "BUFF", PLAYER, { target: m.instanceId, lockedTurns: 4 }));
+        const enemyBoard = session.players[OPPONENT].board;
+        for (const m of enemyBoard) {
+          result.push(ev(session, "DESTROY", OPPONENT, { target: m.instanceId, cardId: m.cardId, reason: "EVENT", eventName: chosen.name }));
         }
+        session.players[OPPONENT] = {
+          ...session.players[OPPONENT],
+          board: [],
+          graveyardCount: session.players[OPPONENT].graveyardCount + enemyBoard.length
+        };
         session.phase = "NORMAL_PLAY";
         session.specialPhase = { ...session.specialPhase, voteSubmittedP1: true, voteSubmittedP2: true };
         result.push(ev(session, "PHASE_ENDED", PLAYER, { phase: "VOTING_PHASE" }));
@@ -989,14 +1130,15 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     },
     {
       id: "l5_field_result",
-      title: "場地效果套用",
-      body: "公投開票完成，中選的公投案成為場地效果並套用到全場！場地效果（例如大停電讓全場沉默、莫拉克讓全場隨從死亡）會大幅改變戰局，是翻盤的大事件。",
-      action: "next"
+      title: "局勢逆轉",
+      body: "莫拉克風災清掉了對手滿場，你從被壓制的一方變成有機會反打。第 20 回合事件就是這種大型翻盤點。",
+      action: "next",
+      highlights: [{ type: "unit", seat: OPPONENT }, { type: "hero", seat: PLAYER }]
     },
     {
       id: "l5_done",
-      title: "完成所有訓練",
-      body: "恭喜！你已經了解增幅與場地效果，完成了全部訓練關卡。點下一步完成第五關。",
+      title: "完成第五關",
+      body: "完成！你已經看過回合計數器、第 7/14 回合增幅，以及第 20 回合事件輪盤。點下一步結束教學。",
       action: "next"
     }
   ]

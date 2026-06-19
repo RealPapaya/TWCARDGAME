@@ -313,3 +313,47 @@ describe("advanced keywords lesson (第四關)", () => {
     ).toBeTruthy();
   });
 });
+
+describe("amplification and field lesson", () => {
+  it("teaches turn counter, low/high amplifications, and the Morakot comeback event", () => {
+    const session = createTrainingSession("amp_field");
+
+    expect(trainingPrompt(session)?.highlights).toContainEqual({ type: "turnCounter" });
+    expect(session.hand.map((card) => [card.instanceId, card.cost])).toEqual([["l5-four-cost-hand", 4]]);
+    expect(session.players.player1.mana).toEqual({ current: 3, max: 3 });
+
+    advanceTraining(session);
+    expect(session.turnNumber).toBe(7);
+    advanceTraining(session);
+    expect(session.phase).toBe("AMPLIFICATION_PHASE");
+    expect(session.amplificationOptions?.map((option) => option.id)).toContain("AMP_INVOICE_200");
+
+    const wrongAmp = handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_SHAREHOLDER_GIFT" });
+    expect(wrongAmp.rejected).toBeTruthy();
+    expect(session.players.player1.mana).toEqual({ current: 3, max: 3 });
+
+    handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_INVOICE_200" });
+    expect(session.phase).toBe("NORMAL_PLAY");
+    expect(session.players.player1.mana).toEqual({ current: 4, max: 4 });
+    expect(session.players.player1.augments?.map((augment) => augment.id)).toEqual(["AMP_INVOICE_200"]);
+
+    advanceTraining(session);
+    handleTrainingCommand(session, { type: "playCard", handInstanceId: "l5-four-cost-hand" });
+    expect(session.players.player1.mana).toEqual({ current: 0, max: 4 });
+    expect(session.players.player1.board[0]?.instanceId).toBe("l5-four-cost-minion");
+
+    driveLesson(session, [
+      { type: "selectAmplification", optionId: "AMP_ONE_PARTY_DOMINANCE" },
+      { type: "submitVote", optionIndex: 0 }
+    ]);
+
+    expect(session.status).toBe("finished");
+    expect(session.turnNumber).toBe(20);
+    expect(session.players.player1.augments?.map((augment) => augment.id)).toEqual([
+      "AMP_INVOICE_200",
+      "AMP_ONE_PARTY_DOMINANCE"
+    ]);
+    expect(session.players.player2.board).toHaveLength(0);
+    expect(session.players.player2.graveyardCount).toBe(7);
+  });
+});
