@@ -835,7 +835,7 @@ function lessonAmpOptions(): AmplificationOption[] {
   // descriptions of what this lesson will demonstrate for each tier.
   const desc: Record<string, string> = {
     加減賺: "（示範）我方全體隨從 +1/+1。",
-    穩穩仔賺: "（示範）我方全體隨從 +2/+2。",
+    蕭貪: "（示範）我方全體隨從 +2/+2。",
     卯死: "（示範）我方全體隨從 +3/+3。"
   };
   return AMPLIFICATION_DB.map((entry) => ({
@@ -876,7 +876,7 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_amp_explain",
       title: "增幅",
-      body: "【增幅】：在第 7 與第 14 回合，你會依牌組陣營獲得三選一強化，分為三個等級——加減賺、穩穩仔賺、卯死，越高越強。按下一步，馬上跳出增幅選擇。",
+      body: "【增幅】：在第 7 與第 14 回合，你會依牌組陣營獲得三選一強化，分為三個等級——加減賺、蕭貪、卯死，越高越強。按下一步，馬上跳出增幅選擇。",
       action: "next",
       apply: (session) => {
         session.phase = "AMPLIFICATION_PHASE";
@@ -894,7 +894,7 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
       resolve: (session, command) => {
         const optionId = command.type === "selectAmplification" ? command.optionId : undefined;
         const option = (session.amplificationOptions ?? []).find((o) => o.id === optionId) ?? session.amplificationOptions?.[0];
-        const amount = option?.tier === "卯死" ? 3 : option?.tier === "穩穩仔賺" ? 2 : 1;
+        const amount = option?.tier === "卯死" ? 3 : option?.tier === "蕭貪" ? 2 : 1;
         const board = session.players[PLAYER].board.map((m) => ({
           ...m,
           attack: m.attack + amount,

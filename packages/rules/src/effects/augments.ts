@@ -20,7 +20,7 @@ type Events = EffectContext["events"];
 
 const CATALOG_MAP = new Map(CARD_CATALOG.map((card) => [card.id, card]));
 
-/** Raises a tier one step (加減賺→穩穩仔賺→卯死), capped at 卯死. Used by 0050. */
+/** Raises a tier one step (加減賺→蕭貪→卯死), capped at 卯死. Used by 0050. */
 export function bumpTier(tier: AmplificationTier): AmplificationTier {
   const index = AMPLIFICATION_TIERS.indexOf(tier);
   return AMPLIFICATION_TIERS[Math.min(index + 1, AMPLIFICATION_TIERS.length - 1)];

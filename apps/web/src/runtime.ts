@@ -2507,6 +2507,7 @@ function renderTurnCounter(): string {
     : nextSpecial
       ? ` is-${nextSpecial}-preview has-special-tooltip`
       : "";
+  const highlight = trainingHighlightClass({ type: "turnCounter" });
   const offsets = [-2, -1, 0, 1, 2] as const;
   const ticks = offsets.map((offset) => {
     const turn = currentTurn + offset;
@@ -2519,7 +2520,7 @@ function renderTurnCounter(): string {
   }).join("");
 
   return `
-    <div class="turn-counter${stateClass}" role="img" aria-label="目前第 ${currentTurn} 回合${tooltip ? `，${tooltip}` : ""}"
+    <div class="turn-counter${stateClass} ${highlight ?? ""}" role="img" aria-label="目前第 ${currentTurn} 回合${tooltip ? `，${tooltip}` : ""}"
       ${tooltip ? `data-tooltip="${tooltip}" tabindex="0"` : ""} data-testid="turn-counter">
       <div class="turn-counter-numbers" data-dom-key="turn-counter-wheel-${currentTurn}">${ticks}</div>
       <img class="turn-counter-frame" src="/images/ui/turn_counter_fan.webp" alt="" draggable="false">
@@ -2678,7 +2679,7 @@ function renderMulliganCard(card: HandCardView, disabled: boolean): string {
   `;
 }
 
-const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 穩穩仔賺: "amp-tier-mid", 卯死: "amp-tier-high" };
+const AMP_TIER_CLASS: Record<string, string> = { 加減賺: "amp-tier-low", 蕭貪: "amp-tier-mid", 卯死: "amp-tier-high" };
 
 /** Augment ids with a cut-out icon under /images/augments/<id lowercased>.webp. */
 const AUGMENT_IMAGE_IDS = new Set([

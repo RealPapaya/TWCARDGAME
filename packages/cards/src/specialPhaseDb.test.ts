@@ -28,7 +28,7 @@ describe("special-phase databases", () => {
   });
 
   it("offers at least one amplification per tier so the sampler can fill three picks", () => {
-    for (const tier of ["加減賺", "穩穩仔賺", "卯死"] as const) {
+    for (const tier of ["加減賺", "蕭貪", "卯死"] as const) {
       expect(filterAmplification(AMPLIFICATION_DB, undefined, tier).length).toBeGreaterThanOrEqual(1);
     }
   });
@@ -62,7 +62,7 @@ describe("special-phase databases", () => {
         id: "AMP_BAD_RAMP",
         name: "x",
         description: "x",
-        tier: "穩穩仔賺" as const,
+        tier: "蕭貪" as const,
         factionTags: [],
         effect: { type: "AUG_MANA_RAMP_AFTER_TURN", manaCap: 15 }
       }
@@ -87,7 +87,7 @@ describe("special-phase databases", () => {
         id: "AMP_BAD_BOUNCE_BUFF",
         name: "x",
         description: "x",
-        tier: "穩穩仔賺" as const,
+        tier: "蕭貪" as const,
         factionTags: [],
         effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF" }
       }
@@ -119,7 +119,7 @@ describe("special-phase databases", () => {
       })
     ).toEqual([
       { name: "政壇三腳督", tier: "加減賺", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" },
-      { name: "把國家還給你們", tier: "穩穩仔賺", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" },
+      { name: "把國家還給你們", tier: "蕭貪", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" },
       { name: "垃圾不分藍綠", tier: "卯死", factionTags: ["民眾黨政治人物"], targetCategory: "民眾黨政治人物" }
     ]);
   });
@@ -139,7 +139,7 @@ describe("special-phase databases", () => {
         id: "AMP_BAD_CATEGORY_HEAL",
         name: "x",
         description: "x",
-        tier: "穩穩仔賺" as const,
+        tier: "蕭貪" as const,
         factionTags: [],
         effect: { type: "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL", target_category: "x" }
       }

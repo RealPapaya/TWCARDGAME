@@ -105,7 +105,7 @@ describe("phase pure helpers", () => {
 
   it("rolls two shared augment tiers reproducibly per seed (≈45/35/20)", () => {
     expect(rollAugmentTiers(123)).toEqual(rollAugmentTiers(123));
-    const counts: Record<string, number> = { 加減賺: 0, 穩穩仔賺: 0, 卯死: 0 };
+    const counts: Record<string, number> = { 加減賺: 0, 蕭貪: 0, 卯死: 0 };
     for (let seed = 0; seed < 3000; seed++) {
       for (const tier of rollAugmentTiers(seed)) counts[tier] += 1;
     }
@@ -123,7 +123,7 @@ describe("phase pure helpers", () => {
       categoryCounts: { 勞工: 10, 平民: 20 } as Record<string, number>,
       excludeIds: new Set<string>(),
       isFirstPhase: true,
-      secondPhaseTier: "穩穩仔賺" as const
+      secondPhaseTier: "蕭貪" as const
     };
     const a = sampleAugmentOptions({ rngState: 999, ...base });
     const b = sampleAugmentOptions({ rngState: 999, ...base });
@@ -137,12 +137,12 @@ describe("phase pure helpers", () => {
   it("offers first-phase-only low-tier augments only when eligible", () => {
     const low = AMPLIFICATION_DB.filter((entry) => entry.tier === "加減賺");
     const counts: Record<string, number> = { 平民: 30 };
-    const all = (isFirstPhase: boolean, secondPhaseTier: "加減賺" | "穩穩仔賺" | "卯死") =>
+    const all = (isFirstPhase: boolean, secondPhaseTier: "加減賺" | "蕭貪" | "卯死") =>
       sampleAugmentOptions({ rngState: 5, pool: low, categoryCounts: counts, excludeIds: new Set(), isFirstPhase, secondPhaseTier, count: 99 }).options.map((o) => o.id);
-    expect(all(true, "穩穩仔賺")).toContain("AMP_0050");
-    expect(all(true, "穩穩仔賺")).toContain("AMP_GO_FOR_BROKE");
-    expect(all(false, "穩穩仔賺")).not.toContain("AMP_0050");
-    expect(all(false, "穩穩仔賺")).not.toContain("AMP_GO_FOR_BROKE");
+    expect(all(true, "蕭貪")).toContain("AMP_0050");
+    expect(all(true, "蕭貪")).toContain("AMP_GO_FOR_BROKE");
+    expect(all(false, "蕭貪")).not.toContain("AMP_0050");
+    expect(all(false, "蕭貪")).not.toContain("AMP_GO_FOR_BROKE");
     expect(all(true, "卯死")).not.toContain("AMP_0050");
     expect(all(true, "卯死")).toContain("AMP_GO_FOR_BROKE");
   });
@@ -169,7 +169,7 @@ describe("phase pure helpers", () => {
       categoryCounts: { 勞工: 1 },
       excludeIds: new Set(),
       isFirstPhase: true,
-      secondPhaseTier: "穩穩仔賺",
+      secondPhaseTier: "蕭貪",
       count: 1
     });
     expect(sampled.options[0]?.relatedCardIds).toEqual(["S029"]);

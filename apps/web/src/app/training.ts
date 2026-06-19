@@ -144,6 +144,7 @@ export type TrainingHighlight =
   | { type: "unit"; seat: Seat; instanceId?: string }
   | { type: "mana"; seat: Seat }
   | { type: "minionStat"; instanceId: string; stat: "attack" | "health" }
+  | { type: "turnCounter" }
   | { type: "endTurn" };
 
 export interface TrainingPrompt {
@@ -960,5 +961,6 @@ function sameHighlight(a: TrainingHighlight, b: TrainingHighlight): boolean {
   if (a.type === "unit" && b.type === "unit") return a.seat === b.seat && a.instanceId === b.instanceId;
   if (a.type === "mana" && b.type === "mana") return a.seat === b.seat;
   if (a.type === "minionStat" && b.type === "minionStat") return a.instanceId === b.instanceId && a.stat === b.stat;
+  if (a.type === "turnCounter" && b.type === "turnCounter") return true;
   return a.type === "endTurn" && b.type === "endTurn";
 }

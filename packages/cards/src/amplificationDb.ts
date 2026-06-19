@@ -27,7 +27,7 @@ export interface AmplificationDbEntry {
 }
 
 /**
- * 【動態增幅效果資料庫】加減賺 / 穩穩仔賺 / 卯死 三等級。每個階段的等級於開局抽定
+ * 【動態增幅效果資料庫】加減賺 / 蕭貪 / 卯死 三等級。每個階段的等級於開局抽定
  * （見 rules `phases.ts`），雙方共用同等級、各自依牌組加權抽出 3 個選項。派系
  * 增幅（`factionTags` 非空）僅在牌組含該類別時才可能出現，權重隨占比上升。
  */
@@ -172,13 +172,13 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 1 }
   },
 
-  // ---- 穩穩仔賺（中增幅）------------------------------------------------------
+  // ---- 蕭貪（中增幅）------------------------------------------------------
   {
     id: "AMP_DIVIDEND",
     hasImage: true,
     name: "股利分紅",
     description: "手上所有卡牌費用 -2（僅當下手牌）。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_HAND_COST_DELTA", value: 2 }
   },
@@ -187,7 +187,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "發票中1000",
     description: "額外獲得兩顆水晶，水晶上限 +2。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_GRANT_CRYSTALS", crystals: 2 }
   },
@@ -196,7 +196,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "減稅",
     description: "此局英雄每次受到傷害 -1。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_DAMAGE_REDUCTION", value: 1 }
   },
@@ -205,7 +205,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "育兒津貼",
     description: "每當打出隨從牌 該隨從最大生命 +1。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_PLAYED_MAXHP", value: 1 }
   },
@@ -214,7 +214,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "言論自由",
     description: "新聞費用永久 -2。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_NEWS_COST", value: 2 }
   },
@@ -223,7 +223,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "新青年安心成家貸款",
     description: "建築費用永久 -4。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_BUILDING_COST", value: 4 }
   },
@@ -233,7 +233,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     name: "林北檳榔擠剛攏哺500啦",
     description: "獲得 3 張檳榔到手牌。",
     relatedCardIds: ["S029"],
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: ["勞工"],
     effect: { type: "AUG_ADD_CARD_TO_HAND", cardId: "S029", count: 3 }
   },
@@ -242,7 +242,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "乞丐超人",
     description: "第 8 回合之後 卡片費用 7 折（四捨五入）。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_COST_MULTIPLIER", value: 7, turns: 8 }
   },
@@ -251,7 +251,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "定期定額",
     description: "第 10 回合起，每回合水晶成長 +2，上限提升至 15。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 10, manaCap: 15, manaGrowth: 2 }
   },
@@ -260,7 +260,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "黨產大補丸",
     description: "英雄生命上限 +10。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_HERO_MAX_HP", value: 10 }
   },
@@ -269,7 +269,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "國定假日",
     description: "自己目前場上隨從立刻回到手牌，並且獲得 +2/+2，費用 -1。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: [],
     effect: { type: "AUG_BOUNCE_OWN_BOARD_TO_HAND_BUFF", value: 2, costReduction: 1 }
   },
@@ -279,7 +279,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     name: "非核家園",
     description: "每當召喚一名民進黨政治人物，在對手場上放置一個核廢料。",
     relatedCardIds: ["TW077"],
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: ["民進黨政治人物"],
     effect: {
       type: "AUG_ON_SUMMON_CATEGORY_SUMMON_ENEMY",
@@ -294,7 +294,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     name: "重啟核四",
     description: "在自己的場上放置 4 張核電廠。",
     relatedCardIds: ["TW063"],
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: ["國民黨政治人物"],
     effect: { type: "AUG_SUMMON_CARD", cardId: "TW063", count: 4, target: { side: "FRIENDLY" } }
   },
@@ -303,7 +303,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     hasImage: true,
     name: "把國家還給你們",
     description: "整局我方民眾黨政治人物死亡時，治療死亡當下兩側仍存活隨從 2 點生命。",
-    tier: "穩穩仔賺",
+    tier: "蕭貪",
     factionTags: ["民眾黨政治人物"],
     effect: {
       type: "AUG_CATEGORY_DEATHRATTLE_ADJACENT_HEAL",
@@ -467,7 +467,7 @@ const FIRST_PHASE_ONLY_IDS = new Set<string>(["AMP_0050", "AMP_GO_FOR_BROKE", "A
 export function validateAmplificationDb(db: readonly AmplificationDbEntry[]): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
   const ids = new Set<string>();
-  const tiers = new Set<AmplificationTier>(["加減賺", "穩穩仔賺", "卯死"]);
+  const tiers = new Set<AmplificationTier>(["加減賺", "蕭貪", "卯死"]);
   for (const entry of db) {
     if (ids.has(entry.id)) errors.push(`${entry.id}: duplicate amplification id`);
     ids.add(entry.id);

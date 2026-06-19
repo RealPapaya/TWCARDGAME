@@ -1,7 +1,7 @@
 """Cut all augment icon webps from tiered 5x4 source sheets.
 
 The source sheets live under scripts/augment_sources and are grouped by color:
-Bronze = 加減賺, Silver = 穩穩仔賺, Gold/maosi = 卯死.
+Bronze = 加減賺, Silver = 蕭貪, Gold/maosi = 卯死.
 
 The output convention matches the client loader:
   apps/web/public/images/augments/<augment id lowercased>.webp
@@ -60,7 +60,7 @@ AUGMENTS: list[tuple[str, str, int, int]] = [
     ("amp_blood_donation_voucher", "bronze2", 2, 1),
     ("amp_banquet", "bronze1", 2, 3),
 
-    # 穩穩仔賺
+    # 蕭貪
     ("amp_dividend", "silver1", 0, 2),
     ("amp_invoice_1000", "silver1", 0, 1),
     ("amp_tax_cut", "silver1", 1, 0),

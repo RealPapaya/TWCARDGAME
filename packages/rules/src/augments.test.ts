@@ -432,7 +432,7 @@ describe("augment passive cost readers", () => {
     const state = startInProgress(6);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_BEGGAR_HERO"), []);
-    expect(entry("AMP_BEGGAR_HERO").tier).toBe("穩穩仔賺");
+    expect(entry("AMP_BEGGAR_HERO").tier).toBe("蕭貪");
     state.turn.number = 8;
     expect(getCardActualCost(state, seat, makeCard({ type: "MINION", cost: 10 }))).toBe(10);
     state.turn.number = 9;
@@ -657,7 +657,7 @@ describe("augment triggers & meta", () => {
   it("0050 raises the second phase tier by one, capped at 卯死", () => {
     const state = startInProgress(14);
     const seat = state.turn.activeSeat;
-    state.augmentTiers = ["加減賺", "穩穩仔賺"];
+    state.augmentTiers = ["加減賺", "蕭貪"];
     applyAugmentSelection(state, seat, entry("AMP_0050"), []);
     expect(state.augmentTiers[1]).toBe("卯死");
     state.augmentTiers = ["加減賺", "卯死"];

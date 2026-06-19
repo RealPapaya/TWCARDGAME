@@ -150,10 +150,10 @@ export function weightedIndex(rngState: number, weights: readonly number[]): { v
 
 // --- Game-start tier roll ---------------------------------------------------
 
-/** Per-phase tier probabilities (加減賺 45% / 穩穩仔賺 35% / 卯死 20%). */
+/** Per-phase tier probabilities (加減賺 45% / 蕭貪 35% / 卯死 20%). */
 const TIER_ROLL_WEIGHTS: ReadonlyArray<readonly [AmplificationTier, number]> = [
   ["加減賺", 45],
-  ["穩穩仔賺", 35],
+  ["蕭貪", 35],
   ["卯死", 20]
 ];
 

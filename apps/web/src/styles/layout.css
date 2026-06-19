@@ -1565,7 +1565,7 @@ body.hand-dragging .hand-row .card {
   font-size: clamp(13px, 1.3vw, 16px);
 }
 
-/* Tier framing: low / mid / high amplification (加減賺 / 穩穩仔賺 / 卯死). */
+/* Tier framing: low / mid / high amplification (加減賺 / 蕭貪 / 卯死). */
 .card.mulligan-card.amp-tier-low { border-color: #7fae6a; }
 .card.mulligan-card.amp-tier-mid { border-color: #d8a23c; }
 .card.mulligan-card.amp-tier-high { border-color: #d4564b; }

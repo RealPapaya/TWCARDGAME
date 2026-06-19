@@ -16,7 +16,7 @@ import {
 // Mirror of runtime.ts AMP_TIER_CLASS.
 const AMP_TIER_CLASS: Record<string, string> = {
   加減賺: "amp-tier-low",
-  穩穩仔賺: "amp-tier-mid",
+  蕭貪: "amp-tier-mid",
   卯死: "amp-tier-high"
 };
 

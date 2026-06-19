@@ -97,7 +97,7 @@ function scoreResolvePrompt(state: MatchState, move: Extract<GameCommand, { type
   return card.cost; // spells/news: prefer the higher-impact (costlier) option
 }
 
-const TIER_RANK: Record<string, number> = { 加減賺: 1, 穩穩仔賺: 2, 卯死: 3 };
+const TIER_RANK: Record<string, number> = { 加減賺: 1, 蕭貪: 2, 卯死: 3 };
 
 function scoreAmplification(state: MatchState, seat: Seat, move: Extract<GameCommand, { type: "selectAmplification" }>): number {
   // A phase's options now share one tier, so prefer a faction augment the deck
