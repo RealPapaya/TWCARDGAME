@@ -1,8 +1,12 @@
 import { GameDurableObject, type Env } from "./GameDurableObject.js";
+import { LobbyDurableObject } from "./LobbyDurableObject.js";
+import { normalizeJoinCode } from "./lobbyState.js";
+import { decodeReconnectToken, type RealtimeMode } from "./tokens.js";
 
 // The Durable Object class must be exported from the Worker entry so Wrangler can
 // bind it (see wrangler.jsonc `durable_objects` + `migrations`).
 export { GameDurableObject };
+export { LobbyDurableObject };
 
 const CORS_HEADERS: Record<string, string> = {
   "access-control-allow-origin": "*",
@@ -31,24 +35,76 @@ export default {
       return Response.json({ ok: true, service: "twcardgame-realtime" }, { headers: CORS_HEADERS });
     }
 
+    if (url.pathname === "/matchmaking/public" && request.method === "POST") {
+      return withCors(await lobbyFetch(env, "/matchmaking/public", { method: "POST" }));
+    }
+
+    if (url.pathname === "/private" && request.method === "POST") {
+      return withCors(await lobbyFetch(env, "/private", { method: "POST" }));
+    }
+
+    const privateMatch = url.pathname.match(/^\/private\/([^/]+)$/);
+    if (privateMatch && (request.method === "GET" || request.method === "DELETE")) {
+      return withCors(await lobbyFetch(env, `/private/${privateMatch[1]}`, { method: request.method }));
+    }
+
     const modeMatch = url.pathname.match(/^\/(pvp|pve)\/?$/);
     if (modeMatch) {
-      const mode = modeMatch[1];
+      const mode = modeMatch[1] as RealtimeMode;
+      const token = url.searchParams.get("token") || url.searchParams.get("reconnectToken");
+      const decodedToken = token ? decodeReconnectToken(token) : null;
+      if (token && (!decodedToken || decodedToken.mode !== mode)) {
+        return new Response("Invalid reconnect token.", { status: 400, headers: CORS_HEADERS });
+      }
+
+      const joinCode = url.searchParams.get("joinCode");
+      let room = decodedToken?.room || url.searchParams.get("room");
+      if (!room && mode === "pvp" && joinCode) {
+        room = await lookupPrivateRoom(env, joinCode);
+        if (!room) return new Response("Join code not found.", { status: 404, headers: CORS_HEADERS });
+      }
+      if (!room) {
+        room = mode === "pvp" ? (await claimPublicRoom(env)).room : crypto.randomUUID();
+      }
       // PvE is single-human, so default to a unique room per connection; PvP
-      // matches by shared room code / join code.
-      const room =
-        url.searchParams.get("room") ||
-        (mode === "pvp" ? url.searchParams.get("joinCode") : null) ||
-        crypto.randomUUID();
+      // defaults to Lobby DO matchmaking unless a room / private join code /
+      // reconnect token chooses a specific match.
       const id = env.GAME_ROOM.idFromName(`${mode}:${room}`);
       const stub = env.GAME_ROOM.get(id);
       // Normalise room + mode so the DO sees a stable identity and knows its kind.
       const forward = new URL(request.url);
       forward.searchParams.set("room", room);
       forward.searchParams.set("mode", mode);
+      if (decodedToken) forward.searchParams.set("sessionId", decodedToken.sessionId);
+      if (joinCode) forward.searchParams.set("joinCode", normalizeJoinCode(joinCode));
       return stub.fetch(new Request(forward.toString(), request));
     }
 
     return new Response("Not found", { status: 404, headers: CORS_HEADERS });
   }
 };
+
+async function claimPublicRoom(env: Env): Promise<{ room: string; status: "waiting" | "matched" }> {
+  const response = await lobbyFetch(env, "/matchmaking/public", { method: "POST" });
+  if (!response.ok) throw new Error(`Lobby matchmaking failed: ${response.status}`);
+  return (await response.json()) as { room: string; status: "waiting" | "matched" };
+}
+
+async function lookupPrivateRoom(env: Env, joinCode: string): Promise<string | null> {
+  const response = await lobbyFetch(env, `/private/${encodeURIComponent(normalizeJoinCode(joinCode))}`, { method: "GET" });
+  if (response.status === 404) return null;
+  if (!response.ok) throw new Error(`Private room lookup failed: ${response.status}`);
+  const payload = (await response.json()) as { room: string };
+  return payload.room;
+}
+
+async function lobbyFetch(env: Env, path: string, init: RequestInit): Promise<Response> {
+  const id = env.LOBBY.idFromName("global");
+  return env.LOBBY.get(id).fetch(`https://lobby${path}`, init);
+}
+
+function withCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(CORS_HEADERS)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}

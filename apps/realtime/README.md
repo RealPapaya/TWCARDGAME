@@ -51,6 +51,18 @@ the Colyseus `onMessage` events the existing web client already handles
 `promptChoice`, `joinCode`, `error`) plus `state` (the full snapshot the legacy
 client read off `room.onStateChange`). See `src/protocol.ts`.
 
+## Lobby / Phase 2 endpoints
+
+- `POST /matchmaking/public` returns `{ room, status }` and pairs every two
+  callers into the same PvP room.
+- `POST /private` creates a private challenge and returns `{ room, joinCode }`.
+- `GET /private/:joinCode` resolves a private room; `DELETE /private/:joinCode`
+  releases it after match cleanup.
+- `GET /pvp` without `room` or `joinCode` now uses public matchmaking.
+- `GET /pvp?joinCode=ABC123` resolves the room through the Lobby DO.
+- WebSocket clients receive `reconnectToken`; reconnect with
+  `/pvp?token=<token>` or `/pvp?reconnectToken=<token>`.
+
 ## Run the PoC (Phase 0 acceptance: two tabs play a full PvP game)
 
 Workspace packages are consumed from `dist/`, so build first (NodeNext + explicit
@@ -71,6 +83,11 @@ handled.)
 
 ## Status (see roadmap §A)
 
+Current realtime-layer status: Phase 0 is complete; Phase 1 PvE is complete for
+the Worker/DO path; Phase 2 now has Lobby DO matchmaking, private join-code
+registry, and reconnect-token routing. Supabase deck resolution/finalization
+hooks and the Phase 3 web adapter remain separate follow-up work.
+
 - ✅ **Phase 0** — DO + `reduce` + native WebSocket; PvP-by-room-code; turn /
   mulligan / special-phase deadlines on a DO Alarm; disconnect→reconnect window;
   hibernation-safe persistence; unit tests green.
@@ -86,7 +103,7 @@ handled.)
 
 ## Not yet wired (intentional, next phases)
 
-- `/pve` returns **501** — bot pacing is Phase 1.
 - No Supabase: connections use a default dev deck; `onMatchComplete` is a hook
   with no persistence/reward dispatch yet.
-- Public matchmaking: `/pvp` is **room-code only** (no `joinOrCreate` queue yet).
+- Phase 3 web adapter is not wired yet; use the PoC client or raw WebSocket
+  messages against the realtime Worker.

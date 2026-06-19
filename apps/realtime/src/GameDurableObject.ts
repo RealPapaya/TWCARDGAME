@@ -9,9 +9,11 @@ import {
 } from "./GameSession.js";
 import { serverMessage, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { restoreSession } from "./restore.js";
+import { encodeReconnectToken, type RealtimeMode } from "./tokens.js";
 
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;
+  LOBBY: DurableObjectNamespace;
 }
 
 /** Per-connection state stored on the hibernatable socket via serializeAttachment. */
@@ -98,6 +100,7 @@ export class GameDurableObject {
     // Mirror GameRoom.onJoin: tell the client its seat, and the private join code
     // to the room creator (first seat).
     this.sendToSocket(server, serverMessage("seat", { seat }));
+    this.sendToSocket(server, serverMessage("reconnectToken", { token: this.createReconnectToken(url, sessionId) }));
     if (session.joinCode && seat === "player1" && !reconnect) {
       this.sendToSocket(server, serverMessage("joinCode", { code: session.joinCode }));
     }
@@ -181,6 +184,7 @@ export class GameDurableObject {
   }
 
   private async cleanup(): Promise<void> {
+    const joinCode = this.session?.joinCode;
     for (const ws of this.state.getWebSockets()) {
       try {
         ws.close(1000, "match complete");
@@ -190,6 +194,7 @@ export class GameDurableObject {
     }
     await this.state.storage.deleteAll();
     await this.state.storage.deleteAlarm();
+    if (joinCode) await this.releaseJoinCode(joinCode);
     this.session = undefined;
     this.cleanupAtMs = undefined;
     this.pendingWake = undefined;
@@ -222,6 +227,26 @@ export class GameDurableObject {
       displayName: params.get("name") || `Player ${sessionId.slice(0, 4)}`,
       deckIds: deckIds.length > 0 ? deckIds : defaultDeckIds()
     };
+  }
+
+  private createReconnectToken(url: URL, sessionId: string): string {
+    return encodeReconnectToken({
+      v: 1,
+      mode: (url.searchParams.get("mode") as RealtimeMode | null) ?? "pvp",
+      room: url.searchParams.get("room") || this.state.id.toString(),
+      sessionId,
+      issuedAtMs: Date.now()
+    });
+  }
+
+  private async releaseJoinCode(joinCode: string): Promise<void> {
+    try {
+      const id = this.env.LOBBY.idFromName("global");
+      const stub = this.env.LOBBY.get(id);
+      await stub.fetch(`https://lobby/private/${encodeURIComponent(joinCode)}`, { method: "DELETE" });
+    } catch {
+      // Lobby cleanup is best-effort; the match DO must still be able to evict.
+    }
   }
 
   private sendToSocket(ws: WebSocket, message: ServerMessage): void {

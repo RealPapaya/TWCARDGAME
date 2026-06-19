@@ -72,6 +72,7 @@ export interface PublicSyncPayload {
 export interface ServerMessageMap {
   seat: { seat: Seat };
   joinCode: { code: string };
+  reconnectToken: { token: string };
   bot: { seat: Seat; difficulty?: string; theme?: string | null };
   hand: { seat: Seat; cards: HandCardView[] };
   presence: { seat: Seat; connected: boolean; reconnectUntilMs?: number };
