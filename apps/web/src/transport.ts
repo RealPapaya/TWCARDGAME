@@ -151,6 +151,10 @@ function buildRealtimeUrl(serverUrl: string, mode: GameTransportMode, options: J
   appendString(url, "userId", options.userId);
   appendString(url, "difficulty", options.difficulty);
   appendString(url, "theme", options.theme);
+  // Supabase-backed deck resolution (server validates ownership + legality). Sent
+  // only when present; otherwise the server uses the explicit `deck` list / dev deck.
+  appendString(url, "deckId", options.deckId);
+  appendString(url, "accessToken", options.accessToken);
   if (Array.isArray(options.deckIds) && options.deckIds.length > 0) url.searchParams.set("deck", options.deckIds.join(","));
   return url.toString();
 }

@@ -24,6 +24,7 @@ import {
   requiresActionSeq,
   seedFromString
 } from "./finalize.js";
+import type { MatchMetadata } from "./matchServices.js";
 import { serverMessage, type ServerMessage } from "./protocol.js";
 
 export const DEFAULT_RECONNECT_WINDOW_MS = 30_000;
@@ -52,8 +53,8 @@ export interface SessionHost {
    * onto a DO Alarm — the migration's replacement for `clock.setTimeout`.
    */
   scheduleWake(atMs: number | null): void;
-  /** Fired once when the match reaches a terminal state (persist / cleanup hook). */
-  onMatchComplete?(match: MatchState): void;
+  /** Fired once when the match reaches a terminal state (persist / reward / cleanup hook). */
+  onMatchComplete?(match: MatchState, metadata: MatchMetadata): void;
 }
 
 export interface GameSessionOptions {
@@ -170,6 +171,13 @@ export class GameSession {
     return {};
   }
   protected restoreExtra(_extra: Record<string, unknown>): void {}
+  /**
+   * Per-match context handed to the finalize/reward hook. PvP by default; PvE
+   * (BotGameSession) overrides this to flag `isVsAi` + the bot difficulty/theme.
+   */
+  protected matchMetadata(): MatchMetadata {
+    return { isVsAi: false, startedAtMs: this.matchStartedAtMs };
+  }
 
   /* --------------------------------- lifecycle --------------------------------- */
 
@@ -506,7 +514,7 @@ export class GameSession {
 
   private onComplete(): void {
     this.host.scheduleWake(null);
-    if (this.match) this.host.onMatchComplete?.(this.match);
+    if (this.match) this.host.onMatchComplete?.(this.match, this.matchMetadata());
   }
 
   /* --------------------------------- persistence --------------------------------- */

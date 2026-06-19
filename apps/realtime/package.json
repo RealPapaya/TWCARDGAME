@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@twcardgame/cards": "file:../../packages/cards",
+    "@twcardgame/db": "file:../../packages/db",
     "@twcardgame/rules": "file:../../packages/rules",
     "@twcardgame/shared": "file:../../packages/shared"
   },

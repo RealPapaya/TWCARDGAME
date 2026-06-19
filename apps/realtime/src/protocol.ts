@@ -9,6 +9,7 @@ import type {
   PromptChoiceOffer,
   PublicGameState,
   PublicPlayer,
+  RewardSummary,
   Seat
 } from "@twcardgame/shared";
 
@@ -82,6 +83,8 @@ export interface ServerMessageMap {
   events: GameEvent[];
   amplificationOptions: { options: AmplificationOption[] };
   promptChoice: PromptChoiceOffer;
+  /** Per-seat post-match XP/gold/level summary (mirrors GameRoom's reward_summary send). */
+  reward_summary: RewardSummary;
   error: { message: string };
 }
 

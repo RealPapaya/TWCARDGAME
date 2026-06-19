@@ -1,12 +1,14 @@
-import type { AiDifficulty, AiTheme, Seat } from "@twcardgame/shared";
+import type { MatchState } from "@twcardgame/rules";
+import { SEATS, type AiDifficulty, type AiTheme, type RewardSummary, type Seat } from "@twcardgame/shared";
+import { createAccountStore, type AccountStore } from "./accounts.js";
 import { BotGameSession } from "./BotGameSession.js";
-import { defaultDeckIds } from "./decks.js";
 import {
   GameSession,
   type GameSessionSnapshot,
   type PlayerSetup,
   type SessionHost
 } from "./GameSession.js";
+import { createMatchServices, type MatchMetadata, type MatchServices } from "./matchServices.js";
 import { serverMessage, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { restoreSession } from "./restore.js";
 import { encodeReconnectToken, type RealtimeMode } from "./tokens.js";
@@ -14,6 +16,9 @@ import { encodeReconnectToken, type RealtimeMode } from "./tokens.js";
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;
   LOBBY: DurableObjectNamespace;
+  /** Optional: when set, match results persist + grant rewards via Supabase (Plan B). */
+  SUPABASE_URL?: string;
+  SUPABASE_SERVICE_ROLE_KEY?: string;
 }
 
 /** Per-connection state stored on the hibernatable socket via serializeAttachment. */
@@ -25,6 +30,8 @@ interface Attachment {
 interface StoredState {
   session: GameSessionSnapshot;
   cleanupAtMs?: number;
+  /** Whether the finalize side-effects already ran (survives hibernation, so they run once). */
+  finalized?: boolean;
 }
 
 const STORAGE_KEY = "do";
@@ -43,12 +50,20 @@ export class GameDurableObject {
   private cleanupAtMs?: number;
   /** Pending alarm request captured during a synchronous GameSession call. */
   private pendingWake: number | null | undefined = undefined;
+  /** Match awaiting persistence/reward dispatch (queued in onMatchComplete, run on flush). */
+  private pendingFinalize?: { match: MatchState; metadata: MatchMetadata };
+  /** Set once finalize side-effects have run; persisted so hibernation can't re-run them. */
+  private finalized = false;
   private readonly host: SessionHost;
+  private readonly services: MatchServices;
+  private readonly accounts: AccountStore;
 
   constructor(
     private readonly state: DurableObjectState,
     private readonly env: Env
   ) {
+    this.services = createMatchServices(env);
+    this.accounts = createAccountStore(env);
     this.host = {
       now: () => Date.now(),
       sendToSeat: (seat, message) => this.sendToSeat(seat, message),
@@ -56,11 +71,14 @@ export class GameDurableObject {
       scheduleWake: (atMs) => {
         this.pendingWake = atMs;
       },
-      onMatchComplete: () => {
+      onMatchComplete: (match, metadata) => {
         // No deadline alarm is needed once finished; repurpose the single alarm
         // to evict the room after a short grace window (clients still see the result).
         this.cleanupAtMs = Date.now() + MATCH_CLEANUP_DELAY_MS;
         this.pendingWake = this.cleanupAtMs;
+        // The session call chain is synchronous; the persist/reward writes are
+        // async, so queue them for the next flush (run once, guarded by `finalized`).
+        if (!this.finalized) this.pendingFinalize = { match, metadata };
       }
     };
     // Block message/alarm delivery until durable state is rehydrated on wake.
@@ -113,7 +131,7 @@ export class GameDurableObject {
       session.markReconnected(seat);
     } else {
       // setPlayer broadcasts the initial match state to both seats once full.
-      session.setPlayer(seat, sessionId, this.parseSetup(url, sessionId));
+      session.setPlayer(seat, sessionId, await this.resolveSetup(url, sessionId));
     }
 
     await this.flush();
@@ -198,6 +216,8 @@ export class GameDurableObject {
     this.session = undefined;
     this.cleanupAtMs = undefined;
     this.pendingWake = undefined;
+    this.finalized = false;
+    this.pendingFinalize = undefined;
   }
 
   /* --------------------------------- helpers --------------------------------- */
@@ -218,15 +238,18 @@ export class GameDurableObject {
     }
   }
 
-  private parseSetup(url: URL, sessionId: string): PlayerSetup {
+  private async resolveSetup(url: URL, sessionId: string): Promise<PlayerSetup> {
     const params = url.searchParams;
     const deckParam = params.get("deck");
-    const deckIds = deckParam ? deckParam.split(",").filter(Boolean) : defaultDeckIds();
-    return {
-      userId: params.get("userId") || sessionId,
-      displayName: params.get("name") || `Player ${sessionId.slice(0, 4)}`,
-      deckIds: deckIds.length > 0 ? deckIds : defaultDeckIds()
-    };
+    // The account store validates the deck (dev or Supabase) and resolves identity;
+    // an absent/invalid deck falls back to the dev deck rather than entering illegally.
+    return this.accounts.resolvePlayerSetup(sessionId, {
+      userId: params.get("userId") || undefined,
+      displayName: params.get("name") || undefined,
+      deckIds: deckParam ? deckParam.split(",").filter(Boolean) : undefined,
+      deckId: params.get("deckId") || undefined,
+      accessToken: params.get("accessToken") || undefined
+    });
   }
 
   private createReconnectToken(url: URL, sessionId: string): string {
@@ -288,17 +311,23 @@ export class GameDurableObject {
     if (stored?.session) {
       this.session = restoreSession(this.host, stored.session);
       this.cleanupAtMs = stored.cleanupAtMs;
+      this.finalized = stored.finalized ?? false;
     }
   }
 
   private async persist(): Promise<void> {
     if (!this.session) return;
-    const stored: StoredState = { session: this.session.toSnapshot(), cleanupAtMs: this.cleanupAtMs };
+    const stored: StoredState = {
+      session: this.session.toSnapshot(),
+      cleanupAtMs: this.cleanupAtMs,
+      finalized: this.finalized
+    };
     await this.state.storage.put(STORAGE_KEY, stored);
   }
 
   /** Persist mutated state and apply any alarm requested during the just-run handler. */
   private async flush(): Promise<void> {
+    await this.runPendingFinalize();
     await this.persist();
     if (this.pendingWake !== undefined) {
       if (this.pendingWake === null) {
@@ -307,6 +336,29 @@ export class GameDurableObject {
         await this.state.storage.setAlarm(Math.max(this.pendingWake, Date.now() + 1));
       }
       this.pendingWake = undefined;
+    }
+  }
+
+  /**
+   * Persist history + grant rewards + emit quest events once for a finished match,
+   * then push each seat its `reward_summary`. Best-effort: a failure never blocks
+   * the room from evicting (mirrors GameRoom.finalizeAndReward's isolation).
+   */
+  private async runPendingFinalize(): Promise<void> {
+    if (!this.pendingFinalize || this.finalized) return;
+    this.finalized = true;
+    const { match, metadata } = this.pendingFinalize;
+    this.pendingFinalize = undefined;
+    let summaries: Map<Seat, RewardSummary>;
+    try {
+      summaries = await this.services.finalize(match, metadata);
+    } catch (error) {
+      console.warn("match.finalize.failed", { matchId: match.matchId, error: String(error) });
+      return;
+    }
+    for (const seat of SEATS) {
+      const summary = summaries.get(seat);
+      if (summary) this.sendToSeat(seat, serverMessage("reward_summary", summary));
     }
   }
 }

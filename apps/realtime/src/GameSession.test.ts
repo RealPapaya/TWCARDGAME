@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { Seat } from "@twcardgame/shared";
+import type { MatchState } from "@twcardgame/rules";
 import { GameSession, type PlayerSetup, type SessionHost } from "./GameSession.js";
+import type { MatchMetadata } from "./matchServices.js";
 import type { PublicSyncPayload, ServerMessage } from "./protocol.js";
 import { defaultDeckIds } from "./decks.js";
 
@@ -20,6 +22,7 @@ class FakeHost implements SessionHost {
   wakeAt: number | null = null;
   wakeCleared = false;
   completed = false;
+  completedMetadata?: MatchMetadata;
   captured: Captured[] = [];
 
   now(): number {
@@ -35,8 +38,9 @@ class FakeHost implements SessionHost {
     this.wakeAt = atMs;
     if (atMs === null) this.wakeCleared = true;
   }
-  onMatchComplete(): void {
+  onMatchComplete(_match?: MatchState, metadata?: MatchMetadata): void {
     this.completed = true;
+    this.completedMetadata = metadata;
   }
 
   drain(): Captured[] {
@@ -212,6 +216,88 @@ describe("GameSession deadlines (single DO alarm)", () => {
     expect(host.completed).toBe(true);
     const result = sync().result;
     expect(result).toMatchObject({ reason: "disconnect_timeout", winnerSeat: "player2" });
+  });
+});
+
+describe("GameSession seating + reconnect", () => {
+  it("resolveSeat assigns free seats, recognises owners, and rejects a full room", () => {
+    const host = new FakeHost();
+    const session = new GameSession(host, { matchId: "seat-room" });
+
+    expect(session.resolveSeat("sid-1")).toEqual({ seat: "player1", reconnect: false });
+    session.setPlayer("player1", "sid-1", setup("Alice", "u-1"));
+    // The same sessionId is now recognised as a reconnect on its own seat.
+    expect(session.resolveSeat("sid-1")).toEqual({ seat: "player1", reconnect: true });
+    expect(session.resolveSeat("sid-2")).toEqual({ seat: "player2", reconnect: false });
+    session.setPlayer("player2", "sid-2", setup("Bob", "u-2"));
+    expect(session.resolveSeat("sid-2")).toEqual({ seat: "player2", reconnect: true });
+    // A third, unknown sessionId finds no seat.
+    expect(session.resolveSeat("sid-3")).toBeNull();
+  });
+
+  it("restores a disconnected seat and spends its reconnect budget cumulatively", () => {
+    const { host, passMulligan, session } = startMatch("rc-room");
+    passMulligan();
+    const t0 = host.clock;
+
+    session.markDisconnected("player1");
+    expect(host.lastPayload<{ connected: boolean }>("presence")?.connected).toBe(false);
+
+    // Return 10s later (well within the 30s window).
+    host.clock = t0 + 10_000;
+    host.drain();
+    session.markReconnected("player1");
+    expect(host.lastPayload<{ seat: Seat; connected: boolean }>("presence")).toMatchObject({
+      seat: "player1",
+      connected: true
+    });
+    // Full state + private hand are resynced to the returning seat.
+    expect(host.handFor("player1")?.cards).toHaveLength(3);
+
+    // Drop again immediately: only the REMAINING 20s budget is granted (cumulative,
+    // not reset) — this is the load-bearing reconnect-budget invariant.
+    session.markDisconnected("player1");
+    expect(host.lastPayload<{ reconnectUntilMs?: number }>("presence")?.reconnectUntilMs).toBe(host.clock + 20_000);
+  });
+
+  it("preserves reconnect budget + the disconnected seat across a snapshot round-trip", () => {
+    const { host, passMulligan, session } = startMatch("hib-rc-room");
+    passMulligan();
+    const t0 = host.clock;
+    session.markDisconnected("player1");
+
+    const snapshot = JSON.parse(JSON.stringify(session.toSnapshot()));
+    expect(snapshot.disconnectedAtMs.player1).toBe(t0);
+
+    // Rehydrate in a fresh host 8s later and reconnect.
+    const host2 = new FakeHost();
+    host2.clock = t0 + 8_000;
+    const restored = GameSession.fromSnapshot(host2, snapshot);
+    restored.markReconnected("player1");
+
+    // 8s of the 30s budget was spent → 22s recorded, disconnect timestamp cleared.
+    const after = restored.toSnapshot();
+    expect(after.reconnectBudgetMs.player1).toBe(22_000);
+    expect(after.disconnectedAtMs.player1).toBeUndefined();
+  });
+});
+
+describe("GameSession terminal completion", () => {
+  it("finishes a PvP match on concede and reports PvP metadata to the finalize hook", () => {
+    const { host, session, sync, seatActionSeq, passMulligan } = startMatch("concede-room");
+    passMulligan();
+
+    session.applyClientCommand("player1", {
+      commandId: "give-up",
+      expectedActionSeq: seatActionSeq(),
+      command: { type: "concede" }
+    });
+
+    expect(session.isComplete()).toBe(true);
+    expect(host.completed).toBe(true);
+    // The finalize/reward hook receives PvP metadata (drives reward_summary + persistence).
+    expect(host.completedMetadata?.isVsAi).toBe(false);
+    expect(sync().result?.winnerSeat).toBe("player2");
   });
 });
 

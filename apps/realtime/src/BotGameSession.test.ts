@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { AmplificationOption, GameEvent, Seat } from "@twcardgame/shared";
+import type { MatchState } from "@twcardgame/rules";
 import { BotGameSession } from "./BotGameSession.js";
 import { defaultDeckIds } from "./decks.js";
 import type { PlayerSetup, SessionHost } from "./GameSession.js";
+import type { MatchMetadata } from "./matchServices.js";
 import type { PublicSyncPayload, ServerMessage } from "./protocol.js";
 import { restoreSession } from "./restore.js";
 
@@ -10,6 +12,7 @@ class FakeHost implements SessionHost {
   clock = 1_000_000;
   wakeAt: number | null = null;
   completed = false;
+  completedMetadata?: MatchMetadata;
   events: GameEvent[] = [];
   /** Latest private amplification options offered to player1 (the human under test). */
   p1AmpOptions: AmplificationOption[] = [];
@@ -30,8 +33,9 @@ class FakeHost implements SessionHost {
   scheduleWake(atMs: number | null): void {
     this.wakeAt = atMs;
   }
-  onMatchComplete(): void {
+  onMatchComplete(_match?: MatchState, metadata?: MatchMetadata): void {
     this.completed = true;
+    this.completedMetadata = metadata;
   }
 
   private record(message: ServerMessage): void {
@@ -114,6 +118,8 @@ describe("BotGameSession (PvE)", () => {
     const result = host.sync()?.result;
     expect(result?.reason).toBe("hero_destroyed");
     expect(result?.winnerSeat).toBe("player2");
+    // The finalize/reward hook is told this is a PvE match (drives PvE rewards/quests).
+    expect(host.completedMetadata).toMatchObject({ isVsAi: true, aiDifficulty: "normal" });
     // The bot actually played: it summoned minions / attacked along the way.
     expect(host.events.some((e) => e.seat === "player2" && (e.type === "MINION_SUMMONED" || e.type === "ATTACK"))).toBe(true);
   });

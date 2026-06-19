@@ -26,6 +26,7 @@ import {
   type PlayerSetup,
   type SessionHost
 } from "./GameSession.js";
+import type { MatchMetadata } from "./matchServices.js";
 
 // Pacing defaults, ported from apps/server/src/BotRoom.ts. (The Colyseus version
 // reads BOT_*_DELAY_MS env overrides; on Workers these are plain constants — the
@@ -87,6 +88,15 @@ export class BotGameSession extends GameSession {
 
   protected override get kind(): "pvp" | "pve" {
     return "pve";
+  }
+
+  protected override matchMetadata(): MatchMetadata {
+    return {
+      isVsAi: true,
+      aiDifficulty: this.difficulty,
+      aiTheme: this.theme,
+      startedAtMs: super.matchMetadata().startedAtMs
+    };
   }
 
   // PvE has no turn clock for the human (BotRoom.usesActionDeadlines === false);

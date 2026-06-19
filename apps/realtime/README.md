@@ -42,14 +42,16 @@ The split is the load-bearing design decision:
 | `clock.setTimeout` (turn/phase) | **single DO Alarm** ← `GameSession.nextDeadline()` |
 | `allowReconnection` | reconnect budget on the seat + Alarm timeout |
 | reconnection survives eviction | `GameSession` snapshot persisted to DO storage |
+| match finalize + `reward_summary` | `MatchServices` (env-gated Supabase persist / rewards / quests) — `src/matchServices.ts` |
+| deck resolution + `validateDeck` | `AccountStore` (Supabase owned-deck or dev deck) — `src/accounts.ts` |
 
 ### Wire protocol
 
 JSON `{ type, payload }` both directions. Server→client `type` names are exactly
 the Colyseus `onMessage` events the existing web client already handles
 (`seat`, `hand`, `publicSync`, `events`, `presence`, `amplificationOptions`,
-`promptChoice`, `joinCode`, `error`) plus `state` (the full snapshot the legacy
-client read off `room.onStateChange`). See `src/protocol.ts`.
+`promptChoice`, `reward_summary`, `joinCode`, `error`) plus `state` (the full
+snapshot the legacy client read off `room.onStateChange`). See `src/protocol.ts`.
 
 ## Lobby / Phase 2 endpoints
 
@@ -83,28 +85,41 @@ handled.)
 
 ## Status (see roadmap §A)
 
-Current realtime-layer status: Phase 0 is complete; Phase 1 PvE is complete for
-the Worker/DO path; Phase 2 now has Lobby DO matchmaking, private join-code
-registry, and reconnect-token routing. Phase 3 has started in `apps/web` with a
-native WebSocket transport adapter; the basic two-page browser smoke against
-`wrangler dev` + Vite passes. Full gameplay / visual QA remains.
+Phases 0–2 are functionally complete on the Worker/DO path and Phase 3's transport
+swap is wired; the remaining work is live-environment verification (a real Supabase
+backend + browser visual QA), not missing code.
 
 - ✅ **Phase 0** — DO + `reduce` + native WebSocket; PvP-by-room-code; turn /
   mulligan / special-phase deadlines on a DO Alarm; disconnect→reconnect window;
   hibernation-safe persistence; unit tests green.
-- ⬜ **Phase 1** — PvE (`BotRoom`) bot pacing on Alarms; Supabase deck resolution
-  + match persistence/rewards hooks (`onMatchComplete`).
-- ⬜ **Phase 2** — public matchmaking (Lobby DO) + private-room code registry +
-  full reconnect-token flow.
-- 🟡 **Phase 3** — `apps/web` transport adapter: translate these JSON messages
-  into the existing client event interface, and synthesise `view.state` from the
-  `state` snapshot (the renderer is otherwise untouched). Basic browser smoke
-  passes; full gameplay / visual QA remains.
+- ✅ **Phase 1** — PvE (`BotRoom`) bot pacing on Alarms; **Supabase-backed deck
+  resolution + `validateDeck`** (`src/accounts.ts`); **match persistence + rewards
+  + quest events** behind `onMatchComplete` (`src/matchServices.ts`), pushing a
+  per-seat `reward_summary`. All env-gated: without `SUPABASE_*` it degrades to a
+  dev deck + server-authoritative zero-reward summaries.
+- ✅ **Phase 2** — public matchmaking (Lobby DO) + private-room code registry +
+  full reconnect-token flow; reconnect-budget / seat-resolution / hibernation
+  preservation now unit-tested.
+- 🟡 **Phase 3** — `apps/web` transport adapter translates these JSON messages
+  into the existing client event interface (now incl. `reward_summary`) and
+  synthesises `view.state` from the `state` snapshot. Basic browser smoke passes;
+  **full gameplay / visual QA across PvP / private-room / reconnect / PvE UI
+  remains**, as does the decision on dropping the opt-in Colyseus fallback.
 - ⬜ **Phase 4/5** — Pages + R2 deploy; optional Supabase → D1.
 
-## Not yet wired (intentional, next phases)
+## Configuration
 
-- No Supabase: connections use a default dev deck; `onMatchComplete` is a hook
-  with no persistence/reward dispatch yet.
-- Phase 3 still needs full gameplay / visual QA against `wrangler dev` and the
-  Vite client.
+Set these Worker vars/secrets (e.g. `wrangler secret put`) to activate the
+Supabase-backed persistence/rewards/deck resolution; leave them unset for the
+PoC / dev path:
+
+- `SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+## Not yet verified (needs live infra, not code)
+
+- The Supabase round-trip (deck ownership/legality resolution, `match_history`
+  upsert, `apply_match_rewards` / quest RPCs) is implemented and bundles, but has
+  only been exercised against fakes in `src/matchServices.test.ts` — verify it
+  against a real Supabase project before cutover.
+- Phase 3 still needs full gameplay / visual QA against `wrangler dev` + Vite.

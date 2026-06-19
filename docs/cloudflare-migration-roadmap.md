@@ -29,16 +29,22 @@
 
 ## §A. 進度追蹤(每個 session 完成後更新這裡)
 
-> **最後更新**:2026-06-19 — Phase 0 + Phase 1(PvE)完成,落在新分支 `feat/cloudflare-migration` 的
-> 新 workspace [`apps/realtime`](../apps/realtime/)(見其 README)。Railway/Colyseus 仍照常運作,尚未切換。
+> **最後更新**:2026-06-19 — Phase 0–2 在 Worker/DO 端功能完成、Phase 3 傳輸層接好;落在分支
+> `feat/cloudflare-migration` 的 workspace [`apps/realtime`](../apps/realtime/)(見其 README)。
+> 本次補完:Supabase 牌組解析 + `validateDeck`([`accounts.ts`](../apps/realtime/src/accounts.ts))、
+> 戰績/獎勵/任務 finalize hook + 每席 `reward_summary`([`matchServices.ts`](../apps/realtime/src/matchServices.ts),
+> 全部 env-gated,無 `SUPABASE_*` 時降級為伺服器權威的零獎勵 summary),並補齊 Phase 2 重連/座位/預算/大廳 TTL 單元測試。
+> 全套驗證綠燈(`npm test` 457、`npm run check`、`npm run build`、`wrangler --dry-run` 1550KiB/272KiB gzip;
+> `packages/rules|shared|cards` 對 master 零 diff)。**剩**:真 Supabase 環境 round-trip 與瀏覽器 visual QA(需憑證/實機,非缺程式碼)。
+> Railway/Colyseus 仍照常運作,尚未切換。
 
 | 階段 | 狀態 | 備註 |
 |---|---|---|
 | 規劃 + 研究 + 鎖定方案 B | ✅ 完成 | 本文件 |
 | Phase 0 — 技術驗證 PoC | ✅ 完成 | `apps/realtime`:DO + `reduce` + 原生 WS;PvP 房號對打;回合/階段/重連倒數走單一 DO Alarm;Hibernation 持久化;`GameSession` 純核心測試綠燈;`wrangler deploy --dry-run` 通過 |
-| Phase 1 — 即時層平移 | 🟡 進行中 | **PvE 完成**:`BotGameSession`(`bot.decide` 不動,pacing 改用單一 DO Alarm)、`/pve` 路由、`bot` 訊息、Hibernation 持久化 bot RNG/pacing;整局對 AI 模擬測試綠燈 + `wrangler dev` 真機煙霧測試 PASS。**剩**:Supabase 牌組解析 + 戰績/獎勵/任務 hook(`onMatchComplete` 已留好接點) |
-| Phase 2 — 配對/私人房/重連 | 🟡 進行中 | `apps/realtime`:Lobby DO 已加入公開配對 queue、私人 joinCode registry、`/pvp?joinCode=` 解析、`reconnectToken` 發放與 `/pvp?token=` 路由;剩 Phase 3 web adapter 接 UI 流程與真機 smoke |
-| Phase 3 — 前端傳輸層替換 | 🟡 進行中 | `apps/web`:新增 native WebSocket transport adapter,保留 Colyseus fallback;runtime 改走 adapter,`state` 快照投影成既有 `view.state`;`wrangler dev` + Vite 雙頁 PvP browser smoke PASS;剩完整 gameplay / visual QA、私人房/重連/PvE UI flow 驗證 |
+| Phase 1 — 即時層平移 | ✅ 完成(程式) | PvE(`BotGameSession`、`/pve`、`bot` 訊息、Hibernation bot RNG/pacing)+ **Supabase 牌組解析/`validateDeck`**([`accounts.ts`](../apps/realtime/src/accounts.ts))+ **finalize hook:戰績持久化 + 獎勵 + 任務事件 + 每席 `reward_summary`**([`matchServices.ts`](../apps/realtime/src/matchServices.ts),env-gated,無憑證時降級零獎勵)。整局 AI 模擬 + finalize/reward 單元測試綠燈。剩:真 Supabase round-trip 驗證(需憑證) |
+| Phase 2 — 配對/私人房/重連 | ✅ 完成(程式) | `apps/realtime`:Lobby DO 公開配對 queue、私人 joinCode registry、`/pvp?joinCode=` 解析、`reconnectToken` 發放與 `/pvp?token=` 路由;**新增重連成功路徑/座位解析/累計重連預算/Hibernation 欄位保存/大廳 queue TTL 單元測試**。剩:Phase 3 端到端瀏覽器重連 smoke(實機) |
+| Phase 3 — 前端傳輸層替換 | 🟡 進行中 | `apps/web`:native WebSocket transport adapter(保留 opt-in Colyseus fallback);runtime 改走 adapter,`state` 快照投影成既有 `view.state`;**`reward_summary` 已端到端打通**(伺服器現在會發送,取代 web 800ms 後備),transport 已帶 `deckId`/`accessToken` 透傳。`wrangler dev` + Vite 雙頁 PvP smoke PASS;剩完整 gameplay / visual QA(PvP/私人房/重連/PvE UI flow)+ 是否移除 Colyseus fallback 的決定 |
 | Phase 4 — Pages + R2 部署 | ⬜ 未開始 | |
 | Phase 5 — Supabase→D1(可選) | ⬜ 未開始 | 方案 B 預設**不做** |
 
