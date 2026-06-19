@@ -9,7 +9,6 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@colyseus/sdk": "^0.17.42",
     "@supabase/supabase-js": "^2.105.4",
     "@twcardgame/cards": "file:../../packages/cards",
     "@twcardgame/shared": "file:../../packages/shared",

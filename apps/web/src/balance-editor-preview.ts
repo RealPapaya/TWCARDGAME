@@ -2,7 +2,7 @@
 //
 // These call the SAME markup builders the live battle UI uses
 // (apps/web/src/app/card-markup.ts), so importing apps/web/src/styles.css gives a
-// pixel-faithful preview without booting the game (Colyseus, audio, DOM patching).
+// pixel-faithful preview without booting the game (realtime transport, audio, DOM patching).
 // There is no hand-copied markup here to drift — only the editor-specific inputs
 // (plain description, image-by-convention) are computed locally.
 import type { CardDefinition, AmplificationDbEntry, VoteEventDbEntry } from "@twcardgame/cards";

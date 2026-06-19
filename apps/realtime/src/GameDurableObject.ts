@@ -1,5 +1,5 @@
 import type { MatchState } from "@twcardgame/rules";
-import { SEATS, type AiDifficulty, type AiTheme, type RewardSummary, type Seat } from "@twcardgame/shared";
+import { SEATS, type AiDifficulty, type AiTheme, type DevTestMatchSetup, type RewardSummary, type Seat } from "@twcardgame/shared";
 import { createAccountStore, type AccountStore } from "./accounts.js";
 import { BotGameSession } from "./BotGameSession.js";
 import {
@@ -35,6 +35,8 @@ interface StoredState {
 }
 
 const STORAGE_KEY = "do";
+/** Pending dev-test board setup, stashed by the worker before the WS connect. */
+const DEVTEST_KEY = "devtest";
 /** Port of GameRoom's MATCH_CLEANUP_DELAY_MS — hold the room open briefly post-match. */
 const MATCH_CLEANUP_DELAY_MS = 10_000;
 
@@ -78,7 +80,9 @@ export class GameDurableObject {
         this.pendingWake = this.cleanupAtMs;
         // The session call chain is synchronous; the persist/reward writes are
         // async, so queue them for the next flush (run once, guarded by `finalized`).
-        if (!this.finalized) this.pendingFinalize = { match, metadata };
+        // Dev-test matches are throwaway (BotRoom.shouldPersistMatchSideEffects ===
+        // false): clean up the room but skip persistence/rewards/reward_summary.
+        if (!this.finalized && !metadata.devTest) this.pendingFinalize = { match, metadata };
       }
     };
     // Block message/alarm delivery until durable state is rehydrated on wake.
@@ -92,6 +96,15 @@ export class GameDurableObject {
   async fetch(request: Request): Promise<Response> {
     const url = new URL(request.url);
 
+    // Internal (worker → DO): stash a localhost dev-test board setup for the next
+    // match this room creates. The WS connect that follows reads it in
+    // ensureSession. The worker gates this on a local origin before forwarding.
+    if (request.method === "POST" && url.pathname === "/devtest-setup") {
+      const setup = (await request.json()) as DevTestMatchSetup;
+      await this.state.storage.put(DEVTEST_KEY, setup);
+      return Response.json({ ok: true });
+    }
+
     if (request.headers.get("Upgrade") !== "websocket") {
       return Response.json({
         ok: true,
@@ -101,7 +114,7 @@ export class GameDurableObject {
       });
     }
 
-    this.ensureSession(url);
+    await this.ensureSession(url);
     const session = this.session!;
 
     const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
@@ -222,16 +235,19 @@ export class GameDurableObject {
 
   /* --------------------------------- helpers --------------------------------- */
 
-  private ensureSession(url: URL): void {
+  private async ensureSession(url: URL): Promise<void> {
     if (this.session) return;
     const matchId = this.state.id.toString();
     const joinCode = url.searchParams.get("joinCode") ?? undefined;
     if (url.searchParams.get("mode") === "pve") {
+      // A dev-test setup (if any) was stashed by the worker just before this connect.
+      const devTest = await this.state.storage.get<DevTestMatchSetup>(DEVTEST_KEY);
       this.session = new BotGameSession(this.host, {
         matchId,
         joinCode,
         difficulty: (url.searchParams.get("difficulty") as AiDifficulty | null) ?? undefined,
-        theme: (url.searchParams.get("theme") as AiTheme | null) ?? undefined
+        theme: (url.searchParams.get("theme") as AiTheme | null) ?? undefined,
+        devTest
       });
     } else {
       this.session = new GameSession(this.host, { matchId, joinCode });

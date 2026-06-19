@@ -64,6 +64,10 @@ snapshot the legacy client read off `room.onStateChange`). See `src/protocol.ts`
 - `GET /pvp?joinCode=ABC123` resolves the room through the Lobby DO.
 - WebSocket clients receive `reconnectToken`; reconnect with
   `/pvp?token=<token>` or `/pvp?reconnectToken=<token>`.
+- `POST /pve/devtest` (localhost only) stages a scripted dev-test board in a fresh
+  PvE room and returns `{ room }`; the client then connects to `/pve?room=…` as
+  usual. The setup is applied in `BotGameSession.customizeInitialMatch`, and
+  finalize side-effects are skipped (`metadata.devTest`). See `src/devTest.ts`.
 
 ## Run the PoC (Phase 0 acceptance: two tabs play a full PvP game)
 
@@ -85,9 +89,10 @@ handled.)
 
 ## Status (see roadmap §A)
 
-Phases 0–2 are functionally complete on the Worker/DO path and Phase 3's transport
-swap is wired; the remaining work is live-environment verification (a real Supabase
-backend + browser visual QA), not missing code.
+Phases 0–3 are complete on the Worker/DO path — **the web client now talks only to
+this Worker; Colyseus is fully removed from `apps/web`.** The remaining work is
+live-environment verification (a real Supabase backend + browser visual QA), not
+missing code.
 
 - ✅ **Phase 0** — DO + `reduce` + native WebSocket; PvP-by-room-code; turn /
   mulligan / special-phase deadlines on a DO Alarm; disconnect→reconnect window;
@@ -100,11 +105,14 @@ backend + browser visual QA), not missing code.
 - ✅ **Phase 2** — public matchmaking (Lobby DO) + private-room code registry +
   full reconnect-token flow; reconnect-budget / seat-resolution / hibernation
   preservation now unit-tested.
-- 🟡 **Phase 3** — `apps/web` transport adapter translates these JSON messages
-  into the existing client event interface (now incl. `reward_summary`) and
-  synthesises `view.state` from the `state` snapshot. Basic browser smoke passes;
-  **full gameplay / visual QA across PvP / private-room / reconnect / PvE UI
-  remains**, as does the decision on dropping the opt-in Colyseus fallback.
+- ✅ **Phase 3** — `apps/web` now talks ONLY to this Worker: `@colyseus/sdk`, the
+  client schema mirror (`schema.ts`), and the `ws` browser shim are deleted, and
+  the `:2567` / `VITE_COLYSEUS_URL` config paths are gone. The transport adapter
+  maps the JSON messages onto the existing client event interface (incl.
+  `reward_summary`) and synthesises `view.state` from the `state` snapshot. The
+  localhost dev-test PvE panel was ported here too (`src/devTest.ts` +
+  `POST /pve/devtest`). **Remaining: full browser visual QA across PvP /
+  private-room / reconnect / PvE / dev-test.**
 - ⬜ **Phase 4/5** — Pages + R2 deploy; optional Supabase → D1.
 
 ## Configuration

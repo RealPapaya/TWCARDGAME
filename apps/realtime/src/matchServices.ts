@@ -47,6 +47,12 @@ export interface MatchMetadata {
   aiTheme?: AiTheme;
   /** Wall-clock match start (ms) so history can show real duration. */
   startedAtMs?: number;
+  /**
+   * Localhost dev-test match: the DO skips all finalize side-effects
+   * (persistence + rewards + reward_summary), mirroring the server's
+   * `shouldPersistMatchSideEffects() === false` branch.
+   */
+  devTest?: boolean;
 }
 
 export interface MatchLogger {

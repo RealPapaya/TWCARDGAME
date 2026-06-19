@@ -11,7 +11,7 @@ import type {
   RewardSummary,
   Seat
 } from "@twcardgame/shared";
-import { defaultServerUrl, gameTransportKind, type GameTransportKind } from "./app/config.js";
+import { defaultServerUrl } from "./app/config.js";
 import { projectRealtimeState } from "./transport-state.js";
 
 export type GameTransportMode = "pvp" | "pve";
@@ -69,18 +69,16 @@ type ServerMessageMap = {
 export async function joinOrCreateGameRoom(
   mode: GameTransportMode,
   options: JoinOptions,
-  opts: { serverUrl?: string; transport?: GameTransportKind } = {}
+  opts: { serverUrl?: string } = {}
 ): Promise<GameTransportRoom> {
-  if ((opts.transport ?? gameTransportKind) === "colyseus") return colyseusJoinOrCreate(mode, options, opts.serverUrl);
   return realtimeConnect(mode, options, opts.serverUrl);
 }
 
 export async function createGameRoom(
   mode: GameTransportMode,
   options: JoinOptions,
-  opts: { serverUrl?: string; transport?: GameTransportKind } = {}
+  opts: { serverUrl?: string } = {}
 ): Promise<GameTransportRoom> {
-  if ((opts.transport ?? gameTransportKind) === "colyseus") return colyseusCreate(mode, options, opts.serverUrl);
   if (mode !== "pvp") return realtimeConnect(mode, options, opts.serverUrl);
   const serverUrl = opts.serverUrl ?? defaultServerUrl;
   const response = await fetch(toHttpUrl(serverUrl, "/private"), { method: "POST" });
@@ -91,39 +89,9 @@ export async function createGameRoom(
 
 export async function reconnectGameRoom(
   token: string,
-  opts: { mode?: GameTransportMode; serverUrl?: string; transport?: GameTransportKind } = {}
+  opts: { mode?: GameTransportMode; serverUrl?: string } = {}
 ): Promise<GameTransportRoom> {
-  if ((opts.transport ?? gameTransportKind) === "colyseus") return colyseusReconnect(token, opts.serverUrl);
   return realtimeConnect(opts.mode ?? "pvp", { token }, opts.serverUrl);
-}
-
-async function colyseusJoinOrCreate(
-  mode: GameTransportMode,
-  options: JoinOptions,
-  serverUrl = defaultServerUrl
-): Promise<GameTransportRoom> {
-  const { Client } = await import("@colyseus/sdk");
-  const { GameStateSchema } = await import("./schema.js");
-  const client = new Client(serverUrl);
-  return client.joinOrCreate(mode, options, GameStateSchema) as unknown as GameTransportRoom;
-}
-
-async function colyseusCreate(
-  mode: GameTransportMode,
-  options: JoinOptions,
-  serverUrl = defaultServerUrl
-): Promise<GameTransportRoom> {
-  const { Client } = await import("@colyseus/sdk");
-  const { GameStateSchema } = await import("./schema.js");
-  const client = new Client(serverUrl);
-  return client.create(mode, options, GameStateSchema) as unknown as GameTransportRoom;
-}
-
-async function colyseusReconnect(token: string, serverUrl = defaultServerUrl): Promise<GameTransportRoom> {
-  const { Client } = await import("@colyseus/sdk");
-  const { GameStateSchema } = await import("./schema.js");
-  const client = new Client(serverUrl);
-  return (client as any).reconnect(token, GameStateSchema) as Promise<GameTransportRoom>;
 }
 
 async function realtimeConnect(
@@ -131,11 +99,27 @@ async function realtimeConnect(
   options: JoinOptions,
   serverUrl = defaultServerUrl
 ): Promise<GameTransportRoom> {
-  if (options.devTest) throw new Error("Dev-test PvE rooms still require VITE_GAME_TRANSPORT=colyseus.");
+  if (mode === "pve" && options.devTest) return realtimeCreateDevTestPve(options, serverUrl);
   const url = buildRealtimeUrl(serverUrl, mode, options);
   const room = new RealtimeRoom(mode, String(options.room ?? mode));
   await room.connect(url);
   return room;
+}
+
+/**
+ * Localhost dev-test PvE: POST the scripted board to mint a fresh room (the
+ * Worker gates this on a local origin), then connect to it as a normal /pve room.
+ * Replaces the old "dev-test requires Colyseus" escape hatch.
+ */
+async function realtimeCreateDevTestPve(options: JoinOptions, serverUrl: string): Promise<GameTransportRoom> {
+  const response = await fetch(toHttpUrl(serverUrl, "/pve/devtest"), {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ devTest: options.devTest })
+  });
+  if (!response.ok) throw new Error(`Unable to start dev-test match (${response.status}).`);
+  const { room } = (await response.json()) as { room: string };
+  return realtimeConnect("pve", { ...options, devTest: undefined, room }, serverUrl);
 }
 
 function buildRealtimeUrl(serverUrl: string, mode: GameTransportMode, options: JoinOptions): string {

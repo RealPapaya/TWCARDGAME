@@ -10,10 +10,6 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: "ws",
-        replacement: fileURLToPath(new URL("./src/ws-browser-shim.ts", import.meta.url))
-      },
-      {
         find: /^buffer$/,
         replacement: fileURLToPath(new URL("../../node_modules/buffer/index.js", import.meta.url))
       }

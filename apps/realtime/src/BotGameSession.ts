@@ -15,10 +15,12 @@ import {
   type AiDifficulty,
   type AiTheme,
   type CommandEnvelope,
+  type DevTestMatchSetup,
   type GameEvent,
   type Seat
 } from "@twcardgame/shared";
 import { defaultDeckIds } from "./decks.js";
+import { applyDevTestMatchSetup } from "./devTest.js";
 import { seedFromString } from "./finalize.js";
 import {
   GameSession,
@@ -46,6 +48,12 @@ const BOT_NAMES: Record<AiDifficulty, string> = {
 export interface BotGameSessionOptions extends GameSessionOptions {
   difficulty?: AiDifficulty;
   theme?: AiTheme;
+  /**
+   * Localhost-only dev-test board setup. When present the match is created with a
+   * scripted board instead of a normal mulligan opening (mirrors BotRoom's
+   * `customizeInitialMatch`), and finalize side-effects are skipped.
+   */
+  devTest?: DevTestMatchSetup;
 }
 
 /**
@@ -68,11 +76,16 @@ export class BotGameSession extends GameSession {
   private botPending?: "step" | "endTurn";
   private lastBotTurnKey?: string;
   private lastBatchAnimationMs = 0;
+  // Dev-test board setup (consumed once at match creation) + a sticky flag so a
+  // restored/hibernated dev-test match still skips finalize side-effects.
+  private readonly devTestSetup?: DevTestMatchSetup;
+  private devTestActive = false;
 
   constructor(host: SessionHost, options: BotGameSessionOptions) {
     super(host, options);
     this.difficulty = options.difficulty && AI_DIFFICULTIES.includes(options.difficulty) ? options.difficulty : "normal";
     this.theme = isAiTheme(options.theme) ? options.theme : undefined;
+    this.devTestSetup = options.devTest;
     this.botRng = {
       state: normalizeSeed(seedFromString(`${options.matchId}:${this.difficulty}:${this.theme ?? "default"}`))
     };
@@ -95,8 +108,22 @@ export class BotGameSession extends GameSession {
       isVsAi: true,
       aiDifficulty: this.difficulty,
       aiTheme: this.theme,
-      startedAtMs: super.matchMetadata().startedAtMs
+      startedAtMs: super.matchMetadata().startedAtMs,
+      // Dev-test matches are throwaway: the DO uses this to skip persistence/rewards.
+      devTest: this.devTestActive
     };
+  }
+
+  /**
+   * Port of BotRoom.customizeInitialMatch: when a dev-test setup is present,
+   * discard the normal opening (events + mulligan) and stamp the scripted board.
+   * Runs inside GameSession.createMatch before the first broadcast.
+   */
+  protected override customizeInitialMatch(state: MatchState, events: GameEvent[]): void {
+    if (!this.devTestSetup) return;
+    this.devTestActive = true;
+    events.length = 0;
+    applyDevTestMatchSetup(state, this.devTestSetup, this.now(), events);
   }
 
   // PvE has no turn clock for the human (BotRoom.usesActionDeadlines === false);
@@ -267,7 +294,8 @@ export class BotGameSession extends GameSession {
       botStepAtMs: this.botStepAtMs ?? null,
       botPending: this.botPending ?? null,
       lastBotTurnKey: this.lastBotTurnKey ?? null,
-      lastBatchAnimationMs: this.lastBatchAnimationMs
+      lastBatchAnimationMs: this.lastBatchAnimationMs,
+      devTestActive: this.devTestActive
     };
   }
 
@@ -277,5 +305,6 @@ export class BotGameSession extends GameSession {
     this.botPending = (extra.botPending as "step" | "endTurn" | null | undefined) ?? undefined;
     this.lastBotTurnKey = (extra.lastBotTurnKey as string | null | undefined) ?? undefined;
     if (typeof extra.lastBatchAnimationMs === "number") this.lastBatchAnimationMs = extra.lastBatchAnimationMs;
+    this.devTestActive = extra.devTestActive === true;
   }
 }

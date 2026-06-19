@@ -1,3 +1,5 @@
+import type { DevTestMatchSetup } from "@twcardgame/shared";
+import { isDevTestAllowed } from "./devTest.js";
 import { GameDurableObject, type Env } from "./GameDurableObject.js";
 import { LobbyDurableObject } from "./LobbyDurableObject.js";
 import { normalizeJoinCode } from "./lobbyState.js";
@@ -41,6 +43,33 @@ export default {
 
     if (url.pathname === "/private" && request.method === "POST") {
       return withCors(await lobbyFetch(env, "/private", { method: "POST" }));
+    }
+
+    // Localhost-only dev-test PvE: stage a scripted board in a fresh DO, then the
+    // client connects to it like a normal /pve room. Mirrors the server's
+    // BotRoom dev-test path; the gate fails closed on a deployed (public) Worker.
+    if (url.pathname === "/pve/devtest" && request.method === "POST") {
+      if (!isDevTestAllowed(request)) {
+        return new Response("Dev-test mode is only available from localhost.", { status: 403, headers: CORS_HEADERS });
+      }
+      let body: { devTest?: DevTestMatchSetup };
+      try {
+        body = (await request.json()) as { devTest?: DevTestMatchSetup };
+      } catch {
+        return new Response("Invalid dev-test request body.", { status: 400, headers: CORS_HEADERS });
+      }
+      if (!body?.devTest) {
+        return new Response("Missing dev-test setup.", { status: 400, headers: CORS_HEADERS });
+      }
+      const room = crypto.randomUUID();
+      const stub = env.GAME_ROOM.get(env.GAME_ROOM.idFromName(`pve:${room}`));
+      const staged = await stub.fetch("https://do/devtest-setup", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(body.devTest)
+      });
+      if (!staged.ok) return new Response("Failed to stage dev-test match.", { status: 502, headers: CORS_HEADERS });
+      return withCors(Response.json({ room }));
     }
 
     const privateMatch = url.pathname.match(/^\/private\/([^/]+)$/);
