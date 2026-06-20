@@ -65,7 +65,8 @@
       "Bash(python -c \"from PIL import Image; im=Image.open\\('scripts/augment_sources/BUFF-BRONZE2-Photoroom.png'\\); print\\('size', im.size\\)\")",
       "WebSearch",
       "WebFetch(domain:docs.partykit.io)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(awk '{printf \"%.1fMB %s\\\\n\", $1/1048576, $2}')"
     ],
     "additionalDirectories": [
       "\\tmp"

@@ -1,0 +1,16 @@
+{
+  // Cloudflare Pages config for the web client. See the migration roadmap:
+  // docs/cloudflare-migration-roadmap.md Phase 4 (Vercel -> Pages, assets -> R2).
+  //
+  // The static bundle (HTML/JS/CSS) is hosted by Pages; the heavy media
+  // (/images, /audio, /video) are served from R2 by the Pages Functions in
+  // functions/ (bound below). Deploy with: npm run pages:deploy -w @twcardgame/web
+  // (after `npm run build`). Upload media once with: npm run assets:upload.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "twcardgame-web",
+  "compatibility_date": "2025-06-01",
+  "pages_build_output_dir": "dist-public",
+  "r2_buckets": [
+    { "binding": "ASSETS_BUCKET", "bucket_name": "twcardgame-assets" }
+  ]
+}

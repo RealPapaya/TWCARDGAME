@@ -29,16 +29,20 @@
 
 ## §A. 進度追蹤(每個 session 完成後更新這裡)
 
-> **最後更新**:2026-06-20 — **Phase 3 完成全面切換(full cut)**:`apps/web` 移除 `@colyseus/sdk`、
-> 客戶端 schema 鏡像(`schema.ts`/`schema.test.ts`)、`ws-browser-shim` 與 vite `ws` alias、config 的
-> `:2567` 推斷與 `VITE_COLYSEUS_URL`/`VITE_GAME_TRANSPORT`;**realtime 成為唯一傳輸**。
-> 最後一個綁死 Colyseus 的 dev-test PvE 面板已移植到 DO:新增
-> [`apps/realtime/src/devTest.ts`](../apps/realtime/src/devTest.ts)(移植 `applyDevTestMatchSetup` + localhost gate)、
-> worker `POST /pve/devtest` 端點、DO 暫存/套用 setup、`BotGameSession.customizeInitialMatch` 套牌局並
-> env-gate 跳過 finalize(`metadata.devTest`),附 8 個單元測試。
-> 全套驗證綠燈(`npm run check`、`npm test` 464、`npm run build`、`wrangler --dry-run` 1561KiB/275KiB gzip;
-> `packages/rules|shared|cards` 對 master 零 diff)。**剩**:瀏覽器 visual QA(PvP/私人房/重連/PvE/dev-test UI 流程,需實機)
-> 與真 Supabase round-trip(需憑證)。`apps/server`(Colyseus/Railway)尚未動,尚未切換 DNS/下線。
+> **最後更新**:2026-06-20 — **Phase 4 完成(程式)**:`apps/web` 改為 **Cloudflare Pages + R2** 部署。
+> 重 media(`/images`、`/audio`、`/video`,~129MB)搬到 R2,經 [`apps/web/functions/`](../apps/web/functions/)
+> 三條 scoped Pages Functions(共用 [`_lib/r2.ts`](../apps/web/functions/_lib/r2.ts):edge-cache、Range/206、
+> 條件式 304、immutable cache-control)串流,**前端 100+ 個 `/images|/audio|/video` 參照(TS + CSS)一行未改**;
+> Vite `build.copyPublicDir:false` 把 media 排出靜態包(deploy 由 129MB → **946KB**),dev server 仍從本機
+> `public/` 服務故本機遊玩不受影響;build plugin 產生 `_routes.json`(只對三個 media 前綴啟用 Function,其餘純靜態)
+> 與 `_headers`(hash 過的 `/assets/*` immutable)。新增 [`apps/web/wrangler.jsonc`](../apps/web/wrangler.jsonc)
+> (Pages config + `ASSETS_BUCKET` R2 binding)、[`scripts/upload-assets.mjs`](../apps/web/scripts/upload-assets.mjs)
+> (R2 上傳,keys 對齊 `public/` 佈局)、`package.json` 的 `assets:bucket|assets:upload|pages:dev|pages:deploy`
+> scripts、[`apps/web/DEPLOY.md`](../apps/web/DEPLOY.md);`.env.example` 改 Vercel→Pages 字樣。
+> 全套驗證綠燈(`npm run check`、`npm test` 464、`npm run build` 產出已確認無 media + 含 `_routes.json`/`_headers`;
+> `packages/rules|shared|cards` 對 master 零 diff)。**剩**:實機 Cloudflare 部署(`wrangler login`/建 bucket/上傳/
+> `pages:deploy` + 自訂網域)、瀏覽器 visual QA(資產走 R2、PvP/私人房/重連/PvE/dev-test,需實機)、真 Supabase
+> round-trip(需憑證)。`apps/server`(Colyseus/Railway)尚未動,尚未切換 DNS/下線。
 
 | 階段 | 狀態 | 備註 |
 |---|---|---|
@@ -47,7 +51,7 @@
 | Phase 1 — 即時層平移 | ✅ 完成(程式) | PvE(`BotGameSession`、`/pve`、`bot` 訊息、Hibernation bot RNG/pacing)+ **Supabase 牌組解析/`validateDeck`**([`accounts.ts`](../apps/realtime/src/accounts.ts))+ **finalize hook:戰績持久化 + 獎勵 + 任務事件 + 每席 `reward_summary`**([`matchServices.ts`](../apps/realtime/src/matchServices.ts),env-gated,無憑證時降級零獎勵)。整局 AI 模擬 + finalize/reward 單元測試綠燈。剩:真 Supabase round-trip 驗證(需憑證) |
 | Phase 2 — 配對/私人房/重連 | ✅ 完成(程式) | `apps/realtime`:Lobby DO 公開配對 queue、私人 joinCode registry、`/pvp?joinCode=` 解析、`reconnectToken` 發放與 `/pvp?token=` 路由;**新增重連成功路徑/座位解析/累計重連預算/Hibernation 欄位保存/大廳 queue TTL 單元測試**。剩:Phase 3 端到端瀏覽器重連 smoke(實機) |
 | Phase 3 — 前端傳輸層替換 | ✅ 完成(程式) | **full cut**:`@colyseus/sdk`/schema 鏡像/`ws-browser-shim`/`:2567`/`VITE_COLYSEUS_URL`/`VITE_GAME_TRANSPORT` 全移除,**realtime 為唯一傳輸**;`state` 快照投影成既有 `view.state`、`reward_summary` 端到端、`deckId`/`accessToken` 透傳。最後一塊綁死 Colyseus 的 **dev-test PvE 已移植到 DO**([`devTest.ts`](../apps/realtime/src/devTest.ts) + worker `POST /pve/devtest` + `BotGameSession.customizeInitialMatch`,finalize env-gate 跳過,8 單元測試)。剩:瀏覽器 visual QA(PvP/私人房/重連/PvE/dev-test,實機) |
-| Phase 4 — Pages + R2 部署 | ⬜ 未開始 | |
+| Phase 4 — Pages + R2 部署 | ✅ 完成(程式) | `apps/web`→Cloudflare Pages;`/images\|/audio\|/video`(~129MB)搬 R2,經 [`functions/`](../apps/web/functions/) scoped Pages Functions(edge-cache/Range/304/immutable)串流,**前端 100+ 參照零改動**;`copyPublicDir:false`(deploy 129MB→946KB)、build 產 `_routes.json`/`_headers`;新增 [`wrangler.jsonc`](../apps/web/wrangler.jsonc)(`ASSETS_BUCKET` R2 binding)、[`upload-assets.mjs`](../apps/web/scripts/upload-assets.mjs)、deploy scripts、[`DEPLOY.md`](../apps/web/DEPLOY.md)。剩:實機部署(建 bucket/上傳/`pages:deploy`/自訂網域)+ R2 資產 visual QA(實機) |
 | Phase 5 — Supabase→D1(可選) | ⬜ 未開始 | 方案 B 預設**不做** |
 
 > **Phase 0 交付重點(給下一個 session):**

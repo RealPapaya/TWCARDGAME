@@ -6,7 +6,11 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "check": "tsc -b --pretty false"
+    "check": "tsc -b --pretty false",
+    "assets:bucket": "wrangler r2 bucket create twcardgame-assets",
+    "assets:upload": "node scripts/upload-assets.mjs",
+    "pages:dev": "wrangler pages dev",
+    "pages:deploy": "wrangler pages deploy"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.4",
@@ -14,5 +18,9 @@
     "@twcardgame/shared": "file:../../packages/shared",
     "buffer": "^6.0.3",
     "vite": "^8.0.13"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250620.0",
+    "wrangler": "^4.20.0"
   }
 }

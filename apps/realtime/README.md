@@ -113,7 +113,11 @@ missing code.
   localhost dev-test PvE panel was ported here too (`src/devTest.ts` +
   `POST /pve/devtest`). **Remaining: full browser visual QA across PvP /
   private-room / reconnect / PvE / dev-test.**
-- ⬜ **Phase 4/5** — Pages + R2 deploy; optional Supabase → D1.
+- ✅ **Phase 4 (code)** — `apps/web` deploys to Cloudflare Pages; its media
+  (`/images`, `/audio`, `/video`) move to R2 and are streamed by scoped Pages
+  Functions, leaving the realtime Worker here untouched. See
+  [apps/web/DEPLOY.md](../web/DEPLOY.md). Remaining: the live Cloudflare deploy.
+- ⬜ **Phase 5** — optional Supabase → D1.
 
 ## Configuration
 
