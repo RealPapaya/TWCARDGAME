@@ -90,7 +90,11 @@ import {
 } from "./app/activeMatch.js";
 import { PATCH_NOTES } from "./app/patch-notes.js";
 import { selectDailyBoard } from "./app/daily-board.js";
-import { hasMainMenuNotification } from "./app/main-menu-notification.js";
+import {
+  hasAchievementNotification,
+  hasFriendNotification,
+  hasTaskNotification
+} from "./app/main-menu-notification.js";
 import {
   computeMatchStats,
   matchLengthLabel,
@@ -773,7 +777,9 @@ function renderMainMenu(): string {
   const xpFraction = level >= MAX_LEVEL || xpRequired <= 0 ? 1 : Math.min(1, xp / xpRequired);
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
   const playerTitle = view.profile?.selected_title ? `#${titleLabel(view.profile.selected_title)}` : "未設定稱號";
-  const showNotification = hasMainMenuNotification(view.tasks, view.friendRequests);
+  const showFriendNotification = accountMode && hasFriendNotification(view.friendRequests);
+  const showTaskNotification = accountMode && hasTaskNotification(view.tasks);
+  const showAchievementNotification = accountMode && hasAchievementNotification(view.tasks);
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
@@ -782,9 +788,7 @@ function renderMainMenu(): string {
         <button type="button" id="changelog-open" class="version-changelog-btn">更新資訊</button>
       </div>
       <div class="main-menu-center">
-        <h1 class="game-title">寶島遊戲王${showNotification
-          ? `<span class="main-menu-notification-dot" data-testid="main-menu-notification" role="status" aria-label="有待處理通知"></span>`
-          : ""}</h1>
+        <h1 class="game-title">寶島遊戲王</h1>
         <nav class="menu-tile-grid" aria-label="Main menu">
           <button class="menu-tile menu-tile-battle" data-menu-screen="battle" data-testid="menu-battle">
             <img class="menu-tile-icon" src="/images/ui/MenuBattle.webp" alt="" />
@@ -810,12 +814,15 @@ function renderMainMenu(): string {
         </button>
         <button class="menu-icon-btn menu-image-btn" data-menu-screen="friends" data-testid="menu-friends" data-tooltip="好友" aria-label="好友" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailFriends.webp" alt="好友" />
+          ${showFriendNotification ? `<span class="main-menu-notification-dot" data-testid="main-menu-friends-notification" role="status" aria-label="有待處理好友邀請"></span>` : ""}
         </button>
         <button class="menu-icon-btn menu-image-btn" data-menu-screen="tasks" data-testid="menu-tasks" data-tooltip="任務" aria-label="任務" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailTasks.webp" alt="任務" />
+          ${showTaskNotification ? `<span class="main-menu-notification-dot" data-testid="main-menu-tasks-notification" role="status" aria-label="有可領取任務獎勵"></span>` : ""}
         </button>
         <button class="menu-icon-btn menu-image-btn" data-menu-screen="achievements" data-testid="menu-achievements" data-tooltip="成就" aria-label="成就" ${accountMode ? "" : "disabled"}>
           <img class="rail-icon-image" src="/images/ui/RailAchievements.webp" alt="成就" />
+          ${showAchievementNotification ? `<span class="main-menu-notification-dot" data-testid="main-menu-achievements-notification" role="status" aria-label="有可領取成就獎勵"></span>` : ""}
         </button>
       </nav>
       <div class="main-menu-bottom">

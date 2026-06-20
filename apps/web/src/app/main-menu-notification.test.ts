@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { FriendRequestRow } from "@twcardgame/shared";
-import { hasMainMenuNotification } from "./main-menu-notification.js";
+import {
+  hasAchievementNotification,
+  hasFriendNotification,
+  hasTaskNotification
+} from "./main-menu-notification.js";
 import type { TaskRecurrence, TaskView } from "./types.js";
 
 function task(recurrence: TaskRecurrence, state: TaskView["state"]): TaskView {
@@ -29,22 +33,33 @@ function friendRequest(direction: FriendRequestRow["direction"]): FriendRequestR
   };
 }
 
-describe("hasMainMenuNotification", () => {
-  it.each(["once", "daily", "weekly"] as const)(
-    "shows for a claimable %s quest",
+describe("main menu notification helpers", () => {
+  it.each(["daily", "weekly"] as const)(
+    "shows task notification for a claimable %s quest",
     (recurrence) => {
-      expect(hasMainMenuNotification([task(recurrence, "claimable")], [])).toBe(true);
+      expect(hasTaskNotification([task(recurrence, "claimable")])).toBe(true);
     }
   );
 
-  it("shows for an incoming friend request", () => {
-    expect(hasMainMenuNotification([], [friendRequest("incoming")])).toBe(true);
+  it("shows achievement notification for a claimable once quest", () => {
+    expect(hasAchievementNotification([task("once", "claimable")])).toBe(true);
   });
 
-  it("ignores claimed or unfinished quests and outgoing requests", () => {
-    expect(hasMainMenuNotification([
+  it("shows for an incoming friend request", () => {
+    expect(hasFriendNotification([friendRequest("incoming")])).toBe(true);
+  });
+
+  it("ignores claimed or unfinished tasks and achievements", () => {
+    const tasks = [
       task("once", "claimed"),
       task("daily", "in-progress")
-    ], [friendRequest("outgoing")])).toBe(false);
+    ];
+
+    expect(hasTaskNotification(tasks)).toBe(false);
+    expect(hasAchievementNotification(tasks)).toBe(false);
+  });
+
+  it("ignores outgoing friend requests", () => {
+    expect(hasFriendNotification([friendRequest("outgoing")])).toBe(false);
   });
 });

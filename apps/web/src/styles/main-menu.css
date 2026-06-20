@@ -77,6 +77,12 @@
   pointer-events: none;
 }
 
+.menu-icon-btn > .main-menu-notification-dot {
+  top: 18px;
+  right: 18px;
+  z-index: 2;
+}
+
 /* Version corner — top-left absolute position on main menu */
 .version-corner {
   position: absolute;

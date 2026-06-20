@@ -124,6 +124,32 @@ describe("BotGameSession (PvE)", () => {
     expect(host.events.some((e) => e.seat === "player2" && (e.type === "MINION_SUMMONED" || e.type === "ATTACK"))).toBe(true);
   });
 
+  it("applies the challenge handicap to the bot by difficulty", () => {
+    // 專家級 (normal): 45 HP and a 2-crystal head start (mana.max seeded to 1 so
+    // the first ramp lands on 2).
+    const normalHost = new FakeHost();
+    const normal = new BotGameSession(normalHost, { matchId: "pve-normal", difficulty: "normal" });
+    normal.setPlayer("player1", "human", human());
+    expect(normalHost.sync()?.players.player2.hero).toMatchObject({ hp: 45, maxHp: 45 });
+    expect(normalHost.sync()?.players.player2.mana).toMatchObject({ current: 1, max: 1 });
+    // The human keeps the standard opening.
+    expect(normalHost.sync()?.players.player1.hero).toMatchObject({ hp: 30, maxHp: 30 });
+
+    // 大師級 (hard): 60 HP and a 3-crystal head start.
+    const hardHost = new FakeHost();
+    const hard = new BotGameSession(hardHost, { matchId: "pve-hard", difficulty: "hard" });
+    hard.setPlayer("player1", "human", human());
+    expect(hardHost.sync()?.players.player2.hero).toMatchObject({ hp: 60, maxHp: 60 });
+    expect(hardHost.sync()?.players.player2.mana).toMatchObject({ current: 2, max: 2 });
+
+    // 普通級 (easy): no handicap.
+    const easyHost = new FakeHost();
+    const easy = new BotGameSession(easyHost, { matchId: "pve-easy", difficulty: "easy" });
+    easy.setPlayer("player1", "human", human());
+    expect(easyHost.sync()?.players.player2.hero).toMatchObject({ hp: 30, maxHp: 30 });
+    expect(easyHost.sync()?.players.player2.mana).toMatchObject({ current: 0, max: 0 });
+  });
+
   it("round-trips through restoreSession as a PvE session and keeps playing", () => {
     const host = new FakeHost();
     const session = new BotGameSession(host, { matchId: "pve-snap", difficulty: "hard", theme: "kmt" });

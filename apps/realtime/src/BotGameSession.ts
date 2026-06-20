@@ -19,6 +19,7 @@ import {
   type GameEvent,
   type Seat
 } from "@twcardgame/shared";
+import { applyChallengeHandicap } from "./challengeHandicap.js";
 import { defaultDeckIds } from "./decks.js";
 import { applyDevTestMatchSetup } from "./devTest.js";
 import { seedFromString } from "./finalize.js";
@@ -120,6 +121,10 @@ export class BotGameSession extends GameSession {
    * Runs inside GameSession.createMatch before the first broadcast.
    */
   protected override customizeInitialMatch(state: MatchState, events: GameEvent[]): void {
+    // Challenge-mode handicap buffs the bot's hero HP + starting crystals by
+    // difficulty (專家級/大師級); easy is a no-op. Applied before the dev-test
+    // override so a scripted board still gets the difficulty handicap.
+    applyChallengeHandicap(state, this.botSeat, this.difficulty);
     if (!this.devTestSetup) return;
     this.devTestActive = true;
     events.length = 0;
