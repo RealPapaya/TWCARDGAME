@@ -36,6 +36,12 @@ function contentType(file) {
   return CONTENT_TYPES[ext] ?? "application/octet-stream";
 }
 
+// Synchronous sleep — spawning wrangler back-to-back with no gap reliably trips
+// a libuv exit crash on Windows (async.c assertion); a short delay avoids it.
+function sleepSync(ms) {
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+}
+
 function* walk(dir) {
   for (const entry of readdirSync(dir)) {
     const full = join(dir, entry);
@@ -68,22 +74,34 @@ for (const file of files) {
     console.log(`  ${key}  [${ct}]`);
     continue;
   }
-  try {
-    execFileSync(
-      "npx",
-      [
-        "wrangler", "r2", "object", "put", `${bucket}/${key}`,
-        "--file", file, "--content-type", ct, "--remote"
-      ],
-      { stdio: ["ignore", "ignore", "inherit"], shell: process.platform === "win32" }
-    );
-    if (done % 25 === 0 || done === files.length) {
-      console.log(`  ${done}/${files.length} uploaded`);
+  // wrangler can crash on process exit on Windows (libuv async.c assertion)
+  // intermittently, aborting the upload; retry a few times before giving up.
+  const MAX_ATTEMPTS = 5;
+  let uploaded = false;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS && !uploaded; attempt += 1) {
+    try {
+      execFileSync(
+        "npx",
+        [
+          "wrangler", "r2", "object", "put", `${bucket}/${key}`,
+          "--file", file, "--content-type", ct, "--remote"
+        ],
+        { stdio: ["ignore", "ignore", "ignore"], shell: process.platform === "win32" }
+      );
+      uploaded = true;
+    } catch {
+      if (attempt === MAX_ATTEMPTS) {
+        console.error(`FAILED ${key} after ${MAX_ATTEMPTS} attempts`);
+        process.exitCode = 1;
+      } else {
+        sleepSync(1500); // back off before retrying
+      }
     }
-  } catch (err) {
-    console.error(`FAILED ${key}: ${err.message}`);
-    process.exitCode = 1;
   }
+  if (uploaded && (done % 25 === 0 || done === files.length)) {
+    console.log(`  ${done}/${files.length} uploaded`);
+  }
+  sleepSync(1000); // gap between files keeps wrangler from crashing on spawn
 }
 
 console.log("Done.");
