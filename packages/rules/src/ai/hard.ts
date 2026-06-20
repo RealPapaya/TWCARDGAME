@@ -1,8 +1,7 @@
 import { opponentOf, type GameCommand } from "@twcardgame/shared";
-import { legalMoves } from "../legalMoves.js";
 import type { MatchState } from "../types.js";
 import { enemyHasTaunt, totalReachableFaceDamage } from "./combat.js";
-import { evaluateState, rankMoves } from "./shared.js";
+import { engineMoves, evaluateState, rankMoves } from "./shared.js";
 import { simulate } from "./simulate.js";
 import type { EngineContext } from "./types.js";
 
@@ -54,7 +53,7 @@ export function decideHard(moves: GameCommand[], ctx: EngineContext): GameComman
 
     for (const node of frontier) {
       if (sims >= MAX_SIM_NODES) break;
-      const candidates = rankMoves(node.state, ctx.seat, legalMoves(node.state, ctx.seat))
+      const candidates = rankMoves(node.state, ctx.seat, engineMoves(node.state, ctx.seat))
         .filter((c) => c.move.type !== "endTurn")
         .slice(0, BRANCH);
 

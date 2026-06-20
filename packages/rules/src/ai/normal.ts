@@ -1,6 +1,5 @@
 import type { GameCommand } from "@twcardgame/shared";
-import { legalMoves } from "../legalMoves.js";
-import { evaluateState, rankMoves } from "./shared.js";
+import { engineMoves, evaluateState, rankMoves } from "./shared.js";
 import { simulate } from "./simulate.js";
 import type { EngineContext } from "./types.js";
 
@@ -26,7 +25,7 @@ export function decideNormal(moves: GameCommand[], ctx: EngineContext): GameComm
 
     let lineValue = evaluateState(afterFirst, ctx.seat); // option: stop after the first move
     if (afterFirst.status === "in_progress" && afterFirst.turn.activeSeat === ctx.seat) {
-      const followUps = rankMoves(afterFirst, ctx.seat, legalMoves(afterFirst, ctx.seat))
+      const followUps = rankMoves(afterFirst, ctx.seat, engineMoves(afterFirst, ctx.seat))
         .filter((m) => m.move.type !== "endTurn")
         .slice(0, K2);
       for (const follow of followUps) {

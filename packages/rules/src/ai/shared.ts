@@ -1,5 +1,6 @@
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
 import type { EffectDefinition } from "@twcardgame/cards";
+import { legalMoves } from "../legalMoves.js";
 import { canPayCardCost, findMinion, getCardActualCost } from "../state.js";
 import type { MatchState, RuntimeMinion } from "../types.js";
 import { resolveMinionTrade } from "./combat.js";
@@ -209,6 +210,45 @@ export function worstMinion(board: readonly RuntimeMinion[]): RuntimeMinion | un
     if (!worst || m.attack + m.currentHealth < worst.attack + worst.currentHealth) worst = m;
   }
   return worst;
+}
+
+/**
+ * Legal moves for the engines, with one correction: a forced friendly sacrifice
+ * (`EAT_FRIENDLY` / friendly `DESTROY`/`BOUNCE`) is collapsed to the single variant
+ * that targets the WORST body. `boardValue` is linear so eating the worst vs the
+ * best is value-equivalent to the lookahead — collapsing here guarantees the
+ * engine "殺死最爛的卡" instead of leaving it to a tiebreak.
+ */
+export function engineMoves(state: MatchState, seat: Seat): GameCommand[] {
+  return collapseSacrificeTargets(state, seat, legalMoves(state, seat));
+}
+
+export function collapseSacrificeTargets(state: MatchState, seat: Seat, moves: readonly GameCommand[]): GameCommand[] {
+  const worstByCard = new Map<string, { move: GameCommand; rank: number }>();
+  const passthrough: GameCommand[] = [];
+  for (const move of moves) {
+    if (
+      move.type === "playCard" &&
+      move.target?.type === "MINION" &&
+      move.target.side === seat &&
+      move.target.instanceId &&
+      isSacrificePlay(state, seat, move)
+    ) {
+      const minion = findMinion(state.players[seat], move.target.instanceId)?.minion;
+      const rank = minion ? minion.attack + minion.currentHealth : Number.POSITIVE_INFINITY;
+      const current = worstByCard.get(move.handInstanceId);
+      if (!current || rank < current.rank) worstByCard.set(move.handInstanceId, { move, rank });
+      continue;
+    }
+    passthrough.push(move);
+  }
+  for (const { move } of worstByCard.values()) passthrough.push(move);
+  return passthrough;
+}
+
+function isSacrificePlay(state: MatchState, seat: Seat, move: Extract<GameCommand, { type: "playCard" }>): boolean {
+  const card = state.players[seat].hand.find((c) => c.instanceId === move.handInstanceId);
+  return battlecryIntent(card?.keywords.battlecry?.type ?? "", true) === "SACRIFICE";
 }
 
 /** Rank legal moves by the one-ply heuristic, ties broken deterministically by order. */

@@ -129,6 +129,144 @@ function readyMinion(minion: RuntimeMinion): RuntimeMinion {
   return minion;
 }
 
+const VANILLA_MINION = CARD_CATALOG.find((card) => card.type === "MINION" && card.collectible !== false)!;
+
+/** A cleared, deterministic position with player1 to act, empty boards/hands, 10 mana. */
+function arena(seed: number): { state: MatchState; seat: "player1"; enemy: "player2" } {
+  const state = startedMatch(seed);
+  state.turn.activeSeat = "player1";
+  for (const p of ["player1", "player2"] as const) {
+    state.players[p].board = [];
+    state.players[p].hand = [];
+  }
+  state.players.player1.mana = { current: 10, max: 10 };
+  return { state, seat: "player1", enemy: "player2" };
+}
+
+function placeMinion(
+  state: MatchState,
+  seat: "player1" | "player2",
+  opts: { attack: number; health: number; ready?: boolean; divineShield?: boolean; taunt?: boolean }
+): RuntimeMinion {
+  const minion = createMinionFromCard(state, createRuntimeCard(VANILLA_MINION, seat, nextInstanceId(state, "card")), seat);
+  minion.attack = opts.attack;
+  minion.baseAttack = opts.attack;
+  minion.health = opts.health;
+  minion.currentHealth = opts.health;
+  minion.keywords = { ...minion.keywords, divineShield: opts.divineShield ?? false, taunt: opts.taunt ?? false };
+  if (opts.ready) {
+    minion.sleeping = false;
+    minion.canAttack = true;
+    minion.lockedTurns = 0;
+  } else {
+    minion.sleeping = true;
+    minion.canAttack = false;
+  }
+  state.players[seat].board.push(minion);
+  return minion;
+}
+
+function giveCard(state: MatchState, seat: "player1" | "player2", cardId: string): string {
+  const def = CARD_CATALOG.find((card) => card.id === cardId)!;
+  const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+  state.players[seat].hand.push(card);
+  return card.instanceId;
+}
+
+describe("bot engines (refactored)", () => {
+  it("each engine is deterministic under a fixed RNG seed", () => {
+    for (const difficulty of ["easy", "normal", "hard"] as const) {
+      const a = startedMatch(909);
+      const b = startedMatch(909);
+      const moveA = decide(a, a.turn.activeSeat, difficulty, { state: 4242 }, CARD_CATALOG, 2000);
+      const moveB = decide(b, b.turn.activeSeat, difficulty, { state: 4242 }, CARD_CATALOG, 2000);
+      expect(JSON.stringify(moveA)).toEqual(JSON.stringify(moveB));
+    }
+  });
+
+  it("hard takes lethal on the enemy hero when it is on the board", () => {
+    const { state, seat, enemy } = arena(1);
+    state.players[enemy].hero = { hp: 6, maxHp: 30 };
+    placeMinion(state, seat, { attack: 5, health: 5, ready: true });
+    placeMinion(state, seat, { attack: 4, health: 4, ready: true });
+
+    const move = decide(state, seat, "hard", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("attack");
+    expect(move?.type === "attack" && move.target.type).toBe("HERO");
+  });
+
+  it("hard puts a single-target divine shield on the highest-attack friendly minion", () => {
+    const { state, seat, enemy } = arena(2);
+    const big = placeMinion(state, seat, { attack: 5, health: 3 }); // best body — should be shielded
+    placeMinion(state, seat, { attack: 1, health: 4 });
+    placeMinion(state, enemy, { attack: 6, health: 6 }); // a tempting but wrong (enemy) target
+    state.players[seat].mana = { current: 4, max: 4 };
+    const shieldId = giveCard(state, seat, "TW015"); // GIVE_DIVINE_SHIELD, target ALL MINION
+
+    const move = decide(state, seat, "hard", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("playCard");
+    expect(move?.type === "playCard" && move.handInstanceId).toBe(shieldId);
+    expect(move?.type === "playCard" && move.target?.side).toBe(seat);
+    expect(move?.type === "playCard" && move.target?.instanceId).toBe(big.instanceId);
+  });
+
+  it("hard sacrifices the worst minion and lets it attack first (EAT_FRIENDLY)", () => {
+    const { state: base, seat, enemy } = arena(3);
+    base.players[enemy].hero = { hp: 30, maxHp: 30 };
+    const weak = placeMinion(base, seat, { attack: 1, health: 1, ready: true }); // worst — should be eaten
+    placeMinion(base, seat, { attack: 4, health: 5, ready: true });
+    base.players[seat].mana = { current: 6, max: 6 };
+    const eatId = giveCard(base, seat, "TW034"); // EAT_FRIENDLY, target FRIENDLY MINION
+
+    // Drive the bot's whole turn the way BotGameSession does.
+    let state = base;
+    const log: { type: string; attacker?: string; play?: string; targetInstance?: string }[] = [];
+    const rng = { state: 5 };
+    for (let i = 0; i < 12; i++) {
+      if (state.turn.activeSeat !== seat) break;
+      const move = decide(state, seat, "hard", rng, CARD_CATALOG, 2000 + i);
+      if (!move || move.type === "endTurn") break;
+      if (move.type === "attack") log.push({ type: "attack", attacker: move.attackerInstanceId });
+      if (move.type === "playCard") log.push({ type: "playCard", play: move.handInstanceId, targetInstance: move.target?.instanceId });
+      state = reduce(state, { commandId: `eat-${i}`, seat, nowMs: 2000 + i, command: move }, CARD_CATALOG).state;
+    }
+
+    const eatIndex = log.findIndex((e) => e.type === "playCard" && e.play === eatId);
+    const weakAttackIndex = log.findIndex((e) => e.type === "attack" && e.attacker === weak.instanceId);
+    expect(eatIndex).toBeGreaterThanOrEqual(0); // it did play the sacrifice card
+    expect(log[eatIndex].targetInstance).toBe(weak.instanceId); // and ate the WORST minion
+    expect(weakAttackIndex).toBeGreaterThanOrEqual(0); // the worst minion swung...
+    expect(weakAttackIndex).toBeLessThan(eatIndex); // ...BEFORE being sacrificed
+  });
+
+  it("normal is divine-shield aware: it does not waste a swing into a shielded defender", () => {
+    const { state, seat, enemy } = arena(4);
+    state.players[enemy].hero = { hp: 30, maxHp: 30 };
+    placeMinion(state, seat, { attack: 3, health: 3, ready: true });
+    const shielded = placeMinion(state, enemy, { attack: 3, health: 1, divineShield: true }); // popping this kills our attacker
+    placeMinion(state, enemy, { attack: 6, health: 3 }); // a real trade target
+
+    const move = decide(state, seat, "normal", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("attack");
+    // The suicidal swing into the shielded minion must NOT be chosen.
+    expect(move?.type === "attack" && move.target.instanceId).not.toBe(shielded.instanceId);
+  });
+
+  it("normal routes a harmful battlecry onto the enemy, never a friendly minion", () => {
+    const { state, seat, enemy } = arena(5);
+    state.players[enemy].hero = { hp: 30, maxHp: 30 };
+    placeMinion(state, seat, { attack: 2, health: 2 }); // friendly — must not be the target
+    placeMinion(state, enemy, { attack: 2, health: 2 });
+    state.players[seat].mana = { current: 1, max: 1 };
+    const dmgId = giveCard(state, seat, "TW002"); // DAMAGE 1, target ALL/ALL
+
+    const move = decide(state, seat, "normal", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("playCard");
+    expect(move?.type === "playCard" && move.handInstanceId).toBe(dmgId);
+    expect(move?.type === "playCard" && move.target?.side).toBe(enemy);
+  });
+});
+
 describe("bot.decide", () => {
   it("returns deterministic moves for difficulty=easy with a fixed RNG seed", () => {
     const stateA = startedMatch(101);

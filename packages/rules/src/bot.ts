@@ -1,6 +1,6 @@
 import type { CardDefinition } from "@twcardgame/cards";
 import type { AiDifficulty, GameCommand, Seat } from "@twcardgame/shared";
-import { bestMove, decideEasy, decideHard, decideNormal, type EngineContext } from "./ai/index.js";
+import { bestMove, collapseSacrificeTargets, decideEasy, decideHard, decideNormal, type EngineContext } from "./ai/index.js";
 import { legalMoves } from "./legalMoves.js";
 import type { MatchState } from "./types.js";
 
@@ -45,6 +45,9 @@ export function decide(
     !state.pendingPrompt;
   if (!regularPlay) return bestMove(ctx, moves);
 
-  if (difficulty === "normal") return decideNormal(moves, ctx);
-  return decideHard(moves, ctx);
+  // Collapse a forced friendly sacrifice to its worst-target variant so the
+  // lookahead can't "trade up" by eating its best body.
+  const engineMoves = collapseSacrificeTargets(state, seat, moves);
+  if (difficulty === "normal") return decideNormal(engineMoves, ctx);
+  return decideHard(engineMoves, ctx);
 }
