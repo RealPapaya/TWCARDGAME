@@ -124,35 +124,56 @@ describe("BotGameSession (PvE)", () => {
     expect(host.events.some((e) => e.seat === "player2" && (e.type === "MINION_SUMMONED" || e.type === "ATTACK"))).toBe(true);
   });
 
-  it("applies the challenge handicap to the bot by difficulty", () => {
+  it("applies the challenge handicap to the bot by tier (challenge mode only)", () => {
     // 專家級 (normal): 45 HP and a 2-crystal head start (mana.max seeded to 1 so
-    // the first ramp lands on 2).
+    // the first ramp lands on 2). The handicap keys on the TIER even though the
+    // engine is forced to hard in challenge mode.
     const normalHost = new FakeHost();
-    const normal = new BotGameSession(normalHost, { matchId: "pve-normal", difficulty: "normal" });
+    const normal = new BotGameSession(normalHost, { matchId: "pve-normal", difficulty: "normal", challenge: true });
     normal.setPlayer("player1", "human", human());
     expect(normalHost.sync()?.players.player2.hero).toMatchObject({ hp: 45, maxHp: 45 });
     expect(normalHost.sync()?.players.player2.mana).toMatchObject({ current: 1, max: 1 });
+    expect(normal.engineDifficulty).toBe("hard"); // every challenge tier uses the hard brain
+    expect(normal.botInfo.difficulty).toBe("normal"); // tier preserved for rewards/labels
     // The human keeps the standard opening.
     expect(normalHost.sync()?.players.player1.hero).toMatchObject({ hp: 30, maxHp: 30 });
 
     // 大師級 (hard): 60 HP and a 3-crystal head start.
     const hardHost = new FakeHost();
-    const hard = new BotGameSession(hardHost, { matchId: "pve-hard", difficulty: "hard" });
+    const hard = new BotGameSession(hardHost, { matchId: "pve-hard", difficulty: "hard", challenge: true });
     hard.setPlayer("player1", "human", human());
     expect(hardHost.sync()?.players.player2.hero).toMatchObject({ hp: 60, maxHp: 60 });
     expect(hardHost.sync()?.players.player2.mana).toMatchObject({ current: 2, max: 2 });
 
-    // 普通級 (easy): no handicap.
+    // 普通級 (easy challenge tier): hard brain, no handicap.
     const easyHost = new FakeHost();
-    const easy = new BotGameSession(easyHost, { matchId: "pve-easy", difficulty: "easy" });
+    const easy = new BotGameSession(easyHost, { matchId: "pve-easy", difficulty: "easy", challenge: true });
     easy.setPlayer("player1", "human", human());
     expect(easyHost.sync()?.players.player2.hero).toMatchObject({ hp: 30, maxHp: 30 });
     expect(easyHost.sync()?.players.player2.mana).toMatchObject({ current: 0, max: 0 });
+    expect(easy.engineDifficulty).toBe("hard");
+  });
+
+  it("electromode (practice) uses the selected engine with NO handicap", () => {
+    // 電腦模式: challenge omitted/false. Engine = selected tier, bot keeps fair stats.
+    const host = new FakeHost();
+    const session = new BotGameSession(host, { matchId: "pve-practice", difficulty: "hard" });
+    session.setPlayer("player1", "human", human());
+    expect(session.engineDifficulty).toBe("hard"); // 困難 → hard brain
+    expect(session.botInfo.difficulty).toBe("hard");
+    expect(host.sync()?.players.player2.hero).toMatchObject({ hp: 30, maxHp: 30 });
+    expect(host.sync()?.players.player2.mana).toMatchObject({ current: 0, max: 0 });
+
+    const easyHost = new FakeHost();
+    const easy = new BotGameSession(easyHost, { matchId: "pve-practice-easy", difficulty: "easy" });
+    easy.setPlayer("player1", "human", human());
+    expect(easy.engineDifficulty).toBe("easy"); // 簡單 → easy brain in practice
+    expect(easyHost.sync()?.players.player2.hero).toMatchObject({ hp: 30, maxHp: 30 });
   });
 
   it("round-trips through restoreSession as a PvE session and keeps playing", () => {
     const host = new FakeHost();
-    const session = new BotGameSession(host, { matchId: "pve-snap", difficulty: "hard", theme: "kmt" });
+    const session = new BotGameSession(host, { matchId: "pve-snap", difficulty: "normal", theme: "kmt", challenge: true });
     session.setPlayer("player1", "human", human());
     // The bot's first step (its mulligan) is armed on the alarm — capture it: in
     // the real DO the storage alarm persists across hibernation independently of
@@ -163,6 +184,7 @@ describe("BotGameSession (PvE)", () => {
     const snapshot = JSON.parse(JSON.stringify(session.toSnapshot()));
     expect(snapshot.kind).toBe("pve");
     expect(snapshot.extra.botRng).toBeDefined();
+    expect(snapshot.extra.challenge).toBe(true);
 
     const host2 = new FakeHost();
     host2.clock = host.clock;
@@ -170,6 +192,8 @@ describe("BotGameSession (PvE)", () => {
     const restored = restoreSession(host2, snapshot);
     expect(restored).toBeInstanceOf(BotGameSession);
     expect(restored.hasMatch()).toBe(true);
+    // Challenge mode (hard engine) survives the round-trip.
+    expect((restored as BotGameSession).engineDifficulty).toBe("hard");
 
     // The restored PvE session can be driven to completion.
     drive(host2, restored as BotGameSession);

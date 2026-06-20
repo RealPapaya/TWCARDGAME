@@ -246,6 +246,7 @@ export class GameDurableObject {
         matchId,
         joinCode,
         difficulty: (url.searchParams.get("difficulty") as AiDifficulty | null) ?? undefined,
+        challenge: url.searchParams.get("challenge") === "1",
         theme: (url.searchParams.get("theme") as AiTheme | null) ?? undefined,
         devTest
       });

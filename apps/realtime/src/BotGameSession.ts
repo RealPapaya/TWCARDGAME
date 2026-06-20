@@ -50,6 +50,13 @@ export interface BotGameSessionOptions extends GameSessionOptions {
   difficulty?: AiDifficulty;
   theme?: AiTheme;
   /**
+   * Challenge mode (挑戰模式). When true the bot always uses the `hard` decision
+   * engine regardless of the selected tier, and the per-tier stat handicap is
+   * applied. 電腦模式 (practice) leaves this false: the tier picks the engine and
+   * there is no handicap. `difficulty` still carries the tier (rewards/labels).
+   */
+  challenge?: boolean;
+  /**
    * Localhost-only dev-test board setup. When present the match is created with a
    * scripted board instead of a normal mulligan opening (mirrors BotRoom's
    * `customizeInitialMatch`), and finalize side-effects are skipped.
@@ -67,6 +74,7 @@ export interface BotGameSessionOptions extends GameSessionOptions {
  */
 export class BotGameSession extends GameSession {
   private readonly difficulty: AiDifficulty;
+  private readonly challenge: boolean;
   private readonly theme?: AiTheme;
   private readonly botSeat: Seat = "player2";
   private readonly humanSeat: Seat = "player1";
@@ -85,6 +93,7 @@ export class BotGameSession extends GameSession {
   constructor(host: SessionHost, options: BotGameSessionOptions) {
     super(host, options);
     this.difficulty = options.difficulty && AI_DIFFICULTIES.includes(options.difficulty) ? options.difficulty : "normal";
+    this.challenge = options.challenge === true;
     this.theme = isAiTheme(options.theme) ? options.theme : undefined;
     this.devTestSetup = options.devTest;
     this.botRng = {
@@ -98,6 +107,15 @@ export class BotGameSession extends GameSession {
   /** Identity for the client's `bot` message (mirrors BotRoom's client.send("bot", …)). */
   get botInfo(): { seat: Seat; difficulty: AiDifficulty; theme: AiTheme | null } {
     return { seat: this.botSeat, difficulty: this.difficulty, theme: this.theme ?? null };
+  }
+
+  /**
+   * The decision engine the bot actually plays with. Challenge mode forces `hard`
+   * for every tier; practice mode uses the selected tier. (The `difficulty` tier is
+   * still what drives rewards, labels, the seed and `botInfo`.)
+   */
+  get engineDifficulty(): AiDifficulty {
+    return this.challenge ? "hard" : this.difficulty;
   }
 
   protected override get kind(): "pvp" | "pve" {
@@ -121,10 +139,11 @@ export class BotGameSession extends GameSession {
    * Runs inside GameSession.createMatch before the first broadcast.
    */
   protected override customizeInitialMatch(state: MatchState, events: GameEvent[]): void {
-    // Challenge-mode handicap buffs the bot's hero HP + starting crystals by
-    // difficulty (專家級/大師級); easy is a no-op. Applied before the dev-test
-    // override so a scripted board still gets the difficulty handicap.
-    applyChallengeHandicap(state, this.botSeat, this.difficulty);
+    // Challenge-mode handicap buffs the bot's hero HP + starting crystals by tier
+    // (專家級/大師級; 普通級 is a no-op). Challenge-only: 電腦模式 (practice) gets the
+    // selected engine but fair stats. Applied before the dev-test override so a
+    // scripted board still gets the handicap.
+    if (this.challenge) applyChallengeHandicap(state, this.botSeat, this.difficulty);
     if (!this.devTestSetup) return;
     this.devTestActive = true;
     events.length = 0;
@@ -240,7 +259,7 @@ export class BotGameSession extends GameSession {
       return;
     }
 
-    const move = decide(match, this.botSeat, this.difficulty, this.botRng, CARD_CATALOG, this.now());
+    const move = decide(match, this.botSeat, this.engineDifficulty, this.botRng, CARD_CATALOG, this.now());
     if (!move || move.type === "endTurn") {
       this.scheduleBotEndTurn();
       return;
@@ -252,7 +271,7 @@ export class BotGameSession extends GameSession {
     const match = this.match;
     if (!match || match.phase === "NORMAL_PLAY") return;
     if (legalMoves(match, this.botSeat).length === 0) return;
-    const move = decide(match, this.botSeat, this.difficulty, this.botRng, CARD_CATALOG, this.now());
+    const move = decide(match, this.botSeat, this.engineDifficulty, this.botRng, CARD_CATALOG, this.now());
     if (!move) return;
     this.applyServerCommand(this.botSeat, "bot-phase", move);
   }
@@ -294,6 +313,7 @@ export class BotGameSession extends GameSession {
   protected override snapshotExtra(): Record<string, unknown> {
     return {
       difficulty: this.difficulty,
+      challenge: this.challenge,
       theme: this.theme ?? null,
       botRng: this.botRng,
       botStepAtMs: this.botStepAtMs ?? null,

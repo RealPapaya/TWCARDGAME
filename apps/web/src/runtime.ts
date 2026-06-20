@@ -5726,12 +5726,15 @@ async function startAiMatch(options: { withTheme?: boolean } = {}): Promise<void
           accessToken: view.session?.access_token,
           ...selectedDeckJoinOptions(),
           difficulty: view.aiDifficulty,
+          // 挑戰模式 (withTheme) → hard engine + per-tier handicap; 電腦模式 → fair practice.
+          challenge: withTheme,
           ...(withTheme ? { theme: view.aiTheme } : {})
         }
       : {
           displayName: view.profile?.display_name ?? "Player",
           ...selectedDeckJoinOptions(),
           difficulty: view.aiDifficulty,
+          challenge: withTheme,
           ...(withTheme ? { theme: view.aiTheme } : {})
         };
     const room = await joinOrCreateGameRoom("pve", joinOptions, { serverUrl });

@@ -18,6 +18,7 @@ export function restoreSession(host: SessionHost, snapshot: GameSessionSnapshot)
       mulliganTimeLimitMs: snapshot.mulliganTimeLimitMs,
       turnTimeLimitMs: snapshot.turnTimeLimitMs,
       difficulty: extra.difficulty as AiDifficulty | undefined,
+      challenge: extra.challenge === true,
       theme: (extra.theme as AiTheme | null | undefined) ?? undefined
     });
     session.applySnapshot(snapshot);

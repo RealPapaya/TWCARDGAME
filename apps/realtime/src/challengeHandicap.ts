@@ -2,10 +2,12 @@ import type { MatchState } from "@twcardgame/rules";
 import type { AiDifficulty, Seat } from "@twcardgame/shared";
 
 /**
- * Challenge-mode AI handicaps. The PvE opponent is buffed by difficulty so the
- * higher tiers are a real "challenge": a bigger hero pool and a head start on
- * crystals (which also persists as a permanent lead, since the per-turn mana
- * ramp keeps adding on top of it).
+ * Challenge-mode (挑戰模式) AI handicaps — applied ONLY when `BotGameSession` is in
+ * challenge mode (電腦模式 practice gets fair stats). The PvE opponent is buffed by
+ * tier so the higher tiers are a real "challenge": a bigger hero pool and a head
+ * start on crystals (which also persists as a permanent lead, since the per-turn
+ * mana ramp keeps adding on top of it). In challenge mode every tier already uses
+ * the `hard` decision engine; this handicap is what differentiates the tiers.
  *
  * - 專家級 (`normal`): start with 2 crystals, hero HP 45.
  * - 大師級 (`hard`):   start with 3 crystals, hero HP 60.

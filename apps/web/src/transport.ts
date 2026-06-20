@@ -32,6 +32,8 @@ export type JoinOptions = {
   userId?: string;
   deckIds?: string[];
   difficulty?: AiDifficulty;
+  /** Challenge mode (挑戰模式): bot uses the hard engine + per-tier stat handicap. */
+  challenge?: boolean;
   theme?: AiTheme;
   joinCode?: string;
   devTest?: unknown;
@@ -134,6 +136,7 @@ function buildRealtimeUrl(serverUrl: string, mode: GameTransportMode, options: J
   appendString(url, "name", options.displayName ?? options.name);
   appendString(url, "userId", options.userId);
   appendString(url, "difficulty", options.difficulty);
+  if (options.challenge) url.searchParams.set("challenge", "1");
   appendString(url, "theme", options.theme);
   // Supabase-backed deck resolution (server validates ownership + legality). Sent
   // only when present; otherwise the server uses the explicit `deck` list / dev deck.
