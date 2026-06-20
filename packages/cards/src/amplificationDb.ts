@@ -354,13 +354,13 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_ILLEGAL_MIGRANT_WORKERS",
     hasImage: true,
     name: "非法移工",
-    description: "隨機從牌組召喚三名勞工。本場每當有勞工死亡，本回合獲得 1 點臨時費用。",
+    description: "隨機從牌組召喚兩名勞工。本場每當有勞工死亡，本回合獲得 1 點臨時費用。",
     tier: "卯死",
     factionTags: ["勞工"],
     effect: {
       type: "AUG_SUMMON_RANDOM_CATEGORY_FROM_DECK_AND_DEATH_MANA",
       target_category: "勞工",
-      count: 3,
+      count: 2,
       value: 1
     }
   },
