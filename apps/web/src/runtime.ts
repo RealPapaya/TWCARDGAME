@@ -90,6 +90,7 @@ import {
 } from "./app/activeMatch.js";
 import { PATCH_NOTES } from "./app/patch-notes.js";
 import { selectDailyBoard } from "./app/daily-board.js";
+import { hasMainMenuNotification } from "./app/main-menu-notification.js";
 import {
   computeMatchStats,
   matchLengthLabel,
@@ -772,6 +773,7 @@ function renderMainMenu(): string {
   const xpFraction = level >= MAX_LEVEL || xpRequired <= 0 ? 1 : Math.min(1, xp / xpRequired);
   const xpDisplay = level >= MAX_LEVEL ? "MAX" : `${xp}/${xpRequired} XP`;
   const playerTitle = view.profile?.selected_title ? `#${titleLabel(view.profile.selected_title)}` : "未設定稱號";
+  const showNotification = hasMainMenuNotification(view.tasks, view.friendRequests);
   return `
     <section class="screen main-menu" data-screen="main">
       ${renderCloudLayer()}
@@ -780,7 +782,9 @@ function renderMainMenu(): string {
         <button type="button" id="changelog-open" class="version-changelog-btn">更新資訊</button>
       </div>
       <div class="main-menu-center">
-        <h1 class="game-title">寶島遊戲王</h1>
+        <h1 class="game-title">寶島遊戲王${showNotification
+          ? `<span class="main-menu-notification-dot" data-testid="main-menu-notification" role="status" aria-label="有待處理通知"></span>`
+          : ""}</h1>
         <nav class="menu-tile-grid" aria-label="Main menu">
           <button class="menu-tile menu-tile-battle" data-menu-screen="battle" data-testid="menu-battle">
             <img class="menu-tile-icon" src="/images/ui/MenuBattle.webp" alt="" />
@@ -4291,6 +4295,10 @@ function navigateToScreen(target: MenuScreen): void {
   if (target === "leaderboard") void loadLeaderboard();
   if (target === "shop") void loadShopItems();
   if (target === "tasks" || target === "achievements") void loadTasks();
+  if (target === "main") {
+    void loadTasks();
+    void loadFriends();
+  }
   render();
   if (target === "collection" && supabase && view.session?.user) void loadAccountData();
 }
@@ -7166,8 +7174,13 @@ async function backToLobby(): Promise<void> {
       // The room may already be closed after match cleanup.
     }
   }
-  if (supabase && view.session) await loadAccountData();
-  else render();
+  if (supabase && view.session) {
+    await loadAccountData();
+    void loadTasks();
+    void loadFriends();
+  } else {
+    render();
+  }
 }
 
 async function joinRoom(event: Event): Promise<void> {
