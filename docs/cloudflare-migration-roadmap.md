@@ -10,6 +10,9 @@
 
 ## ⭐ 給接手的 session / agent:從這裡開始讀
 
+> 📘 **已上線後的營運(網址、怎麼更新、要不要 push、回滾、疑難排解)** 看
+> [cloudflare-operations.md](cloudflare-operations.md);本文只談「為什麼搬、怎麼搬」。
+
 這是一個**會跨很多次 session 執行**的長期專案。如果你是新開的 session 被要求「繼續做這個遷移」,請依序:
 
 1. **先看 §A 進度追蹤** —— 知道做到哪、下一步是什麼。
