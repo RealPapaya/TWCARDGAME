@@ -24,14 +24,15 @@ Keep these responsibilities separate:
 - `packages/rules`: authoritative gameplay only, including the PvE bot's decision logic (`bot.ts`, `legalMoves.ts`). Pure TypeScript. No DOM, Colyseus, Supabase, timers, network, `Math.random()`, or `Date.now()`.
 - `packages/cards`: card catalog, card schemas, supported effect-type lists, catalog validation.
 - `packages/shared`: DTOs and cross-package contracts only. Avoid business logic here.
-- `apps/server`: Colyseus adapter — `GameRoom` (PvP) and `BotRoom` (PvE). Seat assignment, room lifecycle, command routing, public sync, private hand messages, account/persistence wiring, bot pacing.
-- `apps/web`: rendering and input only, organized as a thin entry (`main.ts` → `runtime.ts`) plus focused `app/` modules (DOM rendering/patching, animations, audio, viewport, storage). It sends commands and renders server state; it does not apply authoritative game state changes.
+- `apps/realtime` (**live backend**): Cloudflare Workers + Durable Objects adapter — `GameSession` (PvP) / `BotGameSession` (PvE) orchestration on a `GameDurableObject`, plus `LobbyDurableObject` (matchmaking/private rooms/reconnect), `accounts.ts` (deck resolution), `matchServices.ts` (finalize/rewards). Seat assignment, command routing, public sync, private hand messages, deadlines via DO Alarms, bot pacing — **no gameplay logic**.
+- `apps/server` (**legacy, pending decommission**): the old Colyseus adapter — `GameRoom` (PvP) and `BotRoom` (PvE). Same adapter responsibilities, now superseded by `apps/realtime`. Don't add features here.
+- `apps/web`: rendering and input only, organized as a thin entry (`main.ts` → `runtime.ts`) plus focused `app/` modules (native-WebSocket transport adapter, DOM rendering/patching, animations, audio, viewport, storage). It sends commands and renders server state; it does not apply authoritative game state changes.
 - `packages/db`: persistence adapters and migrations only.
 
 All gameplay mutation must flow through:
 
 ```txt
-client command -> GameRoom.handleCommand -> reduce(...) -> MatchState + GameEvents -> sync schema/private messages
+client command -> GameSession.applyClientCommand -> reduce(...) -> MatchState + GameEvents -> public snapshot (toPublicState) + private hand (toHandView)
 ```
 
 ## Coding Style
@@ -54,7 +55,7 @@ Rules engine code should be deterministic and replayable:
 - Return events for animation/replay, but treat `MatchState` as truth.
 - Resolve deaths, auras, triggers, and win conditions in rules code, not the client.
 - Keep private state in `MatchState.private`; never expose hand contents or deck order through public state.
-- Keep PvE AI logic in `bot.ts`/`legalMoves.ts` deterministic — drive it from a seeded `BotRngState`, never `Math.random()`. `BotRoom` only paces and submits the resulting commands.
+- Keep PvE AI logic in `bot.ts`/`legalMoves.ts` deterministic — drive it from a seeded `BotRngState`, never `Math.random()`. `BotGameSession` (live) / `BotRoom` (legacy) only paces and submits the resulting commands.
 
 When adding a command:
 
@@ -80,18 +81,19 @@ Do not special-case cards by name unless the card's intended behavior truly requ
 
 ## Server Style
 
-Colyseus room code should be an adapter:
+Backend code (live `apps/realtime`, legacy `apps/server`) is an adapter — keep gameplay out of it:
 
 - Receive command messages.
 - Build `CommandEnvelope`.
 - Call `reduce(...)`.
-- Sync public schema from `toPublicState(...)`.
+- Broadcast the public snapshot from `toPublicState(...)` (in `apps/realtime`, as JSON `state`/`publicSync`; legacy Colyseus synced a Schema delta).
 - Send private hand via `toHandView(...)`.
+- Schedule deadlines with DO Alarms in `apps/realtime` (never wall-clock timers in rules); keep the `GameSession` orchestration transport-agnostic and unit-testable.
 
-For Colyseus Schema:
+For the **legacy Colyseus Schema** in `apps/server` only:
 
 - Use `defineTypes(...)`.
-- Keep `useDefineForClassFields: false` in `tsconfig.base.json`.
+- Keep `useDefineForClassFields: false` in `tsconfig.base.json` (still set repo-wide while `apps/server` exists).
 - Use explicit fields for stable shapes when maps cause schema metadata friction.
 
 ## Web Style
