@@ -111,7 +111,7 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_PERSIST_LOWCOST_ATTACK":
       flags.lowCostMinionAttackBuff += effect.value ?? 0;
       for (const minion of player.board) {
-        if (minion.cost >= 1 && minion.cost <= 3) {
+        if (minion.cost >= 1 && minion.cost <= 4) {
           addStats(minion, effect.value ?? 0, 0);
           glowTargets.push(minion.instanceId);
         }
@@ -348,7 +348,7 @@ export function applyPersistentMinionAugments(state: MatchState, seat: Seat, min
   if (!flags) return;
   let changed = false;
 
-  if (flags.lowCostMinionAttackBuff > 0 && minion.cost >= 1 && minion.cost <= 3) {
+  if (flags.lowCostMinionAttackBuff > 0 && minion.cost >= 1 && minion.cost <= 4) {
     addStats(minion, flags.lowCostMinionAttackBuff, 0);
     changed = true;
   }

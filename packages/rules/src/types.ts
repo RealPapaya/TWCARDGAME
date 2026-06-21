@@ -109,7 +109,7 @@ export interface AugmentFlags {
   nextDrawHalfCost: boolean;
   /** 颱風假: persistent stat buff to summoned minions of a category (and current board). */
   categoryBuff?: { category: string; value: number; stat: "ATTACK" | "HEALTH" | "ALL" };
-  /** 基本工資調漲: +attack to summoned minions of printed cost 1-3. */
+  /** 基本工資調漲: +attack to summoned minions of printed cost 1-4. */
   lowCostMinionAttackBuff: number;
   /** 育兒津貼: +maxHP to every minion this player plays. */
   playedMinionMaxHpBonus: number;

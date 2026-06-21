@@ -173,9 +173,9 @@ describe("labor cards and amplification", () => {
 
     applyAugmentSelection(state, "player1", entry("AMP_ILLEGAL_MIGRANT_WORKERS"), []);
 
-    expect(player.board).toHaveLength(3);
+    expect(player.board).toHaveLength(2);
     expect(player.board.every((minion) => minion.category === "勞工")).toBe(true);
-    expect(player.deck.filter((card) => card.category === "勞工")).toHaveLength(1);
+    expect(player.deck.filter((card) => card.category === "勞工")).toHaveLength(2);
 
     player.mana.current = 0;
     const maxMana = player.mana.max;
@@ -559,15 +559,18 @@ describe("augment combat / persistent effects", () => {
     expect(minion.currentHealth).toBe(3);
   });
 
-  it("基本工資調漲 gives +2 attack only to printed-cost 1-3 minions", () => {
+  it("基本工資調漲 gives +1 attack only to printed-cost 1-4 minions", () => {
     const state = startInProgress(9);
     const seat = state.turn.activeSeat;
     applyAugmentSelection(state, seat, entry("AMP_MIN_WAGE"), []);
     const cheap = makeMinion({ cost: 2, attack: 1, health: 1, currentHealth: 1 });
+    const mid = makeMinion({ cost: 4, attack: 1, health: 1, currentHealth: 1 });
     const pricey = makeMinion({ cost: 5, attack: 1, health: 1, currentHealth: 1 });
     applyPersistentMinionAugments(state, seat, cheap, []);
+    applyPersistentMinionAugments(state, seat, mid, []);
     applyPersistentMinionAugments(state, seat, pricey, []);
-    expect(cheap.attack).toBe(3);
+    expect(cheap.attack).toBe(2);
+    expect(mid.attack).toBe(2);
     expect(pricey.attack).toBe(1);
   });
 
@@ -587,7 +590,7 @@ describe("augment combat / persistent effects", () => {
 
     applyAugmentSelection(state, seat, entry("AMP_MIN_WAGE"), []);
 
-    expect(waste.attack).toBe(2);
+    expect(waste.attack).toBe(1);
     expect(legalMoves(state, seat)).toContainEqual({
       type: "attack",
       attackerInstanceId: waste.instanceId,

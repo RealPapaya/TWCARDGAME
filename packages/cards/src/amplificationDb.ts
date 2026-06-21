@@ -93,10 +93,10 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_MIN_WAGE",
     hasImage: true,
     name: "基本工資調漲",
-    description: "費用 1-3 的隨從 攻擊 +2（含之後打出，整局有效）。",
+    description: "費用 1-4 的隨從 攻擊 +1（含之後打出，整局有效）。",
     tier: "加減賺",
     factionTags: [],
-    effect: { type: "AUG_PERSIST_LOWCOST_ATTACK", value: 2 }
+    effect: { type: "AUG_PERSIST_LOWCOST_ATTACK", value: 1 }
   },
   {
     id: "AMP_FRIES_BOGO",
