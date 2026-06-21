@@ -4,6 +4,7 @@ import {
   COLLISION_NEWS_TRAINING,
   SOCIAL_ROOKIE_TRAINING,
   advanceTraining,
+  advanceTrainingPeek,
   createCollisionNewsTraining,
   createSocialRookieTraining,
   createTrainingSession,
@@ -178,6 +179,12 @@ function driveLesson(session: TrainingSession, gatedCommands: GameCommand[]): vo
       if (result.completed) return;
       continue;
     }
+    if (prompt.allowedAction === "script_peek") {
+      const result = advanceTrainingPeek(session);
+      if (!result) throw new Error("peek step did not advance");
+      if (result.completed) return;
+      continue;
+    }
     const command = queue.shift();
     if (!command) throw new Error(`no queued command for gated step "${prompt.allowedAction}"`);
     const result = handleTrainingCommand(session, command);
@@ -341,6 +348,20 @@ describe("amplification and field lesson", () => {
     expect(session.phase).toBe("AMPLIFICATION_PHASE");
     expect(session.amplificationOptions?.map((option) => option.id)).toContain("AMP_INVOICE_200");
 
+    // The peek step gates on the eye toggle; amplification picks are refused
+    // until the player has inspected the board.
+    expect(trainingPrompt(session)?.allowedAction).toBe("script_peek");
+    expect(trainingPrompt(session)?.highlights).toContainEqual({ type: "peekButton" });
+    const tooEarly = handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_INVOICE_200" });
+    expect(tooEarly.rejected).toBeTruthy();
+    expect(session.players.player1.mana).toEqual({ current: 3, max: 3 });
+
+    advanceTrainingPeek(session); // eye pressed → board preview explains the cost gap
+    expect(trainingPrompt(session)?.allowedAction).toBe("next");
+    advanceTraining(session); // return to the amplification options
+    expect(trainingPrompt(session)?.allowedAction).toBe("script_amp");
+    expect(trainingPrompt(session)?.highlights).toContainEqual({ type: "ampOption", optionId: "AMP_INVOICE_200" });
+
     const wrongAmp = handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_SHAREHOLDER_GIFT" });
     expect(wrongAmp.rejected).toBeTruthy();
     expect(session.players.player1.mana).toEqual({ current: 3, max: 3 });
@@ -357,7 +378,7 @@ describe("amplification and field lesson", () => {
 
     driveLesson(session, [
       { type: "selectAmplification", optionId: "AMP_ONE_PARTY_DOMINANCE" },
-      { type: "submitVote", optionIndex: 0 }
+      { type: "submitVote", optionIndex: 1 } // 莫拉克風災 now sits in the centre slot
     ]);
 
     expect(session.status).toBe("finished");
@@ -368,5 +389,49 @@ describe("amplification and field lesson", () => {
     ]);
     expect(session.players.player2.board).toHaveLength(0);
     expect(session.players.player2.graveyardCount).toBe(7);
+  });
+
+  it("guides the eye toggle, the chosen augments, both heroes' HP, and the Morakot vote", () => {
+    const session = createTrainingSession("amp_field");
+    const stepId = () => session.script?.steps[session.stepIndex ?? 0]?.id;
+    const highlights = () => trainingPrompt(session)?.highlights ?? [];
+
+    // Turn 7: open the amplification phase, then the eye-toggle peek lesson.
+    advanceTraining(session); // intro → amp_explain
+    advanceTraining(session); // amp_explain → peek_hint (opens amplification)
+    expect(stepId()).toBe("l5_peek_hint");
+    expect(highlights()).toContainEqual({ type: "peekButton" });
+
+    advanceTrainingPeek(session); // eye pressed → peek_cost (board preview)
+    expect(stepId()).toBe("l5_peek_cost");
+    expect(highlights()).toContainEqual({ type: "cardCost", instanceId: "l5-four-cost-hand" });
+    expect(highlights()).toContainEqual({ type: "mana", seat: "player1" });
+
+    advanceTraining(session); // peek_cost → invoice_pick (back to options)
+    expect(highlights()).toContainEqual({ type: "ampOption", optionId: "AMP_INVOICE_200" });
+    handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_INVOICE_200" });
+    advanceTraining(session); // invoice_result → play_after_invoice
+    handleTrainingCommand(session, { type: "playCard", handInstanceId: "l5-four-cost-hand" });
+
+    // Turn 14 卯死: 一黨獨大 highlighted while the player is one hit from defeat.
+    expect(stepId()).toBe("l5_jump_turn_13");
+    advanceTraining(session); // jump_turn_13 → lethal_warning
+    expect(stepId()).toBe("l5_lethal_warning");
+    advanceTraining(session); // lethal_warning → one_party_pick (opens high amp)
+    expect(stepId()).toBe("l5_one_party_pick");
+    expect(highlights()).toContainEqual({ type: "ampOption", optionId: "AMP_ONE_PARTY_DOMINANCE" });
+    handleTrainingCommand(session, { type: "selectAmplification", optionId: "AMP_ONE_PARTY_DOMINANCE" });
+
+    // Turn 20 event: both heroes' HP highlighted, then the Morakot ballot.
+    advanceTraining(session); // one_party_result → event_setup
+    expect(stepId()).toBe("l5_event_setup");
+    expect(highlights()).toContainEqual({ type: "hero", seat: "player1" });
+    expect(highlights()).toContainEqual({ type: "hero", seat: "player2" });
+    advanceTraining(session); // event_setup → vote_explain (opens voting)
+    expect(highlights()).toContainEqual({ type: "hero", seat: "player1" });
+    expect(highlights()).toContainEqual({ type: "hero", seat: "player2" });
+    advanceTraining(session); // vote_explain → vote_morakot
+    expect(stepId()).toBe("l5_vote_morakot");
+    expect(highlights()).toContainEqual({ type: "voteOption", eventId: "VE_MORAKOT" });
   });
 });

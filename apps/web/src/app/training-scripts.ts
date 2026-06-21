@@ -137,10 +137,23 @@ export function advanceScript(session: TrainingSession): ScriptStepResult {
   return commitStep(session, events);
 }
 
+/**
+ * Advance past a gated `script_peek` step when the player presses the eye toggle.
+ * Returns undefined if the current step is not a peek gate, so the runtime can
+ * fall back to treating the eye as a plain board preview.
+ */
+export function advanceScriptPeek(session: TrainingSession): ScriptStepResult | undefined {
+  const step = currentStep(session);
+  if (!step || step.action !== "script_peek") return undefined;
+  const events = step.apply ? step.apply(session) : [];
+  return commitStep(session, events);
+}
+
 export function handleScriptCommand(session: TrainingSession, command: GameCommand): ScriptStepResult {
   const step = currentStep(session);
   if (!step) return { events: [], completed: true };
   if (step.action === "next") return { events: [], rejected: "請點下一步繼續。" };
+  if (step.action === "script_peek") return { events: [], rejected: "請先按下眼睛按鈕查看場上狀況。" };
   if (step.match && !step.match(command, session)) {
     return { events: [], rejected: "這一步只能照教學指定的操作進行。" };
   }
@@ -830,6 +843,9 @@ const ADVANCED_KEYWORDS_SCRIPT: TrainingScript = {
 const L5_FOUR_COST_HAND = "l5-four-cost-hand";
 const L5_FOUR_COST_MINION = "l5-four-cost-minion";
 const L5_ENEMY_PREFIX = "l5-enemy";
+const L5_LOW_AMP_ID = "AMP_INVOICE_200";
+const L5_HIGH_AMP_ID = "AMP_ONE_PARTY_DOMINANCE";
+const L5_VOTE_ID = "VE_MORAKOT";
 
 function ampOptionById(id: string, description?: string): AmplificationOption {
   const entry = AMPLIFICATION_DB.find((candidate) => candidate.id === id);
@@ -842,24 +858,27 @@ function ampOptionById(id: string, description?: string): AmplificationOption {
   };
 }
 
+// The guided pick sits in the centre slot: the coach panel is anchored bottom-left
+// and would otherwise cover the leftmost option card.
 function lessonLowAmpOptions(): AmplificationOption[] {
   return [
-    ampOptionById("AMP_INVOICE_200", "立刻多 1 顆水晶，水晶上限 +1。"),
     ampOptionById("AMP_SHAREHOLDER_GIFT", "下一張抽到的牌費用永久減半。"),
+    ampOptionById("AMP_INVOICE_200", "立刻多 1 顆水晶，水晶上限 +1。"),
     ampOptionById("AMP_FRIES_BOGO", "接下來 2 回合都可以多抽 1 張。")
   ];
 }
 
 function lessonHighAmpOptions(): AmplificationOption[] {
   return [
-    ampOptionById("AMP_ONE_PARTY_DOMINANCE", "英雄生命上限 +20，教學中會同步回復 20 點生命。"),
     ampOptionById("AMP_JACKPOT", "立刻多 3 顆水晶，水晶上限 +3。"),
+    ampOptionById("AMP_ONE_PARTY_DOMINANCE", "英雄生命上限 +20，教學中會同步回復 20 點生命。"),
     ampOptionById("AMP_FIRE_SALE", "手上的牌費用全部變成 1。")
   ];
 }
 
 function lessonFieldEvents(): NonNullable<TrainingSpecialPhase["voteEvents"]> {
-  return ["VE_MORAKOT", "VE_KAOHSIUNG_BLAST", "VE_BLACKOUT"].map((id) => {
+  // 莫拉克風災 sits in the centre slot so the bottom-left coach panel doesn't cover it.
+  return ["VE_KAOHSIUNG_BLAST", "VE_MORAKOT", "VE_BLACKOUT"].map((id) => {
     const e = VOTE_EVENT_DB.find((entry) => entry.id === id)!;
     return { id: e.id, name: e.name, option0: e.options[0], option1: e.options[1], option2: e.options[2] };
   });
@@ -936,18 +955,33 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_amp_explain",
       title: "第七輪增幅",
-      body: "增幅有三種等級：加減賺、蕭貪、卯死。第 7 回合先示範最低階的加減賺，它也能把卡住的局面打開。",
+      body: "增幅有三種等級：加減賺、蕭貪、卯死。第 7 回合先示範最低階的加減賺。按下一步，三個增幅選項就會出現。",
       action: "next",
-      highlights: [{ type: "turnCounter" }, { type: "mana", seat: PLAYER }, { type: "cardCost", instanceId: L5_FOUR_COST_HAND }],
+      highlights: [{ type: "turnCounter" }],
       apply: (session) => {
         return startAmplificationPhase(session, lessonLowAmpOptions());
       }
     },
     {
+      id: "l5_peek_hint",
+      title: "先看清楚場面",
+      body: "三個增幅出現了，先別急著選。按下方的眼睛（透視）按鈕，可以暫時收起選項、看看目前場上的狀況再決定。",
+      action: "script_peek",
+      highlights: [{ type: "peekButton" }]
+    },
+    {
+      id: "l5_peek_cost",
+      title: "目前的難題",
+      body: "你手上的『水電師傅』需要 4 點水晶才能召喚，但你目前只有 3 顆，現在還召喚不出來。看清楚後，按下一步回到增幅選項。",
+      action: "next",
+      highlights: [{ type: "cardCost", instanceId: L5_FOUR_COST_HAND }, { type: "mana", seat: PLAYER }]
+    },
+    {
       id: "l5_invoice_pick",
       title: "選發票中200",
-      body: "你手上只有一張 4 費卡，但目前只有 3 顆水晶。選【發票中200】，多拿 1 顆水晶後就能打出來。",
+      body: "回到增幅選項。增幅可以依當下情況，挑一個對自己最有利的——你現在缺 1 顆水晶，就選【發票中200】補上，正好能召喚水電師傅。",
       action: "script_amp",
+      highlights: [{ type: "ampOption", optionId: L5_LOW_AMP_ID }],
       match: (command) => command.type === "selectAmplification" && command.optionId === "AMP_INVOICE_200",
       resolve: (session, command) => {
         const optionId = command.type === "selectAmplification" ? command.optionId : undefined;
@@ -972,8 +1006,8 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     },
     {
       id: "l5_play_after_invoice",
-      title: "打出 4 費卡",
-      body: "現在水晶足夠了。把手上的 4 費隨從打到場上。",
+      title: "召喚水電師傅",
+      body: "現在水晶足夠了。把剛剛召喚不出來的水電師傅打到場上。",
       action: "script_play",
       selectHandId: L5_FOUR_COST_HAND,
       highlights: [{ type: "hand", instanceId: L5_FOUR_COST_HAND }, { type: "mana", seat: PLAYER }],
@@ -1010,8 +1044,8 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     },
     {
       id: "l5_lethal_warning",
-      title: "卯死增幅",
-      body: "你只剩 1 點生命，對手下一次攻擊就能結束比賽。第 14 回合會出現最高階的卯死增幅，選對就能逃過死劫。",
+      title: "你快被擊倒了",
+      body: "你只剩 1 點生命，對手下一次攻擊就能結束比賽。第 14 回合會出現最高階的卯死增幅，選對就能逃過死劫。按下一步，卯死增幅就會出現。",
       action: "next",
       highlights: [{ type: "hero", seat: PLAYER }, { type: "unit", seat: OPPONENT }],
       apply: (session) => {
@@ -1025,8 +1059,9 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_one_party_pick",
       title: "選一黨獨大",
-      body: "選【一黨獨大】。卯死等級的增幅很強，這次會把生命上限和目前生命一起拉高，讓你活下來。",
+      body: "你命在旦夕——選【一黨獨大】。卯死等級的增幅很強，這次會把生命上限和目前生命一起拉高，讓你撐過對手的攻擊、躲過死劫。",
       action: "script_amp",
+      highlights: [{ type: "ampOption", optionId: L5_HIGH_AMP_ID }],
       match: (command) => command.type === "selectAmplification" && command.optionId === "AMP_ONE_PARTY_DOMINANCE",
       resolve: (session, command) => {
         const optionId = command.type === "selectAmplification" ? command.optionId : undefined;
@@ -1052,9 +1087,9 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_event_setup",
       title: "第 20 回合事件",
-      body: "最後跳到公投事件。對手現在滿場隨從，你方場上沒有隨從；而且你血量比較低，會拿到比較高的中選率。",
+      body: "最後跳到公投事件。對手現在滿場隨從，你方場上沒有隨從。先看雙方的血量——你的血量比對手低不少。",
       action: "next",
-      highlights: [{ type: "turnCounter" }, { type: "hero", seat: PLAYER }],
+      highlights: [{ type: "hero", seat: PLAYER }, { type: "hero", seat: OPPONENT }],
       apply: (session) => {
         session.turnNumber = 20;
         session.activeSeat = PLAYER;
@@ -1072,9 +1107,9 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
     {
       id: "l5_vote_explain",
       title: "低血量的優勢",
-      body: "公投輪盤會讓弱勢方，也就是血量較低的一方，有較高機率中選。按下一步，選【莫拉克風災】來清掉對手滿場。",
+      body: "公投輪盤會依雙方血量決定中選率：血量較低的一方，也就是現在的你，會拿到較高的中選機率。按下一步，挑一個公投案。",
       action: "next",
-      highlights: [{ type: "hero", seat: PLAYER }, { type: "unit", seat: OPPONENT }],
+      highlights: [{ type: "hero", seat: PLAYER }, { type: "hero", seat: OPPONENT }],
       apply: (session) => {
         session.phase = "VOTING_PHASE";
         session.specialPhase = {
@@ -1092,6 +1127,7 @@ const AMP_FIELD_SCRIPT: TrainingScript = {
       title: "選莫拉克風災",
       body: "選【莫拉克風災】。輪盤開出你的公投案後，場上的隨從會全部被摧毀，你就能看見局勢逆轉。",
       action: "script_vote",
+      highlights: [{ type: "voteOption", eventId: L5_VOTE_ID }],
       match: (command) => command.type === "submitVote" && lessonFieldEvents()[command.optionIndex]?.id === "VE_MORAKOT",
       resolve: (session, command) => {
         const events = lessonFieldEvents();

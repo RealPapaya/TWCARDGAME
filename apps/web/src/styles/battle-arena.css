@@ -862,7 +862,7 @@
 .preview-description {
   width: 520px;
   min-height: 148px;
-  margin: 46px auto 0;
+  margin: 24px auto 0;
   padding: 20px;
   display: grid;
   place-items: center;
@@ -1063,6 +1063,8 @@
   color: #f1e4d1;
   font-size: 32px;
   font-weight: 900;
+  line-height: 1.1;
+  text-align: center;
   text-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
 }
 

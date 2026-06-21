@@ -17,6 +17,7 @@ import {
   AMP_FIELD_TRAINING,
   CARD_TYPES_TRAINING,
   advanceScript,
+  advanceScriptPeek,
   createScriptedSession,
   handleScriptCommand,
   lessonScriptFor,
@@ -135,6 +136,7 @@ export type TrainingAllowedAction =
   | "script_attack"
   | "script_amp"
   | "script_vote"
+  | "script_peek"
   | "none";
 
 export type TrainingHighlight =
@@ -145,7 +147,13 @@ export type TrainingHighlight =
   | { type: "mana"; seat: Seat }
   | { type: "minionStat"; instanceId: string; stat: "attack" | "health" }
   | { type: "turnCounter" }
-  | { type: "endTurn" };
+  | { type: "endTurn" }
+  /** The 透視 / 返回選項 eye toggle on the amplification / voting overlay. */
+  | { type: "peekButton" }
+  /** A specific amplification option card in the turn 7/14 chooser. */
+  | { type: "ampOption"; optionId: string }
+  /** A specific vote-event option card in the turn 20 ballot. */
+  | { type: "voteOption"; eventId: string };
 
 export interface TrainingPrompt {
   title: string;
@@ -548,6 +556,21 @@ export function advanceTraining(session: TrainingSession): TrainingCommandResult
     default:
       return reject(session, "請照教學指示操作。");
   }
+}
+
+/**
+ * Advance a scripted lesson when the player presses the eye (透視) peek toggle on
+ * a gated `script_peek` step. The peek button is a view-only control (not a
+ * `GameCommand`), so the runtime calls this directly from its click handler.
+ * Returns undefined when the current step is not awaiting a peek, leaving the
+ * toggle to behave as a plain board preview.
+ */
+export function advanceTrainingPeek(session: TrainingSession): TrainingCommandResult | undefined {
+  if (!session.script) return undefined;
+  const result = advanceScriptPeek(session);
+  if (!result) return undefined;
+  const base = update(session, result.events);
+  return result.completed ? { ...base, completed: true } : base;
 }
 
 export function handleTrainingCommand(session: TrainingSession, command: GameCommand): TrainingCommandResult {
@@ -962,5 +985,8 @@ function sameHighlight(a: TrainingHighlight, b: TrainingHighlight): boolean {
   if (a.type === "mana" && b.type === "mana") return a.seat === b.seat;
   if (a.type === "minionStat" && b.type === "minionStat") return a.instanceId === b.instanceId && a.stat === b.stat;
   if (a.type === "turnCounter" && b.type === "turnCounter") return true;
+  if (a.type === "peekButton" && b.type === "peekButton") return true;
+  if (a.type === "ampOption" && b.type === "ampOption") return a.optionId === b.optionId;
+  if (a.type === "voteOption" && b.type === "voteOption") return a.eventId === b.eventId;
   return a.type === "endTurn" && b.type === "endTurn";
 }

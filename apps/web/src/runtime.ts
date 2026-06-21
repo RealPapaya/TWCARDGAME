@@ -140,6 +140,7 @@ import {
 import {
   TRAINING_LEVELS,
   advanceTraining,
+  advanceTrainingPeek,
   createTrainingSession,
   createTrainingRewardSummary,
   handleTrainingCommand,
@@ -1048,7 +1049,7 @@ function renderAiBattleSetupScreen(): string {
             <div id="start-battle-wrapper" class="${aiDisabled ? "disabled" : ""}">
               <button id="start-ai-match" class="hearth-select-btn" data-testid="start-ai-match" ${aiDisabled ? "disabled" : ""}>
                 <div class="btn-ripple"></div>
-                <span class="btn-text">${view.joining ? "連線" : "開始挑戰"}</span>
+                <span class="btn-text">${view.joining ? "連線" : "開始<br>挑戰"}</span>
                 <div class="ring-glow"></div>
               </button>
             </div>
@@ -2809,8 +2810,10 @@ function renderSpecialPhasePeekButton(opts: { submitted: boolean; peeking: boole
   const label = peeking ? "返回選項" : "透視";
   const action = peeking ? "data-special-return" : "data-special-peek";
   const disabled = submitted && !peeking ? "disabled" : "";
+  // Training can point the player at the eye toggle (turn-7 peek lesson).
+  const highlight = trainingHighlightClass({ type: "peekButton" }) ?? "";
   return `
-    <button type="button" class="special-phase-peek-btn ${peeking ? "peeking" : ""}" ${action} aria-label="${label}" title="${label}" ${disabled}>
+    <button type="button" class="special-phase-peek-btn ${peeking ? "peeking" : ""} ${highlight}" ${action} aria-label="${label}" title="${label}" ${disabled}>
       <img class="special-phase-peek-icon" src="/images/ui/${icon}" alt="" aria-hidden="true" draggable="false" />
     </button>
   `;
@@ -2904,6 +2907,7 @@ function renderAmplificationOption(option: AmplificationOption, disabled: boolea
     descriptionHtml: renderDescriptionWithRelatedCards(option.description, option.relatedCardIds),
     imgSrc,
     extraAttrs: `data-amp-id="${escapeAttr(option.id)}"\n      data-dom-key="amp-${escapeAttr(option.id)}"`,
+    extraClass: trainingHighlightClass({ type: "ampOption", optionId: option.id }),
     disabled
   });
 }
@@ -3007,6 +3011,7 @@ function renderVoteOption(event: { id: string; name: string; options: string[] }
     optionLabel: event.options[0] ?? "",
     imgSrc,
     extraAttrs: `data-vote-index="${index}"\n      data-dom-key="vote-${escapeAttr(event.id)}"`,
+    extraClass: trainingHighlightClass({ type: "voteOption", eventId: event.id }),
     disabled
   });
 }
@@ -3024,10 +3029,15 @@ function renderResultOverlay(status: GameStatus | ""): string {
   return renderRewardOverlay(view);
 }
 
+// Steps whose coach panel stays visible even though they are gated: the special
+// phases (amplification / vote / peek) overlay the board, so their guidance text
+// must ride above that overlay instead of relying on the hidden battle surface.
+const COACH_VISIBLE_ACTIONS = new Set(["next", "script_peek", "script_amp", "script_vote"]);
+
 function renderTrainingOverlay(): string {
   if (!trainingSession) return "";
   const prompt = trainingPrompt(trainingSession);
-  if (!prompt || prompt.allowedAction !== "next" || readStatus() === "finished") return "";
+  if (!prompt || !COACH_VISIBLE_ACTIONS.has(prompt.allowedAction) || readStatus() === "finished") return "";
   const showNext = prompt.allowedAction === "next";
   return `
     <section class="training-coach" data-testid="training-coach" role="dialog" aria-live="polite">
@@ -3702,6 +3712,9 @@ function bindStaticActions(): void {
   });
   on(document.querySelector<HTMLButtonElement>("#training-next"), "click", "training-next", () => {
     if (!trainingSession) return;
+    // Advancing past the turn-7 peek-explanation step returns from the board
+    // preview back to the amplification options.
+    view.specialPhasePeek = false;
     applyTrainingResult(advanceTraining(trainingSession));
   });
   on(document.querySelector<HTMLButtonElement>("#end-turn"), "click", "end-turn", (event) => {
@@ -6465,6 +6478,15 @@ function bindSelectionActions(): void {
       view.selectedAttackerId = undefined;
       view.selectedHandId = undefined;
       view.selectedTarget = undefined;
+      // In training, the turn-7 lesson gates on the player pressing the eye to
+      // inspect the board; advance that step (the peek stays open behind it).
+      if (trainingSession) {
+        const peeked = advanceTrainingPeek(trainingSession);
+        if (peeked) {
+          applyTrainingResult(peeked);
+          return;
+        }
+      }
       render();
     });
   }

@@ -58,13 +58,15 @@ export interface AugmentOptionMarkupInput {
   imgSrc: string | undefined;
   /** Extra attributes injected into the <button> (e.g. data-amp-id, data-dom-key). */
   extraAttrs?: string;
+  /** Extra class names appended to the button (e.g. training-highlight). */
+  extraClass?: string;
   disabled: boolean;
 }
 
 export function renderAugmentOptionMarkup(a: AugmentOptionMarkupInput): string {
   return `
     <button
-      class="card mulligan-card amp-option ${a.tierClass}"
+      class="card mulligan-card amp-option ${a.tierClass} ${a.extraClass ?? ""}"
       ${a.extraAttrs ?? ""}
       ${a.disabled ? "disabled" : ""}
     >
@@ -84,13 +86,15 @@ export interface VoteOptionMarkupInput {
   imgSrc: string | undefined;
   /** Extra attributes injected into the <button> (e.g. data-vote-index, data-dom-key). */
   extraAttrs?: string;
+  /** Extra class names appended to the button (e.g. training-highlight). */
+  extraClass?: string;
   disabled: boolean;
 }
 
 export function renderVoteOptionMarkup(v: VoteOptionMarkupInput): string {
   return `
     <button
-      class="card mulligan-card vote-option"
+      class="card mulligan-card vote-option ${v.extraClass ?? ""}"
       ${v.extraAttrs ?? ""}
       ${v.disabled ? "disabled" : ""}
     >
