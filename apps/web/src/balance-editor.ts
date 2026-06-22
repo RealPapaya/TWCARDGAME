@@ -12,7 +12,13 @@ import {
   AI_DIFFICULTIES
 } from "@twcardgame/shared";
 import type { AmplificationTier, AiDifficulty } from "@twcardgame/shared";
-import { getXPRequiredForLevel, getPveXpReward, getPveFirstVictoryGold } from "@twcardgame/shared";
+import {
+  getXPRequiredForLevel,
+  getPveXpReward,
+  getPveFirstVictoryGold,
+  calculatePvPExp,
+  calculatePvPGold
+} from "@twcardgame/shared";
 import {
   QUEST_DEFINITIONS_SEED,
   QUEST_RECURRENCE_OPTIONS,
@@ -1441,21 +1447,98 @@ function renderProgressionPanel(): HTMLElement {
   xpWrap.append(xpTable);
   panel.append(xpWrap);
 
-  // PvE rewards table
-  panel.append(h("div", { class: "be-section-title", style: "margin-top:32px;" }, "PvE 獎勵表"));
+  // In-game difficulty labels — the internal keys (easy/normal/hard) are a v1→v2
+  // remap, so the editor shows the player-facing 普通/專家/大師 names too to avoid
+  // the "easy 其實是普通級" confusion.
+  const diffLabel: Record<AiDifficulty, string> = { easy: "普通級", normal: "專家級", hard: "大師級" };
+  const lvlGold = prog.LEVEL_UP_GOLD;
+
+  // ── PvE rewards table ──────────────────────────────────────────────
+  panel.append(h("div", { class: "be-section-title", style: "margin-top:32px;" }, "PvE 獎勵表（對戰 AI）"));
   const rewardsTable = h("table", { class: "be-rewards-table" });
-  let rHtml = `<thead><tr><th>難度</th><th>首勝 XP</th><th>重複 XP</th><th>首勝金幣</th></tr></thead><tbody>`;
+  let rHtml = `<thead><tr><th>難度（內部鍵）</th><th>遊戲內名稱</th><th>首勝 XP</th><th>重複 XP</th><th>首勝金幣</th><th>重複金幣</th></tr></thead><tbody>`;
   for (const diff of AI_DIFFICULTIES) {
     rHtml += `<tr>
       <td style="font-weight:600;text-transform:uppercase">${diff}</td>
+      <td style="font-weight:600">${diffLabel[diff]}</td>
       <td style="color:var(--success)">${getPveXpReward(diff, true)}</td>
       <td style="color:var(--text-dim)">${getPveXpReward(diff, false)}</td>
       <td style="color:var(--warning)">${getPveFirstVictoryGold(diff)}</td>
+      <td style="color:var(--text-muted)">0</td>
     </tr>`;
   }
   rHtml += "</tbody>";
   rewardsTable.innerHTML = rHtml;
   panel.append(rewardsTable);
+  panel.append(
+    h(
+      "div",
+      { style: "margin-top:8px;font-size:0.78rem;color:var(--text-dim);line-height:1.6;" },
+      `※ PvE 金幣只有「每個 AI 主題 × 難度」的『首勝』才會發放（每組合一次）；重複勝利只給 XP，金幣為 0。`,
+      h("br"),
+      `※ 不論首勝或重複，勝利取得的 XP 若觸發升級，每升一級額外 +${lvlGold} 金幣（PvP 同樣適用）。`,
+      h("br"),
+      `※ PvE 只有「勝方」會拿到獎勵，敗方無任何 XP / 金幣。`
+    )
+  );
+
+  // ── PvP rewards table ──────────────────────────────────────────────
+  panel.append(h("div", { class: "be-section-title", style: "margin-top:32px;" }, "PvP 獎勵表（線上對戰）"));
+  panel.append(
+    h(
+      "div",
+      { style: "margin-bottom:12px;font-size:0.8rem;color:var(--text-dim);line-height:1.7;" },
+      h("b", { style: "color:var(--text)" }, "勝方 XP"),
+      `：8 基礎 + 剩餘血量加成 floor(剩血/30×4)(0–4) + 速度加成(≤5回合+3、≤10+2、≤15+1)。範圍 8–15。`,
+      h("br"),
+      h("b", { style: "color:var(--text)" }, "勝方金幣"),
+      `：( 20 + 回合加成 min(回合數,20) + 受傷加成 floor((30−剩血)/3) ) × 2。`,
+      h("br"),
+      h("b", { style: "color:var(--text)" }, "敗方金幣"),
+      `：floor(勝方金幣 / 3) + 敗方受傷加成 floor((30−敗方剩血)/3)。`,
+      h("br"),
+      `升級金幣（每級 +${lvlGold}）同樣適用於 PvP 勝方。`
+    )
+  );
+
+  // Worked examples computed from the live progression functions so the table
+  // can never drift from the server's actual reward math.
+  const pvpScenarios: { label: string; turns: number; winnerHp: number; loserHp: number }[] = [
+    { label: "速勝・血量全滿", turns: 4, winnerHp: 30, loserHp: 0 },
+    { label: "普通勝", turns: 8, winnerHp: 20, loserHp: 0 },
+    { label: "慘勝（剩 4 血）", turns: 12, winnerHp: 4, loserHp: 0 },
+    { label: "長盤勝", turns: 20, winnerHp: 15, loserHp: 0 },
+    { label: "對手投降（敗方剩 18 血）", turns: 9, winnerHp: 26, loserHp: 18 }
+  ];
+  const pvpTable = h("table", { class: "be-rewards-table" });
+  let pHtml = `<thead><tr><th>情境</th><th>回合數</th><th>勝方剩血</th><th>敗方剩血</th><th>勝方 XP</th><th>勝方金幣</th><th>敗方金幣</th></tr></thead><tbody>`;
+  for (const s of pvpScenarios) {
+    const xp = calculatePvPExp(s.winnerHp, s.turns);
+    const { winnerGold, loserGold } = calculatePvPGold(s.winnerHp, s.loserHp, s.turns);
+    pHtml += `<tr>
+      <td style="font-weight:600;text-align:left">${s.label}</td>
+      <td style="color:var(--text-dim)">${s.turns}</td>
+      <td style="color:var(--text-dim)">${s.winnerHp}</td>
+      <td style="color:var(--text-dim)">${s.loserHp}</td>
+      <td style="color:var(--success)">${xp}</td>
+      <td style="color:var(--warning)">${winnerGold}</td>
+      <td style="color:#60a5fa">${loserGold}</td>
+    </tr>`;
+  }
+  pHtml += "</tbody>";
+  pvpTable.innerHTML = pHtml;
+  panel.append(pvpTable);
+  panel.append(
+    h(
+      "div",
+      { style: "margin-top:8px;font-size:0.78rem;color:var(--text-dim);line-height:1.6;" },
+      `※ PvP 勝方與敗方都會拿到金幣（敗方為安慰獎）；只有勝方拿 XP。`,
+      h("br"),
+      `※ 以上為範例情境，實際數值依該場「回合數 / 雙方剩餘血量」即時計算。`,
+      h("br"),
+      `※ 所有 XP / 金幣只發給已登入帳號，且需伺服器（realtime Worker）設好 Supabase 金鑰；否則雙方都會看到「獎勵未發放」。`
+    )
+  );
 
   return panel;
 }
