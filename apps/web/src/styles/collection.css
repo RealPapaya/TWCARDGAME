@@ -5,7 +5,7 @@
   grid-template-columns: minmax(0, 1fr) 380px;
   gap: 12px;
   padding: 10px 14px;
-  background: url("/images/backgrounds/profile_bg.jpg") center / cover no-repeat;
+  background: url("/images/backgrounds/profile_bg.webp") center / cover no-repeat;
 }
 
 .collection-screen::before {

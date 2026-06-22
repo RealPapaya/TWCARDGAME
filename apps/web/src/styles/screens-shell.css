@@ -6,7 +6,7 @@
   grid-template-rows: 1fr;
   background:
     radial-gradient(circle at 50% 18%, rgba(255, 236, 170, 0.18), transparent 38%),
-    url("/images/backgrounds/main_menu_bg.jpg") center / cover no-repeat,
+    url("/images/backgrounds/main_menu_bg.webp") center / cover no-repeat,
     #050403;
 }
 

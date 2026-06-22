@@ -23,7 +23,7 @@ export const CARD_CATALOG_GENERATED = [
         "target_category": "民進黨政治人物"
       }
     },
-    "image": "assets/images/cards/tw011.jpg"
+    "image": "assets/images/cards/tw011.webp"
   },
   {
     "id": "TW044",
@@ -518,7 +518,7 @@ export const CARD_CATALOG_GENERATED = [
         "stat": "HEALTH"
       }
     },
-    "image": "assets/images/cards/tw003.jpg"
+    "image": "assets/images/cards/tw003.webp"
   },
   {
     "id": "TW027",
@@ -1347,7 +1347,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/betel_nut.png"
+    "image": "assets/images/cards/betel_nut.webp"
   },
   {
     "id": "TW048",

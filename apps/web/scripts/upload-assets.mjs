@@ -78,20 +78,31 @@ for (const file of files) {
   // intermittently, aborting the upload; retry a few times before giving up.
   const MAX_ATTEMPTS = 5;
   let uploaded = false;
+  let lastError = "";
+  // With shell:true (needed so cmd.exe resolves `npx` on Windows) args are NOT
+  // auto-quoted, so the key and file paths — which can contain spaces and ()
+  // (e.g. "Cloud (4).webp", or the "Google AI" repo path) — must be wrapped in
+  // double quotes or cmd splits them and wrangler gets a garbled key/path.
+  const useShell = process.platform === "win32";
+  const q = (s) => (useShell ? `"${s}"` : s);
   for (let attempt = 1; attempt <= MAX_ATTEMPTS && !uploaded; attempt += 1) {
     try {
       execFileSync(
         "npx",
         [
-          "wrangler", "r2", "object", "put", `${bucket}/${key}`,
-          "--file", file, "--content-type", ct, "--remote"
+          "wrangler", "r2", "object", "put", q(`${bucket}/${key}`),
+          "--file", q(file), "--content-type", ct, "--remote"
         ],
-        { stdio: ["ignore", "ignore", "ignore"], shell: process.platform === "win32" }
+        // Capture stderr (instead of discarding it) so the real failure reason
+        // surfaces below — throttling, auth, crash, etc. are otherwise invisible.
+        { stdio: ["ignore", "ignore", "pipe"], shell: useShell }
       );
       uploaded = true;
-    } catch {
+    } catch (err) {
+      lastError = String(err?.stderr ?? err?.message ?? err).trim();
       if (attempt === MAX_ATTEMPTS) {
         console.error(`FAILED ${key} after ${MAX_ATTEMPTS} attempts`);
+        if (lastError) console.error(`  ↳ ${lastError.split("\n").slice(-4).join("\n     ")}`);
         process.exitCode = 1;
       } else {
         sleepSync(1500); // back off before retrying

@@ -37,7 +37,7 @@
   background:
     linear-gradient(180deg, rgba(7, 18, 24, 0.16), rgba(7, 18, 24, 0.36)),
     url("/images/backgrounds/battle_map_bg.webp") center / cover no-repeat,
-    url("/images/backgrounds/deck_selection_bg.jpg") center / 100% 100% no-repeat;
+    url("/images/backgrounds/deck_selection_bg.webp") center / 100% 100% no-repeat;
   padding: 0;
   color: #f1e4d1;
 }
