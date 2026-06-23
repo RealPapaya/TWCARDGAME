@@ -102,7 +102,7 @@ function scoreBattlecryTarget(state: MatchState, seat: Seat, battlecry: EffectDe
 
 type BattlecryIntent = "BENEFICIAL" | "HARMFUL" | "SACRIFICE" | "NEUTRAL";
 
-function battlecryIntent(type: string, friendlyTarget: boolean): BattlecryIntent {
+export function battlecryIntent(type: string, friendlyTarget: boolean): BattlecryIntent {
   if (type === "EAT_FRIENDLY") return "SACRIFICE";
   if (type === "DESTROY" || type.startsWith("DESTROY_") || type.startsWith("BOUNCE")) {
     return friendlyTarget ? "SACRIFICE" : "HARMFUL";
@@ -178,10 +178,23 @@ export function evaluateState(state: MatchState, seat: Seat): number {
   const enemyThreat = enemy.board.reduce((sum, m) => sum + Math.max(0, m.attack), 0);
   return (
     2 * (me.hero.hp - enemy.hero.hp) +
+    // Non-linear life pressure: being low on HP is far worse than the linear term
+    // implies (想盡辦法不要死), and an enemy near death is worth pushing for. Convex,
+    // so it only really bites once a hero drops into kill range.
+    (hpDanger(enemy.hero.hp) - hpDanger(me.hero.hp)) +
     (boardValue(me.board) - boardValue(enemy.board)) +
-    0.5 * me.hand.length -
+    // Card advantage: value our own resources, and mildly fear the enemy's.
+    (0.8 * me.hand.length - 0.4 * enemy.hand.length) -
     1.5 * enemyThreat
   );
+}
+
+/** Convex penalty for a hero sitting below the "comfortable" threshold; 0 above it. */
+function hpDanger(hp: number): number {
+  const SAFE = 18;
+  if (hp >= SAFE) return 0;
+  const deficit = SAFE - Math.max(0, hp);
+  return deficit * deficit * 0.06;
 }
 
 export function boardValue(board: readonly RuntimeMinion[]): number {

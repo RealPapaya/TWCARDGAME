@@ -274,6 +274,39 @@ describe("bot engines (refactored)", () => {
     expect(move?.type === "playCard" && move.handInstanceId).not.toBe(bigId);
   });
 
+  it("hard finds lethal through a taunt: clears the wall, then swings face for the kill", () => {
+    const { state: base, seat, enemy } = arena(88);
+    base.players[enemy].hero = { hp: 5, maxHp: 30 };
+    placeMinion(base, enemy, { attack: 0, health: 3, taunt: true }); // wall: must die first
+    placeMinion(base, seat, { attack: 3, health: 3, ready: true }); // exactly clears the taunt
+    placeMinion(base, seat, { attack: 5, health: 5, ready: true }); // then this is lethal (5 >= 5)
+
+    // Drive the whole turn the way BotGameSession does.
+    let state = base;
+    const rng = { state: 9 };
+    for (let i = 0; i < 12; i++) {
+      if (state.status !== "in_progress" || state.turn.activeSeat !== seat) break;
+      const move = decide(state, seat, "hard", rng, CARD_CATALOG, 2000 + i);
+      if (!move || move.type === "endTurn") break;
+      state = reduce(state, { commandId: `lethal-${i}`, seat, nowMs: 2000 + i, command: move }, CARD_CATALOG).state;
+    }
+    expect(state.status).toBe("finished");
+    expect(state.result?.winnerSeat).toBe(seat);
+  });
+
+  it("hard finds burn lethal: throws a damage card at the face to close the game", () => {
+    const { state, seat, enemy } = arena(89);
+    state.players[enemy].hero = { hp: 1, maxHp: 30 };
+    state.players[seat].mana = { current: 1, max: 1 };
+    const burnId = giveCard(state, seat, "TW002"); // DAMAGE 1, target ALL/ALL
+
+    const move = decide(state, seat, "hard", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("playCard");
+    expect(move?.type === "playCard" && move.handInstanceId).toBe(burnId);
+    expect(move?.type === "playCard" && move.target?.side).toBe(enemy);
+    expect(move?.type === "playCard" && move.target?.type).toBe("HERO");
+  });
+
   it("normal is divine-shield aware: it does not waste a swing into a shielded defender", () => {
     const { state, seat, enemy } = arena(4);
     state.players[enemy].hero = { hp: 30, maxHp: 30 };
@@ -285,6 +318,30 @@ describe("bot engines (refactored)", () => {
     expect(move?.type).toBe("attack");
     // The suicidal swing into the shielded minion must NOT be chosen.
     expect(move?.type === "attack" && move.target.instanceId).not.toBe(shielded.instanceId);
+  });
+
+  it("difficulty ladder: normal walls up to survive a lethal threat that easy ignores", () => {
+    const build = (seed: number) => {
+      const { state, seat, enemy } = arena(seed);
+      state.players[seat].hero = { hp: 8, maxHp: 30 };
+      state.players[enemy].hero = { hp: 30, maxHp: 30 };
+      placeMinion(state, enemy, { attack: 5, health: 5, ready: true });
+      placeMinion(state, enemy, { attack: 4, health: 4, ready: true }); // 9 face >= 8 = lethal
+      state.players[seat].mana = { current: 5, max: 5 };
+      const bigId = giveMinionCard(state, seat, { attack: 7, health: 7, cost: 5 }); // greedy bait
+      const tauntId = giveMinionCard(state, seat, { attack: 1, health: 8, cost: 5, taunt: true });
+      return { state, seat, bigId, tauntId };
+    };
+
+    const easy = build(91);
+    const easyMove = decide(easy.state, easy.seat, "easy", { state: 1 }, CARD_CATALOG, 2000);
+    // Greedy has no survival instinct: it grabs the bigger body and dies next turn.
+    expect(easyMove?.type === "playCard" && easyMove.handInstanceId).toBe(easy.bigId);
+
+    const normal = build(91);
+    const normalMove = decide(normal.state, normal.seat, "normal", { state: 1 }, CARD_CATALOG, 2000);
+    // Normal now sees the incoming lethal and walls up instead.
+    expect(normalMove?.type === "playCard" && normalMove.handInstanceId).toBe(normal.tauntId);
   });
 
   it("normal routes a harmful battlecry onto the enemy, never a friendly minion", () => {

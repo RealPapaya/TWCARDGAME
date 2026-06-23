@@ -1,6 +1,7 @@
 import { opponentOf, type GameCommand } from "@twcardgame/shared";
 import type { MatchState } from "../types.js";
 import { enemyHasTaunt, totalReachableFaceDamage } from "./combat.js";
+import { findLethal } from "./lethal.js";
 import { engineMoves, evaluateState, rankMoves } from "./shared.js";
 import { evaluateWithOpponentReply } from "./opponent.js";
 import { simulate } from "./simulate.js";
@@ -13,7 +14,11 @@ import type { EngineContext } from "./types.js";
 // non-greedy opener (set up now, swing later) isn't pruned before it's tried.
 // MAX_SIM_NODES is a hard backstop so a pathological board can't blow the DO alarm.
 const MAX_DEPTH = 5;
-const ROOT_BRANCH = 10;
+// The root considers (almost) every legal opener, because the final ranking is the
+// opponent-aware rollout, not the crude one-ply heuristic — a strong but non-greedy
+// opener (set up now, cash in after the reply) must not be pruned before it's judged.
+// Interior nodes keep the cheap heuristic shortlist to bound the branching factor.
+const ROOT_BRANCH = 24;
 const BRANCH = 6;
 const BEAM_WIDTH = 6;
 const MAX_SIM_NODES = 320;
@@ -44,7 +49,11 @@ interface Node {
  *      now scores as a loss, so the search avoids it outright.
  */
 export function decideHard(moves: GameCommand[], ctx: EngineContext): GameCommand {
-  const lethal = findLethalFaceMove(ctx, moves);
+  // Cheap no-taunt face check first, then the full lethal solver (clear-taunt /
+  // burn / buff-then-swing). Either short-circuits the beam: a kill beats everything.
+  const quickLethal = findLethalFaceMove(ctx, moves);
+  if (quickLethal) return quickLethal;
+  const lethal = findLethal(ctx);
   if (lethal) return lethal;
 
   const staticEval = (state: MatchState): number => evaluateState(state, ctx.seat);

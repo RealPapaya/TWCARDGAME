@@ -13,8 +13,10 @@ export interface BotRngState {
  * `./ai/`), selected by difficulty:
  *  - "easy"   — one-ply greedy heuristic (no lookahead).
  *  - "normal" — 2-ply self-only lookahead + targeted buff/debuff + trade math.
- *  - "hard"   — bounded turn-sequence beam search (lethal, buff-then-swing,
- *               sacrifice-worst, survival-aware).
+ *  - "hard"   — 2-ply minimax: a turn-sequence beam plans our whole turn, each line
+ *               is scored by simulating the opponent's best reply, and a dedicated
+ *               lethal solver (clear-taunt / burn / buff-then-swing) short-circuits
+ *               the search when the kill is on.
  *
  * Deeper engines only kick in during regular play on `seat`'s own turn; mulligan
  * and the amplification / voting / 教召 prompt phases use the greedy pick so their
