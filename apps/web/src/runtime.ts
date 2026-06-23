@@ -1806,7 +1806,7 @@ function renderGame(status: GameStatus | ""): string {
       <span>Active: ${escapeHtml(activeSeat || "none")}</span>
       <span>${escapeHtml(targetHint)}</span>
     </section>
-    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""} ${trainingSession ? "training-active" : ""}" data-testid="battle-surface">
+    <section class="battle-surface ${view.animationCues.length ? "has-event-cues" : ""} ${hasCardPlayFocus ? "has-card-play-focus" : ""} ${battleLocked ? "battle-locked" : ""} ${activeTargeting() ? "targeting-active" : ""} ${trainingSession ? "training-active" : ""}" data-testid="battle-surface">
       <button id="battle-settings-toggle" class="battle-gear-btn" data-testid="battle-settings" title="設定" aria-label="設定">⚙</button>
       ${renderBattleSettingsMenu()}
       ${renderBattleHistoryPanel()}

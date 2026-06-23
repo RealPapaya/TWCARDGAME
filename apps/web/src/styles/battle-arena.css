@@ -1190,6 +1190,36 @@
   font-size: 12px;
 }
 
+.battle-surface:not(.targeting-active) .player-area.opponent .hero:not(.valid-target):not(.target-selected):hover > strong {
+  position: absolute;
+  left: 50%;
+  top: -34px;
+  z-index: 12;
+  display: block;
+  width: max-content;
+  max-width: 180px;
+  height: auto;
+  margin: 0;
+  padding: 6px 10px;
+  overflow: hidden;
+  clip: auto;
+  clip-path: none;
+  border: 2px solid rgba(88, 50, 22, 0.85);
+  border-radius: 8px;
+  background: rgba(35, 20, 11, 0.92);
+  color: #fff1c7;
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.42);
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.65);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .battle-surface .status-cluster {
   position: absolute;
   z-index: 60;
@@ -1201,17 +1231,17 @@
 
 .battle-surface .player-area.opponent .status-cluster {
   top: 28px;
-  left: 38px;
+  left: 24px;
   right: auto;
   bottom: auto;
   align-items: center;
 }
 
 .battle-surface .player-area:not(.opponent) .status-cluster {
-  right: 34px;
+  left: 24px;
+  right: auto;
   bottom: 26px;
   top: auto;
-  left: auto;
   align-items: center;
 }
 
@@ -2409,11 +2439,12 @@
 
 .battle-player-hud {
   position: absolute;
-  left: 20px;
+  right: 20px;
   bottom: 14px;
   z-index: 75;
   display: flex;
   align-items: flex-end;
+  justify-content: flex-end;
   gap: 8px;
   pointer-events: none;
 }
@@ -2431,6 +2462,10 @@
   color: #4a2c1d;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1), 0 4px 10px rgba(0, 0, 0, 0.5);
   pointer-events: auto;
+}
+
+.battle-player-hud .battle-player-info {
+  display: none;
 }
 
 .battle-player-info .player-username {
@@ -2767,11 +2802,15 @@
   }
 
   .battle-surface .player-area:not(.opponent) .status-cluster {
-    right: 40px;
+    left: 12px;
+  }
+
+  .battle-surface .player-area.opponent .status-cluster {
+    left: 12px;
   }
 
   .battle-player-hud {
-    left: 10px;
+    right: 10px;
     bottom: 8px;
     gap: 2px;
   }
