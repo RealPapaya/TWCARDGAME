@@ -101,6 +101,22 @@ describe("legalMoves", () => {
     expect(result.state.players[enemy].board[0]?.currentHealth).toBe(3);
   });
 
+  it("offers every board slot for an adjacency-buff minion so placement is a real choice", () => {
+    const state = startedMatch(708);
+    const seat = state.turn.activeSeat;
+    state.players[seat].board = [];
+    placeMinion(state, seat, { attack: 2, health: 2 });
+    placeMinion(state, seat, { attack: 2, health: 2 });
+    state.players[seat].mana = { current: 5, max: 5 };
+    const adjId = giveCard(state, seat, "TW030"); // 朱立倫 — BUFF_ADJACENT, no target
+
+    const slots = legalMoves(state, seat)
+      .filter((m) => m.type === "playCard" && m.handInstanceId === adjId)
+      .map((m) => (m.type === "playCard" ? m.boardIndex : undefined));
+    // With two minions on board there are three insertion slots: 0, 1, 2.
+    expect(new Set(slots)).toEqual(new Set([0, 1, 2]));
+  });
+
   it("enumerates target.type ALL battlecries with explicit hero or minion targets", () => {
     const state = startedMatch(607);
     const seat = state.turn.activeSeat;
@@ -305,6 +321,20 @@ describe("bot engines (refactored)", () => {
     expect(move?.type === "playCard" && move.handInstanceId).toBe(burnId);
     expect(move?.type === "playCard" && move.target?.side).toBe(enemy);
     expect(move?.type === "playCard" && move.target?.type).toBe("HERO");
+  });
+
+  it("hard places an adjacency buffer between two bodies so both sides get buffed (放中間)", () => {
+    const { state, seat } = arena(710);
+    placeMinion(state, seat, { attack: 3, health: 3 }); // left body
+    placeMinion(state, seat, { attack: 3, health: 3 }); // right body
+    state.players[seat].mana = { current: 5, max: 5 };
+    const adjId = giveCard(state, seat, "TW030"); // 朱立倫 — BUFF_ADJACENT +1/+1 to both neighbours
+
+    const move = decide(state, seat, "hard", { state: 1 }, CARD_CATALOG, 2000);
+    expect(move?.type).toBe("playCard");
+    expect(move?.type === "playCard" && move.handInstanceId).toBe(adjId);
+    // boardIndex 1 slots it between the two minions, so the +1/+1 hits both, not one.
+    expect(move?.type === "playCard" && move.boardIndex).toBe(1);
   });
 
   it("normal is divine-shield aware: it does not waste a swing into a shielded defender", () => {

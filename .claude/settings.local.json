@@ -71,7 +71,9 @@
       "Bash(grep -oiE 'image[^,}]{0,80}' packages/cards/src/catalog.generated.ts)",
       "Bash(awk '{print $5\"\\\\t\"$9, $10, $11, $12}')",
       "Bash(node scripts/upload-assets.mjs --dry-run)",
-      "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/ai/lethal.ts'\\) -replace 'seat: typeof state.turn.activeSeat', 'seat: Seat' | Set-Content 'packages/rules/src/ai/lethal.ts'\")"
+      "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/ai/lethal.ts'\\) -replace 'seat: typeof state.turn.activeSeat', 'seat: Seat' | Set-Content 'packages/rules/src/ai/lethal.ts'\")",
+      "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/bot.test.ts'\\) -replace 'placeMinionRaw', 'placeMinion' | Set-Content -Encoding UTF8 'packages/rules/src/bot.test.ts'\")",
+      "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/bot.test.ts' | Measure-Object -Line\\).Lines\")"
     ],
     "additionalDirectories": [
       "\\tmp"

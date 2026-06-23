@@ -89,7 +89,13 @@ function legalPlays(state: MatchState, seat: Seat): GameCommand[] {
     const battlecry = card.keywords.battlecry;
     const rule = battlecry?.target;
     if (!effectNeedsTarget(battlecry)) {
-      result.push({ type: "playCard", handInstanceId: card.instanceId });
+      for (const boardIndex of placementOptions(state, seat, card)) {
+        result.push(
+          boardIndex === undefined
+            ? { type: "playCard", handInstanceId: card.instanceId }
+            : { type: "playCard", handInstanceId: card.instanceId, boardIndex }
+        );
+      }
       continue;
     }
 
@@ -98,6 +104,50 @@ function legalPlays(state: MatchState, seat: Seat): GameCommand[] {
     }
   }
   return result;
+}
+
+/**
+ * Effects whose value depends on WHERE a minion sits — they buff/grant to the left and
+ * right neighbours (`board[i-1]` / `board[i+1]`). For these, placement is a real
+ * decision, so the AI must be offered the `boardIndex` choices instead of only append.
+ */
+export const ADJACENCY_EFFECT_TYPES: ReadonlySet<string> = new Set([
+  "BUFF_ADJACENT",
+  "BUFF_ADJACENT_HEALTH",
+  "GIVE_KEYWORD_ADJACENT",
+  "ADJACENT_BUFF_STATS",
+  "ADJACENT_BUFF_CATEGORY_ATTRS"
+]);
+
+function isAdjacencyEffect(effect: { type?: string } | undefined): boolean {
+  return effect?.type !== undefined && ADJACENCY_EFFECT_TYPES.has(effect.type);
+}
+
+/** True iff this card itself buffs/grants to its neighbours on play / death / continuously. */
+function cardEmitsAdjacencyEffect(card: RuntimeCard): boolean {
+  const k = card.keywords;
+  return isAdjacencyEffect(k.battlecry) || isAdjacencyEffect(k.ongoing) || isAdjacencyEffect(k.deathrattle);
+}
+
+/** True iff a friendly minion already in play radiates an ongoing neighbour aura (e.g. 服務生). */
+function friendlyHasOngoingAdjacencyAura(state: MatchState, seat: Seat): boolean {
+  return state.players[seat].board.some((m) => isAdjacencyEffect(m.keywords.ongoing));
+}
+
+/**
+ * The `boardIndex` slots worth offering for a minion play. Position only matters when the
+ * card carries an adjacency effect, or when a friendly ongoing aura is already on the board
+ * (so a new body can be slotted next to it). Otherwise we offer a single append (`undefined`)
+ * to keep the branching factor down — a non-positional minion plays the same anywhere.
+ */
+function placementOptions(state: MatchState, seat: Seat, card: RuntimeCard): (number | undefined)[] {
+  if (card.type !== "MINION") return [undefined];
+  const board = state.players[seat].board;
+  if (board.length === 0) return [undefined]; // only one possible slot
+  if (!cardEmitsAdjacencyEffect(card) && !friendlyHasOngoingAdjacencyAura(state, seat)) return [undefined];
+  const options: (number | undefined)[] = [];
+  for (let i = 0; i <= board.length; i++) options.push(i);
+  return options;
 }
 
 function hasEnoughOtherCardsForDiscard(card: RuntimeCard, handLength: number): boolean {

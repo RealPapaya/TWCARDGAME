@@ -1,8 +1,8 @@
 import { opponentOf, type GameCommand, type Seat, type TargetRef } from "@twcardgame/shared";
 import type { EffectDefinition } from "@twcardgame/cards";
-import { legalMoves } from "../legalMoves.js";
+import { ADJACENCY_EFFECT_TYPES, legalMoves } from "../legalMoves.js";
 import { canPayCardCost, findMinion, getCardActualCost } from "../state.js";
-import type { MatchState, RuntimeMinion } from "../types.js";
+import type { MatchState, RuntimeCard, RuntimeMinion } from "../types.js";
 import { resolveMinionTrade } from "./combat.js";
 import type { EngineContext, ScoredMove } from "./types.js";
 
@@ -68,7 +68,40 @@ export function scorePlay(state: MatchState, seat: Seat, move: Extract<GameComma
   }
   const battlecry = card.keywords.battlecry;
   if (battlecry) score += scoreBattlecryTarget(state, seat, battlecry, move.target);
+  score += placementBonus(state, seat, card, move.boardIndex);
   return score;
+}
+
+/**
+ * "兩側 buff 角色要放中間": reward a placement that lands a neighbour buff on as many real
+ * bodies as possible, and reward slotting a fresh body NEXT TO an existing ongoing aura
+ * (服務生). The deeper engines confirm this via simulation, but baking it into the one-ply
+ * heuristic means even the greedy pick — and the beam's pruning shortlist — favour the good
+ * slot instead of blindly appending. Append (`boardIndex === undefined`) scores neutral.
+ */
+function placementBonus(state: MatchState, seat: Seat, card: RuntimeCard, boardIndex: number | undefined): number {
+  if (boardIndex === undefined || card.type !== "MINION") return 0;
+  const board = state.players[seat].board;
+  const index = Math.max(0, Math.min(boardIndex, board.length));
+  // After insertion the new body sits at `index`; its neighbours are the OLD board[index-1]
+  // (left) and board[index] (right).
+  const neighbors = [board[index - 1], board[index]].filter((m): m is RuntimeMinion => Boolean(m));
+  if (neighbors.length === 0) return 0;
+
+  let bonus = 0;
+  // (a) This card's own neighbour effect lands on each adjacent body.
+  const own = adjacencyEffectValue(card.keywords.battlecry) || adjacencyEffectValue(card.keywords.ongoing);
+  bonus += neighbors.length * own;
+  // (b) Sitting next to an existing ongoing aura buffs THIS body.
+  for (const n of neighbors) bonus += adjacencyEffectValue(n.keywords.ongoing);
+  return bonus;
+}
+
+/** Rough per-neighbour value of an adjacency effect (≈ stat points granted), else 0. */
+function adjacencyEffectValue(effect: EffectDefinition | undefined): number {
+  if (!effect?.type || !ADJACENCY_EFFECT_TYPES.has(effect.type)) return 0;
+  if (effect.type === "GIVE_KEYWORD_ADJACENT") return 3; // a keyword (taunt/shield/…) on a body
+  return (effect.value ?? 1) * 2; // +v/+v ≈ 2v stat points
 }
 
 /**
