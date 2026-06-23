@@ -271,6 +271,7 @@ export type ClientViewState = {
     confirmLabel: string;
     cancelLabel: string;
     danger?: boolean;
+    dismissOnBackdrop?: boolean;
     resolve: (ok: boolean) => void;
   };
   coverPickerOpen?: boolean;

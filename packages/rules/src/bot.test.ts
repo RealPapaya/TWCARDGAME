@@ -173,6 +173,21 @@ function giveCard(state: MatchState, seat: "player1" | "player2", cardId: string
   return card.instanceId;
 }
 
+/** A vanilla minion card placed in hand with overridden stats/cost/keywords. */
+function giveMinionCard(
+  state: MatchState,
+  seat: "player1" | "player2",
+  opts: { attack: number; health: number; cost: number; taunt?: boolean }
+): string {
+  const id = giveCard(state, seat, VANILLA_MINION.id);
+  const card = state.players[seat].hand.find((c) => c.instanceId === id)!;
+  card.attack = opts.attack;
+  card.health = opts.health;
+  card.cost = opts.cost;
+  card.keywords = { ...card.keywords, taunt: opts.taunt ?? false };
+  return id;
+}
+
 describe("bot engines (refactored)", () => {
   it("each engine is deterministic under a fixed RNG seed", () => {
     for (const difficulty of ["easy", "normal", "hard"] as const) {
@@ -237,6 +252,26 @@ describe("bot engines (refactored)", () => {
     expect(log[eatIndex].targetInstance).toBe(weak.instanceId); // and ate the WORST minion
     expect(weakAttackIndex).toBeGreaterThanOrEqual(0); // the worst minion swung...
     expect(weakAttackIndex).toBeLessThan(eatIndex); // ...BEFORE being sacrificed
+  });
+
+  it("hard plays a taunt to block lethal instead of the bigger non-taunt body (opponent-aware)", () => {
+    const { state, seat, enemy } = arena(77);
+    state.players[seat].hero = { hp: 8, maxHp: 30 };
+    state.players[enemy].hero = { hp: 30, maxHp: 30 };
+    // Enemy already has lethal on board for next turn if left unblocked: 5 + 4 = 9 >= 8.
+    placeMinion(state, enemy, { attack: 5, health: 5, ready: true });
+    placeMinion(state, enemy, { attack: 4, health: 4, ready: true });
+    // Only enough mana for ONE play, so the bot must choose between them.
+    state.players[seat].mana = { current: 5, max: 5 };
+    const bigId = giveMinionCard(state, seat, { attack: 7, health: 7, cost: 5 }); // higher static value...
+    const tauntId = giveMinionCard(state, seat, { attack: 1, health: 8, cost: 5, taunt: true }); // ...but only this survives
+
+    const move = decide(state, seat, "hard", { state: 1 }, CARD_CATALOG, 2000);
+    // A self-only optimizer prefers the 7/7 (more board value) and dies to the swing-back;
+    // the 2-ply minimax sees the lethal reply and walls up instead.
+    expect(move?.type).toBe("playCard");
+    expect(move?.type === "playCard" && move.handInstanceId).toBe(tauntId);
+    expect(move?.type === "playCard" && move.handInstanceId).not.toBe(bigId);
   });
 
   it("normal is divine-shield aware: it does not waste a swing into a shielded defender", () => {

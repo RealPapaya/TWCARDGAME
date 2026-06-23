@@ -500,25 +500,25 @@ describe("augment mana ramp", () => {
     expect(player.mana.max).toBe(20);
   });
 
-  it("台股四萬點 starts +2 mana growth on global turn 20 and caps at 30", () => {
+  it("台股四萬點 starts +2 mana growth on global turn 15 and caps at 30", () => {
     const state = startInProgress(23);
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
     applyAugmentSelection(state, seat, entry("AMP_TW_40000"), []);
 
     player.mana.max = 10;
-    state.turn.number = 18;
+    state.turn.number = 13;
     startTurn(state, 2000, []);
-    expect(state.turn.number).toBe(19);
+    expect(state.turn.number).toBe(14);
     expect(player.mana.max).toBe(10);
 
-    state.turn.number = 19;
+    state.turn.number = 14;
     startTurn(state, 3000, []);
-    expect(state.turn.number).toBe(20);
+    expect(state.turn.number).toBe(15);
     expect(player.mana.max).toBe(12);
 
     player.mana.max = 29;
-    state.turn.number = 20;
+    state.turn.number = 15;
     startTurn(state, 4000, []);
     expect(player.mana.max).toBe(30);
   });

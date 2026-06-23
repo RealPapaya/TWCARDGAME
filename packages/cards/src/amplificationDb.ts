@@ -377,10 +377,10 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_TW_40000",
     hasImage: true,
     name: "台股四萬點",
-    description: "第 20 回合起，每回合水晶成長 +2，上限提升至 30。",
+    description: "第 15 回合起，每回合水晶成長 +2，上限提升至 30。",
     tier: "卯死",
     factionTags: [],
-    effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 20, manaCap: 30, manaGrowth: 2 }
+    effect: { type: "AUG_MANA_RAMP_AFTER_TURN", turnThreshold: 15, manaCap: 30, manaGrowth: 2 }
   },
   {
     id: "AMP_FIRE_SALE",
@@ -404,7 +404,7 @@ export const AMPLIFICATION_DB: AmplificationDbEntry[] = [
     id: "AMP_TAIJI_ELECTRIC_OFFER",
     hasImage: true,
     name: "台雞電OFFER",
-    description: "你的下個回合卡片費用改為血量。",
+    description: "你的下個回合卡片費用改為血量，不可高於費用上限。",
     tier: "卯死",
     factionTags: [],
     effect: { type: "AUG_PAY_COST_WITH_HEALTH_NEXT_TURN" }

@@ -3498,6 +3498,7 @@ function themedConfirm(options: {
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
+  dismissOnBackdrop?: boolean;
 }): Promise<boolean> {
   return new Promise((resolve) => {
     view.confirmDialog = {
@@ -3506,6 +3507,7 @@ function themedConfirm(options: {
       confirmLabel: options.confirmLabel ?? "確定",
       cancelLabel: options.cancelLabel ?? "取消",
       danger: options.danger,
+      dismissOnBackdrop: options.dismissOnBackdrop ?? true,
       resolve
     };
     render();
@@ -3667,7 +3669,7 @@ function bindStaticActions(): void {
   on(document.querySelector<HTMLButtonElement>("#themed-confirm-ok"), "click", "themed-confirm-ok", () => settleConfirmDialog(true));
   on(document.querySelector<HTMLButtonElement>("#themed-confirm-cancel"), "click", "themed-confirm-cancel", () => settleConfirmDialog(false));
   on(document.querySelector<HTMLElement>("#themed-confirm-overlay"), "click", "themed-confirm-overlay", (event) => {
-    if (event.target === event.currentTarget) settleConfirmDialog(false);
+    if (event.target === event.currentTarget && view.confirmDialog?.dismissOnBackdrop !== false) settleConfirmDialog(false);
   });
   on(document.querySelector<HTMLFormElement>("#join-form"), "submit", "join-form", joinRoom);
   on(document.querySelector<HTMLFormElement>("#auth-form"), "submit", "auth-form", submitAuthForm);
@@ -6063,7 +6065,8 @@ async function maybePromptResumeMatch(): Promise<void> {
     title: "尚未結束的對戰",
     message: "你仍有一場對戰尚未結束。要重新連線回到對戰嗎？選擇「否」將判定為落敗。",
     confirmLabel: "重新連線",
-    cancelLabel: "否，放棄對戰"
+    cancelLabel: "否，放棄對戰",
+    dismissOnBackdrop: false
   });
   if (resume) await resumeMatch(rec);
   else await declineMatch(rec);
