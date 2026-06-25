@@ -1396,32 +1396,24 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           </header>
           <div class="collection-controls-bar">
             <span id="collection-progress">已收集卡片種類: ${ownedTotal}/${collectibles.length}</span>
-            <label class="collection-select" aria-label="排序">
-              <span>排序</span>
-              <select id="collection-sort-select">
-                ${collectionSortOptions().map((option) => `
-                  <option value="${option.value}" ${view.collectionSort === option.value ? "selected" : ""}>${option.label}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label class="collection-select" aria-label="分類篩選">
-              <span>分類</span>
-              <select id="collection-category-select">
-                <option value="all" ${view.collectionCategory === "all" ? "selected" : ""}>全部分類</option>
-                ${categories.map((category) => `
-                  <option value="${escapeAttr(category)}" ${view.collectionCategory === category ? "selected" : ""}>${escapeHtml(category)}</option>
-                `).join("")}
-              </select>
-            </label>
-            <label class="collection-select" aria-label="稀有度篩選">
-              <span>稀有度</span>
-              <select id="collection-rarity-select">
-                <option value="all" ${view.collectionRarity === "all" ? "selected" : ""}>全部稀有度</option>
-                ${rarities.map((rarity) => `
-                  <option value="${escapeAttr(rarity)}" ${view.collectionRarity === rarity ? "selected" : ""}>${escapeHtml(rarityLabel[rarity] ?? rarity)}</option>
-                `).join("")}
-              </select>
-            </label>
+            ${renderCollectionDropdown(
+              "sort",
+              "排序",
+              view.collectionSort,
+              collectionSortOptions()
+            )}
+            ${renderCollectionDropdown(
+              "category",
+              "分類",
+              view.collectionCategory,
+              [{ value: "all", label: "全部分類" }, ...categories.map((category) => ({ value: category, label: category }))]
+            )}
+            ${renderCollectionDropdown(
+              "rarity",
+              "稀有度",
+              view.collectionRarity,
+              [{ value: "all", label: "全部稀有度" }, ...rarities.map((rarity) => ({ value: rarity, label: rarityLabel[rarity] ?? rarity }))]
+            )}
             <label class="search-box" aria-label="搜尋卡牌">
               <input id="collection-search-input" value="${escapeAttr(view.collectionSearch)}" placeholder="搜尋卡牌名稱..." autocomplete="off" />
               <span class="search-icon">⌕</span>
@@ -1461,6 +1453,47 @@ function renderCollectionFilterButton(filter: CollectionFilter, label: string, t
       data-testid="${testId}"
       aria-pressed="${active}"
     >${label}</button>
+  `;
+}
+
+function renderCollectionDropdown(
+  id: "sort" | "category" | "rarity",
+  label: string,
+  value: string,
+  options: Array<{ value: string; label: string }>
+): string {
+  const open = view.collectionDropdownOpen === id;
+  const selected = options.find((option) => option.value === value) ?? options[0];
+  return `
+    <div class="collection-select" data-collection-dropdown-root="${id}">
+      <span>${escapeHtml(label)}</span>
+      <div class="collection-themed-select ${open ? "open" : ""}">
+        <button
+          type="button"
+          class="collection-themed-select-button"
+          data-collection-dropdown="${id}"
+          aria-haspopup="listbox"
+          aria-expanded="${open}"
+        >
+          <span>${escapeHtml(selected?.label ?? "")}</span>
+          <span class="collection-themed-select-arrow" aria-hidden="true"></span>
+        </button>
+        ${open ? `
+          <div class="collection-themed-select-menu" role="listbox" aria-label="${escapeAttr(label)}">
+            ${options.map((option) => `
+              <button
+                type="button"
+                class="collection-themed-select-option ${option.value === value ? "selected" : ""}"
+                data-collection-dropdown-option="${id}"
+                data-value="${escapeAttr(option.value)}"
+                role="option"
+                aria-selected="${option.value === value}"
+              >${escapeHtml(option.label)}</button>
+            `).join("")}
+          </div>
+        ` : ""}
+      </div>
+    </div>
   `;
 }
 
@@ -3936,19 +3969,26 @@ function bindStaticActions(): void {
       render();
     });
   }
-  on(document.querySelector<HTMLSelectElement>("#collection-sort-select"), "change", "collection-sort-select", (event) => {
-    const value = (event.currentTarget as HTMLSelectElement).value as CollectionSort;
-    view.collectionSort = value;
-    render();
-  });
-  on(document.querySelector<HTMLSelectElement>("#collection-category-select"), "change", "collection-category-select", (event) => {
-    view.collectionCategory = (event.currentTarget as HTMLSelectElement).value;
-    render();
-  });
-  on(document.querySelector<HTMLSelectElement>("#collection-rarity-select"), "change", "collection-rarity-select", (event) => {
-    view.collectionRarity = (event.currentTarget as HTMLSelectElement).value;
-    render();
-  });
+  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-dropdown]")) {
+    on(el, "click", "collection-dropdown", () => {
+      const id = el.dataset.collectionDropdown as "sort" | "category" | "rarity" | undefined;
+      if (!id) return;
+      view.collectionDropdownOpen = view.collectionDropdownOpen === id ? undefined : id;
+      render();
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLElement>("[data-collection-dropdown-option]")) {
+    on(el, "click", "collection-dropdown-option", () => {
+      const id = el.dataset.collectionDropdownOption as "sort" | "category" | "rarity" | undefined;
+      const value = el.dataset.value;
+      if (!id || value === undefined) return;
+      if (id === "sort") view.collectionSort = value as CollectionSort;
+      else if (id === "category") view.collectionCategory = value;
+      else view.collectionRarity = value;
+      view.collectionDropdownOpen = undefined;
+      render();
+    });
+  }
   for (const el of document.querySelectorAll<HTMLElement>("[data-lb-sort]")) {
     on(el, "click", "lb-sort", () => {
       const value = el.dataset.lbSort as "wins" | "level" | undefined;

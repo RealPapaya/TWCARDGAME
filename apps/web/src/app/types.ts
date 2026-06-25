@@ -263,6 +263,7 @@ export type ClientViewState = {
   collectionCategory: string;
   collectionRarity: string;
   collectionSearch: string;
+  collectionDropdownOpen?: "sort" | "category" | "rarity";
   pinnedCollectionCardId?: string;
   cardOpBusy?: boolean;
   confirmDialog?: {
