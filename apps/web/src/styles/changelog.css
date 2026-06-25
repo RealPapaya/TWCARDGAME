@@ -145,3 +145,77 @@
   transform: translateX(-50%) translateY(0);
   transition: opacity 0.3s ease, transform 0.3s ease;
 }
+
+/* Achievement-complete popup — shown after a match when a 成就 newly completes. */
+.achievement-popup {
+  position: fixed;
+  top: 90px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-24px);
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  min-width: 280px;
+  max-width: 90vw;
+  padding: 14px 28px;
+  border: 4px solid #b8860b;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #3a2c12 0%, #5d3a17 100%);
+  color: #f4e4bc;
+  font-family: "Noto Serif TC", serif;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.55), 0 0 18px rgba(255, 200, 80, 0.35);
+  opacity: 0;
+  visibility: hidden;
+  cursor: pointer;
+  transition: opacity 0.3s ease, transform 0.3s ease, visibility 0s linear 0.3s;
+  overflow: hidden;
+}
+
+.achievement-popup.show {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.achievement-popup-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 0% 50%, rgba(255, 215, 120, 0.28), transparent 60%);
+  pointer-events: none;
+}
+
+.achievement-popup-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: center;
+  width: 100%;
+}
+
+.achievement-popup-label {
+  font-size: 0.95rem;
+  font-weight: bold;
+  letter-spacing: 2px;
+  color: #ffd76a;
+}
+
+.achievement-popup-name {
+  font-size: 1.3rem;
+  font-weight: bold;
+}
+
+.achievement-popup-reward {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1.05rem;
+  color: #ffe9a8;
+}
+
+.achievement-popup-reward .task-coin {
+  width: 18px;
+  height: 18px;
+}

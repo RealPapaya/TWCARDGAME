@@ -62,8 +62,21 @@ export const QUEST_EVENT_TYPES: ReadonlyArray<QuestEventTypeDef> = [
   // --- New: match outcome ------------------------------------------------
   { value: "match_lost", label: "戰敗 (match_lost)", mode: "cumulative" },
   { value: "pve_win:", label: "擊敗電腦特定難度 (pve_win:<easy|normal|hard>)", mode: "cumulative", dynamic: true },
+  { value: "pve_lost:", label: "敗給電腦特定難度，投降不計 (pve_lost:<easy|normal|hard>)", mode: "cumulative", dynamic: true },
+  { value: "pvp_played", label: "進行玩家對戰 (pvp_played)", mode: "cumulative" },
   { value: "challenge_win", label: "通關挑戰模式 (challenge_win)", mode: "cumulative" },
   { value: "challenge_win:", label: "通關挑戰特定關卡 (challenge_win:<stage>:<level>)", mode: "cumulative", dynamic: true },
+
+  // --- New: in-match combat thresholds (emitted at match end) ------------
+  { value: "damage_taken", label: "我方英雄受到傷害 (damage_taken)", mode: "cumulative" },
+  { value: "own_minions_died", label: "我方隨從死亡 (own_minions_died)", mode: "cumulative" },
+  { value: "political_minions_killed", label: "擊殺藍綠政治隨從 (political_minions_killed)", mode: "cumulative" },
+  { value: "hero_damage_vs_taunt", label: "對方有沙包時對英雄造成傷害 (hero_damage_vs_taunt)", mode: "cumulative" },
+  { value: "vote_won", label: "公投中選 (vote_won)", mode: "cumulative" },
+  { value: "minion_heal_match_50", label: "單場回復隨從滿 50 (minion_heal_match_50)", mode: "cumulative" },
+  { value: "perfect_game", label: "完全比賽 (perfect_game)", mode: "cumulative" },
+  { value: "labor_deck_win", label: "勞工牌組獲勝 (labor_deck_win)", mode: "cumulative" },
+  { value: "pack_epic_multi", label: "單卡包多張史詩 (pack_epic_multi)", mode: "cumulative" },
 
   // --- New: economy ------------------------------------------------------
   { value: "gold_spent", label: "累積消費金幣 (gold_spent)", mode: "cumulative" },

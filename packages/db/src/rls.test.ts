@@ -30,6 +30,7 @@ const collisionTrainingMigration = readFileSync(new URL("../migrations/0020_trai
 const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_training_card_lessons.sql", import.meta.url), "utf8");
 const trainingLegendaryRewardMigration = readFileSync(new URL("../migrations/0028_training_legendary_reward.sql", import.meta.url), "utf8");
 const trainingRewardGoldTuningMigration = readFileSync(new URL("../migrations/0029_training_reward_gold_tuning.sql", import.meta.url), "utf8");
+const cosmeticPackUniformMigration = readFileSync(new URL("../migrations/0031_cosmetic_pack_uniform_titles.sql", import.meta.url), "utf8");
 const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
@@ -150,6 +151,15 @@ describe("Supabase RLS migration coverage", () => {
     expect(legacyShopMigration).toContain("'cosmetic-pack'");
     expect(legacyShopMigration).toContain("'CARD_PACK'");
     expect(legacyShopMigration).toContain("'COSMETIC_PACK'");
+  });
+
+  it("keeps cosmetic pack title names current and rolls unowned cosmetics uniformly", () => {
+    expect(cosmeticPackUniformMigration).toContain("'heartbroken_dog', '心碎小狗'");
+    expect(cosmeticPackUniformMigration).toContain("'monument_smoker', '古蹟抽菸'");
+    expect(cosmeticPackUniformMigration).toContain("'wehavemusic', '至少我們還有音樂'");
+    expect(cosmeticPackUniformMigration).toContain("'busy_worker', '社畜小狗'");
+    expect(cosmeticPackUniformMigration).toContain("where c.kind in ('avatar', 'title')");
+    expect(cosmeticPackUniformMigration).not.toContain("random() < 0.5");
   });
 
   it("adds user-data tables behind RLS for inventory, login, events, and quests", () => {

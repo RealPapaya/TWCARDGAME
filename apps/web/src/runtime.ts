@@ -170,10 +170,10 @@ const FALLBACK_PROFILE_AVATAR_URL = "/images/avatars/avatar1.webp";
 const TITLE_LABELS: Record<string, string> = {
   beginner: "菜鳥",
   salary_thief: "薪水小偷",
-  monument_smoker: "古蹟菸客",
-  busy_worker: "忙碌社畜",
-  wehavemusic: "我們有音樂",
-  heartbroken_dog: "傷心狗狗",
+  monument_smoker: "古蹟抽菸",
+  busy_worker: "社畜小狗",
+  wehavemusic: "至少我們還有音樂",
+  heartbroken_dog: "心碎小狗",
   sixty_seven: "67",
   salmon_dream: "張鮭魚之夢",
   how_pitiful: "可憐哪",
@@ -4952,8 +4952,7 @@ function legacyShopDropRates(kind: string): NonNullable<ShopItemRow["contents"][
   }
   if (kind === "COSMETIC_PACK") {
     return [
-      { label: "個人頭像", type: "avatar", rate: 50 },
-      { label: "專屬稱號", type: "title", rate: 50 }
+      { label: "未擁有內容等機率", type: "cosmetic", rate: 100 }
     ];
   }
   return [];
@@ -5976,6 +5975,7 @@ function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolea
     }
     startRewardAnimation(view, render);
     render();
+    scheduleAchievementCheck();
   });
 }
 
@@ -7870,6 +7870,114 @@ function showAlert(message: string, title = "提示"): void {
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
 let battleToastTimer: ReturnType<typeof setTimeout> | undefined;
 let pendingWelcomeToast = false;
+/* ---- Achievement-complete popup (server-confirmed, shown after a match) ---- */
+
+const ACHV_ANNOUNCED_PREFIX = "achv_announced:";
+const achievementPopupQueue: Array<{ name: string; gold: number }> = [];
+let achievementPopupShowing = false;
+
+function announcedKey(userId: string): string {
+  return `${ACHV_ANNOUNCED_PREFIX}${userId}`;
+}
+
+/** The set of achievement ids already announced for this account, or undefined on first ever load. */
+function readAnnouncedAchievements(userId: string): Set<string> | undefined {
+  try {
+    const raw = localStorage.getItem(announcedKey(userId));
+    if (raw === null) return undefined;
+    const parsed = JSON.parse(raw) as unknown;
+    return new Set(Array.isArray(parsed) ? parsed.filter((x): x is string => typeof x === "string") : []);
+  } catch {
+    return undefined;
+  }
+}
+
+function writeAnnouncedAchievements(userId: string, ids: Set<string>): void {
+  try {
+    localStorage.setItem(announcedKey(userId), JSON.stringify([...ids]));
+  } catch {
+    /* storage full / disabled — popups simply won't dedupe across reloads */
+  }
+}
+
+/**
+ * After a match (and a silent `loadTasks`), pop a "成就達成" card for every
+ * newly-completed `once` achievement. The first time we ever see an account we
+ * seed its announced-set silently so existing players don't get a flood.
+ */
+function announceCompletedAchievements(): void {
+  const userId = view.session?.user.id;
+  if (!userId) return;
+  const completedIds = view.tasks
+    .filter((task) => task.quest.recurrence === "once" && task.state !== "in-progress")
+    .map((task) => task.quest.id);
+
+  const existing = readAnnouncedAchievements(userId);
+  if (existing === undefined) {
+    writeAnnouncedAchievements(userId, new Set(completedIds));
+    return;
+  }
+
+  const fresh = view.tasks.filter(
+    (task) => task.quest.recurrence === "once" && task.state !== "in-progress" && !existing.has(task.quest.id)
+  );
+  if (fresh.length === 0) return;
+  for (const task of fresh) {
+    existing.add(task.quest.id);
+    achievementPopupQueue.push({ name: task.quest.display_name, gold: task.quest.reward?.gold ?? 0 });
+  }
+  writeAnnouncedAchievements(userId, existing);
+  if (!achievementPopupShowing) showNextAchievementPopup();
+}
+
+function showNextAchievementPopup(): void {
+  const next = achievementPopupQueue.shift();
+  if (!next) {
+    achievementPopupShowing = false;
+    return;
+  }
+  achievementPopupShowing = true;
+
+  const el = document.createElement("div");
+  el.className = "achievement-popup";
+  el.setAttribute("role", "status");
+  el.dataset.testid = "achievement-popup";
+  el.innerHTML = `
+    <div class="achievement-popup-glow"></div>
+    <div class="achievement-popup-body">
+      <div class="achievement-popup-label">🏆 成就達成</div>
+      <div class="achievement-popup-name">${escapeHtml(next.name)}</div>
+      ${next.gold > 0
+        ? `<div class="achievement-popup-reward"><img class="task-coin" src="/images/ui/Coin.webp" alt="金幣" onerror="this.style.display='none'">+${next.gold}</div>`
+        : ""}
+    </div>`;
+  document.body.appendChild(el);
+  window.requestAnimationFrame(() => el.classList.add("show"));
+
+  let dismissed = false;
+  const dismiss = (): void => {
+    if (dismissed) return;
+    dismissed = true;
+    el.classList.remove("show");
+    window.setTimeout(() => {
+      el.remove();
+      showNextAchievementPopup();
+    }, 320);
+  };
+  el.addEventListener("click", dismiss);
+  window.setTimeout(dismiss, 4200);
+}
+
+/** Re-pull tasks after a result lands, then pop any freshly-completed achievement. */
+function scheduleAchievementCheck(): void {
+  if (!supabase || !view.session) return;
+  // Quest events are emitted server-side at finalize (before reward_summary is
+  // sent), so they're committed by now; a short beat covers read replication.
+  window.setTimeout(() => {
+    void loadTasks().then(announceCompletedAchievements);
+  }, 800);
+}
+
 function showToast(message: string): void {
   let el = document.getElementById("medieval-toast");
   if (!el) {

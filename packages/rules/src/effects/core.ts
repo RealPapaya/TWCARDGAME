@@ -214,7 +214,11 @@ export function applyDamage(
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_TAX_CUT" }, ref.owner.seat);
     }
     ref.owner.hero.hp -= dealt;
-    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp, ...payload }, ref.owner.seat);
+    // Achievement detection (他的手可以穿過我的巴巴阿): record whether the damaged
+    // hero's own side had a 沙包/taunt minion up at the moment of the hit, so the
+    // match-end aggregator can sum "hero damage dealt past a taunt" deterministically.
+    const defenderHadTaunt = ref.owner.board.some((minion) => minion.keywords.taunt);
+    addEvent(state, events, "DAMAGE", { target: `${ref.owner.seat}:hero`, amount: dealt, remainingHealth: ref.owner.hero.hp, defenderHadTaunt, ...payload }, ref.owner.seat);
     if (unlockLowHpManaCap(ref.owner)) {
       addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, ref.owner.seat);
     }

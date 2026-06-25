@@ -250,6 +250,28 @@ describe("effect golden tests", () => {
     expect(next.players[foe].hero.hp).toBe(27);
   });
 
+  it("DAMAGE — flags defenderHadTaunt on hero hits when the defender has a 沙包/taunt", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "DAMAGE", value: 3, target: { side: "ENEMY", type: "HERO" } } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    const foe = enemy(seat);
+    placeMinion(state, foe, { keywords: { taunt: true } });
+    const { events } = play(state, catalog, card, { type: "HERO", side: foe });
+    const heroHit = events.find((e) => e.type === "DAMAGE" && e.payload?.target === `${foe}:hero`);
+    expect(heroHit?.payload?.defenderHadTaunt).toBe(true);
+  });
+
+  it("DAMAGE — defenderHadTaunt is false when the defender has no 沙包/taunt", () => {
+    const card = NEWS_CARD("C", { battlecry: { type: "DAMAGE", value: 3, target: { side: "ENEMY", type: "HERO" } } });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    const foe = enemy(seat);
+    placeMinion(state, foe); // no taunt
+    const { events } = play(state, catalog, card, { type: "HERO", side: foe });
+    const heroHit = events.find((e) => e.type === "DAMAGE" && e.payload?.target === `${foe}:hero`);
+    expect(heroHit?.payload?.defenderHadTaunt).toBe(false);
+  });
+
   it("DAMAGE_ALL_ENEMY_MINIONS — damages all enemy minions", () => {
     const card = NEWS_CARD("C", { battlecry: { type: "DAMAGE_ALL_ENEMY_MINIONS", value: 2 } });
     const { state, catalog } = makeMatch([card]);

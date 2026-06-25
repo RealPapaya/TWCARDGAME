@@ -25,16 +25,28 @@ export function stableHash(input: string): number {
  * Server progress still advances for every daily quest — this only controls
  * which ones are displayed. The check-in is always shown (when active); the
  * picks are sorted claimable → in-progress → claimed for a useful order.
+ *
+ * Invariant: every **claimable** daily is always surfaced, even when it falls
+ * outside the hash-picked subset. Otherwise the main-menu red dot (which counts
+ * all claimable dailies) would stay lit forever for a reward the player can't
+ * see to claim. The hash pick only fills the remaining slots from the rest.
  */
 export function selectDailyBoard(tasks: readonly TaskView[], seed: string): TaskView[] {
   const dailies = tasks.filter((task) => task.quest.recurrence === "daily");
   const checkIn = dailies.filter((task) => task.quest.id === DAILY_CHECKIN_QUEST_ID);
-  const picks = dailies
-    .filter((task) => task.quest.id !== DAILY_CHECKIN_QUEST_ID)
+  const others = dailies.filter((task) => task.quest.id !== DAILY_CHECKIN_QUEST_ID);
+
+  // Always-visible: any claimable daily (so the red dot never outlives the board).
+  const claimable = others.filter((task) => task.state === "claimable");
+  // Fill the remaining slots from the non-claimable rest, stable-shuffled by seed.
+  const fillCount = Math.max(0, DAILY_PICK_COUNT - claimable.length);
+  const filler = others
+    .filter((task) => task.state !== "claimable")
     .map((task) => ({ task, rank: stableHash(`${seed}:${task.quest.id}`) }))
     .sort((a, b) => a.rank - b.rank)
-    .slice(0, DAILY_PICK_COUNT)
-    .map((entry) => entry.task)
-    .sort((a, b) => TASK_STATE_RANK[a.state] - TASK_STATE_RANK[b.state]);
+    .slice(0, fillCount)
+    .map((entry) => entry.task);
+
+  const picks = [...claimable, ...filler].sort((a, b) => TASK_STATE_RANK[a.state] - TASK_STATE_RANK[b.state]);
   return [...checkIn, ...picks];
 }

@@ -204,4 +204,80 @@ describe("aggregateMatchStats", () => {
     // The HEALTH-payment self damage must not count as dealt damage.
     expect(stats.player2.damageDealt).toBe(0);
   });
+
+  it("tracks the new achievement stats (hero damage taken, taunt-bypass, deaths, political kills, minion heals, votes)", () => {
+    const political = CARD_CATALOG.find(
+      (c) => c.category === "民進黨政治人物" || c.category === "國民黨政治人物"
+    )!;
+    const log = [
+      { seq: 1, type: "DAMAGE", seat: "player2", payload: { target: "player2:hero", amount: 7, defenderHadTaunt: true } },
+      { seq: 2, type: "DAMAGE", seat: "player1", payload: { target: "player1:hero", amount: 4 } },
+      { seq: 3, type: "DESTROY", seat: "player2", payload: { cardId: political.id } },
+      { seq: 4, type: "DESTROY", seat: "player1", payload: { cardId: "no-such-card" } },
+      { seq: 5, type: "HEAL", seat: "player1", payload: { target: "m-9", amount: 12 } },
+      { seq: 6, type: "HEAL", seat: "player1", payload: { target: "player1:hero", amount: 5 } },
+      { seq: 7, type: "VOTE_RESOLVED", seat: "player1", payload: { winningSeat: "player1" } }
+    ] as unknown as GameEvent[];
+
+    const stats = aggregateMatchStats(log);
+    expect(stats.player2.heroDamageTaken).toBe(7);
+    expect(stats.player1.heroDamageTaken).toBe(4);
+    // The dealer of taunt-bypassing hero damage is the opponent of the damaged seat.
+    expect(stats.player1.heroDamageVsTaunt).toBe(7);
+    expect(stats.player2.heroDamageVsTaunt).toBe(0);
+    expect(stats.player2.ownMinionsDied).toBe(1);
+    expect(stats.player1.ownMinionsDied).toBe(1);
+    expect(stats.player1.politicalMinionsKilled).toBe(1);
+    expect(stats.player2.politicalMinionsKilled).toBe(0);
+    expect(stats.player1.minionHealing).toBe(12); // hero heal excluded
+    expect(stats.player1.votesWon).toBe(1);
+  });
+});
+
+describe("emitTaskEvents — new achievements", () => {
+  const typesFor = (userId: string, events: Array<{ userId: string; eventType: string }>): string[] =>
+    events.filter((e) => e.userId === userId).map((e) => e.eventType);
+
+  it("emits pvp_played for both PvP humans", async () => {
+    const events: Array<{ userId: string; eventType: string }> = [];
+    await emitTaskEvents(async (i) => void events.push(i), finishedMatch({ p1: UUID_1, p2: UUID_2, winner: "player1" }), PVP, silent);
+    expect(typesFor(UUID_1, events)).toContain("pvp_played");
+    expect(typesFor(UUID_2, events)).toContain("pvp_played");
+  });
+
+  it("emits pve_lost:<difficulty> for a PvE loss but not on concede", async () => {
+    const easy: MatchMetadata = { isVsAi: true, aiDifficulty: "easy", aiTheme: "kmt", startedAtMs: 1000 };
+
+    const lost = finishedMatch({ p1: UUID_1, p2: "bot-x", winner: "player2" });
+    const e1: Array<{ userId: string; eventType: string }> = [];
+    await emitTaskEvents(async (i) => void e1.push(i), lost, easy, silent);
+    expect(typesFor(UUID_1, e1)).toContain("pve_lost:easy");
+
+    const conceded = finishedMatch({ p1: UUID_1, p2: "bot-x", winner: "player2" });
+    conceded.result = { winnerSeat: "player2", reason: "concede" };
+    const e2: Array<{ userId: string; eventType: string }> = [];
+    await emitTaskEvents(async (i) => void e2.push(i), conceded, easy, silent);
+    expect(typesFor(UUID_1, e2)).not.toContain("pve_lost:easy");
+  });
+
+  it("emits perfect_game only when hero untouched, 20+ turns and opponent played cards", async () => {
+    const m = finishedMatch({ p1: UUID_1, p2: UUID_2, winner: "player1" });
+    m.turn.number = 22;
+    m.private.eventLog = [{ seq: 1, type: "CARD_PLAYED", seat: "player2", payload: {} }] as unknown as GameEvent[];
+    const events: Array<{ userId: string; eventType: string }> = [];
+    await emitTaskEvents(async (i) => void events.push(i), m, PVP, silent);
+    expect(typesFor(UUID_1, events)).toContain("perfect_game");
+    expect(typesFor(UUID_2, events)).not.toContain("perfect_game"); // player2 lost
+  });
+
+  it("emits labor_deck_win for an all-勞工 30-card deck PvP win", async () => {
+    const laborIds = CARD_CATALOG.filter((c) => c.category === "勞工").map((c) => c.id);
+    const deck = Array.from({ length: 30 }, (_, i) => laborIds[i % laborIds.length]);
+    const meta: MatchMetadata = { isVsAi: false, startedAtMs: 1000, deckCardIds: { player1: deck } };
+    const m = finishedMatch({ p1: UUID_1, p2: UUID_2, winner: "player1" });
+    const events: Array<{ userId: string; eventType: string }> = [];
+    await emitTaskEvents(async (i) => void events.push(i), m, meta, silent);
+    expect(typesFor(UUID_1, events)).toContain("labor_deck_win");
+    expect(typesFor(UUID_2, events)).not.toContain("labor_deck_win");
+  });
 });

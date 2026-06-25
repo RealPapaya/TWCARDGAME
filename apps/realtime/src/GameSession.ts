@@ -176,7 +176,11 @@ export class GameSession {
    * (BotGameSession) overrides this to flag `isVsAi` + the bot difficulty/theme.
    */
   protected matchMetadata(): MatchMetadata {
-    return { isVsAi: false, startedAtMs: this.matchStartedAtMs };
+    return {
+      isVsAi: false,
+      startedAtMs: this.matchStartedAtMs,
+      deckCardIds: { player1: this.setup.player1?.deckIds, player2: this.setup.player2?.deckIds }
+    };
   }
 
   /* --------------------------------- lifecycle --------------------------------- */

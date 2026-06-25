@@ -8,6 +8,7 @@ import {
   type EmitUserEventInput,
   type MatchHistoryRow
 } from "@twcardgame/db";
+import { getCardById } from "@twcardgame/cards";
 import { toPublicState, type MatchState } from "@twcardgame/rules";
 import {
   calculatePvPExp,
@@ -53,6 +54,13 @@ export interface MatchMetadata {
    * `shouldPersistMatchSideEffects() === false` branch.
    */
   devTest?: boolean;
+  /**
+   * The 30-card deck list each seat brought to the match, resolved by the room
+   * before play. Used only for deck-composition achievements (e.g. the all-勞工
+   * deck win) — the mutated MatchState can't be reverse-engineered into the
+   * original deck once tokens/transforms enter play.
+   */
+  deckCardIds?: Partial<Record<Seat, string[]>>;
 }
 
 export interface MatchLogger {
@@ -271,27 +279,36 @@ export async function emitTaskEvents(
 ): Promise<void> {
   const mode: "pvp" | "pve" = metadata.isVsAi ? "pve" : "pvp";
   const winnerSeat = state.result?.winnerSeat;
+  const reason = state.result?.reason;
+  const turnNumber = state.turn.number;
   const stats = aggregateMatchStats(state.private.eventLog);
   const sourceId = state.matchId;
 
   for (const seat of SEATS) {
     const userId = state.players[seat].userId;
     if (!isHumanUser(userId)) continue;
+    const isWinner = seat === winnerSeat;
+    const s = stats[seat];
+    const opp = stats[opponentOf(seat)];
 
     try {
       await emit({ userId, eventType: "match_played", sourceType: "match", sourceId, metadata: { mode } });
-      if (seat === winnerSeat) {
+      if (mode === "pvp") await emit({ userId, eventType: "pvp_played", sourceType: "match", sourceId });
+      if (isWinner) {
         await emit({ userId, eventType: "match_won", sourceType: "match", sourceId, metadata: { mode } });
         if (mode === "pve") await emit({ userId, eventType: "pve_win", sourceType: "match", sourceId });
       }
-      if (winnerSeat !== undefined && seat !== winnerSeat) {
+      if (winnerSeat !== undefined && !isWinner) {
         await emit({ userId, eventType: "match_lost", sourceType: "match", sourceId, metadata: { mode } });
+        // 可憐哪: PvE losses by difficulty, surrenders (concede) excluded.
+        if (mode === "pve" && metadata.aiDifficulty && reason !== "concede") {
+          await emit({ userId, eventType: `pve_lost:${metadata.aiDifficulty}`, sourceType: "match", sourceId });
+        }
       }
-      if (seat === winnerSeat && mode === "pve" && metadata.aiDifficulty) {
+      if (isWinner && mode === "pve" && metadata.aiDifficulty) {
         await emit({ userId, eventType: `pve_win:${metadata.aiDifficulty}`, sourceType: "match", sourceId });
       }
 
-      const s = stats[seat];
       if (s.cardsPlayed > 0) await emit({ userId, eventType: "cards_played", amount: s.cardsPlayed, sourceType: "match", sourceId });
       if (s.minionsSummoned > 0) await emit({ userId, eventType: "minions_summoned", amount: s.minionsSummoned, sourceType: "match", sourceId });
       if (s.damageDealt > 0) await emit({ userId, eventType: "damage_dealt", amount: s.damageDealt, sourceType: "match", sourceId });
@@ -300,10 +317,37 @@ export async function emitTaskEvents(
       if (s.healthRestored > 0) await emit({ userId, eventType: "health_restored", amount: s.healthRestored, sourceType: "match", sourceId });
       if (s.minionsResurrected > 0) await emit({ userId, eventType: "minions_resurrected", amount: s.minionsResurrected, sourceType: "match", sourceId });
       if (s.minionsBounced > 0) await emit({ userId, eventType: "minions_bounced", amount: s.minionsBounced, sourceType: "match", sourceId });
+
+      // New achievement detection.
+      if (s.ownMinionsDied > 0) await emit({ userId, eventType: "own_minions_died", amount: s.ownMinionsDied, sourceType: "match", sourceId });
+      if (s.politicalMinionsKilled > 0) await emit({ userId, eventType: "political_minions_killed", amount: s.politicalMinionsKilled, sourceType: "match", sourceId });
+      if (s.heroDamageVsTaunt > 0) await emit({ userId, eventType: "hero_damage_vs_taunt", amount: s.heroDamageVsTaunt, sourceType: "match", sourceId });
+      if (s.votesWon > 0) await emit({ userId, eventType: "vote_won", amount: s.votesWon, sourceType: "match", sourceId });
+      // PvP-only thresholds.
+      if (mode === "pvp" && s.heroDamageTaken > 0) {
+        await emit({ userId, eventType: "damage_taken", amount: s.heroDamageTaken, sourceType: "match", sourceId });
+      }
+      if (mode === "pvp" && s.minionHealing >= 50) {
+        await emit({ userId, eventType: "minion_heal_match_50", sourceType: "match", sourceId });
+      }
+      // 完全比賽: PvP win, own hero untouched, 20+ turns, opponent actually played cards.
+      if (mode === "pvp" && isWinner && s.heroDamageTaken === 0 && turnNumber >= 20 && opp.cardsPlayed > 0) {
+        await emit({ userId, eventType: "perfect_game", sourceType: "match", sourceId });
+      }
+      // 了不起的奴才: PvP win with an all-勞工 30-card deck.
+      if (mode === "pvp" && isWinner && isAllLaborDeck(metadata.deckCardIds?.[seat])) {
+        await emit({ userId, eventType: "labor_deck_win", sourceType: "match", sourceId });
+      }
     } catch (error) {
       logger.warn("match.taskEvents.seat_failed", { matchId: sourceId, seat, error: String(error) });
     }
   }
+}
+
+/** True for a full 30-card deck whose every card is in the 勞工 category. */
+function isAllLaborDeck(deckCardIds: readonly string[] | undefined): boolean {
+  if (!deckCardIds || deckCardIds.length !== 30) return false;
+  return deckCardIds.every((id) => getCardById(id)?.category === "勞工");
 }
 
 interface SeatStats {
@@ -315,6 +359,18 @@ interface SeatStats {
   healthRestored: number;
   minionsResurrected: number;
   minionsBounced: number;
+  /** Damage this seat's OWN hero took (= opponent's hero damage dealt). */
+  heroDamageTaken: number;
+  /** Hero damage this seat dealt while the enemy had a 沙包/taunt minion up. */
+  heroDamageVsTaunt: number;
+  /** This seat's own minions that died. */
+  ownMinionsDied: number;
+  /** Enemy 民進黨/國民黨 political minions this seat killed. */
+  politicalMinionsKilled: number;
+  /** Healing this seat poured into minions (hero heals excluded). */
+  minionHealing: number;
+  /** 公投 referendums this seat won (中選). */
+  votesWon: number;
 }
 
 function emptySeatStats(): SeatStats {
@@ -326,7 +382,13 @@ function emptySeatStats(): SeatStats {
     minionsKilled: 0,
     healthRestored: 0,
     minionsResurrected: 0,
-    minionsBounced: 0
+    minionsBounced: 0,
+    heroDamageTaken: 0,
+    heroDamageVsTaunt: 0,
+    ownMinionsDied: 0,
+    politicalMinionsKilled: 0,
+    minionHealing: 0,
+    votesWon: 0
   };
 }
 
@@ -340,6 +402,15 @@ function isHeroTarget(target: string): boolean {
 
 function asSeat(value: unknown): Seat | undefined {
   return value === "player1" || value === "player2" ? value : undefined;
+}
+
+const POLITICAL_CATEGORIES = new Set(["民進黨政治人物", "國民黨政治人物"]);
+
+/** True for the blue/green political minions counted by 垃圾不分藍綠. */
+function isPoliticalMinion(cardId: unknown): boolean {
+  if (typeof cardId !== "string") return false;
+  const category = getCardById(cardId)?.category;
+  return category !== undefined && POLITICAL_CATEGORIES.has(category);
 }
 
 /** Port of taskEvents.aggregateMatchStats — per-seat stats from the authoritative event log. */
@@ -357,13 +428,32 @@ export function aggregateMatchStats(eventLog: readonly GameEvent[]): Record<Seat
       const target = payload.target;
       const amount = typeof payload.amount === "number" ? payload.amount : 0;
       if (amount <= 0 || typeof target !== "string" || !event.seat) continue;
-      if (isHeroTarget(target)) stats[opponentOf(event.seat)].damageDealt += amount;
-      else stats[opponentOf(event.seat)].damageToMinions += amount;
+      // event.seat is the damaged unit's owner; the dealer is its opponent.
+      if (isHeroTarget(target)) {
+        stats[opponentOf(event.seat)].damageDealt += amount;
+        stats[event.seat].heroDamageTaken += amount;
+        if (payload.defenderHadTaunt === true) stats[opponentOf(event.seat)].heroDamageVsTaunt += amount;
+      } else {
+        stats[opponentOf(event.seat)].damageToMinions += amount;
+      }
     } else if (event.type === "DESTROY") {
-      if (event.seat) stats[opponentOf(event.seat)].minionsKilled += 1;
+      // event.seat is the dead minion's owner: a death for that seat, a kill for its opponent.
+      if (event.seat) {
+        stats[event.seat].ownMinionsDied += 1;
+        stats[opponentOf(event.seat)].minionsKilled += 1;
+        if (isPoliticalMinion(payload.cardId)) stats[opponentOf(event.seat)].politicalMinionsKilled += 1;
+      }
     } else if (event.type === "HEAL") {
       const amount = typeof payload.amount === "number" ? payload.amount : 0;
-      if (amount > 0 && event.seat) stats[event.seat].healthRestored += amount;
+      if (amount > 0 && event.seat) {
+        stats[event.seat].healthRestored += amount;
+        if (typeof payload.target === "string" && !isHeroTarget(payload.target)) {
+          stats[event.seat].minionHealing += amount;
+        }
+      }
+    } else if (event.type === "VOTE_RESOLVED") {
+      const winner = asSeat(payload.winningSeat);
+      if (winner) stats[winner].votesWon += 1;
     } else if (event.type === "RESURRECT") {
       if (event.seat) stats[event.seat].minionsResurrected += 1;
     } else if (event.type === "BOUNCE") {

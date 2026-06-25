@@ -68,6 +68,36 @@ describe("selectDailyBoard", () => {
     expect(board[2].state).toBe("claimed");
   });
 
+  it("always surfaces a claimable daily even when it is outside the hash pick", () => {
+    // 5 in-progress fillers compete for DAILY_PICK_COUNT slots; one extra daily
+    // is claimable. The claimable one must always appear regardless of its hash.
+    const dailies = [
+      task(DAILY_CHECKIN_QUEST_ID, "daily"),
+      task("d_a", "daily"),
+      task("d_b", "daily"),
+      task("d_c", "daily"),
+      task("d_d", "daily"),
+      task("d_e", "daily"),
+      task("d_claimable", "daily", "claimable")
+    ];
+    const board = selectDailyBoard(dailies, "user-9:2026-06-11");
+    expect(board.some((t) => t.quest.id === "d_claimable")).toBe(true);
+    expect(board[1].quest.id).toBe("d_claimable"); // claimable sorts first among picks
+  });
+
+  it("shows every claimable daily when more than DAILY_PICK_COUNT are claimable", () => {
+    const dailies = [
+      task(DAILY_CHECKIN_QUEST_ID, "daily"),
+      task("c1", "daily", "claimable"),
+      task("c2", "daily", "claimable"),
+      task("c3", "daily", "claimable"),
+      task("ip", "daily")
+    ];
+    const board = selectDailyBoard(dailies, "seed");
+    const claimableIds = board.filter((t) => t.state === "claimable").map((t) => t.quest.id).sort();
+    expect(claimableIds).toEqual(["c1", "c2", "c3"]);
+  });
+
   it("omits the check-in row when no check-in quest is active", () => {
     const board = selectDailyBoard(DAILIES.slice(1), "seed");
     expect(board.every((t) => t.quest.id !== DAILY_CHECKIN_QUEST_ID)).toBe(true);
