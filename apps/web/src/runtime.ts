@@ -3495,22 +3495,41 @@ function renderConcedeModal(): string {
 function themedConfirm(options: {
   title: string;
   message?: string;
+  bodyHtml?: string;
   confirmLabel?: string;
   cancelLabel?: string;
   danger?: boolean;
   dismissOnBackdrop?: boolean;
+  hideCancel?: boolean;
 }): Promise<boolean> {
   return new Promise((resolve) => {
     view.confirmDialog = {
       title: options.title,
       message: options.message,
+      bodyHtml: options.bodyHtml,
       confirmLabel: options.confirmLabel ?? "確定",
       cancelLabel: options.cancelLabel ?? "取消",
       danger: options.danger,
       dismissOnBackdrop: options.dismissOnBackdrop ?? true,
+      hideCancel: options.hideCancel,
       resolve
     };
     render();
+  });
+}
+
+async function themedNotice(options: {
+  title: string;
+  message?: string;
+  bodyHtml?: string;
+  confirmLabel?: string;
+}): Promise<void> {
+  await themedConfirm({
+    title: options.title,
+    message: options.message,
+    bodyHtml: options.bodyHtml,
+    confirmLabel: options.confirmLabel ?? "確定",
+    hideCancel: true
   });
 }
 
@@ -3530,8 +3549,9 @@ function renderConfirmDialog(): string {
       <div class="confirm-content">
         <h3>${escapeHtml(dialog.title)}</h3>
         ${dialog.message ? `<p class="confirm-message">${escapeHtml(dialog.message)}</p>` : ""}
+        ${dialog.bodyHtml ?? ""}
         <div class="confirm-actions">
-          <button id="themed-confirm-cancel">${escapeHtml(dialog.cancelLabel)}</button>
+          ${dialog.hideCancel ? "" : `<button id="themed-confirm-cancel">${escapeHtml(dialog.cancelLabel)}</button>`}
           <button id="themed-confirm-ok" class="${dialog.danger ? "danger" : ""}">${escapeHtml(dialog.confirmLabel)}</button>
         </div>
       </div>
@@ -7635,6 +7655,31 @@ function extraCopyEntries(): Array<{ cardId: string; extra: number }> {
   return entries;
 }
 
+function renderBulkDisenchantResult(entries: Array<{ cardId: string; extra: number }>, totalCards: number, totalGain: number): string {
+  const rows = entries
+    .map(({ cardId, extra }) => {
+      const card = cardCatalog.get(cardId);
+      if (!card) return "";
+      const gain = voucherRate(card.rarity).disenchant * extra;
+      return `
+        <li class="bulk-disenchant-result-row">
+          <span class="bulk-disenchant-card-name">${escapeHtml(card.name)}</span>
+          <span class="bulk-disenchant-card-meta">x${extra}</span>
+          <span class="bulk-disenchant-card-gain">+${gain}</span>
+        </li>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  return `
+    <div class="bulk-disenchant-result">
+      <p class="bulk-disenchant-summary">已分解 ${totalCards} 張多餘卡，獲得 ${totalGain} 點消費券。</p>
+      <ul class="bulk-disenchant-result-list">${rows}</ul>
+    </div>
+  `;
+}
+
 async function bulkDisenchantExtras(): Promise<void> {
   if (!supabase || !view.session?.user || view.cardOpBusy) return;
   const entries = extraCopyEntries();
@@ -7665,7 +7710,11 @@ async function bulkDisenchantExtras(): Promise<void> {
       if (error) throw error;
     }
     await loadAccountDataRaw();
-    showToast(`一鍵分解完成！分解 ${totalCards} 張，獲得 ${totalGain} 點消費券。`);
+    await themedNotice({
+      title: "一鍵分解完成",
+      bodyHtml: renderBulkDisenchantResult(entries, totalCards, totalGain),
+      confirmLabel: "確定"
+    });
   } catch (error) {
     showToast(`一鍵分解失敗：${errorMessage(error)}`);
   } finally {

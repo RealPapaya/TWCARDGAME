@@ -268,10 +268,12 @@ export type ClientViewState = {
   confirmDialog?: {
     title: string;
     message?: string;
+    bodyHtml?: string;
     confirmLabel: string;
     cancelLabel: string;
     danger?: boolean;
     dismissOnBackdrop?: boolean;
+    hideCancel?: boolean;
     resolve: (ok: boolean) => void;
   };
   coverPickerOpen?: boolean;
