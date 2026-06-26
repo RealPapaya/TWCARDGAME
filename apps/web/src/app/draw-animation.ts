@@ -21,6 +21,9 @@ const FLIGHT_MS = 850;
 const FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
 const FAIL_SAFE_MS = 1400;
 export const DRAW_ANIMATION_MS = FAIL_SAFE_MS;
+// Scale of the card as it leaves the deck, before it settles onto its slot.
+// Higher = a larger flying card (was 0.5 in the v1 port).
+const START_SCALE = 0.8;
 
 // `instanceId` for the previous local hand sync, in slot order. The first sync
 // of a match seeds this (no animation for the opening hand).
@@ -202,13 +205,31 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
         return;
       }
 
-      const cloneW = targetEl.offsetWidth || 128;
-      const cloneH = targetEl.offsetHeight || 184;
-      // Anchor by centre, not top-left: a hand card (128x184) dwarfs the deck
-      // pile (54x72), so a corner anchor would start the flight well below and
-      // right of the deck. Centring makes the card visibly fly *out of* the
-      // deck pile. `scale()` keeps the centre fixed, so the shrunk start frame
-      // also sits centred on the deck.
+      // Slot (resting) size of the real card the clone must land on.
+      const slotW = targetEl.offsetWidth || (side === "player" ? 128 : 80);
+      const slotH = targetEl.offsetHeight || (side === "player" ? 184 : 110);
+
+      // The clone's base box, plus the scale at takeoff (deck) and landing (slot).
+      // Player: fly at the slot size, growing START_SCALE -> 1. Opponent: the
+      // opponent hand back is tiny (~80px), so fly at the player's card size for
+      // legibility and shrink into the small slot (endScale < 1), preserving the
+      // back's aspect ratio.
+      let cloneW = slotW;
+      let cloneH = slotH;
+      let startScale = START_SCALE;
+      let endScale = 1;
+      if (side === "opponent") {
+        const playerCardW = document.querySelector<HTMLElement>(".hand-row .card")?.offsetWidth;
+        cloneW = playerCardW || 128;
+        cloneH = cloneW * (slotH / slotW);
+        endScale = slotW / cloneW; // land exactly on the small slot
+        startScale = Math.max(endScale, 0.95); // emerge near full size, tuck in
+      }
+
+      // Anchor by centre, not top-left: the flying card dwarfs the deck pile
+      // (54x72), so a corner anchor would start the flight well below and right
+      // of the deck. Centring makes the card visibly fly *out of* the deck pile.
+      // With `transform-origin: center`, scale() keeps that centre fixed.
       const startX = deckRect.left + deckRect.width / 2 - cloneW / 2;
       const startY = deckRect.top + deckRect.height / 2 - cloneH / 2;
       const endX = cardRect.left + cardRect.width / 2 - cloneW / 2;
@@ -228,21 +249,22 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
       // `.card` defines `transform-origin: center 130%` for the fan tilt, which
       // would pivot the scale well below the card — the start frame computed for
       // a centre anchor would then sit ~0.4H too low and grow off-axis. Pin the
-      // clone's pivot to its centre so it emerges from the deck and grows into
-      // the slot at the matching size (the bug that made the drawn card look
-      // small / "re-rendered").
+      // clone's pivot to its centre so it emerges from the deck and settles onto
+      // the slot at the matching size.
       clone.style.transformOrigin = "center center";
-      clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
-
-      document.body.appendChild(clone);
 
       // Land at the destination card's resting fan rotation so the hand-off to
-      // the (rotated) real card is seamless — without this the clone settles
-      // upright and snaps to its fan angle when revealed.
-      const restRot = side === "player" ? clone.style.getPropertyValue("--rot").trim() : "";
-      const endTransform = restRot
-        ? `translate(${endX}px, ${endY}px) rotate(${restRot}) scale(1)`
-        : `translate(${endX}px, ${endY}px) scale(1)`;
+      // the real card is seamless. The opponent fan is mirrored and flipped
+      // upside-down (`rotate(180deg - --rot)` in CSS), so its clone must fly
+      // flipped too; the player's fan is just `rotate(--rot)`.
+      const rot = clone.style.getPropertyValue("--rot").trim() || "0deg";
+      const startRotate = side === "opponent" ? "rotate(180deg)" : "";
+      const endRotate = side === "opponent" ? `rotate(calc(180deg - ${rot}))` : `rotate(${rot})`;
+      const startTransform = `translate(${startX}px, ${startY}px) ${startRotate} scale(${startScale})`;
+      const endTransform = `translate(${endX}px, ${endY}px) ${endRotate} scale(${endScale})`;
+      clone.style.transform = startTransform;
+
+      document.body.appendChild(clone);
 
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {

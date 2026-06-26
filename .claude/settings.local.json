@@ -74,7 +74,17 @@
       "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/ai/lethal.ts'\\) -replace 'seat: typeof state.turn.activeSeat', 'seat: Seat' | Set-Content 'packages/rules/src/ai/lethal.ts'\")",
       "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/bot.test.ts'\\) -replace 'placeMinionRaw', 'placeMinion' | Set-Content -Encoding UTF8 'packages/rules/src/bot.test.ts'\")",
       "Bash(powershell -Command \"\\(Get-Content 'packages/rules/src/bot.test.ts' | Measure-Object -Line\\).Lines\")",
-      "Bash(npx wrangler *)"
+      "Bash(npx wrangler *)",
+      "Bash(curl -s -i -X POST http://localhost:8787/pve/devtest -H \"content-type: application/json\" -H \"origin: http://localhost:5174\" -d '{\"devTest\":{}}')",
+      "PowerShell($c = Get-NetTCPConnection -LocalPort 5175 -State Listen -ErrorAction SilentlyContinue; if \\($c\\) { $c.OwningProcess | Select-Object -Unique | ForEach-Object { try { Stop-Process -Id $_ -Force; \"killed PID $_\" } catch {} } } else { \"no listener on 5175\" })",
+      "Bash(node .tmp-draw-visual.mjs)",
+      "Bash(findstr \":8787 :5173 :3000\")",
+      "Bash(curl -s -i -X POST http://127.0.0.1:8787/pve/devtest -H \"content-type: application/json\" -H \"origin: http://localhost:5173\" -d \"{\\\\\"devTest\\\\\":{\\\\\"activeSeat\\\\\":\\\\\"player1\\\\\"}}\")",
+      "Bash(ping -n 1 localhost)",
+      "Bash(findstr /i \"Pinging Reply\")",
+      "Bash(curl -s -o NUL -w \"localhost -> HTTP %{http_code} \\(connected to %{remote_ip}\\)\\\\n\" -X POST http://localhost:8787/pve/devtest -H \"content-type: application/json\" -d \"{\\\\\"devTest\\\\\":{\\\\\"activeSeat\\\\\":\\\\\"player1\\\\\"}}\")",
+      "Bash(curl -s -o NUL -w \"ipv6 -> HTTP %{http_code}\\\\n\" -X POST http://[::1]:8787/pve/devtest -H \"content-type: application/json\" -d \"{\\\\\"devTest\\\\\":{\\\\\"activeSeat\\\\\":\\\\\"player1\\\\\"}}\")",
+      "Bash(node artifacts/repro-devtest.mjs)"
     ],
     "additionalDirectories": [
       "\\tmp"

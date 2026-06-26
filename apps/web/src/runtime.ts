@@ -2187,7 +2187,11 @@ function renderAmplificationBadge(player: PublicPlayer | undefined): string {
   const dots = augments
     .map((aug) => {
       const tierClass = AMP_TIER_CLASS[aug.tier] ?? "amp-tier-low";
-      return `<button class="hero-augment-dot ${tierClass}" type="button" data-augment-id="${escapeAttr(aug.id)}" aria-label="${escapeAttr(`${aug.tier} ${aug.name}`)}">${escapeHtml(aug.name.slice(0, 2))}</button>`;
+      const iconSrc = heroAugmentIconSrc(aug);
+      const content = iconSrc
+        ? `<img class="hero-augment-icon" src="${escapeAttr(iconSrc)}" alt="" aria-hidden="true" />`
+        : `<span class="hero-augment-fallback">${escapeHtml(aug.name.slice(0, 2))}</span>`;
+      return `<button class="hero-augment-dot ${tierClass} ${iconSrc ? "has-icon" : ""}" type="button" data-augment-id="${escapeAttr(aug.id)}" aria-label="${escapeAttr(`${aug.tier} ${aug.name}`)}">${content}</button>`;
     })
     .join("");
   return `<span class="hero-augments" aria-hidden="false">${dots}</span>`;
@@ -2788,6 +2792,29 @@ const AUGMENT_IMAGE_IDS = new Set([
 
 function augmentImageSrc(id: string): string | undefined {
   return AUGMENT_IMAGE_IDS.has(id) ? `/images/augments/${id.toLowerCase()}.webp` : undefined;
+}
+
+const HERO_AUGMENT_ICON_IDS = new Set([
+  "AMP_INVOICE_200",
+  "AMP_VOUCHER_3600",
+  "AMP_SHAREHOLDER_GIFT",
+  "AMP_0050",
+  "AMP_GO_FOR_BROKE",
+  "AMP_THREE_WAY_RACE",
+  "AMP_MIN_WAGE",
+  "AMP_FRIES_BOGO",
+  "AMP_FLEE_ABROAD",
+  "AMP_TYPHOON_DAY",
+  "AMP_ENERGY_TRANSITION",
+  "AMP_LIFE_INSURANCE",
+  "AMP_VILLAGE_LUNCHBOX",
+  "AMP_BLOOD_DONATION_VOUCHER",
+  "AMP_BANQUET"
+]);
+
+function heroAugmentIconSrc(augment: Pick<AmplificationSelection, "id" | "tier">): string | undefined {
+  if (augment.tier !== "加減賺" || !HERO_AUGMENT_ICON_IDS.has(augment.id)) return undefined;
+  return `/images/augments/icons/${augment.id.toLowerCase()}.svg`;
 }
 
 function renderPhaseCountdown(label: string): string {
