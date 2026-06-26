@@ -1424,6 +1424,40 @@ body.hand-dragging .hand-row .card {
   font-size: 11px;
 }
 
+/* The mulligan chassis is larger than an in-game hand card, but the cost/title/
+   category/stats otherwise stay at the small base size and read as out of scale.
+   Scale those up to match the in-game card proportions, centre the name, and tuck
+   a smaller cost pill into the corner. (Also covers the 教召 discover cards, which
+   share `.mulligan-card`; amp/vote options don't use these inner elements.) */
+.mulligan-card .card-title {
+  width: 100%;
+  align-self: center;
+  justify-content: center;
+  padding: 2px 26px 0;
+  min-height: 40px;
+  font-size: 16px;
+}
+
+.mulligan-card .card-cost {
+  width: 23px;
+  height: 23px;
+  top: 6px;
+  left: 6px;
+  font-size: 13px;
+}
+
+.mulligan-card .card-category {
+  font-size: 12px;
+  padding: 4px 9px;
+}
+
+.mulligan-card .minion-stats .stat-atk,
+.mulligan-card .minion-stats .stat-hp {
+  width: 42px;
+  height: 42px;
+  font-size: 20px;
+}
+
 /* --- Special phases: amplification chooser & referendum ballot --- */
 /* Reuse the mulligan overlay/card chassis; these are text cards, not art cards. */
 .amp-option,
@@ -3168,6 +3202,33 @@ body.hand-dragging .hand-row .card {
   .mulligan-card .card-desc {
     height: 28px;
     font-size: 7px;
+  }
+
+  /* Scale the desktop mulligan proportion overrides down for the 92×136 card. */
+  .mulligan-card .card-title {
+    padding: 1px 14px 0;
+    min-height: 22px;
+    font-size: 9px;
+  }
+
+  .mulligan-card .card-cost {
+    width: 16px;
+    height: 16px;
+    top: 4px;
+    left: 4px;
+    font-size: 9px;
+  }
+
+  .mulligan-card .card-category {
+    font-size: 7px;
+    padding: 2px 5px;
+  }
+
+  .mulligan-card .minion-stats .stat-atk,
+  .mulligan-card .minion-stats .stat-hp {
+    width: 24px;
+    height: 24px;
+    font-size: 11px;
   }
 
   .event-card-preview {

@@ -30,6 +30,10 @@ let prevOpponentHandCount: number | undefined;
 
 // Local hand cards currently mid-flight; their real elements stay hidden.
 const animatingHandIds = new Set<string>();
+// Count of opponent card-backs currently flying in. The trailing N backs of the
+// opponent fan are kept hidden (they land at the end of the fan, in order) so the
+// real back isn't sitting full-size in the hand while its clone is still flying.
+let animatingOpponentCount = 0;
 const drawQueue: Array<{ side: Side; slotIndex: number; handId?: string }> = [];
 let drawQueueActive = false;
 let drawQueueGeneration = 0;
@@ -39,6 +43,7 @@ export function resetDrawTracking(): void {
   prevPlayerHandIds = undefined;
   prevOpponentHandCount = undefined;
   animatingHandIds.clear();
+  animatingOpponentCount = 0;
   drawQueue.length = 0;
   drawQueueActive = false;
   drawQueueGeneration += 1;
@@ -47,6 +52,32 @@ export function resetDrawTracking(): void {
 /** True while a drawn local hand card is still flying — used by renderHandCard. */
 export function isHandCardAnimating(instanceId: string): boolean {
   return animatingHandIds.has(instanceId);
+}
+
+/**
+ * How many trailing opponent card-backs are mid-flight and must render hidden —
+ * used by renderOpponentHand so a re-render during the flight keeps the real
+ * back invisible until its clone lands.
+ */
+export function opponentDrawHiddenCount(): number {
+  return animatingOpponentCount;
+}
+
+/**
+ * Applies the in-flight hide to the live opponent fan: the last
+ * `animatingOpponentCount` backs are hidden, the rest revealed. Called whenever
+ * the count changes so the DOM stays correct between full re-renders.
+ */
+function syncOpponentHiddenBacks(): void {
+  const backs = document.querySelectorAll<HTMLElement>(".opponent-hand .card.card-back");
+  const hideFrom = backs.length - animatingOpponentCount;
+  backs.forEach((back, index) => {
+    if (index >= hideFrom) {
+      back.style.opacity = "0";
+    } else if (back.style.opacity === "0") {
+      back.style.opacity = "";
+    }
+  });
 }
 
 /**
@@ -65,6 +96,14 @@ export function notePlayerHandSync(handIds: string[], opts: { suppressNewIds?: r
     const id = handIds[slot];
     if (prevSet.has(id) || suppressed.has(id)) continue;
     animatingHandIds.add(id);
+    // render() ran before this call, so the freshly drawn card is already in the
+    // DOM at full size — hide it now so only the flying clone shows. Subsequent
+    // re-renders keep it hidden via isHandCardAnimating(); cleanup re-reveals it.
+    const el = document.querySelector<HTMLElement>(`.hand-row .card[data-hand-id="${cssAttr(id)}"]`);
+    if (el) {
+      el.style.opacity = "0";
+      el.style.pointerEvents = "none";
+    }
     enqueueDrawAnimation("player", slot, id);
   }
 }
@@ -81,9 +120,13 @@ export function noteOpponentHandSync(handCount: number): void {
   const drawn = handCount - previous;
   if (drawn <= 0 || drawn > 15) return; // ignore shrink / implausible jumps
   for (let i = 0; i < drawn; i += 1) {
-    // New opponent cards land at the end of the fan.
+    // New opponent cards land at the end of the fan. Mark them hidden now so the
+    // real back doesn't sit full-size in the fan while its clone is still flying.
+    animatingOpponentCount += 1;
     enqueueDrawAnimation("opponent", handCount - drawn + i);
   }
+  // renderNow() ran before this call — hide the just-added backs in place.
+  syncOpponentHiddenBacks();
 }
 
 function enqueueDrawAnimation(side: Side, slotIndex: number, handId?: string): void {
@@ -130,7 +173,12 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
       const deckEl = document.querySelector<HTMLElement>(`.deck-pile.battle-deck-pile.${side}-deck`);
       const targetEl = resolveSlotElement(side, slotIndex, handId);
       if (!deckEl || !targetEl) {
-        if (handId) animatingHandIds.delete(handId);
+        if (handId) {
+          animatingHandIds.delete(handId);
+        } else {
+          animatingOpponentCount = Math.max(0, animatingOpponentCount - 1);
+          syncOpponentHiddenBacks();
+        }
         done();
         return;
       }
@@ -144,7 +192,12 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
         (cardRect.left === 0 && cardRect.top === 0) ||
         (deckRect.left === 0 && deckRect.top === 0)
       ) {
-        if (handId) animatingHandIds.delete(handId);
+        if (handId) {
+          animatingHandIds.delete(handId);
+        } else {
+          animatingOpponentCount = Math.max(0, animatingOpponentCount - 1);
+          syncOpponentHiddenBacks();
+        }
         done();
         return;
       }
@@ -172,14 +225,29 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
       clone.style.pointerEvents = "none";
       clone.style.opacity = "1";
       clone.style.transition = "none";
+      // `.card` defines `transform-origin: center 130%` for the fan tilt, which
+      // would pivot the scale well below the card — the start frame computed for
+      // a centre anchor would then sit ~0.4H too low and grow off-axis. Pin the
+      // clone's pivot to its centre so it emerges from the deck and grows into
+      // the slot at the matching size (the bug that made the drawn card look
+      // small / "re-rendered").
+      clone.style.transformOrigin = "center center";
       clone.style.transform = `translate(${startX}px, ${startY}px) scale(0.5)`;
 
       document.body.appendChild(clone);
 
+      // Land at the destination card's resting fan rotation so the hand-off to
+      // the (rotated) real card is seamless — without this the clone settles
+      // upright and snaps to its fan angle when revealed.
+      const restRot = side === "player" ? clone.style.getPropertyValue("--rot").trim() : "";
+      const endTransform = restRot
+        ? `translate(${endX}px, ${endY}px) rotate(${restRot}) scale(1)`
+        : `translate(${endX}px, ${endY}px) scale(1)`;
+
       requestAnimationFrame(() => {
         requestAnimationFrame(() => {
           clone.style.transition = `transform ${FLIGHT_MS}ms ${FLIGHT_EASING}, opacity 0.3s ease`;
-          clone.style.transform = `translate(${endX}px, ${endY}px) scale(1)`;
+          clone.style.transform = endTransform;
         });
       });
 
@@ -200,6 +268,10 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
             real.style.opacity = "";
             real.style.pointerEvents = "";
           }
+        } else {
+          // Opponent back has landed — drop the hide on one trailing back.
+          animatingOpponentCount = Math.max(0, animatingOpponentCount - 1);
+          syncOpponentHiddenBacks();
         }
         done();
       };

@@ -70,6 +70,7 @@ import {
   isHandCardAnimating,
   noteOpponentHandSync,
   notePlayerHandSync,
+  opponentDrawHiddenCount,
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
@@ -2216,9 +2217,15 @@ function renderMana(current: number, max: number, role: "player" | "opponent", s
 }
 
 function renderOpponentHand(count: number): string {
+  // The last N backs are mid draw-flight: render them hidden so only the flying
+  // clone shows (draw-animation.ts reveals them when each clone lands).
+  const hideFrom = count - opponentDrawHiddenCount();
   return `
     <div class="hand opponent-hand" data-testid="opponent-hand">
-      ${Array.from({ length: count }, (_, index) => `<span class="card card-back" style="${opponentFanStyle(index, count)}"></span>`).join("")}
+      ${Array.from({ length: count }, (_, index) => {
+        const hidden = index >= hideFrom ? " opacity: 0;" : "";
+        return `<span class="card card-back" style="${opponentFanStyle(index, count)}${hidden}"></span>`;
+      }).join("")}
     </div>
   `;
 }
