@@ -182,7 +182,10 @@ const TITLE_LABELS: Record<string, string> = {
   taoyuan_hsinchu: "你從桃園新竹"
 };
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
-const ATTACK_LUNGE_MS = 800;
+// Keep in sync with the `attack-lunge`/`hero-attack-lunge` CSS animation
+// durations in styles/battle-fx.css (.minion.lunging / .hero.lunging). The
+// keyframe contact stays at 70%, so ATTACK_IMPACT_DELAY_MS tracks any change here.
+const ATTACK_LUNGE_MS = 600;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
 // Hero death shatter is deliberately slower than the minion one (0.78s) for a
@@ -191,7 +194,7 @@ const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
 const HERO_SHATTER_MS = 1600;
 const RESULT_OVERLAY_PAUSE_MS = 400;
 const APP_VERSION = "v1.1.0";
-const POST_ATTACK_STATE_SYNC_LAG_MS = 120;
+const POST_ATTACK_STATE_SYNC_LAG_MS = 90;
 const MINION_DEATH_FADE_MS = 780;
 const SUMMON_POP_MS = 600;
 const DEATHRATTLE_EFFECT_MS = 1200;

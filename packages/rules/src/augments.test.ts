@@ -940,6 +940,32 @@ describe("new hero and resource augments", () => {
     const ended = reduce(played, env(seat, { type: "endTurn" }), CARD_CATALOG).state;
     expect(ended.players[seat].augmentFlags.payCostWithHealthThisTurn).toBe(false);
   });
+
+  it("emits remainingHealth on the pay-with-health DAMAGE so the client drops the HP digit at impact", () => {
+    const state = startInProgress(28);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.hand = [makeCard({ instanceId: "health-pay-hp", cost: 3, keywords: {} })];
+    player.deck = [];
+    player.hero.hp = 10;
+    player.mana.max = 0;
+    player.mana.current = 0;
+
+    applyAugmentSelection(state, seat, entry("AMP_TAIJI_ELECTRIC_OFFER"), []);
+    startTurn(state, 2000, []);
+    const result = reduce(state, env(seat, { type: "playCard", handInstanceId: "health-pay-hp" }), CARD_CATALOG);
+
+    const damage = result.events.find(
+      (e) => e.type === "DAMAGE" && (e.payload as { target?: string }).target === `${seat}:hero`
+    );
+    expect(damage).toBeDefined();
+    const payload = damage!.payload as { remainingHealth?: number; lifeLoss?: boolean; payment?: string };
+    // 10 HP - 3 cost = 7; carried so the hero digit can drop in lockstep with the -3.
+    expect(payload.remainingHealth).toBe(7);
+    expect(payload.lifeLoss).toBe(true);
+    expect(payload.payment).toBe("HEALTH");
+    expect(result.state.players[seat].hero.hp).toBe(7);
+  });
 });
 
 describe("new bounce-buff augments", () => {

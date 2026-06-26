@@ -186,7 +186,8 @@ export function applyAugmentSelection(state: MatchState, seat: Seat, entry: Ampl
     case "AUG_SELF_HP_LOSS_GRANT_CRYSTALS_NEXT_TURN": {
       const health = effect.health ?? effect.value ?? 0;
       player.hero.hp -= health;
-      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: health, lifeLoss: true }, seat);
+      // Post-loss HP so the client drops the hero digit at impact, not on the held flush.
+      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: health, remainingHealth: player.hero.hp, lifeLoss: true }, seat);
       if (unlockLowHpManaCap(player)) {
         addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, seat);
       }

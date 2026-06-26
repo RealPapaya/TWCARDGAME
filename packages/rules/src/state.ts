@@ -242,7 +242,10 @@ export function payCardCost(state: MatchState, seat: Seat, card: RuntimeCard, ev
   if (paysCardCostWithHealth(state, seat)) {
     if (cost > 0) {
       player.hero.hp -= cost;
-      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: cost, lifeLoss: true, payment: "HEALTH" }, seat);
+      // Carry post-payment HP so the client drops the hero digit at impact (in
+      // lockstep with the -N number) instead of waiting for the held publicSync
+      // flush. lifeLoss/payment still mark this self-inflicted for stat exclusion.
+      addEvent(state, events, "DAMAGE", { target: `${seat}:hero`, amount: cost, remainingHealth: player.hero.hp, lifeLoss: true, payment: "HEALTH" }, seat);
       if (unlockLowHpManaCap(player)) addEvent(state, events, "AUGMENT_TRIGGERED", { augmentId: "AMP_LIFE_INSURANCE" }, seat);
     }
   } else {

@@ -53,13 +53,15 @@
 }
 
 .minion.lunging {
-  animation: attack-lunge 800ms both;
+  /* Duration coupled to ATTACK_LUNGE_MS in runtime.ts — keep both in sync. */
+  animation: attack-lunge 600ms both;
   z-index: 200;
   box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
 }
 
 .hero.lunging {
-  animation: hero-attack-lunge 800ms both;
+  /* Duration coupled to ATTACK_LUNGE_MS in runtime.ts — keep both in sync. */
+  animation: hero-attack-lunge 600ms both;
   z-index: 200;
   box-shadow: 0 0 32px rgba(255, 80, 80, 0.6);
 }
