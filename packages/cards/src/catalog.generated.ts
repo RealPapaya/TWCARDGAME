@@ -426,7 +426,8 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW025",
     "name": "民眾黨黨部",
-    "category": "政府機關",
+    "category": "建築",
+    "hiddenCategory": "政府機關",
     "cost": 8,
     "attack": 0,
     "health": 5,
@@ -445,7 +446,8 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW055",
     "name": "國民黨黨部",
-    "category": "政府機關",
+    "category": "建築",
+    "hiddenCategory": "政府機關",
     "cost": 8,
     "attack": 0,
     "health": 5,
@@ -465,7 +467,8 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW056",
     "name": "民進黨黨部",
-    "category": "政府機關",
+    "category": "建築",
+    "hiddenCategory": "政府機關",
     "cost": 8,
     "attack": 0,
     "health": 5,
@@ -542,7 +545,8 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW017",
     "name": "勞工局",
-    "category": "政府機關",
+    "category": "建築",
+    "hiddenCategory": "政府機關",
     "cost": 5,
     "attack": 0,
     "health": 5,

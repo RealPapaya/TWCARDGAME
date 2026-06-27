@@ -63,6 +63,7 @@ export const CardSchema = z
     id: z.string().min(1),
     name: z.string().min(1),
     category: z.string().min(1),
+    hiddenCategory: z.string().min(1).optional(),
     cost: z.number().int().min(0),
     type: z.enum(["MINION", "NEWS"]),
     rarity: z.enum(["COMMON", "RARE", "EPIC", "LEGENDARY"]),

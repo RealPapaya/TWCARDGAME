@@ -880,6 +880,9 @@ function renderCardsPanel(): HTMLElement {
   let expandedId: string | null = null;
 
   const categories = [...new Set(cards.map((c) => c.category))].sort();
+  const hiddenCategories = [
+    ...new Set(cards.map((c) => c.hiddenCategory).filter((c): c is string => !!c))
+  ].sort();
   const totalCards = cards.length;
   const avgCost = (cards.reduce((s, c) => s + c.cost, 0) / totalCards).toFixed(1);
   const minions = cards.filter((c) => c.type === "MINION");
@@ -913,7 +916,14 @@ function renderCardsPanel(): HTMLElement {
   const raritySelect = h("select", { class: "be-select" });
   raritySelect.innerHTML = `<option value="">全部稀有度</option><option value="COMMON">COMMON</option><option value="RARE">RARE</option><option value="EPIC">EPIC</option><option value="LEGENDARY">LEGENDARY</option>`;
   const catSelect = h("select", { class: "be-select" });
-  catSelect.innerHTML = `<option value="">全部分類</option>` + categories.map((c) => `<option value="${c}">${c}</option>`).join("");
+  catSelect.innerHTML =
+    `<option value="">全部分類</option>` +
+    categories.map((c) => `<option value="${c}">${c}</option>`).join("") +
+    (hiddenCategories.length
+      ? `<optgroup label="隱藏分類">` +
+        hiddenCategories.map((c) => `<option value="hidden:${c}">🕶 ${c}</option>`).join("") +
+        `</optgroup>`
+      : "");
   toolbar.append(searchInput, typeSelect, raritySelect, catSelect);
   panel.append(toolbar);
 
@@ -921,7 +931,7 @@ function renderCardsPanel(): HTMLElement {
   const tableWrap = h("div", { style: "overflow-x: auto;" });
   const table = h("table", { class: "be-table" });
   const thead = h("thead");
-  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>是否有圖片</th><th>費用</th><th>攻/血</th><th>平衡</th><th>類型</th><th>稀有度</th><th>分類</th><th>關鍵字</th></tr>`;
+  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>是否有圖片</th><th>費用</th><th>攻/血</th><th>平衡</th><th>類型</th><th>稀有度</th><th>分類</th><th>隱藏分類</th><th>關鍵字</th></tr>`;
   table.append(thead);
   const tbody = h("tbody");
   table.append(tbody);
@@ -933,7 +943,13 @@ function renderCardsPanel(): HTMLElement {
     const filtered = cards.filter((c) => {
       if (filterType && c.type !== filterType) return false;
       if (filterRarity && c.rarity !== filterRarity) return false;
-      if (filterCategory && c.category !== filterCategory) return false;
+      if (filterCategory) {
+        if (filterCategory.startsWith("hidden:")) {
+          if (c.hiddenCategory !== filterCategory.slice("hidden:".length)) return false;
+        } else if (c.category !== filterCategory) {
+          return false;
+        }
+      }
       if (searchTerm) {
         const s = searchTerm.toLowerCase();
         if (!c.id.toLowerCase().includes(s) && !c.name.toLowerCase().includes(s) && !c.description.toLowerCase().includes(s)) return false;
@@ -956,6 +972,7 @@ function renderCardsPanel(): HTMLElement {
         <td><span class="be-type be-type--${card.type}">${card.type}</span></td>
         <td><span class="${rarityClass(card.rarity)}">${card.rarity}</span></td>
         <td style="color:var(--text-dim)">${card.category}</td>
+        <td style="color:var(--text-muted)">${card.hiddenCategory ? `🕶 ${card.hiddenCategory}` : "—"}</td>
         <td style="font-size:0.75rem;color:var(--text-dim);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${kwSummary(card.keywords)}</td>
       `;
       tr.addEventListener("click", () => {
@@ -966,7 +983,7 @@ function renderCardsPanel(): HTMLElement {
 
       if (expandedId === card.id) {
         const edRow = h("tr", { class: "be-editor be-editor--open" });
-        const edTd = h("td", { colspan: "10" });
+        const edTd = h("td", { colspan: "11" });
         edTd.append(buildCardEditor(card, () => rebuildRows()));
         edRow.append(edTd);
         tbody.append(edRow);
@@ -1050,6 +1067,19 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
   catField.append(catInp);
   grid.append(catField);
+
+  // hidden category (optional — not shown on the card face)
+  const hiddenCatField = h("div", { class: "be-field" });
+  hiddenCatField.append(h("label", {}, "隱藏分類"));
+  const hiddenCatInp = h("input", { type: "text", value: card.hiddenCategory ?? "", placeholder: "（選填）" });
+  hiddenCatInp.addEventListener("change", () => {
+    const v = hiddenCatInp.value.trim();
+    card.hiddenCategory = v || undefined;
+    bumpChanges();
+    refresh();
+  });
+  hiddenCatField.append(hiddenCatInp);
+  grid.append(hiddenCatField);
 
   const imageField = h("div", { class: "be-field" });
   imageField.append(h("label", {}, "圖片路徑"));
