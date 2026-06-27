@@ -2176,7 +2176,7 @@ body.hand-dragging .hand-row .card {
 .hero-augment-dot.amp-tier-mid { background: #f0cd7e; }
 .hero-augment-dot.amp-tier-high { background: #f0998f; }
 .hero-augment-dot.has-icon {
-  background: radial-gradient(circle at 38% 30%, #fff8d6 0 18%, #d9b355 56%, #8b5a22 100%);
+  background: radial-gradient(circle at 38% 30%, #eef9d2 0 18%, #bfe0a6 58%, #5f8c45 100%);
 }
 .hero-augment-icon {
   display: block;
