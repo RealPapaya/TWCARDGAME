@@ -636,6 +636,9 @@
 .card-op-hint {
   margin: 0;
   font-size: 13px;
+  /* Override .muted's dark-brown colour which is unreadable on the dark modal
+     background; use a warm-cream tone that matches the modal's light-on-dark palette. */
+  color: var(--ink-muted) !important;
 }
 
 /* Deck cover thumbnail + picker */

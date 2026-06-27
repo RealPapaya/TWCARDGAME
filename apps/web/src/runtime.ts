@@ -1393,9 +1393,9 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           <header class="collection-header">
             <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
             <h2 class="collection-title">${escapeHtml(title)}</h2>
-            <div class="collection-header-voucher" title="持有消費券">
+            <div class="collection-header-voucher">
               <span id="collection-vouchers"><span class="voucher-icon" aria-hidden="true"></span>${view.profile?.vouchers ?? 0}</span>
-              ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" title="一鍵分解所有超過 2 張的多餘卡牌" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
+              ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
             </div>
           </header>
           <div class="collection-controls-bar">
@@ -1562,7 +1562,7 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   const disabled = Boolean(view.editingDeck) && owned && !canAdd;
   const resolved = resolveCatalogCard(card, `collection-${card.id}`);
   return `
-    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-owned="${owned ? "1" : "0"}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-owned="${owned ? "1" : "0"}" data-testid="collection-tile" ${disabled ? "disabled" : ""}>
       <span class="card-count-badge">x${quantity}</span>
       ${selectedCount > 0 ? `<span class="deck-count-badge">${selectedCount}/${limit}</span>` : ""}
       <div class="card rarity-${card.rarity.toLowerCase()}">
@@ -4710,7 +4710,7 @@ function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, s
         <div class="lb-player-title">未設定稱號</div>
       </div>
       <div class="lb-stat-pill">${escapeHtml(statLabel)}</div>
-      <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}" title="查看個人頁面">查看</button>
+      <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}">查看</button>
     </div>
   `;
 }
