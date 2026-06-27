@@ -733,10 +733,10 @@ body.hand-dragging .hand-row .card {
 
 .card-cost {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 28px;
-  height: 28px;
+  top: -5px;
+  left: -5px;
+  width: 26px;
+  height: 26px;
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, #00c6ff, #0072ff);
@@ -744,7 +744,7 @@ body.hand-dragging .hand-row .card {
   border: 2px solid rgba(255, 255, 255, 0.5);
   border-radius: 4px;
   transform: rotate(45deg);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
   z-index: 5;
   box-shadow: 0 0 10px rgba(0, 198, 255, 0.68);
@@ -755,8 +755,8 @@ body.hand-dragging .hand-row .card {
 }
 
 .card-title {
-  align-self: flex-end;
-  width: calc(100% - 34px);
+  align-self: center;
+  width: 100%;
   min-height: 32px;
   margin: 1px 0 3px;
   padding: 2px 2px 0;
@@ -819,9 +819,9 @@ body.hand-dragging .hand-row .card {
 .card .minion-stats,
 .minion .minion-stats {
   position: absolute;
-  left: 6px;
-  right: 6px;
-  bottom: -8px;
+  left: -5px;
+  right: -5px;
+  bottom: -5px;
   display: flex;
   justify-content: space-between;
   pointer-events: none;
@@ -835,7 +835,7 @@ body.hand-dragging .hand-row .card {
   place-items: center;
   color: #fff;
   font-family: var(--font-display);
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 900;
   text-shadow: 1px 1px 2px #000;
 }

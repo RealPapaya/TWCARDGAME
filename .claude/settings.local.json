@@ -84,7 +84,12 @@
       "Bash(findstr /i \"Pinging Reply\")",
       "Bash(curl -s -o NUL -w \"localhost -> HTTP %{http_code} \\(connected to %{remote_ip}\\)\\\\n\" -X POST http://localhost:8787/pve/devtest -H \"content-type: application/json\" -d \"{\\\\\"devTest\\\\\":{\\\\\"activeSeat\\\\\":\\\\\"player1\\\\\"}}\")",
       "Bash(curl -s -o NUL -w \"ipv6 -> HTTP %{http_code}\\\\n\" -X POST http://[::1]:8787/pve/devtest -H \"content-type: application/json\" -d \"{\\\\\"devTest\\\\\":{\\\\\"activeSeat\\\\\":\\\\\"player1\\\\\"}}\")",
-      "Bash(node artifacts/repro-devtest.mjs)"
+      "Bash(node artifacts/repro-devtest.mjs)",
+      "Bash(node .tmp-cover-check.mjs)",
+      "Bash(node .tmp-cover-mobile.mjs)",
+      "Bash(node .tmp-shot.mjs http://192.168.1.74:5173 \"/\")",
+      "Bash(node .tmp-shot.mjs \"http://192.168.1.74:5173/\")",
+      "Bash(node .tmp-cover-saved.mjs http://localhost:5174)"
     ],
     "additionalDirectories": [
       "\\tmp"

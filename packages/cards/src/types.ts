@@ -74,7 +74,14 @@ export interface CardKeywords {
 export interface CardDefinition {
   id: string;
   name: string;
+  /** Visible category shown to players (e.g. "建築"). Always present. */
   category: string;
+  /**
+   * Optional hidden category that keeps a card grouped under a legacy/secondary
+   * tag (e.g. former "政府機關" cards now shown as "建築"). Not surfaced on the
+   * card face; used for editor bookkeeping and future category logic.
+   */
+  hiddenCategory?: string;
   cost: number;
   type: CardType;
   rarity: Rarity;
