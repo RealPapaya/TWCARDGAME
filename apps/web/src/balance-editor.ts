@@ -340,6 +340,18 @@ main#app {
   background: rgba(0,0,0,0.25); border-radius: var(--radius-sm);
   border: 1px dashed var(--glass-border);
 }
+.be-augment-preview-pair {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+  width: 100%;
+  flex-wrap: wrap;
+}
+.be-augment-preview-pair .hero-augment-dot {
+  flex: 0 0 auto;
+  transform: scale(1.25);
+}
 /* neutralise the hand fan transform so the preview sits upright and centered */
 .be-preview .card { transform: none !important; margin: 0 !important; }
 /* the preview is display-only; keep it inert without the game's disabled
