@@ -18,7 +18,7 @@ Use the target card category to choose the final flat background color.
 | 民眾黨政治人物 | `#fdfcfb` |
 | 勞工 | `#6e4c2d` |
 | 建築 | `#ced3d7` |
-| 公眾人物 | `#ffb3c6` |
+| 公眾人物 | `#52414C` |
 | 學生 | `#ffb352` |
 | 動物 | `#f1ddbf` |
 | 新聞 | `#28282b` |
