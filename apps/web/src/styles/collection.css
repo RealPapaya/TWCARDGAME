@@ -244,23 +244,23 @@
   z-index: 50;
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 3px;
-  border: 1px solid #fff4d6;
+  gap: 6px;
+  padding: 5px;
+  border: 1.5px solid #fff4d6;
   border-radius: 999px;
   background: #25140e;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.24);
 }
 
 .collection-filter-tab {
-  min-width: 54px;
-  height: 26px;
-  padding: 0 9px;
+  min-width: 70px;
+  height: 32px;
+  padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: #4a2a1b;
   color: #fff4d6;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   user-select: none;
@@ -455,11 +455,11 @@
 /* Align the card name's vertical centre with the cost badge: occupy a header band that
    starts at the card's top edge and leave left room so the name clears the cost badge. */
 .collection-card .card-title {
-  align-self: stretch;
-  width: auto;
+  align-self: center;
+  width: 100%;
   min-height: 28px;
   margin: 0 0 4px;
-  padding: 0 6px 0 30px;
+  padding: 0 6px;
 }
 
 .card-count-badge {

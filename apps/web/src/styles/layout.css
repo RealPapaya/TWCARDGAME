@@ -733,18 +733,18 @@ body.hand-dragging .hand-row .card {
 
 .card-cost {
   position: absolute;
-  top: 8px;
-  left: 8px;
-  width: 28px;
-  height: 28px;
+  top: 6px;
+  left: 6px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   background: linear-gradient(135deg, #00c6ff, #0072ff);
   color: #fff;
-  border: 2px solid rgba(255, 255, 255, 0.5);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
   border-radius: 4px;
   transform: rotate(45deg);
-  font-size: 15px;
+  font-size: 11px;
   font-weight: 900;
   z-index: 5;
   box-shadow: 0 0 10px rgba(0, 198, 255, 0.68);
@@ -755,8 +755,8 @@ body.hand-dragging .hand-row .card {
 }
 
 .card-title {
-  align-self: flex-end;
-  width: calc(100% - 34px);
+  align-self: center;
+  width: 100%;
   min-height: 32px;
   margin: 1px 0 3px;
   padding: 2px 2px 0;

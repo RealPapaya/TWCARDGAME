@@ -566,7 +566,8 @@ export const CARD_CATALOG_GENERATED = [
   {
     "id": "TW018",
     "name": "台積電",
-    "category": "企業",
+    "category": "建築",
+    "hiddenCategory": "企業",
     "cost": 5,
     "attack": 0,
     "health": 10,
