@@ -1,0 +1,4 @@
+interface:
+  display_name: "TW Card Image Pilot"
+  short_description: "Generate one TWCARDGAME card portrait pilot and validate WebP specs."
+  default_prompt: "Use $tw-card-image-pilot to transform one specified TWCARDGAME card image into a medieval fantasy adventure portrait, then validate WebP, 16:9, file size, and git status."
