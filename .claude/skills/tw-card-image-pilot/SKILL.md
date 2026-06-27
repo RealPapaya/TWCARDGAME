@@ -5,7 +5,7 @@ description: Create or update a single TWCARDGAME card image pilot from one refe
 
 # TW Card Image Pilot
 
-Use this skill for a one-card image pilot before any batch image generation.
+Use this skill for a one-card image pilot before any batch image generation. After a pilot is accepted, use the same rules one card at a time for a category batch.
 
 ## Category Background Colors
 
@@ -40,6 +40,16 @@ The final image background must be a flat, uniform, solid fill using the target 
 
 If generation produces a non-flat background, post-process the connected background area to the target category color before saving the final WebP.
 
+## Subject And Background Color Separation
+
+When prompting, keep the character visually separated from the category background color.
+
+- Do not add new clothing, armor, accessories, rim light, aura, props, or shadows that use the same color as the background.
+- Do not make the character's dominant silhouette color match the background color.
+- If the reference already contains a similar color, preserve the reference item but shift its generated hue/value enough to stay readable against the background.
+- For `#194a7a` 國民黨政治人物 backgrounds, avoid making jackets, shirts, armor, or cast shadows dark navy/blue; preserve blue reference clothing as a lighter, less saturated blue if needed.
+- Preserve identity and original clothing first, but never let the character blend into the flat background.
+
 ## Inputs
 
 - Target card image path, usually `apps/web/public/images/cards/<name>.webp`.
@@ -65,6 +75,16 @@ If no target path is provided, ask for it. Do not infer a different card asset.
    - final aspect ratio is 16:9
    - final file size is under 50KB
    - `git status --short` shows only the intended image changed, plus any explicitly requested skill/config files if the task is creating this skill
+
+## Category Batch Workflow
+
+For a category batch, repeat the core workflow one card at a time.
+
+- Derive each target path from that card's own `image` field.
+- Use only that target image as the visual reference for that card.
+- Do not reuse a generated result as the reference for another card.
+- Generate, post-process, inspect, overwrite, and validate each card before moving to the next.
+- Stop and report if a candidate damages identity, changes the pose/clothing too much, blends into the background, or fails file validation.
 
 ## Prompt Template
 
@@ -114,7 +134,8 @@ Color Treatment:
 natural colors,
 slightly warm palette,
 balanced saturation,
-soft contrast.
+soft contrast,
+avoid using the target background color as a dominant character, clothing, accessory, prop, outline, shadow, or rim-light color.
 
 Quality:
 AAA mobile game character portrait,
@@ -145,6 +166,11 @@ no vignette,
 no shadow,
 no floor plane,
 no environmental backdrop.
+
+Subject/background separation:
+character colors must remain distinct from the flat background color,
+do not add new character elements that match the background color,
+if reference clothing is close to the background color, keep the same clothing but shift it lighter/darker or less saturated enough to remain readable.
 
 No text, no logos, no watermark.
 
