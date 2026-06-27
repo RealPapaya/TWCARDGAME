@@ -2175,8 +2175,14 @@ body.hand-dragging .hand-row .card {
 .hero-augment-dot.amp-tier-low { background: #bfe0a6; }
 .hero-augment-dot.amp-tier-mid { background: #f0cd7e; }
 .hero-augment-dot.amp-tier-high { background: #f0998f; }
-.hero-augment-dot.has-icon {
+.hero-augment-dot.has-icon.amp-tier-low {
   background: radial-gradient(circle at 38% 30%, #eef9d2 0 18%, #bfe0a6 58%, #5f8c45 100%);
+}
+.hero-augment-dot.has-icon.amp-tier-mid {
+  background: radial-gradient(circle at 38% 30%, #fff4c8 0 18%, #f0cd7e 58%, #a66d20 100%);
+}
+.hero-augment-dot.has-icon.amp-tier-high {
+  background: radial-gradient(circle at 38% 30%, #ffe4dc 0 18%, #f0998f 58%, #a3483c 100%);
 }
 .hero-augment-icon {
   display: block;

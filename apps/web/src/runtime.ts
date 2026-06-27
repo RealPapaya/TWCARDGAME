@@ -2809,11 +2809,25 @@ const HERO_AUGMENT_ICON_IDS = new Set([
   "AMP_LIFE_INSURANCE",
   "AMP_VILLAGE_LUNCHBOX",
   "AMP_BLOOD_DONATION_VOUCHER",
-  "AMP_BANQUET"
+  "AMP_BANQUET",
+  "AMP_DIVIDEND",
+  "AMP_INVOICE_1000",
+  "AMP_TAX_CUT",
+  "AMP_CHILDCARE",
+  "AMP_FREE_SPEECH",
+  "AMP_NEW_HOUSING",
+  "AMP_BETEL_NUT_500",
+  "AMP_BEGGAR_HERO",
+  "AMP_DCA",
+  "AMP_PARTY_ASSET_SUPPLEMENT",
+  "AMP_NATIONAL_HOLIDAY",
+  "AMP_NUCLEAR_FREE_HOMELAND",
+  "AMP_RESTART_NUCLEAR_FOUR",
+  "AMP_RETURN_COUNTRY_TO_YOU"
 ]);
 
 function heroAugmentIconSrc(augment: Pick<AmplificationSelection, "id" | "tier">): string | undefined {
-  if (augment.tier !== "加減賺" || !HERO_AUGMENT_ICON_IDS.has(augment.id)) return undefined;
+  if (!HERO_AUGMENT_ICON_IDS.has(augment.id)) return undefined;
   return `/images/augments/icons/${augment.id.toLowerCase()}.svg`;
 }
 
