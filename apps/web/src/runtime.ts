@@ -66,6 +66,7 @@ import {
 import { installClickEffect } from "./app/click-effect.js";
 import { playPveTransition } from "./app/transition-video.js";
 import { setAppContext } from "./app/context.js";
+import { dismissSplash } from "./app/preloader.js";
 import {
   isHandCardAnimating,
   noteOpponentHandSync,
@@ -412,6 +413,32 @@ function processImageDechecker(url: string): string {
   return url;
 }
 
+// Battle/mode-select building art runs through processImageDechecker to flood-fill
+// its near-white background transparent. That swap (opaque -> transparent data URL)
+// flashes if it happens on first paint, so we warm the dechecker cache at boot —
+// the bytes are already in the HTTP cache from the preloader, so processing is done
+// long before the player clicks through to the battle screen. Keep this list in sync
+// with the processImageDechecker() calls in renderBattleScreen().
+const BATTLE_MODE_DECHECKER_IMAGES = [
+  "/images/ui/gamemode-arena-hotspot.webp",
+  "/images/ui/gamemode-president.webp",
+  "/images/ui/gamemode-towel.webp",
+  "/images/ui/gamemode-training.webp",
+  "/images/ui/Banner.webp"
+];
+
+function warmBattleModeImages(): void {
+  for (const url of BATTLE_MODE_DECHECKER_IMAGES) processImageDechecker(url);
+}
+
+// True from page load until the boot splash is dismissed. While set, render() is a
+// no-op so the many intermediate renders during account load don't morph (and
+// destroy) the splash; startApp does one clean render at reveal. Boot-only — no
+// match exists yet, so this never touches the in-match publicSync hold/flush model.
+let bootSplashActive = true;
+// Never trap the player behind the splash if the account fetch hangs.
+const BOOT_ACCOUNT_TIMEOUT_MS = 8000;
+
 let renderScheduled = false;
 let trainingSession: TrainingSession | undefined;
 let remoteTrainingCompletions = new Set<string>();
@@ -476,13 +503,44 @@ export function startApp(): void {
       render();
     });
   }
-  render();
+  // Pre-process the mode-select building art into the dechecker cache while the
+  // splash is still up, so the battle screen never flashes its un-keyed version.
+  warmBattleModeImages();
   // Best-effort: stamp the active-match record at the moment of unload so the
   // startup resume prompt can judge whether the server room is still alive.
   window.addEventListener("pagehide", () => {
     if (view.room) touchActiveMatch();
   });
-  void initializeAccount().finally(() => {
+  // Hold the splash until the account data (collection/decks/profile) is loaded,
+  // then reveal the menu in one render — so the collection is never momentarily
+  // empty on entry. render() is gated by bootSplashActive until this resolves.
+  void bootAndReveal();
+}
+
+async function bootAndReveal(): Promise<void> {
+  // Never rejects — loadAccountData already swallows its own errors; this guards
+  // the getSession() leg so the boot flow always completes and reveals the menu.
+  const account = initializeAccount().catch((error) => {
+    console.error("Account initialization failed during boot", error);
+  });
+
+  // Reveal when account data is ready, or after a timeout so a hung network never
+  // traps the player behind the splash. Late data still renders once it arrives.
+  await Promise.race([
+    account,
+    new Promise<void>((resolve) => window.setTimeout(resolve, BOOT_ACCOUNT_TIMEOUT_MS))
+  ]);
+
+  // Remove the splash while render() is still gated, so the reveal is a clean
+  // innerHTML set into an empty #app rather than a morph of the splash subtree.
+  await dismissSplash();
+  bootSplashActive = false;
+  render();
+
+  // Prompt to resume a match only once account/auth load has genuinely finished
+  // (so view.session is populated) — never on the reveal timeout, or a slow load
+  // would make maybePromptResumeMatch discard a valid PvP reconnect token.
+  void account.then(() => {
     void maybePromptResumeMatch();
   });
 }
@@ -493,6 +551,7 @@ function shouldOpenDevTestFromUrl(): boolean {
 }
 
 function render(): void {
+  if (bootSplashActive) return;
   if (renderScheduled) return;
   renderScheduled = true;
   window.requestAnimationFrame(() => {

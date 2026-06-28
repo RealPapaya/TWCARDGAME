@@ -89,7 +89,12 @@
       "Bash(node .tmp-cover-mobile.mjs)",
       "Bash(node .tmp-shot.mjs http://192.168.1.74:5173 \"/\")",
       "Bash(node .tmp-shot.mjs \"http://192.168.1.74:5173/\")",
-      "Bash(node .tmp-cover-saved.mjs http://localhost:5174)"
+      "Bash(node .tmp-cover-saved.mjs http://localhost:5174)",
+      "Bash(where.exe codex *)",
+      "Bash(where.exe gemini *)",
+      "WebFetch(domain:www.aiposthub.com)",
+      "Bash(codex.cmd --version)",
+      "Bash(codex.cmd exec *)"
     ],
     "additionalDirectories": [
       "\\tmp"
