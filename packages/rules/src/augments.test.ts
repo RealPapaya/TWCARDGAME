@@ -904,7 +904,8 @@ describe("new hero and resource augments", () => {
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
     player.hand = [makeCard({ instanceId: "health-pay-lethal", cost: 3, keywords: {} })];
-    player.deck = [];
+    // One filler so the start-of-turn draw doesn't fatigue (this test is about HP payment, not fatigue).
+    player.deck = [makeCard({ instanceId: "filler-lethal", cost: 0, keywords: {} })];
     player.hero.hp = 3;
     player.mana.max = 0;
     player.mana.current = 0;
@@ -946,7 +947,8 @@ describe("new hero and resource augments", () => {
     const seat = state.turn.activeSeat;
     const player = state.players[seat];
     player.hand = [makeCard({ instanceId: "health-pay-hp", cost: 3, keywords: {} })];
-    player.deck = [];
+    // One filler so the start-of-turn draw doesn't fatigue (this test is about HP payment, not fatigue).
+    player.deck = [makeCard({ instanceId: "filler-hp", cost: 0, keywords: {} })];
     player.hero.hp = 10;
     player.mana.max = 0;
     player.mana.current = 0;

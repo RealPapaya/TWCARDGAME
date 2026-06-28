@@ -246,6 +246,7 @@ function createPlayer(setup: PlayerSetup): PlayerState {
     board: [],
     mulliganReady: false,
     shortTurnPenalty: false,
+    fatigue: 0,
     augments: [],
     augmentFlags: defaultAugmentFlags(),
     registeredCategoryCounts: {}
@@ -446,6 +447,9 @@ function endTurn(state: MatchState, nowMs: number, events: GameEvent[], catalog:
   if (state.status === "finished") return;
   state.turn.activeSeat = opponentPlayer(state).seat;
   startTurn(state, nowMs, events);
+  // 回合開始的固定抽牌若因疲勞致死,startTurn → drawCards 已結算勝負,別再開特殊階段。
+  // (前面的 early-return 讓 TS 把 status narrow 掉了 "finished",故以 string 讀取繞過。)
+  if ((state.status as string) === "finished") return;
   // After the new turn is fully set up (draw/mana/clock done), open a special
   // phase if this turn triggers one. The interrupted turn resumes on resolution.
   const trigger = phaseTriggerForTurn(state.turn.number);

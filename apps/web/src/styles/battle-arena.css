@@ -1885,6 +1885,19 @@
   box-shadow: 1px 1px 0 #222, 2px 2px 0 #222, 3px 3px 0 #222, 4px 4px 5px rgba(0, 0, 0, 0.5);
 }
 
+/* 牌庫抽乾:沒有卡背圖、沒有堆疊陰影,只剩虛線外框,表示牌組已空。 */
+.battle-deck-pile.empty {
+  background: none;
+  border: 2px dashed #555;
+  box-shadow: none;
+}
+
+.battle-deck-pile.empty .count-badge {
+  background: #555;
+  color: #ddd;
+  box-shadow: none;
+}
+
 .battle-deck-pile .count-badge {
   position: absolute;
   right: -8px;

@@ -68,10 +68,12 @@ import { playPveTransition } from "./app/transition-video.js";
 import { setAppContext } from "./app/context.js";
 import { dismissSplash } from "./app/preloader.js";
 import {
+  FATIGUE_DRAW_MS,
   isHandCardAnimating,
   noteOpponentHandSync,
   notePlayerHandSync,
   opponentDrawHiddenCount,
+  playFatigueDraw,
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
@@ -190,6 +192,9 @@ const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 600;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
+// 同批次多次疲勞(例如從空牌庫抽兩張)時,每張骷髏卡命中之間的錯開時間,讓玩家看得到
+// 兩次(以上)獨立的動畫與掉血,而不是疊在一起像一次。
+const FATIGUE_STAGGER_MS = 650;
 // Hero death shatter is deliberately slower than the minion one (0.78s) for a
 // dramatic finish; the victory/defeat overlay is held until it finishes plus a
 // short settle pause.
@@ -472,6 +477,8 @@ const appliedDeathrattles = new Set<string>();
 // delay (fast play → effect waits for the landing to settle) never finished
 // flying. Firing once into a body-level element sidesteps the render churn.
 const appliedKnives = new Set<string>();
+// 疲勞骷髏卡(命令式 body 層級飛行)已觸發的 cue id,確保一張 cue 只飛一次。
+const appliedFatigue = new Set<string>();
 // Last-seen on-screen rect per unit instanceId, so a deathrattle (遺志) plume can
 // anchor on a minion whose DOM has already been removed by its DESTROY (R4).
 const recentUnitRects = new Map<string, { rect: DOMRect; atMs: number }>();
@@ -2674,13 +2681,13 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
       </div>
       ${renderTurnCountdown("turn")}
       <div class="end-turn-group">
-        <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
+        <div class="deck-pile battle-deck-pile opponent-deck${(opponentPlayer?.deckCount ?? 0) === 0 ? " empty" : ""}" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
         </div>
         <span class="end-turn-wrap${isMyTurn && !battleLocked && !hasAnyLegalAction() ? " can-end" : ""} ${endTurnHighlight}">
           <button id="end-turn" class="end-turn-btn" ${canEndTurn ? "" : "disabled"} data-testid="end-turn">結束回合</button>
         </span>
-        <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
+        <div class="deck-pile battle-deck-pile player-deck${(myPlayer?.deckCount ?? 0) === 0 ? " empty" : ""}" title="Player deck">
           <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
         </div>
       </div>
@@ -9339,6 +9346,21 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     applyPostAttackEffectDelays(applyPostPlayEffectDelays(applyPostQuestEffectDelays(rawCues), multiHitSeqs))
   );
   if (cues.length === 0) return [];
+  // 疲勞:讓傷害數字/英雄閃紅/血量落下對齊到骷髏卡命中英雄的當下(FATIGUE_DRAW_MS),
+  // 並把 publicSync 壓住到命中後再 flush,免得血量在卡牌還在飛時就先掉。
+  const fatigueCues = cues.filter((cue) => cue.fatigue);
+  if (fatigueCues.length > 0) {
+    const now = performance.now();
+    // 每張骷髏卡各自飛行、命中時間錯開 FATIGUE_STAGGER_MS;applyFatigueDraw 依 readyAtMs
+    // 反推起飛時間,所以兩次抽空會看到兩張骷髏卡與兩次掉血(各帶自己的 remainingHealth)。
+    fatigueCues.forEach((cue, i) => {
+      const offset = FATIGUE_DRAW_MS + i * FATIGUE_STAGGER_MS;
+      cue.delayMs = Math.max(cue.delayMs ?? 0, offset);
+      cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + offset);
+    });
+    const lastOffset = FATIGUE_DRAW_MS + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
+    holdPendingPublicSyncFor(lastOffset + POST_PLAY_STATE_SYNC_LAG_MS);
+  }
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push
   // the board-effect cues out until the roulette reveals the winner, so e.g.
   // 高雄氣爆 only kills minions after the decision is shown. Guarded by the same
@@ -9913,6 +9935,23 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     const targetKey = targetRef ? targetKeyFor(targetRef) : undefined;
     return { id, kind: "attackerMoves", text: "", seat: event.seat, attackerInstanceId, targetKey };
   }
+  if (event.type === "FATIGUE") {
+    // 牌庫抽乾的疲勞傷害。重用 "damage" cue(數字 -N、英雄閃紅、血量於命中落下),
+    // 並標記 fatigue 讓 applyPostRenderEffects 額外飛出「卡牌已抽乾 + 骷髏」卡。
+    const heroKey = typeof target === "string" ? target : event.seat ? `${event.seat}:hero` : undefined;
+    const resultingHealth = typeof payload.remainingHealth === "number" ? payload.remainingHealth : undefined;
+    return {
+      id,
+      kind: "damage",
+      text: amount ? `-${amount}` : "Fatigue",
+      seat: event.seat,
+      targetKey: heroKey,
+      amount,
+      seq: event.seq,
+      resultingHealth,
+      fatigue: true
+    };
+  }
   // DAMAGE / HEAL / BUFF / SHIELD_POPPED / BOUNCE / DESTROY / DEATHRATTLE all
   // map through the shared cue-kind table. The batch-level `combatDamageSeqs`
   // decides whether a DAMAGE is a basic combat hit ("damage") or a spell strike
@@ -10475,6 +10514,25 @@ function applyKnifeStrike(cue: AnimationCue): void {
   window.setTimeout(() => knife.remove(), 420);
 }
 
+// 疲勞:牌庫抽乾時飛出「卡牌已抽乾 + 骷髏」的卡,從抽牌方的牌庫飛向其英雄。命令式
+// 觸發(一張 cue 一次),不等 readyAtMs —— 卡牌「先飛」,飛行到位(FATIGUE_DRAW_MS)
+// 時 cue 才 ready,傷害數字/血量落下因此正好對齊命中。
+function applyFatigueDraw(cue: AnimationCue): void {
+  if (!cue.fatigue || !cue.targetKey || appliedFatigue.has(cue.id)) return;
+  appliedFatigue.add(cue.id);
+  const targetKey = cue.targetKey;
+  const side: "player" | "opponent" = cue.seat === view.mySeat ? "player" : "opponent";
+  // 讓骷髏卡「命中」對齊到傷害數字 ready 的時刻:起飛 = readyAt − 飛行時間。回合開始的
+  // 疲勞 readyAt≈now+FATIGUE_DRAW_MS,所以幾乎立即起飛;若疲勞排在出牌動畫之後則延後起飛。
+  const landAt = cue.readyAtMs ?? performance.now() + FATIGUE_DRAW_MS;
+  const startDelay = Math.max(0, landAt - FATIGUE_DRAW_MS - performance.now());
+  const fire = (): void => playFatigueDraw(side, targetKey);
+  if (startDelay > 0) window.setTimeout(fire, startDelay);
+  else fire();
+  // cue 結束時清掉,避免集合長期累積。
+  window.setTimeout(() => appliedFatigue.delete(cue.id), startDelay + FATIGUE_DRAW_MS + 1600);
+}
+
 // Shared core for the death-shatter visual: slices `bgImg` (sampled over `rect`)
 // into a cols×rows grid of fragments that fly apart and fade. Used by both the
 // minion shatter (fast, 0.78s) and the hero shatter (slow, HERO_SHATTER_MS).
@@ -10773,6 +10831,9 @@ function applyPostRenderEffects(): void {
     }
     if (cue.kind === "effectStrike" && cue.sourceKey && cue.targetKey && cueIsReady(cue)) {
       applyKnifeStrike(cue);
+    }
+    if (cue.fatigue && cue.targetKey && !appliedFatigue.has(cue.id)) {
+      applyFatigueDraw(cue);
     }
     if (cue.kind === "destroy" && cue.targetKey && cueIsReady(cue)) {
       applyDeathShatter(cue);
