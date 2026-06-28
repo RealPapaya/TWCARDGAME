@@ -459,6 +459,16 @@ let trainingCardRewardTimer: number | undefined;
 const TRAINING_CARD_REWARD_DELAY_MS = 1900;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
+// Target-keys of minions whose death shatter has fired but whose board slot the
+// held publicSync has not yet removed. The `destroy` cue that drives `.being-destroyed`
+// expires at MINION_DEATH_FADE_MS, but in dense multi-kill / resurrect sequences the
+// publicSync flush is pushed much later (holds stack via Math.max). Without this set
+// the minion would lose `.being-destroyed` when its cue expires and pop back to full
+// opacity, lingering as a "ghost" until the delayed flush — the reported flicker.
+// Driving the class off this set (cleared on flush) keeps the dead unit hidden from
+// shatter through removal. Imperatively-added classes are stripped by the render
+// morph, so this must drive the template (same reason as shatteringHeroSeat below).
+const pendingDeathRemovals = new Set<string>();
 // The losing hero's portrait shatters once per match on GAME_FINISHED; this gate
 // stops repeat renders from re-spawning it. resultOverlayHoldUntilMs defers the
 // VICTORY/DEFEAT overlay (and reward animation) until that shatter has finished.
@@ -488,6 +498,7 @@ const loggedSkippedSummonAnimations = new Set<string>();
 
 function resetMinionVisualTracking(): void {
   minionDomKeys.clear();
+  pendingDeathRemovals.clear();
   summonPreviewedTargets.clear();
   loggedSummonPreviewSlots.clear();
   loggedSkippedSummonAnimations.clear();
@@ -2163,7 +2174,10 @@ function renderSummonPreview(cue: AnimationCue): string {
     hasCue(targetKey, "shieldPop") && "shield-popping",
     hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
-    hasCue(targetKey, "destroy") && "being-destroyed"
+    // Same persistence as renderMinion: keep the fade through to the flush so a
+    // previewed minion destroyed in the same held batch doesn't pop back to full
+    // opacity when its destroy cue expires ahead of a delayed publicSync.
+    (hasCue(targetKey, "destroy") || pendingDeathRemovals.has(targetKey)) && "being-destroyed"
   ]);
   return `
     <button
@@ -2428,7 +2442,10 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "summon") && !skipSummonAnimation && "summoning",
-    hasCue(targetKey, "destroy") && "being-destroyed"
+    // Keep the fade applied from the destroy cue through to the (possibly much later)
+    // publicSync flush via pendingDeathRemovals, so a dead minion never pops back to
+    // full opacity when its cue expires during stacked multi-kill holds.
+    (hasCue(targetKey, "destroy") || pendingDeathRemovals.has(targetKey)) && "being-destroyed"
   ]);
 
   return `
@@ -8986,6 +9003,10 @@ function applyPendingPublicSyncNow(): void {
       boardIdsBefore: beforeBoardIds
     });
     view.publicSync = message as typeof view.publicSync;
+    // The flush only runs once the max hold has elapsed, so this authoritative state
+    // already reflects every death that fired during the held window — release the
+    // visual-death gate so the new board (minus the dead units) renders cleanly.
+    pendingDeathRemovals.clear();
     renderNow();
     const cleared = clearAcceptedBattlecryAfterRender();
     if (cleared) renderNow();
@@ -10582,6 +10603,10 @@ function applyDeathShatter(cue: AnimationCue): void {
   const minionEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
   if (!minionEl) return;
   appliedDeathShatters.add(cue.id);
+  // Mark the unit visually dead until the flush actually drops it from the board, so
+  // it stays faded (see pendingDeathRemovals) instead of flashing back after the cue
+  // expires. Cleared wholesale in applyPendingPublicSyncNow once state catches up.
+  pendingDeathRemovals.add(cue.targetKey);
 
   const rect = minionEl.getBoundingClientRect();
   blog("DEATHSHATTER-DBG fired", { targetKey: cue.targetKey, left: Math.round(rect.left) });
