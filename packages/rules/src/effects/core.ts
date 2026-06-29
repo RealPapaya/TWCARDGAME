@@ -187,6 +187,7 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
     }
     player.hand.push(card);
     addEvent(state, events, "CARD_DRAWN", { cardId: card.cardId, handCount: player.hand.length }, player.seat);
+    handleDrawTriggers(state, player, events);
   }
   // 疲勞可能致死。drawCards 被許多路徑呼叫,其中回合開始的固定抽牌之後不會再經過
   // resolvePostAction,所以這裡自行收尾結算(finishIfHeroDead 對已結束狀態為冪等)。
@@ -740,6 +741,15 @@ export function drawEffect(effect: EffectDefinition, context: EffectContext): vo
   drawCards(context.state, context.state.players[context.activeSeat], effect.value ?? 1, context.events);
 }
 
+// 陳致中: draw `value` cards, or `bonus_value` instead when the referenced card
+// (effect.cardId, e.g. 陳水扁) is on the caster's own board.
+export function drawIfCardOnBoard(effect: EffectDefinition, context: EffectContext): void {
+  const player = context.state.players[context.activeSeat];
+  const hasCard = !!effect.cardId && player.board.some((minion) => minion.cardId === effect.cardId);
+  const count = hasCard ? (effect.bonus_value ?? effect.value ?? 1) : (effect.value ?? 1);
+  drawCards(context.state, player, count, context.events);
+}
+
 export function drawMinionReduceCost(effect: EffectDefinition, context: EffectContext): void {
   const player = context.state.players[context.activeSeat];
   const index = player.deck.findIndex((card) => card.type === "MINION");
@@ -986,6 +996,16 @@ function shuffleDeadMinionIntoDeck(
   if (!card) return;
   player.deck.push(card);
   state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+}
+
+// 陳水扁: each successful draw buffs every board minion carrying an ON_DRAW
+// trigger by `value` (stat defaults to ALL → +value/+value).
+function handleDrawTriggers(state: MatchState, player: PlayerState, events: EffectContext["events"]): void {
+  for (const minion of player.board) {
+    const triggered = minion.keywords.triggered;
+    if (triggered?.type !== "ON_DRAW") continue;
+    buffMinion(state, player, minion, triggered.stat ?? "ALL", triggered.value ?? 1, events);
+  }
 }
 
 function handleDiscard(state: MatchState, player: PlayerState, discarded: RuntimeCard, catalog: Map<string, CardDefinition>, events: EffectContext["events"]): void {

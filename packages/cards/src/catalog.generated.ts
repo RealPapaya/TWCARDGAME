@@ -1976,5 +1976,44 @@ export const CARD_CATALOG_GENERATED = [
       }
     },
     "image": "assets/images/cards/server.webp"
+  },
+  {
+    "id": "TW080",
+    "name": "陳水扁",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 4,
+    "health": 4,
+    "type": "MINION",
+    "rarity": "LEGENDARY",
+    "description": "每當你抽一張牌，獲得 +1/+1",
+    "keywords": {
+      "triggered": {
+        "type": "ON_DRAW",
+        "stat": "ALL",
+        "value": 1
+      }
+    },
+    "image": "assets/images/cards/chen_shui_bian.webp"
+  },
+  {
+    "id": "TW081",
+    "name": "陳致中",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 2,
+    "health": 2,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "觸發: 抽兩張牌。若陳水扁在你的場上，改為抽三張",
+    "keywords": {
+      "battlecry": {
+        "type": "DRAW_IF_CARD_ON_BOARD",
+        "value": 2,
+        "bonus_value": 3,
+        "cardId": "TW080"
+      }
+    },
+    "image": "assets/images/cards/chen_chih_chung.webp"
   }
 ] as const satisfies readonly CardDefinition[];

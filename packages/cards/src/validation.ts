@@ -144,6 +144,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "DAMAGE_RANDOM_FRIENDLY":
     case "DAMAGE_SELF":
     case "DRAW":
+    case "DRAW_IF_CARD_ON_BOARD":
     case "DRAW_MINION_REDUCE_COST":
     case "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS":
     case "HEAL":
@@ -209,6 +210,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "SUMMON":
     case "AUG_ADD_CARD_TO_HAND":
     case "AUG_SUMMON_CARD":
+    case "DRAW_IF_CARD_ON_BOARD":
       requireCardId(errors, cardId, label, effect);
       break;
     case "SUMMON_MULTIPLE":

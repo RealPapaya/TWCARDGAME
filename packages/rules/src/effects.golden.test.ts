@@ -4,10 +4,11 @@
  * Not exhaustive; edge-case depth lives in Phase 2.
  */
 import type { CardDefinition } from "@twcardgame/cards";
-import type { Seat } from "@twcardgame/shared";
+import type { GameEvent, Seat } from "@twcardgame/shared";
 import { describe, expect, it } from "vitest";
 import { createInitialMatch } from "./engine.js";
 import { createRuntimeCard, nextInstanceId, reduce } from "./index.js";
+import { drawCards } from "./effects.js";
 import type { MatchState, RuntimeMinion } from "./types.js";
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -668,6 +669,62 @@ describe("effect golden tests", () => {
     expect(after.lockedTurns).toBe(0);
     expect(after.canAttack).toBe(true);
     expect(after.health).toBe(m.health + 2);
+  });
+
+  it("DRAW_IF_CARD_ON_BOARD (陳致中) — draws the base count when the named card is absent", () => {
+    const card = FILLER_MINION("CHIH", {
+      keywords: { battlecry: { type: "DRAW_IF_CARD_ON_BOARD", value: 2, bonus_value: 3, cardId: "BIAN" } },
+    });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    // The named card sitting on the ENEMY board must not count.
+    placeMinion(state, enemy(seat), { cardId: "BIAN" });
+    const { state: next } = play(state, catalog, card);
+    // played minion leaves hand (→0), then draws 2
+    expect(next.players[seat].hand).toHaveLength(2);
+  });
+
+  it("DRAW_IF_CARD_ON_BOARD (陳致中) — draws the bonus count when 陳水扁 is on the caster's board", () => {
+    const card = FILLER_MINION("CHIH", {
+      keywords: { battlecry: { type: "DRAW_IF_CARD_ON_BOARD", value: 2, bonus_value: 3, cardId: "BIAN" } },
+    });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    placeMinion(state, seat, { cardId: "BIAN" });
+    const { state: next } = play(state, catalog, card);
+    expect(next.players[seat].hand).toHaveLength(3);
+  });
+
+  it("ON_DRAW (陳水扁) — buffs +value/+value for every successful draw", () => {
+    const { state } = makeMatch([]);
+    const seat = state.turn.activeSeat;
+    const bian = placeMinion(state, seat, {
+      attack: 4, baseAttack: 4, health: 4, currentHealth: 4,
+      keywords: { triggered: { type: "ON_DRAW", stat: "ALL", value: 1 } },
+    });
+    const events: GameEvent[] = [];
+    drawCards(state, state.players[seat], 2, events);
+    expect(bian.attack).toBe(4 + 2);
+    expect(bian.health).toBe(4 + 2);
+    expect(bian.currentHealth).toBe(4 + 2);
+  });
+
+  it("陳致中 + 陳水扁 combo — draws three and 陳水扁 gains +3/+3", () => {
+    const card = FILLER_MINION("CHIH", {
+      keywords: { battlecry: { type: "DRAW_IF_CARD_ON_BOARD", value: 2, bonus_value: 3, cardId: "BIAN" } },
+    });
+    const { state, catalog } = makeMatch([card]);
+    const seat = state.turn.activeSeat;
+    placeMinion(state, seat, {
+      cardId: "BIAN", attack: 4, baseAttack: 4, health: 4, currentHealth: 4,
+      keywords: { triggered: { type: "ON_DRAW", stat: "ALL", value: 1 } },
+    });
+    const { state: next } = play(state, catalog, card);
+    expect(next.players[seat].hand).toHaveLength(3);
+    const after = next.players[seat].board.find((m) => m.cardId === "BIAN")!;
+    expect(after.attack).toBe(4 + 3);
+    expect(after.health).toBe(4 + 3);
+    expect(after.currentHealth).toBe(4 + 3);
   });
 
 });
