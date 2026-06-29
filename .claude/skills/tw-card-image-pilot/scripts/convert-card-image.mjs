@@ -190,18 +190,32 @@ try {
         ctx.putImageData(imageData, 0, 0);
 
         let chosen = null;
-        for (const quality of [0.82, 0.78, 0.74, 0.70, 0.66, 0.62, 0.58, 0.54, 0.50, 0.46, 0.42, 0.38, 0.34, 0.30]) {
+        for (const quality of [0.82, 0.78, 0.74, 0.70, 0.66, 0.62, 0.58, 0.54, 0.50, 0.46, 0.42, 0.38, 0.34, 0.30, 0.26, 0.22, 0.18]) {
           const blob = await canvas.convertToBlob({ type: "image/webp", quality });
-          const buffer = new Uint8Array(await blob.arrayBuffer());
-          chosen = { quality, size: buffer.byteLength, base64: btoa(String.fromCharCode(...buffer)), backgroundPixels };
-          if (buffer.byteLength <= 50 * 1024) break;
+          const base64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.addEventListener("load", () => {
+              const result = String(reader.result ?? "");
+              resolve(result.includes(",") ? result.split(",")[1] : result);
+            }, { once: true });
+            reader.addEventListener("error", () => reject(reader.error), { once: true });
+            reader.readAsDataURL(blob);
+          });
+          chosen = { quality, size: blob.size, base64, backgroundPixels };
+          if (blob.size <= 50 * 1024) break;
         }
         return chosen;
       })()
     `,
   });
 
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.text ?? "Browser image conversion failed");
+  }
   const value = result.result.value;
+  if (!value?.base64) {
+    throw new Error("Browser image conversion did not return encoded image data");
+  }
   await writeFile(outputPath, Buffer.from(value.base64, "base64"));
   console.log(JSON.stringify({
     outputPath,
