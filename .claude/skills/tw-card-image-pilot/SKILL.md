@@ -79,7 +79,7 @@ If no target path is provided, ask for it. Do not infer a different card asset.
 
 ## Category Batch Workflow
 
-For a category batch, repeat the core workflow one card at a time.
+For a category batch, repeat the core workflow one card at a time
 
 - Derive each target path from that card's own `image` field.
 - Use only that target image as the visual reference for that card.
