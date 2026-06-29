@@ -21,6 +21,11 @@ const DEFERRED_CONCURRENCY = 3;
 // After this long the loading screen offers a "skip" affordance so a player on a
 // poor connection is never trapped — the deferred prefetch still finishes later.
 const SKIP_AFFORDANCE_DELAY_MS = 10_000;
+// Hard cap per asset fetch. A request that never settles (server accepts the
+// connection but never responds) would otherwise keep its worker — and the whole
+// loading screen — hung forever unless the player clicks skip. Bounding each fetch
+// guarantees warmAll() always resolves, so boot proceeds with or without skip.
+const PER_ASSET_TIMEOUT_MS = 8_000;
 
 type SplashElements = {
   root: HTMLElement;
@@ -40,15 +45,27 @@ function findSplash(): SplashElements | undefined {
   };
 }
 
-/** Warm one URL into the HTTP cache. Failures (404, offline) resolve, never reject. */
+/** Warm one URL into the HTTP cache. Failures (404, offline, timeout) resolve, never reject. */
 async function warm(url: string, signal: AbortSignal): Promise<void> {
+  // Per-asset abort: fires on the outer `signal` (skip / overall abort) OR after
+  // PER_ASSET_TIMEOUT_MS, whichever comes first. Aborting only this controller
+  // skips the slow asset without stopping the rest of the pool (the outer signal,
+  // not this one, is what warmAll checks to halt entirely).
+  const local = new AbortController();
+  const onOuterAbort = (): void => local.abort();
+  if (signal.aborted) local.abort();
+  else signal.addEventListener("abort", onOuterAbort, { once: true });
+  const timer = window.setTimeout(() => local.abort(), PER_ASSET_TIMEOUT_MS);
   try {
-    const res = await fetch(url, { cache: "force-cache", signal });
+    const res = await fetch(url, { cache: "force-cache", signal: local.signal });
     // Drain the body so the response is fully committed to cache, then drop it.
     await res.arrayBuffer().catch(() => undefined);
   } catch {
-    // Aborted, offline, or missing — the live `<img>`/`<audio>` request will
-    // surface its own onerror fallback. Boot must not hang on one asset.
+    // Aborted (timeout/skip), offline, or missing — the live `<img>`/`<audio>`
+    // request will surface its own onerror fallback. Boot must not hang on one asset.
+  } finally {
+    window.clearTimeout(timer);
+    signal.removeEventListener("abort", onOuterAbort);
   }
 }
 
@@ -127,17 +144,27 @@ export async function preloadAssets(): Promise<void> {
 
   if (skipTimer !== undefined) window.clearTimeout(skipTimer);
 
-  // Fill the bar and let the final transition land before the menu takes over.
+  // Fill the bar to 100%. The splash is intentionally NOT removed here: startApp
+  // keeps it up while it loads the player's account data (collection/decks), then
+  // calls dismissSplash() so the menu never flashes in with an empty collection.
   if (splash?.bar) splash.bar.style.width = "100%";
   if (splash?.pct) splash.pct.textContent = "100%";
-  await new Promise((r) => window.setTimeout(r, 180));
-
-  // Clear the splash so startApp's first render writes into an empty #app (a
-  // clean innerHTML set rather than morphing the splash subtree).
-  splash?.root.remove();
 
   // The deferred tier keeps loading even if the player skipped the blocking one.
   startDeferredPrefetch(deferred);
+}
+
+/**
+ * Remove the boot splash. Called by startApp once the initial account data is
+ * loaded (or a boot timeout fires) so the first menu render writes into an empty
+ * #app. Idempotent and safe to call when no splash markup exists.
+ */
+export async function dismissSplash(): Promise<void> {
+  const root = document.getElementById("preload-screen");
+  if (!root) return;
+  // Let the final 100% bar state land before the menu takes over.
+  await new Promise((r) => window.setTimeout(r, 180));
+  root.remove();
 }
 
 let deferredStarted = false;

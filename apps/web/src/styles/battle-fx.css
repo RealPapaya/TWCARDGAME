@@ -1093,3 +1093,58 @@
     transform: translate(calc(-50% + var(--tx)), calc(-50% + var(--ty) + 10px)) scale(0.8);
   }
 }
+
+/* 疲勞(牌庫抽乾)骷髏卡 —— applyFatigueDraw 命令式建立的 body 層級卡牌。
+   一張暗色卡,寫著「卡牌已抽乾」與骷髏,從牌庫飛向英雄後碎裂淡出。 */
+.fatigue-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at 50% 35%, #3a1d24 0%, #1a0d12 70%, #0c0608 100%);
+  border: 2px solid #7c1f2c;
+  box-shadow: 0 0 18px rgba(190, 40, 60, 0.55), inset 0 0 24px rgba(0, 0, 0, 0.7);
+  color: #f4dde0;
+  text-align: center;
+  will-change: transform, opacity;
+}
+
+.fatigue-card-skull {
+  font-size: 64px;
+  line-height: 1;
+  color: #f0e6e8;
+  text-shadow: 0 0 12px rgba(220, 60, 80, 0.85), 0 2px 4px rgba(0, 0, 0, 0.6);
+  animation: fatigue-skull-pulse 0.9s ease-in-out infinite;
+}
+
+.fatigue-card-label {
+  font-size: 17px;
+  font-weight: 800;
+  letter-spacing: 1px;
+  color: #ffd7dc;
+  text-shadow: 0 0 8px rgba(200, 40, 60, 0.8), 0 1px 2px rgba(0, 0, 0, 0.7);
+}
+
+.fatigue-card.fatigue-card-impact {
+  animation: fatigue-card-shake 0.32s ease-in-out;
+}
+
+@keyframes fatigue-skull-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+
+@keyframes fatigue-card-shake {
+  0% { filter: brightness(1); }
+  30% { filter: brightness(1.8) drop-shadow(0 0 14px rgba(255, 70, 90, 0.9)); }
+  100% { filter: brightness(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .fatigue-card-skull,
+  .fatigue-card.fatigue-card-impact {
+    animation: none;
+  }
+}

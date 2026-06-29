@@ -21,6 +21,12 @@ const FLIGHT_MS = 850;
 const FLIGHT_EASING = "cubic-bezier(0.18, 0.89, 0.32, 1.15)";
 const FAIL_SAFE_MS = 1400;
 export const DRAW_ANIMATION_MS = FAIL_SAFE_MS;
+
+// 疲勞(牌庫抽乾):骷髏卡從牌庫飛向英雄所需時間。runtime 以此把傷害數字/血量落下
+// 對齊到命中當下(readyAtMs = now + FATIGUE_DRAW_MS),共享端的 bot 配速常數見
+// packages/shared/src/animationTiming.ts FATIGUE_DRAW_MS(務必同步)。
+export const FATIGUE_DRAW_MS = 900;
+const FATIGUE_FAIL_SAFE_MS = 1600;
 // Scale of the card as it leaves the deck, before it settles onto its slot.
 // Higher = a larger flying card (was 0.5 in the v1 port).
 const START_SCALE = 0.8;
@@ -302,6 +308,87 @@ function animateCardFromDeck(side: Side, slotIndex: number, handId?: string, onD
       };
       clone.addEventListener("transitionend", onEnd);
       const failSafe = window.setTimeout(cleanup, FAIL_SAFE_MS);
+    });
+  });
+}
+
+/**
+ * 疲勞抽牌動畫:牌庫已空卻仍要抽牌時,從牌庫飛出一張寫著「卡牌已抽乾」+ 骷髏的卡,
+ * 飛向該玩家的英雄,於命中(FATIGUE_DRAW_MS)時呼叫 `onImpact`(由 runtime 用來
+ * 對齊傷害數字/血量落下),接著卡牌碎裂淡出。命令式、body 層級,不受主 render 重繪
+ * 影響(同 applyKnifeStrike 的理由)。`heroTargetKey` 形如 "player1:hero"。
+ */
+export function playFatigueDraw(side: Side, heroTargetKey: string, onImpact?: () => void): void {
+  let impacted = false;
+  const fireImpact = (): void => {
+    if (impacted) return;
+    impacted = true;
+    onImpact?.();
+  };
+
+  playSfx("cardDraw");
+
+  // 等兩個 frame 讓重繪後的牌庫/英雄座標穩定(同 animateCardFromDeck 的理由)。
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      const deckEl = document.querySelector<HTMLElement>(`.deck-pile.battle-deck-pile.${side}-deck`);
+      const heroEl = document.querySelector<HTMLElement>(`[data-target-key="${cssAttr(heroTargetKey)}"]`);
+      const heroAnchor = heroEl?.querySelector<HTMLElement>(".avatar") ?? heroEl;
+      if (!deckEl || !heroAnchor) {
+        fireImpact();
+        return;
+      }
+      const deckRect = deckEl.getBoundingClientRect();
+      const heroRect = heroAnchor.getBoundingClientRect();
+      if (deckRect.width === 0 || heroRect.width === 0) {
+        fireImpact();
+        return;
+      }
+
+      const cardW = 132;
+      const cardH = 188;
+      const startX = deckRect.left + deckRect.width / 2 - cardW / 2;
+      const startY = deckRect.top + deckRect.height / 2 - cardH / 2;
+      const endX = heroRect.left + heroRect.width / 2 - cardW / 2;
+      const endY = heroRect.top + heroRect.height / 2 - cardH / 2;
+
+      const card = document.createElement("div");
+      card.className = "fatigue-card";
+      card.setAttribute("aria-hidden", "true");
+      card.style.position = "fixed";
+      card.style.left = "0";
+      card.style.top = "0";
+      card.style.width = `${cardW}px`;
+      card.style.height = `${cardH}px`;
+      card.style.zIndex = "9999";
+      card.style.pointerEvents = "none";
+      card.style.transformOrigin = "center center";
+      card.style.transform = `translate(${startX}px, ${startY}px) scale(0.6) rotate(-8deg)`;
+      card.style.transition = "none";
+      card.innerHTML =
+        `<span class="fatigue-card-skull">☠</span>` +
+        `<span class="fatigue-card-label">卡牌已抽乾</span>`;
+      document.body.appendChild(card);
+
+      // 飛行段:從牌庫放大飛到英雄。
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          card.style.transition = `transform ${FATIGUE_DRAW_MS}ms ${FLIGHT_EASING}`;
+          card.style.transform = `translate(${endX}px, ${endY}px) scale(1) rotate(4deg)`;
+        });
+      });
+
+      // 命中:落下傷害數字(onImpact),卡牌抖一下後碎裂淡出。
+      window.setTimeout(() => {
+        fireImpact();
+        playSfx("death");
+        card.classList.add("fatigue-card-impact");
+        card.style.transition = "transform 360ms ease-in, opacity 360ms ease-in";
+        card.style.transform = `translate(${endX}px, ${endY}px) scale(1.18) rotate(-6deg)`;
+        card.style.opacity = "0";
+      }, FATIGUE_DRAW_MS);
+
+      window.setTimeout(() => card.remove(), FATIGUE_FAIL_SAFE_MS);
     });
   });
 }

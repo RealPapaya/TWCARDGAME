@@ -173,6 +173,11 @@ export interface PlayerState {
   board: RuntimeMinion[];
   mulliganReady: boolean;
   shortTurnPenalty: boolean;
+  /**
+   * 疲勞層數:牌庫抽乾後每次再嘗試抽牌就 +1,並對自身英雄造成等量傷害(第一次 1 點、
+   * 第二次 2 點…依此類推)。整場累加,永不重置。見 effects/fatigue.ts。
+   */
+  fatigue: number;
   /** Most-recently bound amplification; shown by the avatar badge (back-compat). */
   amplification?: AmplificationSelection;
   /** All amplifications bound to this player (0..2), in phase order. */

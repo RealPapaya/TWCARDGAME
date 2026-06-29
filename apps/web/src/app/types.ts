@@ -165,6 +165,11 @@ export type AnimationCue = {
   augmentTargets?: string[];
   /** Own-hand card instanceIds an `augmentGlow` should light up (cards the 增幅 changed). */
   augmentCards?: string[];
+  /**
+   * 疲勞(牌庫抽乾)傷害。重用 "damage" cue 的數字/閃紅/血量落下機制,並額外觸發一張
+   * 「卡牌已抽乾 + 骷髏」的卡牌從牌庫飛向英雄(applyFatigueDraw,命令式)。
+   */
+  fatigue?: boolean;
   suppressBoardAnimation?: boolean;
   anchorX?: number;
   anchorY?: number;

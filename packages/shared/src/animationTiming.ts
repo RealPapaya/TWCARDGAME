@@ -14,6 +14,10 @@ export const ANIMATION_COSTS = {
   BOUNCE_EFFECT_SYNC_LAG_MS: 650,
   DESTROY_EFFECT_SYNC_LAG_MS: 820,
   DRAW_ANIMATION_MS: 1400,
+  // 抽乾牌庫(疲勞)：骷髏卡從牌庫飛向英雄(FATIGUE_DRAW_MS)後,傷害數字停留一段時間。
+  // 客戶端的飛行時間見 apps/web/src/app/draw-animation.ts FATIGUE_DRAW_MS。
+  FATIGUE_DRAW_MS: 900,
+  FATIGUE_DAMAGE_LINGER_MS: 1150,
   DISCARD_CARD_BODY_MS: 1500,
   ATTACK_LUNGE_MS: 800,
   POST_ATTACK_STATE_SYNC_LAG_MS: 120,
@@ -88,6 +92,14 @@ export function estimateEventAnimationMs(events: GameEvent[]): number {
       case "CARD_DRAWN": {
         const start = Math.max(currentPostPlayDelay, latestDiscardBodyEnd, latestDrawEnd);
         const tail = start + C.DRAW_ANIMATION_MS;
+        latestDrawEnd = tail;
+        if (tail > total) total = tail;
+        break;
+      }
+      case "FATIGUE": {
+        // 疲勞:骷髏卡飛行 + 命中後傷害數字停留。讓 bot 等過整段動畫再行動。
+        const start = Math.max(currentPostPlayDelay, latestDiscardBodyEnd, latestDrawEnd);
+        const tail = start + C.FATIGUE_DRAW_MS + C.FATIGUE_DAMAGE_LINGER_MS;
         latestDrawEnd = tail;
         if (tail > total) total = tail;
         break;

@@ -21,6 +21,7 @@ import {
   tryReviveMinion
 } from "./augments.js";
 import { augmentManaRamp, unlockLowHpManaCap } from "./augmentFlags.js";
+import { applyFatigue } from "./fatigue.js";
 
 export const effectHandlers: Record<string, (effect: EffectDefinition, context: EffectContext) => void> = {
   ADD_CARD_TO_HAND: addCardToHand,
@@ -157,9 +158,12 @@ export function processEndOfTurn(state: MatchState, events: EffectContext["event
 }
 
 export function drawCards(state: MatchState, player: PlayerState, count: number, events: EffectContext["events"], index = -1, reduction = 0): void {
+  let fatigued = false;
   for (let i = 0; i < count; i++) {
     if (player.deck.length === 0) {
-      addEvent(state, events, "CARD_DRAWN", { emptyDeck: true }, player.seat);
+      // 牌庫抽乾:累加疲勞並對自身英雄造成等量傷害(見 effects/fatigue.ts)。
+      applyFatigue(state, player, events);
+      fatigued = true;
       continue;
     }
     const card = index >= 0 ? player.deck.splice(index, 1)[0] : player.deck.shift();
@@ -184,6 +188,9 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
     player.hand.push(card);
     addEvent(state, events, "CARD_DRAWN", { cardId: card.cardId, handCount: player.hand.length }, player.seat);
   }
+  // 疲勞可能致死。drawCards 被許多路徑呼叫,其中回合開始的固定抽牌之後不會再經過
+  // resolvePostAction,所以這裡自行收尾結算(finishIfHeroDead 對已結束狀態為冪等)。
+  if (fatigued) finishIfHeroDead(state, events);
 }
 
 export function applyDamage(

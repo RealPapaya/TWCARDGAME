@@ -66,11 +66,14 @@ import {
 import { installClickEffect } from "./app/click-effect.js";
 import { playPveTransition } from "./app/transition-video.js";
 import { setAppContext } from "./app/context.js";
+import { dismissSplash } from "./app/preloader.js";
 import {
+  FATIGUE_DRAW_MS,
   isHandCardAnimating,
   noteOpponentHandSync,
   notePlayerHandSync,
   opponentDrawHiddenCount,
+  playFatigueDraw,
   resetDrawTracking
 } from "./app/draw-animation.js";
 import { DISCARD_CARD_BODY_MS, playDiscardAnimations } from "./app/discard-animation.js";
@@ -189,6 +192,9 @@ const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 const ATTACK_LUNGE_MS = 600;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
+// 同批次多次疲勞(例如從空牌庫抽兩張)時,每張骷髏卡命中之間的錯開時間,讓玩家看得到
+// 兩次(以上)獨立的動畫與掉血,而不是疊在一起像一次。
+const FATIGUE_STAGGER_MS = 650;
 // Hero death shatter is deliberately slower than the minion one (0.78s) for a
 // dramatic finish; the victory/defeat overlay is held until it finishes plus a
 // short settle pause.
@@ -412,6 +418,32 @@ function processImageDechecker(url: string): string {
   return url;
 }
 
+// Battle/mode-select building art runs through processImageDechecker to flood-fill
+// its near-white background transparent. That swap (opaque -> transparent data URL)
+// flashes if it happens on first paint, so we warm the dechecker cache at boot —
+// the bytes are already in the HTTP cache from the preloader, so processing is done
+// long before the player clicks through to the battle screen. Keep this list in sync
+// with the processImageDechecker() calls in renderBattleScreen().
+const BATTLE_MODE_DECHECKER_IMAGES = [
+  "/images/ui/gamemode-arena-hotspot.webp",
+  "/images/ui/gamemode-president.webp",
+  "/images/ui/gamemode-towel.webp",
+  "/images/ui/gamemode-training.webp",
+  "/images/ui/Banner.webp"
+];
+
+function warmBattleModeImages(): void {
+  for (const url of BATTLE_MODE_DECHECKER_IMAGES) processImageDechecker(url);
+}
+
+// True from page load until the boot splash is dismissed. While set, render() is a
+// no-op so the many intermediate renders during account load don't morph (and
+// destroy) the splash; startApp does one clean render at reveal. Boot-only — no
+// match exists yet, so this never touches the in-match publicSync hold/flush model.
+let bootSplashActive = true;
+// Never trap the player behind the splash if the account fetch hangs.
+const BOOT_ACCOUNT_TIMEOUT_MS = 8000;
+
 let renderScheduled = false;
 let trainingSession: TrainingSession | undefined;
 let remoteTrainingCompletions = new Set<string>();
@@ -427,6 +459,16 @@ let trainingCardRewardTimer: number | undefined;
 const TRAINING_CARD_REWARD_DELAY_MS = 1900;
 const minionDomKeys = new Map<string, string>();
 const appliedDeathShatters = new Set<string>();
+// Target-keys of minions whose death shatter has fired but whose board slot the
+// held publicSync has not yet removed. The `destroy` cue that drives `.being-destroyed`
+// expires at MINION_DEATH_FADE_MS, but in dense multi-kill / resurrect sequences the
+// publicSync flush is pushed much later (holds stack via Math.max). Without this set
+// the minion would lose `.being-destroyed` when its cue expires and pop back to full
+// opacity, lingering as a "ghost" until the delayed flush — the reported flicker.
+// Driving the class off this set (cleared on flush) keeps the dead unit hidden from
+// shatter through removal. Imperatively-added classes are stripped by the render
+// morph, so this must drive the template (same reason as shatteringHeroSeat below).
+const pendingDeathRemovals = new Set<string>();
 // The losing hero's portrait shatters once per match on GAME_FINISHED; this gate
 // stops repeat renders from re-spawning it. resultOverlayHoldUntilMs defers the
 // VICTORY/DEFEAT overlay (and reward animation) until that shatter has finished.
@@ -445,6 +487,8 @@ const appliedDeathrattles = new Set<string>();
 // delay (fast play → effect waits for the landing to settle) never finished
 // flying. Firing once into a body-level element sidesteps the render churn.
 const appliedKnives = new Set<string>();
+// 疲勞骷髏卡(命令式 body 層級飛行)已觸發的 cue id,確保一張 cue 只飛一次。
+const appliedFatigue = new Set<string>();
 // Last-seen on-screen rect per unit instanceId, so a deathrattle (遺志) plume can
 // anchor on a minion whose DOM has already been removed by its DESTROY (R4).
 const recentUnitRects = new Map<string, { rect: DOMRect; atMs: number }>();
@@ -454,6 +498,7 @@ const loggedSkippedSummonAnimations = new Set<string>();
 
 function resetMinionVisualTracking(): void {
   minionDomKeys.clear();
+  pendingDeathRemovals.clear();
   summonPreviewedTargets.clear();
   loggedSummonPreviewSlots.clear();
   loggedSkippedSummonAnimations.clear();
@@ -476,13 +521,44 @@ export function startApp(): void {
       render();
     });
   }
-  render();
+  // Pre-process the mode-select building art into the dechecker cache while the
+  // splash is still up, so the battle screen never flashes its un-keyed version.
+  warmBattleModeImages();
   // Best-effort: stamp the active-match record at the moment of unload so the
   // startup resume prompt can judge whether the server room is still alive.
   window.addEventListener("pagehide", () => {
     if (view.room) touchActiveMatch();
   });
-  void initializeAccount().finally(() => {
+  // Hold the splash until the account data (collection/decks/profile) is loaded,
+  // then reveal the menu in one render — so the collection is never momentarily
+  // empty on entry. render() is gated by bootSplashActive until this resolves.
+  void bootAndReveal();
+}
+
+async function bootAndReveal(): Promise<void> {
+  // Never rejects — loadAccountData already swallows its own errors; this guards
+  // the getSession() leg so the boot flow always completes and reveals the menu.
+  const account = initializeAccount().catch((error) => {
+    console.error("Account initialization failed during boot", error);
+  });
+
+  // Reveal when account data is ready, or after a timeout so a hung network never
+  // traps the player behind the splash. Late data still renders once it arrives.
+  await Promise.race([
+    account,
+    new Promise<void>((resolve) => window.setTimeout(resolve, BOOT_ACCOUNT_TIMEOUT_MS))
+  ]);
+
+  // Remove the splash while render() is still gated, so the reveal is a clean
+  // innerHTML set into an empty #app rather than a morph of the splash subtree.
+  await dismissSplash();
+  bootSplashActive = false;
+  render();
+
+  // Prompt to resume a match only once account/auth load has genuinely finished
+  // (so view.session is populated) — never on the reveal timeout, or a slow load
+  // would make maybePromptResumeMatch discard a valid PvP reconnect token.
+  void account.then(() => {
     void maybePromptResumeMatch();
   });
 }
@@ -493,6 +569,7 @@ function shouldOpenDevTestFromUrl(): boolean {
 }
 
 function render(): void {
+  if (bootSplashActive) return;
   if (renderScheduled) return;
   renderScheduled = true;
   window.requestAnimationFrame(() => {
@@ -1393,9 +1470,9 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
           <header class="collection-header">
             <button class="back-button" data-menu-screen="${backScreen}" data-testid="back-to-menu">← 返回</button>
             <h2 class="collection-title">${escapeHtml(title)}</h2>
-            <div class="collection-header-voucher" title="持有消費券">
+            <div class="collection-header-voucher">
               <span id="collection-vouchers"><span class="voucher-icon" aria-hidden="true"></span>${view.profile?.vouchers ?? 0}</span>
-              ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" title="一鍵分解所有超過 2 張的多餘卡牌" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
+              ${accountMode ? `<button type="button" id="bulk-disenchant" class="bulk-disenchant-btn" ${extraCopyEntries().length === 0 || view.cardOpBusy ? "disabled" : ""}>一鍵分解多餘卡</button>` : ""}
             </div>
           </header>
           <div class="collection-controls-bar">
@@ -1562,7 +1639,7 @@ function renderCollectionTile(card: CardDefinition, quantity: number, selectedCo
   const disabled = Boolean(view.editingDeck) && owned && !canAdd;
   const resolved = resolveCatalogCard(card, `collection-${card.id}`);
   return `
-    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-owned="${owned ? "1" : "0"}" data-testid="collection-tile" title="${escapeAttr(card.description)}" ${disabled ? "disabled" : ""}>
+    <button type="button" class="${classNames(["collection-card", "collection-tile", owned ? "owned" : "unowned", canAdd ? "can-add" : "cannot-add"])}" data-add-card="${escapeAttr(card.id)}" data-owned="${owned ? "1" : "0"}" data-testid="collection-tile" ${disabled ? "disabled" : ""}>
       <span class="card-count-badge">x${quantity}</span>
       ${selectedCount > 0 ? `<span class="deck-count-badge">${selectedCount}/${limit}</span>` : ""}
       <div class="card rarity-${card.rarity.toLowerCase()}">
@@ -2097,7 +2174,10 @@ function renderSummonPreview(cue: AnimationCue): string {
     hasCue(targetKey, "shieldPop") && "shield-popping",
     hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
-    hasCue(targetKey, "destroy") && "being-destroyed"
+    // Same persistence as renderMinion: keep the fade through to the flush so a
+    // previewed minion destroyed in the same held batch doesn't pop back to full
+    // opacity when its destroy cue expires ahead of a delayed publicSync.
+    (hasCue(targetKey, "destroy") || pendingDeathRemovals.has(targetKey)) && "being-destroyed"
   ]);
   return `
     <button
@@ -2362,7 +2442,10 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
     hasCue(targetKey, "lock") && "locked-fx",
     hasCue(targetKey, "bounce") && "receiving-bounce",
     hasCue(targetKey, "summon") && !skipSummonAnimation && "summoning",
-    hasCue(targetKey, "destroy") && "being-destroyed"
+    // Keep the fade applied from the destroy cue through to the (possibly much later)
+    // publicSync flush via pendingDeathRemovals, so a dead minion never pops back to
+    // full opacity when its cue expires during stacked multi-kill holds.
+    (hasCue(targetKey, "destroy") || pendingDeathRemovals.has(targetKey)) && "being-destroyed"
   ]);
 
   return `
@@ -2615,13 +2698,13 @@ function renderCenterLine(activeSeat: Seat | "", opponentPlayer?: PublicPlayer, 
       </div>
       ${renderTurnCountdown("turn")}
       <div class="end-turn-group">
-        <div class="deck-pile battle-deck-pile opponent-deck" title="Opponent deck">
+        <div class="deck-pile battle-deck-pile opponent-deck${(opponentPlayer?.deckCount ?? 0) === 0 ? " empty" : ""}" title="Opponent deck">
           <span class="count-badge">${opponentPlayer?.deckCount ?? 0}</span>
         </div>
         <span class="end-turn-wrap${isMyTurn && !battleLocked && !hasAnyLegalAction() ? " can-end" : ""} ${endTurnHighlight}">
           <button id="end-turn" class="end-turn-btn" ${canEndTurn ? "" : "disabled"} data-testid="end-turn">結束回合</button>
         </span>
-        <div class="deck-pile battle-deck-pile player-deck" title="Player deck">
+        <div class="deck-pile battle-deck-pile player-deck${(myPlayer?.deckCount ?? 0) === 0 ? " empty" : ""}" title="Player deck">
           <span class="count-badge">${myPlayer?.deckCount ?? 0}</span>
         </div>
       </div>
@@ -4710,7 +4793,7 @@ function renderLeaderboardPlayerCard(row: LeaderboardRow, displayRank: number, s
         <div class="lb-player-title">未設定稱號</div>
       </div>
       <div class="lb-stat-pill">${escapeHtml(statLabel)}</div>
-      <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}" title="查看個人頁面">查看</button>
+      <button class="lb-action-btn" data-view-player-profile="${escapeAttr(row.user_id)}">查看</button>
     </div>
   `;
 }
@@ -8920,6 +9003,10 @@ function applyPendingPublicSyncNow(): void {
       boardIdsBefore: beforeBoardIds
     });
     view.publicSync = message as typeof view.publicSync;
+    // The flush only runs once the max hold has elapsed, so this authoritative state
+    // already reflects every death that fired during the held window — release the
+    // visual-death gate so the new board (minus the dead units) renders cleanly.
+    pendingDeathRemovals.clear();
     renderNow();
     const cleared = clearAcceptedBattlecryAfterRender();
     if (cleared) renderNow();
@@ -9280,6 +9367,21 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
     applyPostAttackEffectDelays(applyPostPlayEffectDelays(applyPostQuestEffectDelays(rawCues), multiHitSeqs))
   );
   if (cues.length === 0) return [];
+  // 疲勞:讓傷害數字/英雄閃紅/血量落下對齊到骷髏卡命中英雄的當下(FATIGUE_DRAW_MS),
+  // 並把 publicSync 壓住到命中後再 flush,免得血量在卡牌還在飛時就先掉。
+  const fatigueCues = cues.filter((cue) => cue.fatigue);
+  if (fatigueCues.length > 0) {
+    const now = performance.now();
+    // 每張骷髏卡各自飛行、命中時間錯開 FATIGUE_STAGGER_MS;applyFatigueDraw 依 readyAtMs
+    // 反推起飛時間,所以兩次抽空會看到兩張骷髏卡與兩次掉血(各帶自己的 remainingHealth)。
+    fatigueCues.forEach((cue, i) => {
+      const offset = FATIGUE_DRAW_MS + i * FATIGUE_STAGGER_MS;
+      cue.delayMs = Math.max(cue.delayMs ?? 0, offset);
+      cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + offset);
+    });
+    const lastOffset = FATIGUE_DRAW_MS + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
+    holdPendingPublicSyncFor(lastOffset + POST_PLAY_STATE_SYNC_LAG_MS);
+  }
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push
   // the board-effect cues out until the roulette reveals the winner, so e.g.
   // 高雄氣爆 only kills minions after the decision is shown. Guarded by the same
@@ -9854,6 +9956,23 @@ function eventToCue(event: GameEvent, events: GameEvent[] = [], index = -1, comb
     const targetKey = targetRef ? targetKeyFor(targetRef) : undefined;
     return { id, kind: "attackerMoves", text: "", seat: event.seat, attackerInstanceId, targetKey };
   }
+  if (event.type === "FATIGUE") {
+    // 牌庫抽乾的疲勞傷害。重用 "damage" cue(數字 -N、英雄閃紅、血量於命中落下),
+    // 並標記 fatigue 讓 applyPostRenderEffects 額外飛出「卡牌已抽乾 + 骷髏」卡。
+    const heroKey = typeof target === "string" ? target : event.seat ? `${event.seat}:hero` : undefined;
+    const resultingHealth = typeof payload.remainingHealth === "number" ? payload.remainingHealth : undefined;
+    return {
+      id,
+      kind: "damage",
+      text: amount ? `-${amount}` : "Fatigue",
+      seat: event.seat,
+      targetKey: heroKey,
+      amount,
+      seq: event.seq,
+      resultingHealth,
+      fatigue: true
+    };
+  }
   // DAMAGE / HEAL / BUFF / SHIELD_POPPED / BOUNCE / DESTROY / DEATHRATTLE all
   // map through the shared cue-kind table. The batch-level `combatDamageSeqs`
   // decides whether a DAMAGE is a basic combat hit ("damage") or a spell strike
@@ -10416,6 +10535,25 @@ function applyKnifeStrike(cue: AnimationCue): void {
   window.setTimeout(() => knife.remove(), 420);
 }
 
+// 疲勞:牌庫抽乾時飛出「卡牌已抽乾 + 骷髏」的卡,從抽牌方的牌庫飛向其英雄。命令式
+// 觸發(一張 cue 一次),不等 readyAtMs —— 卡牌「先飛」,飛行到位(FATIGUE_DRAW_MS)
+// 時 cue 才 ready,傷害數字/血量落下因此正好對齊命中。
+function applyFatigueDraw(cue: AnimationCue): void {
+  if (!cue.fatigue || !cue.targetKey || appliedFatigue.has(cue.id)) return;
+  appliedFatigue.add(cue.id);
+  const targetKey = cue.targetKey;
+  const side: "player" | "opponent" = cue.seat === view.mySeat ? "player" : "opponent";
+  // 讓骷髏卡「命中」對齊到傷害數字 ready 的時刻:起飛 = readyAt − 飛行時間。回合開始的
+  // 疲勞 readyAt≈now+FATIGUE_DRAW_MS,所以幾乎立即起飛;若疲勞排在出牌動畫之後則延後起飛。
+  const landAt = cue.readyAtMs ?? performance.now() + FATIGUE_DRAW_MS;
+  const startDelay = Math.max(0, landAt - FATIGUE_DRAW_MS - performance.now());
+  const fire = (): void => playFatigueDraw(side, targetKey);
+  if (startDelay > 0) window.setTimeout(fire, startDelay);
+  else fire();
+  // cue 結束時清掉,避免集合長期累積。
+  window.setTimeout(() => appliedFatigue.delete(cue.id), startDelay + FATIGUE_DRAW_MS + 1600);
+}
+
 // Shared core for the death-shatter visual: slices `bgImg` (sampled over `rect`)
 // into a cols×rows grid of fragments that fly apart and fade. Used by both the
 // minion shatter (fast, 0.78s) and the hero shatter (slow, HERO_SHATTER_MS).
@@ -10465,6 +10603,10 @@ function applyDeathShatter(cue: AnimationCue): void {
   const minionEl = document.querySelector<HTMLElement>(`[data-target-key="${cssEscape(cue.targetKey)}"]`);
   if (!minionEl) return;
   appliedDeathShatters.add(cue.id);
+  // Mark the unit visually dead until the flush actually drops it from the board, so
+  // it stays faded (see pendingDeathRemovals) instead of flashing back after the cue
+  // expires. Cleared wholesale in applyPendingPublicSyncNow once state catches up.
+  pendingDeathRemovals.add(cue.targetKey);
 
   const rect = minionEl.getBoundingClientRect();
   blog("DEATHSHATTER-DBG fired", { targetKey: cue.targetKey, left: Math.round(rect.left) });
@@ -10714,6 +10856,9 @@ function applyPostRenderEffects(): void {
     }
     if (cue.kind === "effectStrike" && cue.sourceKey && cue.targetKey && cueIsReady(cue)) {
       applyKnifeStrike(cue);
+    }
+    if (cue.fatigue && cue.targetKey && !appliedFatigue.has(cue.id)) {
+      applyFatigueDraw(cue);
     }
     if (cue.kind === "destroy" && cue.targetKey && cueIsReady(cue)) {
       applyDeathShatter(cue);

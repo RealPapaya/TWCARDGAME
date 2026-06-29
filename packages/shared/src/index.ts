@@ -391,6 +391,7 @@ export type GameEventType =
   | "TURN_ENDED"
   | "CARD_DRAWN"
   | "CARD_BURNED"
+  | "FATIGUE"
   | "CARD_PLAYED"
   | "MINION_SUMMONED"
   | "ATTACK"

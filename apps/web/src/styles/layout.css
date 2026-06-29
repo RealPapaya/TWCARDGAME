@@ -1102,7 +1102,12 @@ body.hand-dragging .hand-row .card {
 }
 
 .minion.being-destroyed {
-  animation: death-fade 0.78s ease-out;
+  /* `forwards` holds the faded-out end state until the publicSync flush removes the
+     node, so the dead minion never pops back to full opacity when its destroy cue
+     expires ahead of a delayed flush. pointer-events: none stops the invisible-but-
+     present corpse from intercepting clicks/targeting during that linger. */
+  animation: death-fade 0.78s ease-out forwards;
+  pointer-events: none;
 }
 
 .minion.summoning {
@@ -2816,7 +2821,7 @@ body.hand-dragging .hand-row .card {
   }
   100% {
     filter: grayscale(1);
-    opacity: 0.35;
+    opacity: 0;
   }
 }
 
