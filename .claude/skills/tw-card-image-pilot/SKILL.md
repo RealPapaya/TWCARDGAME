@@ -22,7 +22,7 @@ Use the target card category to choose the final flat background color.
 | 公眾人物 | `#52414C` |
 | 學生 | `#ffb352` |
 | 動物 | `#f1ddbf` |
-| 新聞 | `#28282b` |
+| 新聞 | `#e0feed` |
 | 企業家 | `#8c7aa4` |
 | 公務人員 | `#e8d453` |
 
@@ -79,7 +79,7 @@ If no target path is provided, ask for it. Do not infer a different card asset.
 
 ## Category Batch Workflow
 
-For a category batch, repeat the core workflow one card at a time.
+For a category batch, repeat the core workflow one card at a time
 
 - Derive each target path from that card's own `image` field.
 - Use only that target image as the visual reference for that card.
