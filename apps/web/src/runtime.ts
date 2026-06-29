@@ -193,8 +193,8 @@ const ATTACK_LUNGE_MS = 600;
 const ATTACK_IMPACT_DELAY_MS = Math.round(ATTACK_LUNGE_MS * 0.7);
 const TECH_ENFORCEMENT_DAMAGE_GAP_MS = 360;
 // 同批次多次疲勞(例如從空牌庫抽兩張)時,每張骷髏卡命中之間的錯開時間,讓玩家看得到
-// 兩次(以上)獨立的動畫與掉血,而不是疊在一起像一次。
-const FATIGUE_STAGGER_MS = 650;
+// 兩次(以上)獨立的動畫與掉血,而不是疊在一起像一次。連續抽空時刻意拉長間隔放慢節奏。
+const FATIGUE_STAGGER_MS = 1100;
 // Hero death shatter is deliberately slower than the minion one (0.78s) for a
 // dramatic finish; the victory/defeat overlay is held until it finishes plus a
 // short settle pause.
@@ -234,6 +234,7 @@ let devTestPanel: typeof import("./app/dev-test.js") | undefined;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const amplificationCatalog = new Map(AMPLIFICATION_DB.map((augment) => [augment.id, augment]));
 const voteEventCatalog = new Map(VOTE_EVENT_DB.map((event) => [event.id, event]));
+const PIG_BIG_BROTHER_CARD_ID = "TW075";
 const seats: Seat[] = ["player1", "player2"];
 /**
  * Remembers each minion's card identity by `instanceId` for the battle log. Populated when a minion
@@ -8419,13 +8420,16 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
       return { ...base, kind: "damage", tile: targetRef, badge: "burst", amount, label: `${targetRef.name} 受到 ${amount ?? 0} 點傷害` };
     }
     case "DESTROY": {
-      const tile = cardId ? logCardRef(cardId) : target ? logUnitRef(target) : { name: "隨從" };
+      const destroyedCardId = cardId ?? (target ? battleLogUnit(target).cardId : undefined);
+      const tile = destroyedCardId ? logCardRef(destroyedCardId) : target ? logUnitRef(target) : { name: "隨從" };
       const reason = typeof payload.reason === "string" ? payload.reason : undefined;
       const eventName = typeof payload.eventName === "string" ? payload.eventName : undefined;
       // Spell out *why* the minion died when the engine tagged a cause: a full hand
       // that couldn't take a bounce (滿手死亡) or a referendum/environment event.
       const label =
-        reason === "FULL_HAND"
+        destroyedCardId === PIG_BIG_BROTHER_CARD_ID
+          ? "豬大哥沒有死"
+          : reason === "FULL_HAND"
           ? `${tile.name} 滿手死亡`
           : reason === "EVENT" && eventName
             ? `${tile.name} 因【${eventName}】死亡`

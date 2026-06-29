@@ -22,7 +22,7 @@ Use the target card category to choose the final flat background color.
 | 公眾人物 | `#52414C` |
 | 學生 | `#ffb352` |
 | 動物 | `#f1ddbf` |
-| 新聞 | `#28282b` |
+| 新聞 | `#e0feed` |
 | 企業家 | `#8c7aa4` |
 | 公務人員 | `#e8d453` |
 
