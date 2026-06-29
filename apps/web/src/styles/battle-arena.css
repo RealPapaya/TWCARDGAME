@@ -2299,6 +2299,17 @@
   color: var(--wood-dark, #5d2e17);
 }
 
+/* Fatigue (牌庫抽乾) badge — a bone-white skull on a dark blood disc so the
+   "why am I losing HP" entry reads as a danger marker, not a gold action badge. */
+.log-badge-skull {
+  background: radial-gradient(circle at 35% 30%, #6b1414, #3a0606 70%, #1a0202);
+  border-color: #2a0303;
+}
+
+.log-badge-skull svg {
+  color: #f4e4bc;
+}
+
 /* Hero log tile backed by a player avatar photo — centre-crop, circular-ish feel. */
 .log-card-hero-avatar {
   background-position: center center;

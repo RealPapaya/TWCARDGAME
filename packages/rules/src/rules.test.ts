@@ -230,7 +230,41 @@ describe("rules architecture", () => {
     expect(result.state.turn.activeSeat).toBe(activeSeat);
     expect(result.state.turn.number).toBe(state.turn.number);
   });
+
+  it("陳致中 with 陳水扁 on board draws three from an empty deck (three fatigue hits)", () => {
+    const state = startMatch(31337);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.mana = { current: 10, max: 10 };
+
+    // 陳水扁 onto the board exactly as the real game would summon it.
+    const bian = createRuntimeCard(getCard("TW080"), seat, nextInstanceId(state, "card"));
+    player.hand = [bian];
+    let next = reduce(state, { commandId: "play-bian", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: bian.instanceId } }, CARD_CATALOG).state;
+    expect(next.players[seat].board.some((m) => m.cardId === "TW080")).toBe(true);
+
+    // Empty the deck and give the hero plenty of HP so fatigue won't end the match.
+    next.players[seat].deck = [];
+    next.players[seat].hero.hp = 100;
+    next.players[seat].hero.maxHp = 100;
+    next.players[seat].mana = { current: 10, max: 10 };
+
+    const chih = createRuntimeCard(getCard("TW081"), seat, nextInstanceId(next, "card"));
+    next.players[seat].hand = [chih];
+    const result = reduce(next, { commandId: "play-chih", seat, nowMs: 2100, command: { type: "playCard", handInstanceId: chih.instanceId } }, CARD_CATALOG);
+
+    const fatigueHits = result.events.filter((event) => event.type === "FATIGUE");
+    expect(fatigueHits).toHaveLength(3);
+    // Fatigue damage ramps 1 → 2 → 3 across the three forced draws.
+    expect(fatigueHits.map((event) => event.payload?.amount)).toEqual([1, 2, 3]);
+  });
 });
+
+function getCard(id: string): CardDefinition {
+  const found = CARD_CATALOG.find((card) => card.id === id);
+  if (!found) throw new Error(`missing card ${id}`);
+  return found;
+}
 
 function createSeededMatch(seed: number) {
   return createInitialMatch({

@@ -56,7 +56,7 @@ export type AnimationSweepVariant = "damage" | "heal" | "buff" | "destroy" | "lo
 /** One entry in the Hearthstone-style battle log, derived from a GameEvent. */
 export type BattleLogKind = "summon" | "play" | "attack" | "damage" | "heal" | "buff" | "silence" | "bounce" | "death";
 /** Corner badge / action icon drawn on a log entry and inside its tooltip. */
-export type BattleLogBadge = "sword" | "burst" | "heart" | "arrow" | "sparkle" | "silence" | "bounce";
+export type BattleLogBadge = "sword" | "burst" | "heart" | "arrow" | "sparkle" | "silence" | "bounce" | "skull";
 
 /** A card (or hero) shown as art in a log entry's tile and rich tooltip. */
 export interface BattleLogCardRef {

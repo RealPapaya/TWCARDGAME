@@ -8419,6 +8419,12 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
       }
       return { ...base, kind: "damage", tile: targetRef, badge: "burst", amount, label: `${targetRef.name} 受到 ${amount ?? 0} 點傷害` };
     }
+    case "FATIGUE": {
+      // 牌庫抽乾的疲勞傷害。沒有來源卡,單獨成一條紀錄,用骷髏徽記讓玩家知道
+      // 「為什麼莫名其妙被扣血」——牌庫已空,每次強迫抽牌都對自身英雄造成累加傷害。
+      const heroRef = battleLogHeroRef(event.seat);
+      return { ...base, kind: "damage", tile: heroRef, badge: "skull", amount, label: `牌庫已抽乾！疲勞對 ${heroRef.name} 造成 ${amount ?? 0} 點傷害` };
+    }
     case "DESTROY": {
       const destroyedCardId = cardId ?? (target ? battleLogUnit(target).cardId : undefined);
       const tile = destroyedCardId ? logCardRef(destroyedCardId) : target ? logUnitRef(target) : { name: "隨從" };
@@ -9377,13 +9383,19 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   if (fatigueCues.length > 0) {
     const now = performance.now();
     // 每張骷髏卡各自飛行、命中時間錯開 FATIGUE_STAGGER_MS;applyFatigueDraw 依 readyAtMs
-    // 反推起飛時間,所以兩次抽空會看到兩張骷髏卡與兩次掉血(各帶自己的 remainingHealth)。
+    // 反推起飛時間,所以每次抽空都看到一張骷髏卡與一次掉血(各帶自己的 remainingHealth)。
+    //
+    // 重點:錨點必須是「既有的最大 delay」(出牌動畫造成的 post-play 延遲對所有疲勞
+    // cue 都一樣),再往後逐張累加固定間隔。早期版本用 Math.max(delay, FATIGUE_DRAW_MS +
+    // i*STAGGER),當 post-play 延遲大於前幾個 offset 時,前幾張骷髏會被壓到同一時間點而
+    // 「擠在一起」(陳致中抽三張時只看得到兩次動畫),所以這裡改成在錨點上均勻分散。
+    const anchor = Math.max(FATIGUE_DRAW_MS, ...fatigueCues.map((cue) => cue.delayMs ?? 0));
     fatigueCues.forEach((cue, i) => {
-      const offset = FATIGUE_DRAW_MS + i * FATIGUE_STAGGER_MS;
-      cue.delayMs = Math.max(cue.delayMs ?? 0, offset);
-      cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + offset);
+      const offset = anchor + i * FATIGUE_STAGGER_MS;
+      cue.delayMs = offset;
+      cue.readyAtMs = now + offset;
     });
-    const lastOffset = FATIGUE_DRAW_MS + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
+    const lastOffset = anchor + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
     holdPendingPublicSyncFor(lastOffset + POST_PLAY_STATE_SYNC_LAG_MS);
   }
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push
