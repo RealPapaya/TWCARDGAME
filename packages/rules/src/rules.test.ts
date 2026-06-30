@@ -517,11 +517,11 @@ describe("target legality", () => {
   });
 });
 
-describe("教召 / Discover (CHANNEL)", () => {
+describe("起底 / Discover (CHANNEL)", () => {
   function channelDef(): CardDefinition {
     return {
       id: "TEST_CHANNEL",
-      name: "教召測試",
+      name: "起底測試",
       category: "新聞",
       cost: 0,
       type: "NEWS",

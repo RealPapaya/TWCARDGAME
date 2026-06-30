@@ -166,7 +166,7 @@
           const ev = (f.specialPhase?.voteEvents || [])[0];
           if (ev) ev.options.forEach((label, i) => c.push(`<button data-vote="${i}">${label}</button>`));
         }
-        if (view.promptChoice) view.promptChoice.cards.forEach((card) => c.push(`<button data-prompt="${card.instanceId}">教召 ${card.cardId}</button>`));
+        if (view.promptChoice) view.promptChoice.cards.forEach((card) => c.push(`<button data-prompt="${card.instanceId}">起底 ${card.cardId}</button>`));
         $("controls").innerHTML = c.join(" ");
         $("hint").textContent = pending?.kind === "attack" ? "Pick a target to attack (enemy minion/hero)." : pending?.kind === "play" ? "Pick a target for the card." : "";
       }

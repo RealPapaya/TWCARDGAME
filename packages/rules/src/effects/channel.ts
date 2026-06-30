@@ -4,13 +4,13 @@ import { addEvent, nextInstanceId } from "../state.js";
 import type { EffectContext, EffectHandler, PendingChoice, MatchState, RuntimeCard } from "../types.js";
 import type { GameEvent, Seat } from "@twcardgame/shared";
 
-/** 教召 / Discover: how many candidate cards are revealed when `count` is omitted. */
+/** 起底 / Discover: how many candidate cards are revealed when `count` is omitted. */
 const DEFAULT_REVEAL = 3;
 /** Picker label shown in the UI / events. */
-const CHANNEL_LABEL = "教召";
+const CHANNEL_LABEL = "起底";
 
 /**
- * 教召 (CHANNEL / Discover). Pulls up to `count` (default 3) random cards out of the
+ * 起底 (CHANNEL / Discover). Pulls up to `count` (default 3) random cards out of the
  * active seat's own deck that match the optional `poolCardType` / `target_category_includes`
  * filters, then opens a `pendingPrompt` choice. The candidate cards are held privately in
  * `state.private.pendingChoice` (never in public state — that would leak deck order); the
@@ -65,7 +65,7 @@ export function channel(effect: EffectDefinition, context: EffectContext): void 
 }
 
 /**
- * Resolves an open 教召 choice: the picked card joins the seat's hand (burned if the
+ * Resolves an open 起底 choice: the picked card joins the seat's hand (burned if the
  * hand is full, mirroring a draw) and the remaining candidates are shuffled back into
  * the deck. Returns false (and emits a rejection) when the prompt / choice is invalid.
  */

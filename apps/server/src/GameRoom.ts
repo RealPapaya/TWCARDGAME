@@ -360,7 +360,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     if (this.match.phase === "AMPLIFICATION_PHASE" && this.match.specialPhase?.amplificationOptions) {
       client.send("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] });
     }
-    // 教召 / Discover: the candidate cards are private to the prompted seat (revealing
+    // 起底 / Discover: the candidate cards are private to the prompted seat (revealing
     // them publicly would leak deck order), so deliver them only here.
     const promptChoice = toPromptChoiceOffer(this.match, seat);
     if (promptChoice) client.send("promptChoice", promptChoice);

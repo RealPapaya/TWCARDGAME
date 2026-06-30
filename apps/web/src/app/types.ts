@@ -204,7 +204,7 @@ export type ClientViewState = {
   };
   /** This seat's privately-delivered amplification options (turn 7/14). */
   amplificationOptions?: AmplificationOption[];
-  /** This seat's privately-delivered 教召 / Discover candidate cards, while a choice prompt is open. */
+  /** This seat's privately-delivered 起底 / Discover candidate cards, while a choice prompt is open. */
   promptChoice?: PromptChoiceOffer;
   specialPhasePeek?: boolean;
   amplificationRerollStage?: "out" | "in";

@@ -23,7 +23,7 @@ export function scoreMove(state: MatchState, seat: Seat, move: GameCommand): num
   return 0;
 }
 
-/** 教召 / Discover: pick the highest-value candidate (stats for minions, cost otherwise). */
+/** 起底 / Discover: pick the highest-value candidate (stats for minions, cost otherwise). */
 export function scoreResolvePrompt(state: MatchState, move: Extract<GameCommand, { type: "resolvePrompt" }>): number {
   const card = state.private.pendingChoice?.cards.find((c) => c.instanceId === move.choiceInstanceId);
   if (!card) return 0;

@@ -3029,7 +3029,7 @@ function renderAmplificationOverlay(): string {
 }
 
 /**
- * 教召 / Discover picker — the privately-delivered candidate cards, presented
+ * 起底 / Discover picker — the privately-delivered candidate cards, presented
  * mulligan-style. Shown only while this seat owns the open choice prompt; clicking
  * a card sends `resolvePrompt` to add it to hand.
  */
@@ -3039,7 +3039,7 @@ function renderChannelOverlay(): string {
   return `
     <section id="channel-modal" class="mulligan-overlay channel-overlay" data-testid="channel-overlay">
       <div class="mulligan-content channel-content">
-        <h2>${escapeHtml(offer.label ?? "教召")}</h2>
+        <h2>${escapeHtml(offer.label ?? "起底")}</h2>
         <p>從卡池中選擇 1 張加入手牌</p>
         <div class="mulligan-card-area channel-card-area">
           ${offer.cards.map((card) => renderChannelCard(offer.promptId, card)).join("")}
@@ -3066,7 +3066,7 @@ function renderChannelCard(promptId: string, card: PromptChoiceOffer["cards"][nu
   `;
 }
 
-/** This seat's live 教召 offer, or undefined once the prompt is resolved/cleared. */
+/** This seat's live 起底 offer, or undefined once the prompt is resolved/cleared. */
 function currentPromptChoice(): PromptChoiceOffer | undefined {
   const offer = view.promptChoice;
   if (!offer) return undefined;
@@ -6361,7 +6361,7 @@ function activateRoomStateWhenReady(nextState: any): boolean {
   return true;
 }
 
-/** Drop a stored 教召 offer once its prompt has been resolved/cleared (or replaced). */
+/** Drop a stored 起底 offer once its prompt has been resolved/cleared (or replaced). */
 function syncPromptChoiceState(): void {
   const promptId = (view.state?.pendingPromptId as string | undefined) ?? "";
   if (view.promptChoice && view.promptChoice.promptId !== promptId) {

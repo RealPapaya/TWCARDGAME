@@ -490,7 +490,7 @@ export class GameSession {
         serverMessage("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] })
       );
     }
-    // 教召 / Discover candidates are private to the prompted seat (would leak deck order).
+    // 起底 / Discover candidates are private to the prompted seat (would leak deck order).
     const promptChoice = toPromptChoiceOffer(this.match, seat);
     if (promptChoice) this.host.sendToSeat(seat, serverMessage("promptChoice", promptChoice));
   }
