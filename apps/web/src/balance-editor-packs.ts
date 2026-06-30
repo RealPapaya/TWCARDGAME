@@ -76,7 +76,7 @@ export const SHOP_PACK_SEED: readonly ShopPackDraft[] = [
     price_gold: 100,
     cardCount: 5,
     faction: "民進黨政治人物",
-    factionWeight: 3,
+    factionWeight: 3.5,
     dropRates: FACTION_RATES.map((r) => ({ ...r })),
     image: "/images/ui/SHOP_DPP.webp"
   },
@@ -87,7 +87,7 @@ export const SHOP_PACK_SEED: readonly ShopPackDraft[] = [
     price_gold: 100,
     cardCount: 5,
     faction: "民眾黨政治人物",
-    factionWeight: 3,
+    factionWeight: 4.5,
     dropRates: FACTION_RATES.map((r) => ({ ...r })),
     image: "/images/ui/Carddeck.webp"
   },

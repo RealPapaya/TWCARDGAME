@@ -547,7 +547,7 @@ export const CARD_CATALOG_GENERATED = [
     "name": "勞工局",
     "category": "建築",
     "hiddenCategory": "政府機關",
-    "cost": 5,
+    "cost": 4,
     "attack": 0,
     "health": 5,
     "type": "MINION",
