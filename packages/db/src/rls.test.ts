@@ -31,6 +31,7 @@ const cardLessonsTrainingMigration = readFileSync(new URL("../migrations/0021_tr
 const trainingLegendaryRewardMigration = readFileSync(new URL("../migrations/0028_training_legendary_reward.sql", import.meta.url), "utf8");
 const trainingRewardGoldTuningMigration = readFileSync(new URL("../migrations/0029_training_reward_gold_tuning.sql", import.meta.url), "utf8");
 const cosmeticPackUniformMigration = readFileSync(new URL("../migrations/0031_cosmetic_pack_uniform_titles.sql", import.meta.url), "utf8");
+const cosmeticPackEmotesMigration = readFileSync(new URL("../migrations/0035_cosmetic_pack_emotes.sql", import.meta.url), "utf8");
 const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
@@ -162,6 +163,19 @@ describe("Supabase RLS migration coverage", () => {
     expect(cosmeticPackUniformMigration).not.toContain("random() < 0.5");
   });
 
+
+  it("adds battle emotes to cosmetic pack fixed odds", () => {
+    expect(cosmeticPackEmotesMigration).toContain("kind in ('avatar', 'title', 'card_art', 'emote')");
+    expect(cosmeticPackEmotesMigration).toContain("add column if not exists owned_emotes");
+    expect(cosmeticPackEmotesMigration).toContain("add column if not exists selected_emotes");
+    expect(cosmeticPackEmotesMigration).toContain("create or replace function public.set_user_battle_emotes");
+    expect(cosmeticPackEmotesMigration).toContain("cardinality(next_emotes) > 4");
+    expect(cosmeticPackEmotesMigration).toContain("when roll < 35 then 'avatar'");
+    expect(cosmeticPackEmotesMigration).toContain("when roll < 70 then 'title'");
+    expect(cosmeticPackEmotesMigration).toContain("when roll < 90 then 'emote'");
+    expect(cosmeticPackEmotesMigration).toContain("'type', 'emote'");
+    expect(cosmeticPackEmotesMigration).toContain('"type":"emote","rate":20');
+  });
   it("adds user-data tables behind RLS for inventory, login, events, and quests", () => {
     for (const table of userDataTables) {
       expect(userDataMigration).toContain(`alter table public.${table} enable row level security;`);

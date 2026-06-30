@@ -168,6 +168,8 @@ export class GameDurableObject {
 
     if (parsed?.type === "command") {
       this.session.applyClientCommand(attachment.seat, parsed.payload);
+    } else if (parsed?.type === "battleEmote") {
+      this.session.applyBattleEmote(attachment.seat, parsed.payload);
     } else if (parsed?.type === "getJoinCode") {
       const code = this.session.joinCode;
       if (code) this.sendToSocket(ws, serverMessage("joinCode", { code }));

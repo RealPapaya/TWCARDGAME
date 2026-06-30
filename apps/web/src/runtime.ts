@@ -5246,7 +5246,10 @@ function legacyShopDropRates(kind: string): NonNullable<ShopItemRow["contents"][
   }
   if (kind === "COSMETIC_PACK") {
     return [
-      { label: "未擁有內容等機率", type: "cosmetic", rate: 100 }
+      { label: "個人頭像", type: "avatar", rate: 35 },
+      { label: "專屬稱號", type: "title", rate: 35 },
+      { label: "戰鬥表情", type: "emote", rate: 20 },
+      { label: "特殊卡", type: "card_art", rate: 10 }
     ];
   }
   return [];
@@ -5336,6 +5339,10 @@ function renderRewardVisual(reward: PackOpeningReward): string {
   if (reward.type === "card_art") {
     return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><img class="reward-card-art-img" src="${escapeAttr(assetUrl(reward.path))}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'"></div>`;
   }
+  if (reward.type === "emote") {
+    const label = compactEmoteLabel(reward.label ?? reward.name);
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap reward-emote-wrap"><img class="reward-emote-frame" src="${escapeAttr(BATTLE_EMOTE_FRAME_URL)}" alt="" aria-hidden="true"><span class="reward-emote-label">${escapeHtml(label)}</span></div>`;
+  }
   return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge"><span class="voucher-icon" aria-hidden="true"></span>${reward.amount}</span></div>`;
 }
 
@@ -5348,7 +5355,8 @@ function rewardLabel(reward: PackOpeningReward): string {
   if (reward.type === "card") return rarityLabel[reward.rarity] ?? reward.rarity;
   if (reward.type === "avatar") return "個人頭像";
   if (reward.type === "title") return "專屬稱號";
-  if (reward.type === "card_art") return "炫彩卡圖";
+  if (reward.type === "card_art") return "特殊卡";
+  if (reward.type === "emote") return "戰鬥表情";
   return reward.name;
 }
 
@@ -5734,7 +5742,7 @@ function sanitizeBattleEmoteId(value: unknown): string | undefined {
 }
 
 function battleEmoteLabel(id: string): string {
-  return BATTLE_EMOTE_LABELS[id] ?? id.replace(/^emote[_:-]?/, "").replace(/[_:-]+/g, " ").slice(0, 16) || id;
+  return BATTLE_EMOTE_LABELS[id] ?? (id.replace(/^emote[_:-]?/, "").replace(/[_:-]+/g, " ").slice(0, 16) || id);
 }
 
 function compactEmoteLabel(label: string): string {
@@ -5873,6 +5881,9 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
       if (reward.type === "card_art" && reward.id && reward.name && reward.path) {
         return { type: "card_art", id: reward.id, cardId: reward.cardId ?? reward.id, name: reward.name, path: reward.path };
       }
+      if (reward.type === "emote" && reward.id && reward.name) {
+        return { type: "emote", id: reward.id, name: reward.name, path: reward.path ?? null, label: reward.label ?? reward.name };
+      }
       if (reward.type === "voucher" && typeof reward.amount === "number") {
         return { type: "voucher", amount: reward.amount, name: reward.name ?? "重複補償" };
       }
@@ -5917,6 +5928,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   view.eventStatus = "in_progress";
   view.amplificationOptions = undefined;
   resetSpecialPhaseUiState();
+  clearBattleEmoteState();
   view.selectedHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
@@ -6336,6 +6348,7 @@ function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolea
   view.publicSync = undefined;
   view.amplificationOptions = undefined;
   resetSpecialPhaseUiState();
+  clearBattleEmoteState();
   view.presence.clear();
   stopOpponentDisconnectTick();
   view.rejectedHandIds.clear();
@@ -7708,6 +7721,7 @@ async function backToLobby(): Promise<void> {
   view.events = [];
   resetBattleLog();
   view.animationCues = [];
+  clearBattleEmoteState();
   resetMinionVisualTracking();
   resetCardPlayCues();
   view.eventStatus = undefined;

@@ -2,6 +2,7 @@ import type {
   AiDifficulty,
   AiTheme,
   AmplificationOption,
+  BattleEmotePayload,
   GameEvent,
   HandCardView,
   Phase,
@@ -46,6 +47,7 @@ type ServerMessageMap = {
   bot: { seat: Seat; difficulty?: string; theme?: string | null };
   hand: { seat?: Seat; cards: HandCardView[] };
   presence: { seat: Seat; connected: boolean; reconnectUntilMs?: number };
+  battleEmote: BattleEmotePayload;
   publicSync: {
     status?: string;
     phase?: Phase;

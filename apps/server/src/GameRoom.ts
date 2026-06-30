@@ -9,7 +9,7 @@ import {
   toPublicState,
   type MatchState
 } from "@twcardgame/rules";
-import type { ClientCommandMessage, CommandEnvelope, GameEvent, Seat } from "@twcardgame/shared";
+import type { BattleEmotePayload, BattleEmoteRequest, ClientCommandMessage, CommandEnvelope, GameEvent, Seat } from "@twcardgame/shared";
 import { Room, type Client } from "colyseus";
 import {
   createAccountDeckStoreFromEnv,
@@ -28,6 +28,7 @@ import { GameStateSchema, syncSchemaFromPublic } from "./schema.js";
 
 const RECONNECT_WINDOW_MS = parseInt(process.env.RECONNECT_WINDOW_MS ?? "30000", 10);
 const MATCH_CLEANUP_DELAY_MS = parseInt(process.env.MATCH_CLEANUP_DELAY_MS ?? "10000", 10);
+const BATTLE_EMOTE_COOLDOWN_MS = 5000;
 
 /**
  * The reconnect window is a single, cumulative budget per seat for the whole
@@ -62,6 +63,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   // nextReconnectBudgetMs). Lives on the room — a connection-layer concern, not
   // gameplay — so the rules engine stays pure.
   private reconnectBudgetMs = new Map<Seat, number>();
+  private battleEmoteCooldownUntilMs = new Map<Seat, number>();
   private cleanupScheduled = false;
   private actionDeadlineTimer?: { clear: () => void };
   private serverCommandSeq = 0;
@@ -84,6 +86,7 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
   onCreate(options: GameRoomCreateOptions = {}): void {
     this.setState(new GameStateSchema());
     this.onMessage<ClientCommandMessage>("command", (client, message) => this.handleCommand(client, message));
+    this.onMessage<BattleEmoteRequest>("battleEmote", (client, message) => this.handleBattleEmote(client, message));
     this.onMessage("getJoinCode", (client) => {
       if (this.registeredJoinCode) client.send("joinCode", { code: this.registeredJoinCode });
     });
@@ -257,6 +260,31 @@ export class GameRoom extends Room<{ state: GameStateSchema }> {
     // no-op in the base PvP room.
   }
 
+  private handleBattleEmote(client: Client, message: BattleEmoteRequest): void {
+    if (!this.match) {
+      client.send("error", { message: "對局尚未準備完成。" });
+      return;
+    }
+    if (isMatchComplete(this.match)) return;
+    const seat = this.seats.get(client.sessionId);
+    if (!seat) {
+      client.send("error", { message: "尚未分配玩家座位。" });
+      return;
+    }
+    const now = Date.now();
+    const cooldownUntil = this.battleEmoteCooldownUntilMs.get(seat) ?? 0;
+    if (cooldownUntil > now) {
+      client.send("error", { message: "表情冷卻中。" });
+      return;
+    }
+    const payload = createBattleEmotePayload(seat, message, now);
+    if (!payload) {
+      client.send("error", { message: "表情資料無效。" });
+      return;
+    }
+    this.battleEmoteCooldownUntilMs.set(seat, now + BATTLE_EMOTE_COOLDOWN_MS);
+    this.broadcast("battleEmote", payload);
+  }
   private handleCommand(client: Client, message: ClientCommandMessage): void {
     if (!this.match) {
       client.send("error", { message: "對局尚未準備完成。" });
@@ -572,4 +600,30 @@ function requiresActionSeq(commandType: ClientCommandMessage["command"]["type"])
     commandType !== "rerollAmplification" &&
     commandType !== "submitVote"
   );
+}
+
+function createBattleEmotePayload(seat: Seat, message: BattleEmoteRequest, sentAtMs: number): BattleEmotePayload | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  const emoteId = sanitizeBattleEmoteText(message.emoteId, 64);
+  if (!emoteId || !/^[A-Za-z0-9_.:-]+$/.test(emoteId)) return undefined;
+  return {
+    seat,
+    emoteId,
+    label: sanitizeBattleEmoteText(message.label, 18),
+    assetPath: sanitizeBattleEmoteAssetPath(message.assetPath) ?? null,
+    sentAtMs
+  };
+}
+
+function sanitizeBattleEmoteText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+  return text || undefined;
+}
+
+function sanitizeBattleEmoteAssetPath(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const path = value.trim();
+  if (!path.startsWith("/") || /[\s"'<>]/.test(path)) return undefined;
+  return path.slice(0, 180);
 }

@@ -482,7 +482,9 @@
 .rate-row.legendary .rate-val { color: #ff8000; }
 
 .rate-row.avatar .rate-val,
-.rate-row.title .rate-val {
+.rate-row.title .rate-val,
+.rate-row.emote .rate-val,
+.rate-row.card_art .rate-val {
   color: #e77828;
 }
 

@@ -1,5 +1,7 @@
 import type {
   AmplificationOption,
+  BattleEmotePayload,
+  BattleEmoteRequest,
   GameCommand,
   GameEvent,
   GameStatus,
@@ -45,6 +47,7 @@ export interface CommandClientPayload {
 
 export interface ClientMessageMap {
   command: CommandClientPayload;
+  battleEmote: BattleEmoteRequest;
   getJoinCode: Record<string, never>;
 }
 
@@ -78,6 +81,7 @@ export interface ServerMessageMap {
   hand: { seat: Seat; cards: HandCardView[] };
   presence: { seat: Seat; connected: boolean; reconnectUntilMs?: number };
   publicSync: PublicSyncPayload;
+  battleEmote: BattleEmotePayload;
   /** Canonical full state snapshot; the web adapter maps it onto `view.state`. */
   state: PublicGameState;
   events: GameEvent[];
