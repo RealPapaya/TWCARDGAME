@@ -2199,24 +2199,112 @@ function toast(message: string, ok: boolean) {
   setTimeout(() => el.remove(), ok ? 3200 : 6000);
 }
 
+// Minimal-diff change detection: the server only edits the spans we send, so we
+// send ONLY what differs from the imported baseline. Untouched entries are never
+// transmitted and therefore stay byte-for-byte identical on disk.
+type Leaf = { path: (string | number)[]; value: unknown };
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+// JSON round-trip so undefined-valued keys (e.g. `newsPower = v || undefined`)
+// don't register as differences — they vanish in the serialised source too.
+function normalize<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v ?? null));
+}
+function jsonEq(a: unknown, b: unknown): boolean {
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
+// Collect scalar/array/object leaf edits between baseline and current. Returns
+// false if a key was added or removed (or an object↔non-object swap) — the caller
+// then falls back to re-serialising that whole entry.
+function collectLeaves(base: unknown, cur: unknown, path: (string | number)[], out: Leaf[]): boolean {
+  if (jsonEq(base, cur)) return true;
+  if (isPlainObject(base) && isPlainObject(cur)) {
+    const bk = Object.keys(base);
+    const ck = Object.keys(cur);
+    if (bk.length !== ck.length || !bk.every((k) => k in cur)) return false;
+    for (const k of ck) if (!collectLeaves(base[k], cur[k], [...path, k], out)) return false;
+    return true;
+  }
+  if (isPlainObject(base) !== isPlainObject(cur)) return false;
+  // primitive or array value at an existing key → patch this single span
+  out.push({ path, value: cur });
+  return true;
+}
+
+type EntryChange = { id: string; leaves?: Leaf[]; entry?: unknown };
+function sectionChanges<T extends { id: string }>(base: readonly T[], cur: readonly T[]): EntryChange[] {
+  const baseById = new Map(base.map((e) => [e.id, e]));
+  const changed: EntryChange[] = [];
+  for (const entry of cur) {
+    const b = baseById.get(entry.id);
+    if (b && jsonEq(b, entry)) continue;
+    if (!b) { changed.push({ id: entry.id, entry }); continue; }
+    const leaves: Leaf[] = [];
+    if (collectLeaves(normalize(b), normalize(entry), [], leaves) && leaves.length) {
+      changed.push({ id: entry.id, leaves });
+    } else {
+      changed.push({ id: entry.id, entry });
+    }
+  }
+  return changed;
+}
+
+function buildChangeset() {
+  const sections: Record<string, EntryChange[]> = {};
+  const add = (name: string, ch: EntryChange[]) => { if (ch.length) sections[name] = ch; };
+  add("cards", sectionChanges(CARD_CATALOG as readonly { id: string }[], cards as { id: string }[]));
+  add("amps", sectionChanges(AMPLIFICATION_DB as readonly { id: string }[], amps as { id: string }[]));
+  add("votes", sectionChanges(VOTE_EVENT_DB as readonly { id: string }[], votes as { id: string }[]));
+  add("aiThemes", sectionChanges(AI_THEMES as readonly { id: string }[], aiThemes as { id: string }[]));
+
+  const aiDecksChanged: { key: string; value: string[] }[] = [];
+  for (const key of Object.keys(aiDecks)) {
+    const baseDeck = (AI_THEME_DECKS as Record<string, readonly string[]>)[key];
+    if (!baseDeck || !jsonEq(baseDeck, aiDecks[key])) aiDecksChanged.push({ key, value: aiDecks[key] });
+  }
+
+  const progression: Record<string, number> = {};
+  if (prog.MAX_LEVEL !== MAX_LEVEL) progression.MAX_LEVEL = prog.MAX_LEVEL;
+  if (prog.LEVEL_UP_GOLD !== LEVEL_UP_GOLD) progression.LEVEL_UP_GOLD = prog.LEVEL_UP_GOLD;
+  if (prog.MAX_LEVEL_XP_REQUIREMENT !== MAX_LEVEL_XP_REQUIREMENT) progression.MAX_LEVEL_XP_REQUIREMENT = prog.MAX_LEVEL_XP_REQUIREMENT;
+
+  const changeset: { sections: typeof sections; aiDecks: typeof aiDecksChanged; progression: typeof progression } = {
+    sections,
+    aiDecks: aiDecksChanged,
+    progression
+  };
+  const count =
+    Object.values(sections).reduce((n, c) => n + c.length, 0) +
+    aiDecksChanged.length +
+    Object.keys(progression).length;
+  return { changeset, count };
+}
+
 async function applyToSource(btn: HTMLButtonElement) {
+  const { changeset, count } = buildChangeset();
+  if (count === 0) {
+    toast("沒有偵測到任何變更。", true);
+    return;
+  }
   const label = btn.textContent;
   btn.textContent = "⏳ 寫入中…";
-  (btn as HTMLButtonElement).disabled = true;
+  btn.disabled = true;
   try {
+    // 任務 (quests) and 卡包 (packs) are Supabase seeds, not code — they stay on
+    // the SQL export path; everything else is patched straight into source.
     const res = await fetch("/__apply-balance", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      // Card/augment/event/AI-deck/progression edits write straight to source.
-      // 任務 (quests) and 卡包 (packs) are Supabase seeds, not code — keep using
-      // the SQL export for those.
-      body: JSON.stringify({ cards, amps, votes, aiThemes, aiDecks, progression: prog })
+      body: JSON.stringify(changeset)
     });
     const result = (await res.json()) as { ok: boolean; written?: string[]; error?: string };
     if (result.ok) {
       changeCount = 0;
       bumpChanges();
-      toast(`✅ 已寫入 ${result.written?.length ?? 0} 個原始檔，Vite 會自動重新載入。`, true);
+      toast(`✅ 已精準套用 ${count} 項變更到 ${result.written?.length ?? 0} 個檔案，Vite 會自動重新載入。`, true);
     } else {
       toast(`❌ 套用失敗：${result.error ?? "未知錯誤"}`, false);
     }
@@ -2224,7 +2312,7 @@ async function applyToSource(btn: HTMLButtonElement) {
     toast("❌ 無法連線到開發伺服器。請用「npm run dev:web」開啟編輯器後再套用。", false);
   } finally {
     btn.textContent = label;
-    (btn as HTMLButtonElement).disabled = false;
+    btn.disabled = false;
   }
 }
 
