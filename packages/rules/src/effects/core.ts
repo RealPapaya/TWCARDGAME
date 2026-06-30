@@ -214,6 +214,12 @@ export function applyDamage(
     // Carry the authoritative post-hit health so the client can drop the HP digit
     // AT impact without waiting for (or racing) the held publicSync flush.
     addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth, ...payload }, ref.owner.seat);
+    // 每當此隨從受到傷害時觸發 (陳菊: ON_DAMAGE → 抽一張卡). Fires per damage instance that
+    // got past the divine shield; a lethal hit still draws since death resolves later.
+    const onDamage = minion.keywords.triggered;
+    if (onDamage?.type === "ON_DAMAGE" && (!onDamage.action || onDamage.action === "DRAW")) {
+      drawCards(state, ref.owner, onDamage.value ?? 1, events);
+    }
   } else {
     // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
     const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
@@ -400,6 +406,14 @@ export function handlePlayNews(state: MatchState, player: PlayerState, events: E
     if (trigger.action === "HEAL") {
       healUnit(state, { owner: player, kind: "MINION", unit: minion }, trigger.value ?? 1, events);
     }
+  }
+  // Cards that cheapen themselves while held (新聞龍捲風: 每打出一張新聞 費用-1).
+  for (const card of player.hand) {
+    const trigger = card.keywords.triggered;
+    if (trigger?.type !== "ON_PLAY_NEWS" || trigger.action !== "SELF_COST_REDUCE") continue;
+    const old = card.cost;
+    card.cost = Math.max(0, card.cost - (trigger.value ?? 1));
+    if (card.cost !== old) card.isReduced = true;
   }
 }
 

@@ -252,6 +252,12 @@ export interface PendingChoice {
   sourceInstanceId: string;
   label?: string;
   cards: RuntimeCard[];
+  /** True when candidates were pulled from the graveyard (陣亡區) instead of the deck. */
+  fromGraveyard?: boolean;
+  /** The originating CHANNEL effect, retained so a multi-pick (起底兩張) can re-open. */
+  channelEffect?: EffectDefinition;
+  /** Remaining pick-one rounds including this one; a value > 1 chains another reveal. */
+  remainingPicks?: number;
 }
 
 export interface MatchState {

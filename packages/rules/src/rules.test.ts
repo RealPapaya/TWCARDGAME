@@ -610,6 +610,194 @@ describe("起底 / Discover (CHANNEL)", () => {
     expect(state.pendingPrompt).toBeUndefined();
     expect(state.private.pendingChoice).toBeUndefined();
   });
+
+  it("poolHasDeathrattle restricts candidates to 遺志 cards only", () => {
+    const deathrattleDef: CardDefinition = {
+      id: "DR_MINION",
+      name: "遺志隨從",
+      category: "勞工",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "遺志: 抽一張牌",
+      image: "test.webp",
+      keywords: { deathrattle: { type: "DRAW", value: 1, target: { side: "FRIENDLY" } } }
+    };
+    const plainDef: CardDefinition = {
+      id: "PLAIN_MINION",
+      name: "普通隨從",
+      category: "勞工",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+
+    const state = startMatch(2468);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    // Deterministic deck: a few 遺志 minions mixed with plain ones.
+    state.players[seat].deck = [
+      createRuntimeCard(deathrattleDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(deathrattleDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, seat, nextInstanceId(state, "card"))
+    ];
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, poolHasDeathrattle: true };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const result = reduce(
+      state,
+      { commandId: "ch-dr", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    );
+
+    const candidates = result.state.private.pendingChoice?.cards ?? [];
+    expect(candidates.length).toBe(2); // only the two 遺志 minions qualify
+    expect(candidates.every((c) => c.keywords?.deathrattle)).toBe(true);
+  });
+
+  it("poolFromGraveyard reveals own dead minions and returns the unpicked to the graveyard", () => {
+    const deadDef: CardDefinition = {
+      id: "DEAD_MINION",
+      name: "亡魂",
+      category: "平民",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(1357);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 6;
+    state.players[seat].graveyard = [
+      createRuntimeCard(deadDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(deadDef, seat, nextInstanceId(state, "card"))
+    ];
+    const deckBefore = state.players[seat].deck.length;
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, poolFromGraveyard: true, poolCardType: "MINION" };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const opened = reduce(
+      state,
+      { commandId: "gy-open", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(opened.private.pendingChoice?.fromGraveyard).toBe(true);
+    expect(opened.private.pendingChoice?.cards.length).toBe(2);
+    expect(opened.players[seat].graveyard.length).toBe(0); // candidates held privately
+    expect(opened.players[seat].deck.length).toBe(deckBefore); // deck untouched
+
+    const chosen = opened.private.pendingChoice!.cards[0];
+    const promptId = opened.pendingPrompt!.promptId;
+    const resolved = reduce(
+      opened,
+      { commandId: "gy-res", seat, nowMs: 2100, command: { type: "resolvePrompt", promptId, choiceInstanceId: chosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(resolved.players[seat].hand.some((c) => c.instanceId === chosen.instanceId)).toBe(true);
+    expect(resolved.players[seat].graveyard.length).toBe(1); // the unpicked minion went back to the grave
+    expect(resolved.players[seat].deck.length).toBe(deckBefore); // never reshuffled into the deck
+  });
+
+  it("picks:2 (起底兩張) opens a fresh reveal after the first pick resolves", () => {
+    const newsDef: CardDefinition = {
+      id: "POOL_NEWS",
+      name: "池新聞",
+      category: "新聞",
+      cost: 1,
+      type: "NEWS",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(2024);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 9;
+    state.players[seat].deck = Array.from({ length: 6 }, () => createRuntimeCard(newsDef, seat, nextInstanceId(state, "card")));
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, picks: 2, poolCardType: "NEWS" };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const first = reduce(
+      state,
+      { commandId: "p2-open", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(first.pendingPrompt).toBeDefined();
+    const firstChosen = first.private.pendingChoice!.cards[0];
+    const second = reduce(
+      first,
+      { commandId: "p2-res1", seat, nowMs: 2100, command: { type: "resolvePrompt", promptId: first.pendingPrompt!.promptId, choiceInstanceId: firstChosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    // A second prompt opens automatically for the second pick.
+    expect(second.pendingPrompt).toBeDefined();
+    expect(second.private.pendingChoice?.promptId).not.toBe(first.pendingPrompt!.promptId);
+
+    const secondChosen = second.private.pendingChoice!.cards[0];
+    const done = reduce(
+      second,
+      { commandId: "p2-res2", seat, nowMs: 2200, command: { type: "resolvePrompt", promptId: second.pendingPrompt!.promptId, choiceInstanceId: secondChosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(done.pendingPrompt).toBeUndefined();
+    expect(done.players[seat].hand.filter((c) => c.cardId === "POOL_NEWS").length).toBe(2);
+  });
+});
+
+describe("ON_PLAY_NEWS / SELF_COST_REDUCE (新聞龍捲風)", () => {
+  it("cheapens a held card by 1 each time a NEWS is played, flooring at 0", () => {
+    const tornadoDef: CardDefinition = {
+      id: "TEST_TORNADO",
+      name: "龍捲風測試",
+      category: "新聞",
+      cost: 7,
+      type: "NEWS",
+      rarity: "RARE",
+      description: "",
+      image: "test.webp",
+      keywords: { triggered: { type: "ON_PLAY_NEWS", action: "SELF_COST_REDUCE", value: 1 } }
+    };
+    const simpleNews: CardDefinition = {
+      id: "SIMPLE_NEWS",
+      name: "簡單新聞",
+      category: "新聞",
+      cost: 0,
+      type: "NEWS",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(99);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const tornado = createRuntimeCard(tornadoDef, seat, nextInstanceId(state, "card"));
+    const news = createRuntimeCard(simpleNews, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [tornado, news];
+
+    const after = reduce(
+      state,
+      { commandId: "tor-news", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: news.instanceId } },
+      CARD_CATALOG
+    ).state;
+    const heldTornado = after.players[seat].hand.find((c) => c.instanceId === tornado.instanceId)!;
+    expect(heldTornado.cost).toBe(6);
+    expect(heldTornado.isReduced).toBe(true);
+  });
 });
 
 describe("tech enforcement vote environment", () => {

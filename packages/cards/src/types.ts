@@ -23,6 +23,23 @@ export interface EffectDefinition {
    * category filter and `count` for how many cards are revealed (default 3).
    */
   poolCardType?: CardType;
+  /**
+   * 起底 / Discover (CHANNEL): when true, restricts the candidate pool to cards that
+   * carry a 遺志 (deathrattle) keyword. Combines with `poolCardType` /
+   * `target_category_includes` as an additional AND filter.
+   */
+  poolHasDeathrattle?: boolean;
+  /**
+   * 起底 / Discover (CHANNEL): when true, the candidate pool is drawn from the active
+   * seat's own graveyard (陣亡區) instead of its deck — e.g. 靈媒 起底一張已陣亡隨從.
+   * Picked cards leave the graveyard; unpicked ones return to it (no shuffle).
+   */
+  poolFromGraveyard?: boolean;
+  /**
+   * 起底 / Discover (CHANNEL): how many sequential pick-one rounds to run (default 1).
+   * 起底兩張 = `picks: 2` opens a second reveal-and-pick once the first resolves.
+   */
+  picks?: number;
   buff_stat?: StatName;
   buff_value?: number;
   keyword?: string;
@@ -166,7 +183,7 @@ export const SUPPORTED_ONGOING_EFFECTS = [
   "ADJACENT_BUFF_STATS",
   "REDUCE_NEWS_COST"
 ] as const;
-export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS", "ON_DRAW"] as const;
+export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS", "ON_DRAW", "ON_DAMAGE"] as const;
 export const SUPPORTED_ENRAGE_EFFECTS = ["BUFF_STAT"] as const;
 export const SUPPORTED_QUEST_EFFECTS = ["DAMAGE_ALL_MINIONS"] as const;
 export const SUPPORTED_ON_DISCARD_ACTIONS = ["SUMMON"] as const;
