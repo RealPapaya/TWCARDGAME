@@ -293,6 +293,16 @@
   border: 4px solid var(--wood-medium);
 }
 
+/* 炫彩卡圖獎勵 — show the alt art as a card-shaped thumbnail (16:9 like card art). */
+.reward-card-art-img {
+  width: 132px !important;
+  height: auto !important;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  object-fit: cover !important;
+  border: 3px solid var(--wood-medium);
+}
+
 .reward-title-badge,
 .reward-voucher-badge {
   display: inline-flex;

@@ -5254,6 +5254,9 @@ function renderRewardVisual(reward: PackOpeningReward): string {
   if (reward.type === "title") {
     return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-title-badge">#${escapeHtml(reward.name)}</span></div>`;
   }
+  if (reward.type === "card_art") {
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><img class="reward-card-art-img" src="${escapeAttr(assetUrl(reward.path))}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'"></div>`;
+  }
   return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge"><span class="voucher-icon" aria-hidden="true"></span>${reward.amount}</span></div>`;
 }
 
@@ -5266,6 +5269,7 @@ function rewardLabel(reward: PackOpeningReward): string {
   if (reward.type === "card") return rarityLabel[reward.rarity] ?? reward.rarity;
   if (reward.type === "avatar") return "個人頭像";
   if (reward.type === "title") return "專屬稱號";
+  if (reward.type === "card_art") return "炫彩卡圖";
   return reward.name;
 }
 
@@ -5652,6 +5656,9 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
       }
       if (reward.type === "title" && reward.id && reward.name) {
         return { type: "title", id: reward.id, name: reward.name };
+      }
+      if (reward.type === "card_art" && reward.id && reward.name && reward.path) {
+        return { type: "card_art", id: reward.id, cardId: reward.cardId ?? reward.id, name: reward.name, path: reward.path };
       }
       if (reward.type === "voucher" && typeof reward.amount === "number") {
         return { type: "voucher", amount: reward.amount, name: reward.name ?? "重複補償" };

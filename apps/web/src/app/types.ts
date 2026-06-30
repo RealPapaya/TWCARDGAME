@@ -474,6 +474,7 @@ export type PackOpeningReward =
     }
   | { type: "avatar"; id: string; name: string; path: string }
   | { type: "title"; id: string; name: string }
+  | { type: "card_art"; id: string; cardId: string; name: string; path: string }
   | { type: "voucher"; amount: number; name: string };
 
 export type PurchaseShopResult = {
