@@ -103,13 +103,18 @@ const prog = {
 
 // ── change tracking ─────────────────────────────────────────────────
 let changeCount = 0;
-function bumpChanges() {
-  changeCount++;
+function setChangeBadge(n: number) {
+  changeCount = n;
   const badge = document.getElementById("change-badge");
   if (badge) {
-    badge.textContent = String(changeCount);
-    badge.style.display = changeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = String(n);
+    badge.style.display = n > 0 ? "inline-flex" : "none";
   }
+}
+// Recompute the REAL number of pending changes (vs the imported baseline) so the
+// badge counts actual diffs — touching a field then setting it back is 0, not +2.
+function bumpChanges() {
+  setChangeBadge(buildChangeset().count);
 }
 
 // ── inject styles ───────────────────────────────────────────────────
@@ -372,6 +377,39 @@ main#app {
 }
 /* neutralise the hand fan transform so the preview sits upright and centered */
 .be-preview .card { transform: none !important; margin: 0 !important; }
+
+/* card editor: left = big preview + image/category, right = detail tuning */
+.be-card-editor {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .be-card-editor { grid-template-columns: 1fr; }
+}
+.be-card-editor-left { display: flex; flex-direction: column; gap: 14px; }
+.be-card-editor-right { margin: 0; }
+/* enlarge the preview so the artwork is legible, and vertically centre it
+   (the base .be-preview pins to flex-start, which left the card glued to the top). */
+.be-card-preview-lg {
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 28px 16px;
+  /* visible so the augment art (taller than a card) isn't clipped top/bottom */
+  overflow: visible;
+}
+/* cards and vote options share the .card box → one rule scales both */
+.be-card-preview-lg .card {
+  transform: scale(1.45) !important;
+  transform-origin: center center;
+  margin: 40px 0 !important;
+}
+/* augment previews are the small hero dot pair — scale them up a touch */
+.be-card-preview-lg .be-augment-preview-pair .hero-augment-dot {
+  transform: scale(1.6);
+}
 /* the preview is display-only; keep it inert without the game's disabled
    greyscale (base.css button:disabled { filter: grayscale; opacity }). */
 .be-preview { pointer-events: none; }
@@ -1040,13 +1078,51 @@ function renderCardsPanel(): HTMLElement {
 }
 
 function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large card preview + image / category metadata,
+  // right = the numeric / keyword detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
-  // in-game preview (mirrors the live card face)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  // ── LEFT: large in-game preview (mirrors the live card face) ──
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderCardPreview(card);
-  grid.append(preview);
+  left.append(preview);
 
+  const imageField = h("div", { class: "be-field" });
+  imageField.append(h("label", {}, "圖片路徑"));
+  const imageInp = h("input", { type: "text", value: card.image });
+  imageInp.addEventListener("change", () => {
+    card.image = imageInp.value.trim();
+    bumpChanges();
+    refresh();
+  });
+  imageField.append(imageInp);
+  left.append(imageField);
+
+  // category
+  const catField = h("div", { class: "be-field" });
+  catField.append(h("label", {}, "分類"));
+  const catInp = h("input", { type: "text", value: card.category });
+  catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
+  catField.append(catInp);
+  left.append(catField);
+
+  // hidden category (optional — not shown on the card face)
+  const hiddenCatField = h("div", { class: "be-field" });
+  hiddenCatField.append(h("label", {}, "隱藏分類"));
+  const hiddenCatInp = h("input", { type: "text", value: card.hiddenCategory ?? "", placeholder: "（選填）" });
+  hiddenCatInp.addEventListener("change", () => {
+    const v = hiddenCatInp.value.trim();
+    card.hiddenCategory = v || undefined;
+    bumpChanges();
+    refresh();
+  });
+  hiddenCatField.append(hiddenCatInp);
+  left.append(hiddenCatField);
+
+  // ── RIGHT: detail tuning ──
   // name
   const nameField = h("div", { class: "be-field" });
   nameField.append(h("label", {}, "名稱"));
@@ -1087,40 +1163,8 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   rarField.append(rarSel);
   grid.append(rarField);
 
-  // category
-  const catField = h("div", { class: "be-field" });
-  catField.append(h("label", {}, "分類"));
-  const catInp = h("input", { type: "text", value: card.category });
-  catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
-  catField.append(catInp);
-  grid.append(catField);
-
-  // hidden category (optional — not shown on the card face)
-  const hiddenCatField = h("div", { class: "be-field" });
-  hiddenCatField.append(h("label", {}, "隱藏分類"));
-  const hiddenCatInp = h("input", { type: "text", value: card.hiddenCategory ?? "", placeholder: "（選填）" });
-  hiddenCatInp.addEventListener("change", () => {
-    const v = hiddenCatInp.value.trim();
-    card.hiddenCategory = v || undefined;
-    bumpChanges();
-    refresh();
-  });
-  hiddenCatField.append(hiddenCatInp);
-  grid.append(hiddenCatField);
-
-  const imageField = h("div", { class: "be-field" });
-  imageField.append(h("label", {}, "圖片路徑"));
-  const imageInp = h("input", { type: "text", value: card.image });
-  imageInp.addEventListener("change", () => {
-    card.image = imageInp.value.trim();
-    bumpChanges();
-    refresh();
-  });
-  imageField.append(imageInp);
-  grid.append(imageField);
-
   // description
-  const descField = h("div", { class: "be-field", style: "grid-column: span 2;" });
+  const descField = h("div", { class: "be-field", style: "grid-column: 1 / -1;" });
   descField.append(h("label", {}, "描述"));
   const descInp = h("textarea", {}, card.description);
   descInp.addEventListener("change", () => { card.description = descInp.value; bumpChanges(); });
@@ -1180,7 +1224,7 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   }
 
   grid.append(kwSection);
-  return grid;
+  return wrap;
 }
 
 function buildEffectEditor(ef: EffectDefinition, refresh: () => void): HTMLElement {
@@ -1296,12 +1340,16 @@ function renderAmpsPanel(): HTMLElement {
 }
 
 function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large preview, right = detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
   // in-game preview (mirrors the live augment option)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderAugmentPreview(amp);
-  grid.append(preview);
+  left.append(preview);
 
   const nameF = h("div", { class: "be-field" });
   nameF.append(h("label", {}, "名稱"));
@@ -1346,7 +1394,7 @@ function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
   efDiv.append(buildEffectEditor(amp.effect, () => {}));
   grid.append(efDiv);
 
-  return grid;
+  return wrap;
 }
 
 // ── VOTES PANEL ─────────────────────────────────────────────────────
@@ -1397,12 +1445,16 @@ function renderVotesPanel(): HTMLElement {
 }
 
 function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large preview, right = detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
   // in-game preview (mirrors the live vote option)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderVoteEventPreview(ve);
-  grid.append(preview);
+  left.append(preview);
 
   const nameF = h("div", { class: "be-field" });
   nameF.append(h("label", {}, "名稱"));
@@ -1466,7 +1518,7 @@ function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
   efDiv.append(buildEffectEditor(ve.apply.effect, () => {}));
   grid.append(efDiv);
 
-  return grid;
+  return wrap;
 }
 
 // ── PROGRESSION PANEL ───────────────────────────────────────────────
@@ -2271,15 +2323,28 @@ function buildChangeset() {
   if (prog.LEVEL_UP_GOLD !== LEVEL_UP_GOLD) progression.LEVEL_UP_GOLD = prog.LEVEL_UP_GOLD;
   if (prog.MAX_LEVEL_XP_REQUIREMENT !== MAX_LEVEL_XP_REQUIREMENT) progression.MAX_LEVEL_XP_REQUIREMENT = prog.MAX_LEVEL_XP_REQUIREMENT;
 
-  const changeset: { sections: typeof sections; aiDecks: typeof aiDecksChanged; progression: typeof progression } = {
-    sections,
-    aiDecks: aiDecksChanged,
-    progression
-  };
+  // Shop packs: add/remove/rename rewrites the whole SHOP_PACK_SEED array;
+  // pure field edits go through the precise per-entry section path.
+  let packsFull: ShopPackDraft[] | undefined;
+  if (!jsonEq(SHOP_PACK_SEED, packs)) {
+    const baseIds = new Set(SHOP_PACK_SEED.map((p) => p.id));
+    const curIds = new Set(packs.map((p) => p.id));
+    const structural = packs.some((p) => !baseIds.has(p.id)) || SHOP_PACK_SEED.some((p) => !curIds.has(p.id));
+    if (structural) packsFull = packs;
+    else add("packs", sectionChanges(SHOP_PACK_SEED as readonly { id: string }[], packs as { id: string }[]));
+  }
+
+  const changeset: {
+    sections: typeof sections;
+    aiDecks: typeof aiDecksChanged;
+    progression: typeof progression;
+    packsFull?: ShopPackDraft[];
+  } = { sections, aiDecks: aiDecksChanged, progression, packsFull };
   const count =
     Object.values(sections).reduce((n, c) => n + c.length, 0) +
     aiDecksChanged.length +
-    Object.keys(progression).length;
+    Object.keys(progression).length +
+    (packsFull ? packsFull.length : 0);
   return { changeset, count };
 }
 
@@ -2302,8 +2367,7 @@ async function applyToSource(btn: HTMLButtonElement) {
     });
     const result = (await res.json()) as { ok: boolean; written?: string[]; error?: string };
     if (result.ok) {
-      changeCount = 0;
-      bumpChanges();
+      setChangeBadge(0);
       toast(`✅ 已精準套用 ${count} 項變更到 ${result.written?.length ?? 0} 個檔案，Vite 會自動重新載入。`, true);
     } else {
       toast(`❌ 套用失敗：${result.error ?? "未知錯誤"}`, false);

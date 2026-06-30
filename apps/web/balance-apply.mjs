@@ -18,7 +18,8 @@ export const SECTIONS = {
   cards: { file: "packages/cards/src/catalog.generated.ts", constName: "CARD_CATALOG_GENERATED", idKey: "id" },
   amps: { file: "packages/cards/src/amplificationDb.ts", constName: "AMPLIFICATION_DB", idKey: "id" },
   votes: { file: "packages/cards/src/voteEventDb.ts", constName: "VOTE_EVENT_DB", idKey: "id" },
-  aiThemes: { file: "packages/shared/src/index.ts", constName: "AI_THEMES", idKey: "id" }
+  aiThemes: { file: "packages/shared/src/index.ts", constName: "AI_THEMES", idKey: "id" },
+  packs: { file: "apps/web/src/balance-editor-packs.ts", constName: "SHOP_PACK_SEED", idKey: "id" }
 };
 const AI_DECKS = { file: "packages/shared/src/index.ts", constName: "AI_THEME_DECKS" };
 const PROGRESSION = { file: "packages/shared/src/progression.ts" };
@@ -245,6 +246,19 @@ function applyAiDecks(src, changedThemes, eol) {
   return out;
 }
 
+// Replace an entire `export const <name> = [ ... ]` array literal with a fresh,
+// pretty-printed list. Used when entries are added/removed/renamed and a precise
+// per-entry patch isn't possible (e.g. shop packs).
+function applyWholeArray(src, constName, items, eol) {
+  const open = findInitOpen(src, constName, "[");
+  if (open < 0) throw new Error(`could not find "export const ${constName}"`);
+  const close = findMatchingBracket(src, open);
+  if (close < 0) throw new Error(`unbalanced [ in ${constName}`);
+  const body = items.map((e) => "  " + serializeEntry(e, "  ", eol)).join("," + eol);
+  const literal = items.length ? `[${eol}${body}${eol}]` : "[]";
+  return src.slice(0, open) + literal + src.slice(close + 1);
+}
+
 function applyProgression(src, prog) {
   let out = src;
   for (const [name, val] of Object.entries(prog)) {
@@ -280,6 +294,11 @@ export function applyChangeset(repoRoot, changeset) {
   }
   if (changeset.progression && Object.keys(changeset.progression).length) {
     queue(PROGRESSION.file, (s) => applyProgression(s, changeset.progression));
+  }
+  // Shop packs support add/remove/rename, so a structural change rewrites the
+  // whole SHOP_PACK_SEED array; pure field edits go through SECTIONS.packs above.
+  if (changeset.packsFull) {
+    queue(SECTIONS.packs.file, (s) => applyWholeArray(s, SECTIONS.packs.constName, changeset.packsFull, eolOf(s)));
   }
 
   const written = [];
