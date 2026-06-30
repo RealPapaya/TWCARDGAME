@@ -1,5 +1,14 @@
 import type { MatchState } from "@twcardgame/rules";
-import { SEATS, type AiDifficulty, type AiTheme, type DevTestMatchSetup, type RewardSummary, type Seat } from "@twcardgame/shared";
+import {
+  negotiatedWsProtocol,
+  parseWsProtocols,
+  SEATS,
+  type AiDifficulty,
+  type AiTheme,
+  type DevTestMatchSetup,
+  type RewardSummary,
+  type Seat
+} from "@twcardgame/shared";
 import { createAccountStore, type AccountStore } from "./accounts.js";
 import { BotGameSession } from "./BotGameSession.js";
 import {
@@ -119,6 +128,10 @@ export class GameDurableObject {
     await this.ensureSession(url);
     const session = this.session!;
 
+    // Bearer auth (the Supabase JWT) rides the WS subprotocol, not the URL.
+    const wsProtocolHeader = request.headers.get("sec-websocket-protocol");
+    const accessToken = parseWsProtocols(wsProtocolHeader).accessToken;
+
     const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
     const resolved = session.resolveSeat(sessionId);
     if (!resolved) return new Response("Room is full.", { status: 409 });
@@ -146,11 +159,14 @@ export class GameDurableObject {
       session.markReconnected(seat);
     } else {
       // setPlayer broadcasts the initial match state to both seats once full.
-      session.setPlayer(seat, sessionId, await this.resolveSetup(url, sessionId));
+      session.setPlayer(seat, sessionId, await this.resolveSetup(url, sessionId, accessToken));
     }
 
     await this.flush();
-    return new Response(null, { status: 101, webSocket: client });
+    // Echo the negotiated subprotocol so the browser handshake completes cleanly.
+    const negotiated = negotiatedWsProtocol(wsProtocolHeader);
+    const responseHeaders = negotiated ? { "Sec-WebSocket-Protocol": negotiated } : undefined;
+    return new Response(null, { status: 101, webSocket: client, headers: responseHeaders });
   }
 
   /* --------------------------------- WebSocket handlers --------------------------------- */
@@ -259,17 +275,18 @@ export class GameDurableObject {
     }
   }
 
-  private async resolveSetup(url: URL, sessionId: string): Promise<PlayerSetup> {
+  private async resolveSetup(url: URL, sessionId: string, accessToken: string | undefined): Promise<PlayerSetup> {
     const params = url.searchParams;
     const deckParam = params.get("deck");
     // The account store validates the deck (dev or Supabase) and resolves identity;
     // an absent/invalid deck falls back to the dev deck rather than entering illegally.
+    // accessToken comes from the WS subprotocol; the query param is a rollout fallback.
     return this.accounts.resolvePlayerSetup(sessionId, {
       userId: params.get("userId") || undefined,
       displayName: params.get("name") || undefined,
       deckIds: deckParam ? deckParam.split(",").filter(Boolean) : undefined,
       deckId: params.get("deckId") || undefined,
-      accessToken: params.get("accessToken") || undefined
+      accessToken: accessToken || params.get("accessToken") || undefined
     });
   }
 

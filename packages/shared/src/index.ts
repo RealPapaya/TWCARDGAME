@@ -446,3 +446,4 @@ export interface GameEvent {
 export * from "./animationTiming.js";
 export * from "./progression.js";
 export * from "./questEvents.js";
+export * from "./wsAuth.js";
