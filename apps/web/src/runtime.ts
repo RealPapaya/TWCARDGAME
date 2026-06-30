@@ -4,6 +4,8 @@ import type {
   AiDifficulty,
   AmplificationOption,
   AmplificationSelection,
+  BattleEmotePayload,
+  BattleEmoteRequest,
   ClientCommandMessage,
   DevTestMatchSetup,
   FriendRow,
@@ -173,7 +175,7 @@ import {
 import { startDragDemo, stopDragDemo } from "./app/training-demo.js";
 
 const PROFILE_SELECT =
-  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,login_days,current_login_streak,longest_login_streak,last_login_date";
+  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,owned_emotes,selected_emotes,login_days,current_login_streak,longest_login_streak,last_login_date";
 // Match-history columns + jsonb sub-objects from final_state (opponent display
 // names and turn count). created_at carries the match start time (see persistence.ts).
 const MATCH_HISTORY_SELECT =
@@ -195,6 +197,30 @@ const TITLE_LABELS: Record<string, string> = {
   duck_blood_tofu: "鴨血豆腐鴨血豆腐",
   taoyuan_hsinchu: "你從桃園新竹"
 };
+const BATTLE_EMOTE_FRAME_URL = "/images/ui/battle_emote_frame.webp";
+const BATTLE_EMOTE_DISPLAY_MS = 2000;
+const BATTLE_EMOTE_COOLDOWN_MS = 5000;
+const MAX_BATTLE_EMOTES = 4;
+
+type BattleEmoteOption = {
+  id: string;
+  label: string;
+  assetPath?: string | null;
+};
+
+const BATTLE_EMOTE_LABELS: Record<string, string> = {
+  emote_cheer: "漂亮",
+  emote_think: "思考",
+  emote_shock: "震驚",
+  emote_taunt: "來戰"
+};
+
+const DEFAULT_BATTLE_EMOTES: BattleEmoteOption[] = [
+  { id: "emote_cheer", label: BATTLE_EMOTE_LABELS.emote_cheer },
+  { id: "emote_think", label: BATTLE_EMOTE_LABELS.emote_think },
+  { id: "emote_shock", label: BATTLE_EMOTE_LABELS.emote_shock },
+  { id: "emote_taunt", label: BATTLE_EMOTE_LABELS.emote_taunt }
+];
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 // Keep in sync with the `attack-lunge`/`hero-attack-lunge` CSS animation
 // durations in styles/battle-fx.css (.minion.lunging / .hero.lunging). The
@@ -301,6 +327,8 @@ const view: ClientViewState = {
   events: [],
   battleLog: [],
   animationCues: [],
+  battleEmoteMenuOpen: false,
+  activeBattleEmotes: [],
   joining: false,
   accountLoading: false,
   authMode: "signin",
@@ -2293,10 +2321,11 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
     hasCue(targetKey, "heal") && "receiving-heal",
     seat === shatteringHeroSeat && "hero-shattering"
   ]);
+  const emoteToggleAttr = role === "player" && seat === view.mySeat ? ' data-battle-emote-toggle="1"' : "";
 
   return `
     <div class="hero-frame" data-seat="${seat}">
-      <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
+      <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}"${emoteToggleAttr} aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
         <span class="avatar" aria-hidden="true"></span>
         <strong>${escapeHtml(name)}</strong>
         <span class="hero-hp">${hp}/${maxHp}</span>
@@ -2305,10 +2334,60 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
       </button>
       ${renderHeroEventBadge()}
       ${renderAmplificationBadge(player)}
+      ${renderBattleEmoteMenu(seat, role)}
+      ${renderBattleEmoteBubble(seat)}
     </div>
   `;
 }
 
+function renderBattleEmoteMenu(seat: Seat, role: "player" | "opponent"): string {
+  if (role !== "player" || seat !== view.mySeat || !view.battleEmoteMenuOpen) return "";
+  const options = battleEmoteOptions();
+  const cooldownMs = Math.max(0, (view.battleEmoteCooldownUntilMs ?? 0) - performance.now());
+  const cooling = cooldownMs > 0;
+  const cooldownLabel = cooling ? ` (${Math.ceil(cooldownMs / 1000)}s)` : "";
+  return `
+    <div class="battle-emote-menu" role="menu" aria-label="戰鬥表情">
+      ${options.map((option) => `
+        <button
+          type="button"
+          class="battle-emote-choice ${cooling ? "cooling" : ""}"
+          data-battle-emote-id="${escapeAttr(option.id)}"
+          data-tooltip="${escapeAttr(option.label + cooldownLabel)}"
+          aria-label="${escapeAttr(option.label + cooldownLabel)}"
+          ${cooling ? "disabled" : ""}
+        >
+          ${renderBattleEmoteOptionVisual(option)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderBattleEmoteOptionVisual(option: BattleEmoteOption): string {
+  const path = sanitizeBattleEmoteAssetPath(option.assetPath);
+  if (path) {
+    return `<img class="battle-emote-choice-img" src="${escapeAttr(path)}" alt="" aria-hidden="true" onerror="this.style.display='none'">`;
+  }
+  return `<span class="battle-emote-choice-label">${escapeHtml(compactEmoteLabel(option.label))}</span>`;
+}
+
+function renderBattleEmoteBubble(seat: Seat): string {
+  const now = performance.now();
+  const emote = [...(view.activeBattleEmotes ?? [])]
+    .filter((item) => item.seat === seat && item.untilMs > now)
+    .sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
+  if (!emote) return "";
+  const path = sanitizeBattleEmoteAssetPath(emote.assetPath);
+  const content = path
+    ? `<img class="battle-emote-bubble-img" src="${escapeAttr(path)}" alt="" aria-hidden="true" onerror="this.style.display='none'">`
+    : `<span class="battle-emote-bubble-label">${escapeHtml(emote.label)}</span>`;
+  return `
+    <div class="battle-emote-bubble" aria-hidden="true" style="--battle-emote-frame: url('${escapeAttr(BATTLE_EMOTE_FRAME_URL)}')">
+      <div class="battle-emote-bubble-content">${content}</div>
+    </div>
+  `;
+}
 /**
  * The active 公投 venue/field effect, shown to the LEFT of each hero avatar (the
  * effect is global, so it mirrors on both sides). Renders nothing when no
@@ -5621,6 +5700,140 @@ function googleProfileAvatarUrl(): string | undefined {
   return typeof avatarUrl === "string" && avatarUrl.trim() ? avatarUrl : undefined;
 }
 
+let battleEmoteSeq = 0;
+const battleEmoteTimers = new Map<string, number>();
+let battleEmoteCooldownTimer: number | undefined;
+
+function battleEmoteOptions(): BattleEmoteOption[] {
+  const selected = sanitizeBattleEmoteIds(view.profile?.selected_emotes);
+  const owned = sanitizeBattleEmoteIds(view.profile?.owned_emotes);
+  const ids = selected.length > 0 ? selected : owned;
+  if (ids.length === 0) return DEFAULT_BATTLE_EMOTES;
+  return ids.slice(0, MAX_BATTLE_EMOTES).map((id) => ({ id, label: battleEmoteLabel(id) }));
+}
+
+function sanitizeBattleEmoteIds(ids: readonly string[] | undefined): string[] {
+  if (!Array.isArray(ids)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of ids) {
+    const id = sanitizeBattleEmoteId(raw);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+    if (result.length >= MAX_BATTLE_EMOTES) break;
+  }
+  return result;
+}
+
+function sanitizeBattleEmoteId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const id = value.trim().slice(0, 64);
+  if (!id || !/^[A-Za-z0-9_.:-]+$/.test(id)) return undefined;
+  return id;
+}
+
+function battleEmoteLabel(id: string): string {
+  return BATTLE_EMOTE_LABELS[id] ?? id.replace(/^emote[_:-]?/, "").replace(/[_:-]+/g, " ").slice(0, 16) || id;
+}
+
+function compactEmoteLabel(label: string): string {
+  const chars = Array.from(label.trim());
+  return chars.slice(0, chars.length > 2 ? 2 : chars.length).join("") || "表情";
+}
+
+function sanitizeBattleEmoteAssetPath(path: unknown): string | undefined {
+  if (typeof path !== "string") return undefined;
+  const trimmed = path.trim();
+  if (!trimmed.startsWith("/") || /[\s"'<>]/.test(trimmed)) return undefined;
+  return trimmed.slice(0, 180);
+}
+
+function resolveBattleEmoteOption(id: string): BattleEmoteOption | undefined {
+  return battleEmoteOptions().find((option) => option.id === id);
+}
+
+function sendBattleEmote(emoteId: string): void {
+  const option = resolveBattleEmoteOption(emoteId);
+  if (!option || !view.mySeat) return;
+  const now = performance.now();
+  const cooldownUntil = view.battleEmoteCooldownUntilMs ?? 0;
+  if (cooldownUntil > now) {
+    showBattleToast("表情冷卻中。");
+    view.battleEmoteMenuOpen = false;
+    render();
+    return;
+  }
+
+  view.battleEmoteMenuOpen = false;
+  view.battleEmoteCooldownUntilMs = now + BATTLE_EMOTE_COOLDOWN_MS;
+  scheduleBattleEmoteCooldownRender();
+
+  const request: BattleEmoteRequest = {
+    emoteId: option.id,
+    label: option.label,
+    assetPath: option.assetPath ?? null
+  };
+  if (view.room) {
+    view.room.send("battleEmote", request);
+    render();
+    return;
+  }
+  handleBattleEmoteMessage({ seat: view.mySeat, emoteId: option.id, label: option.label, assetPath: option.assetPath ?? null, sentAtMs: Date.now() });
+}
+
+function handleBattleEmoteMessage(message: BattleEmotePayload): void {
+  const seat = message?.seat;
+  if (seat !== "player1" && seat !== "player2") return;
+  const emoteId = sanitizeBattleEmoteId(message.emoteId);
+  if (!emoteId) return;
+  const label = typeof message.label === "string" && message.label.trim()
+    ? message.label.trim().slice(0, 18)
+    : battleEmoteLabel(emoteId);
+  const now = performance.now();
+  const id = `${seat}-${emoteId}-${message.sentAtMs || Date.now()}-${++battleEmoteSeq}`;
+  const popup = {
+    id,
+    seat,
+    emoteId,
+    label,
+    assetPath: sanitizeBattleEmoteAssetPath(message.assetPath) ?? null,
+    createdAtMs: now,
+    untilMs: now + BATTLE_EMOTE_DISPLAY_MS
+  };
+  view.activeBattleEmotes = [
+    ...(view.activeBattleEmotes ?? []).filter((item) => item.seat !== seat && item.untilMs > now),
+    popup
+  ];
+  const timer = window.setTimeout(() => {
+    battleEmoteTimers.delete(id);
+    view.activeBattleEmotes = (view.activeBattleEmotes ?? []).filter((item) => item.id !== id);
+    render();
+  }, BATTLE_EMOTE_DISPLAY_MS + 80);
+  battleEmoteTimers.set(id, timer);
+  render();
+}
+
+function scheduleBattleEmoteCooldownRender(): void {
+  if (battleEmoteCooldownTimer !== undefined) window.clearTimeout(battleEmoteCooldownTimer);
+  const delay = Math.max(0, (view.battleEmoteCooldownUntilMs ?? 0) - performance.now()) + 60;
+  battleEmoteCooldownTimer = window.setTimeout(() => {
+    battleEmoteCooldownTimer = undefined;
+    render();
+  }, delay);
+}
+
+function clearBattleEmoteState(): void {
+  for (const timer of battleEmoteTimers.values()) window.clearTimeout(timer);
+  battleEmoteTimers.clear();
+  if (battleEmoteCooldownTimer !== undefined) {
+    window.clearTimeout(battleEmoteCooldownTimer);
+    battleEmoteCooldownTimer = undefined;
+  }
+  view.battleEmoteMenuOpen = false;
+  view.battleEmoteCooldownUntilMs = undefined;
+  view.activeBattleEmotes = [];
+}
 function mountPackOpeningOverlay(): void {
   const html = renderLegacyShopPackOverlay();
   if (!html) return;
@@ -6180,6 +6393,9 @@ function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolea
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
   });
+  joined.onMessage("battleEmote", (message: BattleEmotePayload) => {
+    handleBattleEmoteMessage(message);
+  });
   joined.onMessage("error", (message: { message?: string }) => {
     showAlert(message?.message ?? "Room error.");
   });
@@ -6704,6 +6920,27 @@ function bindSelectionActions(): void {
     });
   }
 
+  for (const el of document.querySelectorAll<HTMLElement>("[data-battle-emote-toggle]")) {
+    on(el, "click", "battle-emote-toggle", (event) => {
+      if (activeTargeting()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      view.battleEmoteMenuOpen = !view.battleEmoteMenuOpen;
+      render();
+    });
+  }
+
+  for (const el of document.querySelectorAll<HTMLElement>("[data-battle-emote-id]")) {
+    on(el, "pointerdown", "battle-emote-pointer-isolate", (event) => {
+      event.stopPropagation();
+    });
+    on(el, "click", "battle-emote-select", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const emoteId = el.dataset.battleEmoteId;
+      if (emoteId) sendBattleEmote(emoteId);
+    });
+  }
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
@@ -7812,7 +8049,9 @@ async function ensureProfile(): Promise<void> {
         avatar_url: avatarUrl,
         owned_avatars: ["avatar1"],
         owned_titles: ["beginner"],
-        selected_title: "beginner"
+        selected_title: "beginner",
+        owned_emotes: [],
+        selected_emotes: []
       },
       { onConflict: "user_id", ignoreDuplicates: true }
     );

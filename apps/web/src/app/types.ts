@@ -183,6 +183,16 @@ export type AnimationCue = {
   variant?: AnimationSweepVariant;
 };
 
+export type BattleEmotePopup = {
+  id: string;
+  seat: Seat;
+  emoteId: string;
+  label: string;
+  assetPath?: string | null;
+  createdAtMs: number;
+  untilMs: number;
+};
+
 export type ClientViewState = {
   room?: GameTransportRoom;
   mySeat?: Seat;
@@ -217,6 +227,9 @@ export type ClientViewState = {
   mulliganSelection: Set<string>;
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
+  battleEmoteMenuOpen?: boolean;
+  battleEmoteCooldownUntilMs?: number;
+  activeBattleEmotes?: BattleEmotePopup[];
   /**
    * A targeted-battlecry card mid two-stage play (v1 parity). It plays
    * exactly like any other card — drop, card-play animation, land on the field —
@@ -365,6 +378,8 @@ export type ProfileRow = {
   selected_title?: string | null;
   owned_card_arts?: string[];
   selected_card_arts?: string[];
+  owned_emotes?: string[];
+  selected_emotes?: string[];
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;
@@ -475,6 +490,7 @@ export type PackOpeningReward =
   | { type: "avatar"; id: string; name: string; path: string }
   | { type: "title"; id: string; name: string }
   | { type: "card_art"; id: string; cardId: string; name: string; path: string }
+  | { type: "emote"; id: string; name: string; path?: string | null; label?: string }
   | { type: "voucher"; amount: number; name: string };
 
 export type PurchaseShopResult = {
@@ -482,5 +498,5 @@ export type PurchaseShopResult = {
   kind: string;
   priceGold: number;
   remainingGold: number;
-  rewards: Array<{ type: string; cardId?: string; id?: string; name?: string; path?: string; amount?: number }>;
+  rewards: Array<{ type: string; cardId?: string; id?: string; name?: string; path?: string; label?: string; amount?: number }>;
 };

@@ -376,6 +376,20 @@ export interface ClientCommandMessage {
   command: GameCommand;
 }
 
+export interface BattleEmoteRequest {
+  emoteId?: string;
+  label?: string;
+  assetPath?: string | null;
+}
+
+export interface BattleEmotePayload {
+  seat: Seat;
+  emoteId: string;
+  label?: string;
+  assetPath?: string | null;
+  sentAtMs: number;
+}
+
 export interface CommandEnvelope {
   commandId: string;
   seat: Seat;

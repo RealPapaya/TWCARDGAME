@@ -29,6 +29,15 @@ import {
   type QuestRecurrence
 } from "./balance-editor-quests.js";
 import { renderCardPreview, renderAugmentPreview, renderVoteEventPreview } from "./balance-editor-preview.js";
+import {
+  SHOP_PACK_SEED,
+  PACK_RARITIES,
+  computePackOdds,
+  validatePackDrafts,
+  generatePackSeedSql,
+  type ShopPackDraft,
+  type PackRarity
+} from "./balance-editor-packs.js";
 
 // ── deep clone helpers ──────────────────────────────────────────────
 function deepClone<T>(obj: T): T {
@@ -42,6 +51,7 @@ const votes: VoteEventDbEntry[] = deepClone(VOTE_EVENT_DB);
 const aiDecks: Record<string, string[]> = deepClone(AI_THEME_DECKS as Record<string, string[]>);
 const aiThemes = deepClone(AI_THEMES as any[]);
 const quests: QuestDefinitionDraft[] = deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]);
+const packs: ShopPackDraft[] = deepClone(SHOP_PACK_SEED as ShopPackDraft[]);
 
 const KNOWN_AUGMENT_IMAGE_IDS = new Set([
   "AMP_INVOICE_200",
@@ -332,6 +342,14 @@ main#app {
   outline: none; border-color: var(--primary);
 }
 .be-field textarea { resize: vertical; min-height: 60px; }
+.be-input {
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: rgba(0,0,0,0.3); color: var(--text);
+  font-family: var(--font); font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+.be-input:focus { outline: none; border-color: var(--primary); }
 
 /* in-game card / augment / event preview — uses the live game's .card markup + CSS */
 .be-preview {
@@ -560,18 +578,20 @@ main#app {
 document.head.appendChild(style);
 
 // ── tab IDs ─────────────────────────────────────────────────────────
-type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks" | "tasks";
+type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks" | "tasks" | "packs";
 const TABS: { id: TabId; label: string }[] = [
   { id: "cards", label: "卡牌" },
   { id: "amps", label: "增幅" },
   { id: "votes", label: "事件" },
   { id: "progression", label: "進度" },
   { id: "aidecks", label: "AI牌組" },
-  { id: "tasks", label: "任務/成就" }
+  { id: "tasks", label: "任務/成就" },
+  { id: "packs", label: "卡包" }
 ];
 let activeTab: TabId = "cards";
 let expandedThemeId: string | null = null;
 let expandedQuestId: string | null = null;
+let expandedPackId: string | null = null;
 
 // ── utility helpers ─────────────────────────────────────────────────
 function h<K extends keyof HTMLElementTagNameMap>(
@@ -794,8 +814,9 @@ function render() {
   const expAi = h("button", { class: "be-dropdown-item" }, "AI 牌組 TS (aiDecks.generated.ts)");
   const expProg = h("button", { class: "be-dropdown-item" }, "進度 TS (progression.generated.ts)");
   const expTasks = h("button", { class: "be-dropdown-item" }, "任務/成就 SQL (tasks_achievements_seed.sql)");
+  const expPacks = h("button", { class: "be-dropdown-item" }, "商店卡包 SQL (card_packs_seed.sql)");
 
-  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg, expTasks);
+  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg, expTasks, expPacks);
   dropdown.append(exportTsBtn, dropdownMenu);
 
   const resetBtn = h("button", { class: "be-btn be-btn--danger" }, "🔄 重置");
@@ -823,7 +844,8 @@ function render() {
     votes: renderVotesPanel(),
     progression: renderProgressionPanel(),
     aidecks: renderAiDecksPanel(),
-    tasks: renderTasksPanel()
+    tasks: renderTasksPanel(),
+    packs: renderPacksPanel()
   };
   for (const [id, panel] of Object.entries(panels)) {
     panel.classList.add("be-panel");
@@ -848,6 +870,7 @@ function render() {
   expAi.addEventListener("click", exportAiDecksTs);
   expProg.addEventListener("click", exportProgressionTs);
   expTasks.addEventListener("click", exportTasksSql);
+  expPacks.addEventListener("click", exportPacksSql);
 
   resetBtn.addEventListener("click", () => {
     if (!confirm("確定要重置所有修改？")) return;
@@ -861,7 +884,9 @@ function render() {
     }
     Object.assign(aiDecks, deepClone(AI_THEME_DECKS as Record<string, string[]>));
     quests.splice(0, quests.length, ...deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]));
+    packs.splice(0, packs.length, ...deepClone(SHOP_PACK_SEED as ShopPackDraft[]));
     expandedQuestId = null;
+    expandedPackId = null;
     prog.MAX_LEVEL = MAX_LEVEL;
     prog.LEVEL_UP_GOLD = LEVEL_UP_GOLD;
     prog.MAX_LEVEL_XP_REQUIREMENT = MAX_LEVEL_XP_REQUIREMENT;
@@ -2256,6 +2281,252 @@ function exportAiDecksTs() {
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain" });
   downloadBlob(blob, "aiDecks.generated.ts");
+}
+
+// ── PACKS PANEL ─────────────────────────────────────────────────────
+function renderPacksPanel(): HTMLElement {
+  const panel = h("div");
+
+  // datalist of catalog categories (faction picker hints), from the working copy
+  const categories = [...new Set(cards.map((c) => c.category).filter(Boolean))].sort();
+  const datalist = h("datalist", { id: "pack-faction-categories" });
+  for (const cat of categories) datalist.append(h("option", { value: cat }));
+  panel.append(datalist);
+
+  // intro / explanation of how the odds work
+  const intro = h("div", {
+    style: "margin-bottom:16px;padding:12px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-dim);font-size:0.8rem;line-height:1.6;"
+  });
+  intro.innerHTML =
+    "每抽一張卡分兩步：先依 <b>掉落率</b> 抽稀有度，再於該稀有度的卡池中挑卡。" +
+    "陣營卡會獲得 <b>陣營權重</b> 倍的選中權重（其餘等權重）。下方「命中率」依目前卡牌分頁的卡池即時計算 —— " +
+    "<b>權重越低、卡池越大，目標陣營的命中率就越低</b>。";
+  panel.append(intro);
+
+  // validation banner
+  const issues = validatePackDrafts(packs);
+  if (issues.length) {
+    const warn = h("div", {
+      style: "margin-bottom:16px;padding:10px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--danger);font-size:0.8rem;"
+    });
+    const lines = issues.map((issue) =>
+      issue.type === "empty_id"
+        ? `第 ${issue.index + 1} 列的 ID 為空`
+        : issue.type === "duplicate_id"
+          ? `重複的 ID：${issue.id}`
+          : `${issue.id} 的掉落率加總為 ${issue.total}%（應為 100%）`
+    );
+    warn.innerHTML = `⚠ ${lines.join("；")}`;
+    panel.append(warn);
+  }
+
+  const titleRow = h("div", { style: "display:flex;align-items:center;gap:12px;margin:8px 0 12px;" });
+  titleRow.append(h("div", { class: "be-section-title", style: "margin:0;border:none;flex:1;" }, `商店卡包（${packs.length}）`));
+  const addBtn = h("button", { class: "be-btn be-btn--primary", type: "button" }, "＋ 新增卡包");
+  addBtn.addEventListener("click", addPack);
+  titleRow.append(addBtn);
+  panel.append(titleRow);
+
+  const table = h("table", { class: "be-table" });
+  const thead = h("thead");
+  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>價格</th><th>張數</th><th>目標陣營</th><th>權重</th><th>每張命中率</th></tr>`;
+  table.append(thead);
+  const tbody = h("tbody");
+
+  if (packs.length === 0) {
+    const emptyRow = h("tr");
+    emptyRow.innerHTML = `<td colspan="7" style="color:var(--text-muted);padding:16px 12px;">尚無卡包，點「＋ 新增卡包」建立。</td>`;
+    tbody.append(emptyRow);
+  }
+
+  for (const pack of packs) {
+    const expanded = expandedPackId === pack.id;
+    const odds = computePackOdds(pack, cards);
+    const hitCell = odds.hasFaction
+      ? `<span style="color:var(--primary);font-weight:700">${(odds.perCardFactionChance * 100).toFixed(1)}%</span> <span style="color:var(--text-muted);font-size:0.75rem">(${odds.expectedFactionCards.toFixed(2)} 張/包)</span>`
+      : `<span style="color:var(--text-muted)">均等</span>`;
+    const tr = h("tr", { class: `be-row ${expanded ? "be-row--expanded" : ""}` });
+    tr.innerHTML = `
+      <td style="font-family:monospace;color:var(--text-muted)">${escapeHtmlText(pack.id)}</td>
+      <td style="font-weight:600">${escapeHtmlText(pack.display_name)}</td>
+      <td style="color:var(--warning);font-weight:600">💰${pack.price_gold}</td>
+      <td>${pack.cardCount}</td>
+      <td style="font-size:0.8rem;color:var(--text-dim)">${escapeHtmlText(pack.faction ?? "—")}</td>
+      <td>${odds.hasFaction ? `${pack.factionWeight}×` : "—"}</td>
+      <td>${hitCell}</td>
+    `;
+    tr.addEventListener("click", () => {
+      expandedPackId = expanded ? null : pack.id;
+      render();
+    });
+    tbody.append(tr);
+
+    if (expanded) {
+      const edRow = h("tr", { class: "be-editor be-editor--open" });
+      const edTd = h("td", { colspan: "7" });
+      edTd.append(buildPackEditor(pack));
+      edRow.append(edTd);
+      tbody.append(edRow);
+    }
+  }
+  table.append(tbody);
+  panel.append(table);
+
+  return panel;
+}
+
+function buildPackEditor(pack: ShopPackDraft): HTMLElement {
+  const wrap = h("div", { style: "padding:16px;display:flex;flex-direction:column;gap:16px;" });
+
+  const field = (label: string, input: HTMLElement): HTMLElement => {
+    const f = h("label", { style: "display:flex;flex-direction:column;gap:4px;font-size:0.75rem;color:var(--text-muted);" });
+    f.append(document.createTextNode(label), input);
+    return f;
+  };
+
+  const grid = h("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;" });
+
+  const idInput = h("input", { class: "be-input", type: "text", value: pack.id });
+  idInput.addEventListener("input", () => { pack.id = idInput.value; bumpChanges(); });
+
+  const nameInput = h("input", { class: "be-input", type: "text", value: pack.display_name });
+  nameInput.addEventListener("input", () => { pack.display_name = nameInput.value; bumpChanges(); });
+
+  const priceInput = h("input", { class: "be-input", type: "number", value: String(pack.price_gold), min: "0" });
+  priceInput.addEventListener("input", () => { pack.price_gold = Number(priceInput.value) || 0; bumpChanges(); });
+
+  const countInput = h("input", { class: "be-input", type: "number", value: String(pack.cardCount), min: "1" });
+  countInput.addEventListener("input", () => { pack.cardCount = Number(countInput.value) || 0; render(); bumpChanges(); });
+
+  const factionInput = h("input", { class: "be-input", type: "text", value: pack.faction ?? "", list: "pack-faction-categories", placeholder: "（無，均等）" });
+  factionInput.addEventListener("input", () => { pack.faction = factionInput.value.trim() || undefined; render(); bumpChanges(); });
+
+  const weightInput = h("input", { class: "be-input", type: "number", value: String(pack.factionWeight), min: "1", step: "0.5" });
+  weightInput.addEventListener("input", () => { pack.factionWeight = Number(weightInput.value) || 1; render(); bumpChanges(); });
+
+  grid.append(
+    field("ID", idInput),
+    field("名稱", nameInput),
+    field("價格 (gold)", priceInput),
+    field("每包張數", countInput),
+    field("目標陣營 (category)", factionInput),
+    field("陣營權重 (×)", weightInput)
+  );
+  wrap.append(grid);
+
+  const descInput = h("textarea", { class: "be-input", rows: "2", style: "resize:vertical;width:100%;" });
+  descInput.value = pack.description;
+  descInput.addEventListener("input", () => { pack.description = descInput.value; bumpChanges(); });
+  wrap.append(field("描述", descInput));
+
+  // drop-rates editor
+  wrap.append(h("div", { class: "be-section-title", style: "margin:8px 0 0;border:none;" }, "稀有度掉落率 (%)"));
+  const drTable = h("table", { class: "be-table", style: "max-width:420px;" });
+  drTable.innerHTML = `<thead><tr><th>稀有度</th><th>掉落率 (%)</th></tr></thead>`;
+  const drBody = h("tbody");
+  for (const rarity of PACK_RARITIES) {
+    let dr = pack.dropRates.find((r) => r.rarity === rarity.value);
+    const row = h("tr");
+    const labelTd = h("td", {}, `${rarity.label} (${rarity.value})`);
+    const valTd = h("td");
+    const rateInput = h("input", { class: "be-input", type: "number", min: "0", step: "0.1", value: dr ? String(dr.rate) : "0", style: "width:100px;" });
+    rateInput.addEventListener("input", () => {
+      const v = Number(rateInput.value) || 0;
+      if (!dr) {
+        dr = { label: rarity.label, rarity: rarity.value as PackRarity, rate: v };
+        pack.dropRates.push(dr);
+      } else {
+        dr.rate = v;
+      }
+      render();
+      bumpChanges();
+    });
+    valTd.append(rateInput);
+    row.append(labelTd, valTd);
+    drBody.append(row);
+  }
+  drTable.append(drBody);
+  const total = pack.dropRates.reduce((s, r) => s + (Number.isFinite(r.rate) ? r.rate : 0), 0);
+  const totalNote = h("div", {
+    style: `font-size:0.75rem;margin-top:6px;color:${Math.abs(total - 100) < 0.01 ? "var(--success)" : "var(--danger)"};`
+  }, `加總：${total}%`);
+  wrap.append(drTable, totalNote);
+
+  // computed odds breakdown
+  const odds = computePackOdds(pack, cards);
+  wrap.append(h("div", { class: "be-section-title", style: "margin:8px 0 0;border:none;" }, "命中率分析（依目前卡池即時計算）"));
+  if (!odds.hasFaction) {
+    wrap.append(h("div", { style: "font-size:0.8rem;color:var(--text-dim);" }, "此卡包無目標陣營，所有卡牌於各稀有度內等機率。"));
+  } else {
+    const oddsTable = h("table", { class: "be-table" });
+    oddsTable.innerHTML = `<thead><tr><th>稀有度</th><th>掉落率</th><th>陣營卡</th><th>其他卡</th><th>該稀有度命中率</th></tr></thead>`;
+    const oBody = h("tbody");
+    for (const r of odds.perRarity) {
+      const tr = h("tr");
+      tr.innerHTML = `
+        <td>${r.rarity}</td>
+        <td>${r.rate}%</td>
+        <td>${r.factionCount}</td>
+        <td>${r.otherCount}</td>
+        <td style="color:var(--primary);font-weight:600">${(r.pFactionGivenRarity * 100).toFixed(1)}%</td>
+      `;
+      oBody.append(tr);
+    }
+    oddsTable.append(oBody);
+    wrap.append(oddsTable);
+    const summary = h("div", {
+      style: "margin-top:8px;font-size:0.85rem;color:var(--text);"
+    });
+    summary.innerHTML =
+      `每抽一張卡，是「${escapeHtmlText(pack.faction ?? "")}」的機率為 ` +
+      `<b style="color:var(--primary)">${(odds.perCardFactionChance * 100).toFixed(1)}%</b>` +
+      `，整包平均拿到 <b style="color:var(--primary)">${odds.expectedFactionCards.toFixed(2)}</b> 張。`;
+    wrap.append(summary);
+  }
+
+  // delete
+  const actions = h("div", { style: "display:flex;justify-content:flex-end;margin-top:8px;" });
+  const delBtn = h("button", { class: "be-btn be-btn--danger", type: "button" }, "🗑 刪除此卡包");
+  delBtn.addEventListener("click", () => {
+    if (!confirm(`確定要刪除「${pack.display_name}」？`)) return;
+    const idx = packs.indexOf(pack);
+    if (idx >= 0) packs.splice(idx, 1);
+    expandedPackId = null;
+    render();
+    bumpChanges();
+  });
+  actions.append(delBtn);
+  wrap.append(actions);
+
+  return wrap;
+}
+
+function addPack() {
+  let n = packs.length + 1;
+  let id = `pack-new-${n}`;
+  while (packs.some((p) => p.id === id)) id = `pack-new-${++n}`;
+  packs.push({
+    id,
+    display_name: "新卡包",
+    description: "包含 5 張隨機卡牌。",
+    price_gold: 100,
+    cardCount: 5,
+    factionWeight: 3,
+    dropRates: [
+      { label: "普通", rarity: "COMMON", rate: 60 },
+      { label: "精良", rarity: "RARE", rate: 30 },
+      { label: "史詩", rarity: "EPIC", rate: 7 },
+      { label: "傳說", rarity: "LEGENDARY", rate: 3 }
+    ]
+  });
+  expandedPackId = id;
+  render();
+  bumpChanges();
+}
+
+function exportPacksSql() {
+  const blob = new Blob([generatePackSeedSql(packs)], { type: "text/plain" });
+  downloadBlob(blob, "card_packs_seed.sql");
 }
 
 function exportProgressionTs() {
