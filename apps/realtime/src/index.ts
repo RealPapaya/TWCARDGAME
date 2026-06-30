@@ -3,7 +3,7 @@ import { isDevTestAllowed } from "./devTest.js";
 import { GameDurableObject, type Env } from "./GameDurableObject.js";
 import { LobbyDurableObject } from "./LobbyDurableObject.js";
 import { normalizeJoinCode } from "./lobbyState.js";
-import { decodeReconnectToken, type RealtimeMode } from "./tokens.js";
+import { reconnectKeyFor, verifyReconnectToken, type RealtimeMode } from "./tokens.js";
 
 // The Durable Object class must be exported from the Worker entry so Wrangler can
 // bind it (see wrangler.jsonc `durable_objects` + `migrations`).
@@ -81,7 +81,8 @@ export default {
     if (modeMatch) {
       const mode = modeMatch[1] as RealtimeMode;
       const token = url.searchParams.get("token") || url.searchParams.get("reconnectToken");
-      const decodedToken = token ? decodeReconnectToken(token) : null;
+      const key = token ? await reconnectKeyFor(env.RECONNECT_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY) : null;
+      const decodedToken = token ? await verifyReconnectToken(token, key, Date.now()) : null;
       if (token && (!decodedToken || decodedToken.mode !== mode)) {
         return new Response("Invalid reconnect token.", { status: 400, headers: CORS_HEADERS });
       }

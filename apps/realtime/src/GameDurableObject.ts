@@ -11,7 +11,7 @@ import {
 import { createMatchServices, type MatchMetadata, type MatchServices } from "./matchServices.js";
 import { serverMessage, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { restoreSession } from "./restore.js";
-import { encodeReconnectToken, type RealtimeMode } from "./tokens.js";
+import { reconnectKeyFor, signReconnectToken, type RealtimeMode } from "./tokens.js";
 
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;
@@ -19,6 +19,8 @@ export interface Env {
   /** Optional: when set, match results persist + grant rewards via Supabase (Plan B). */
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  /** Optional HMAC secret for signing reconnect tokens; falls back to the service-role key. */
+  RECONNECT_TOKEN_SECRET?: string;
 }
 
 /** Per-connection state stored on the hibernatable socket via serializeAttachment. */
@@ -131,7 +133,7 @@ export class GameDurableObject {
     // Mirror GameRoom.onJoin: tell the client its seat, and the private join code
     // to the room creator (first seat).
     this.sendToSocket(server, serverMessage("seat", { seat }));
-    this.sendToSocket(server, serverMessage("reconnectToken", { token: this.createReconnectToken(url, sessionId) }));
+    this.sendToSocket(server, serverMessage("reconnectToken", { token: await this.createReconnectToken(url, sessionId) }));
     if (session.joinCode && seat === "player1" && !reconnect) {
       this.sendToSocket(server, serverMessage("joinCode", { code: session.joinCode }));
     }
@@ -271,14 +273,18 @@ export class GameDurableObject {
     });
   }
 
-  private createReconnectToken(url: URL, sessionId: string): string {
-    return encodeReconnectToken({
-      v: 1,
-      mode: (url.searchParams.get("mode") as RealtimeMode | null) ?? "pvp",
-      room: url.searchParams.get("room") || this.state.id.toString(),
-      sessionId,
-      issuedAtMs: Date.now()
-    });
+  private async createReconnectToken(url: URL, sessionId: string): Promise<string> {
+    const key = await reconnectKeyFor(this.env.RECONNECT_TOKEN_SECRET ?? this.env.SUPABASE_SERVICE_ROLE_KEY);
+    return signReconnectToken(
+      {
+        v: 1,
+        mode: (url.searchParams.get("mode") as RealtimeMode | null) ?? "pvp",
+        room: url.searchParams.get("room") || this.state.id.toString(),
+        sessionId,
+        issuedAtMs: Date.now()
+      },
+      key
+    );
   }
 
   private async releaseJoinCode(joinCode: string): Promise<void> {
