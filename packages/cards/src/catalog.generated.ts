@@ -2096,6 +2096,23 @@ export const CARD_CATALOG_GENERATED = [
     "image": "assets/images/cards/news_tornado.webp"
   },
   {
+    "id": "S033",
+    "name": "抄底",
+    "category": "新聞",
+    "cost": 2,
+    "type": "NEWS",
+    "rarity": "RARE",
+    "description": "抽一張牌\n如果你完全沒有牌，改抽三張",
+    "keywords": {
+      "battlecry": {
+        "type": "DRAW_IF_HAND_EMPTY",
+        "value": 1,
+        "bonus_value": 3
+      }
+    },
+    "image": "assets/images/cards/chao_di.webp"
+  },
+  {
     "id": "TW083",
     "name": "靈媒",
     "category": "平民",
@@ -2113,7 +2130,7 @@ export const CARD_CATALOG_GENERATED = [
         "count": 3
       }
     },
-    "image": "assets/images/cards/TW083.webp"
+    "image": "assets/images/cards/ling_mei.webp"
   },
   {
     "id": "TW084",

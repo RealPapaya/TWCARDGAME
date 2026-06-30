@@ -145,6 +145,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
     case "DAMAGE_SELF":
     case "DRAW":
     case "DRAW_IF_CARD_ON_BOARD":
+    case "DRAW_IF_HAND_EMPTY":
     case "DRAW_MINION_REDUCE_COST":
     case "FULL_HEAL_BUFF_TARGET_CATEGORY_BONUS":
     case "HEAL":

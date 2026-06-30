@@ -764,6 +764,15 @@ export function drawIfCardOnBoard(effect: EffectDefinition, context: EffectConte
   drawCards(context.state, player, count, context.events);
 }
 
+// 抄底: draw `value` cards normally, or `bonus_value` instead when the caster's
+// hand is empty (this card was their last — 如果你完全沒有牌，改抽三張). The played
+// card is already spliced out of hand before the battlecry resolves.
+export function drawIfHandEmpty(effect: EffectDefinition, context: EffectContext): void {
+  const player = context.state.players[context.activeSeat];
+  const count = player.hand.length === 0 ? (effect.bonus_value ?? effect.value ?? 1) : (effect.value ?? 1);
+  drawCards(context.state, player, count, context.events);
+}
+
 export function drawMinionReduceCost(effect: EffectDefinition, context: EffectContext): void {
   const player = context.state.players[context.activeSeat];
   const index = player.deck.findIndex((card) => card.type === "MINION");

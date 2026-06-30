@@ -800,6 +800,60 @@ describe("ON_PLAY_NEWS / SELF_COST_REDUCE (新聞龍捲風)", () => {
   });
 });
 
+describe("DRAW_IF_HAND_EMPTY (抄底)", () => {
+  function chaodiDef(): CardDefinition {
+    return {
+      id: "TEST_CHAODI",
+      name: "抄底測試",
+      category: "新聞",
+      cost: 2,
+      type: "NEWS",
+      rarity: "RARE",
+      description: "",
+      image: "test.webp",
+      keywords: { battlecry: { type: "DRAW_IF_HAND_EMPTY", value: 1, bonus_value: 3 } }
+    };
+  }
+
+  it("draws 1 when other cards remain in hand", () => {
+    const state = startMatch(4242);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const chaodi = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    const filler = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [chaodi, filler];
+    const deckBefore = state.players[seat].deck.length;
+
+    const after = reduce(
+      state,
+      { commandId: "cd-some", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: chaodi.instanceId } },
+      CARD_CATALOG
+    ).state;
+
+    // filler stays + 1 drawn = 2 in hand; deck down by 1.
+    expect(after.players[seat].hand.length).toBe(2);
+    expect(after.players[seat].deck.length).toBe(deckBefore - 1);
+  });
+
+  it("draws 3 when it was the last card in hand", () => {
+    const state = startMatch(4243);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const chaodi = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [chaodi];
+    const deckBefore = state.players[seat].deck.length;
+
+    const after = reduce(
+      state,
+      { commandId: "cd-empty", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: chaodi.instanceId } },
+      CARD_CATALOG
+    ).state;
+
+    expect(after.players[seat].hand.length).toBe(3);
+    expect(after.players[seat].deck.length).toBe(deckBefore - 3);
+  });
+});
+
 describe("tech enforcement vote environment", () => {
   it("damages an attacking minion after it attacks a hero", () => {
     const { state, catalog } = targetLegalityMatch();
