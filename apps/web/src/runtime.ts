@@ -85,6 +85,16 @@ import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snaps
 import { renderCardFaceMarkup, renderAugmentOptionMarkup, renderVoteOptionMarkup } from "./app/card-markup.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import {
+  cosmeticCardImage,
+  getCardCosmetic,
+  canToggleCardCosmetic,
+  isCardCosmeticEnabled,
+  applyCardCosmeticSelection,
+  setOwnedCardCosmetics,
+  setSelectedCardCosmetics,
+  clearCosmeticState
+} from "./app/card-cosmetics.js";
+import {
   clearActiveMatch,
   isActiveMatchFresh,
   readActiveMatch,
@@ -163,7 +173,7 @@ import {
 import { startDragDemo, stopDragDemo } from "./app/training-demo.js";
 
 const PROFILE_SELECT =
-  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,login_days,current_login_streak,longest_login_streak,last_login_date";
 // Match-history columns + jsonb sub-objects from final_state (opponent display
 // names and turn count). created_at carries the match start time (see persistence.ts).
 const MATCH_HISTORY_SELECT =
@@ -1689,6 +1699,7 @@ function renderPinnedCardDetail(cardId: string): string {
           <div class="card-op-side">
             ${renderKeywordGlossary(card.id, "right")}
             <p class="card-op-count">${owned > 0 ? `擁有數量：<strong>${owned}</strong>` : `<span class="card-op-unowned">未擁有</span>`}</p>
+            ${renderCardCosmeticToggle(card.id)}
             ${collectible ? `
               <div class="card-op-actions">
                 <button type="button" id="card-op-disenchant" class="card-op-btn disenchant" data-card-id="${escapeAttr(card.id)}" ${canDisenchant ? "" : "disabled"}>
@@ -1707,6 +1718,59 @@ function renderPinnedCardDetail(cardId: string): string {
       </div>
     </div>
   `;
+}
+
+/**
+ * 炫彩 (special card-art) toggle for the card-detail modal. Only rendered when
+ * the card has a 炫彩 in the registry AND the player owns it — otherwise nothing
+ * (the framework registry is empty until a 炫彩包 ships). The switch persists the
+ * player's choice and re-renders so the new art shows everywhere immediately.
+ */
+function renderCardCosmeticToggle(cardId: string): string {
+  if (!canToggleCardCosmetic(cardId)) return "";
+  const cosmetic = getCardCosmetic(cardId);
+  const enabled = isCardCosmeticEnabled(cardId);
+  return `
+    <div class="card-cosmetic-toggle">
+      <span class="card-cosmetic-label">${escapeHtml(cosmetic?.label ?? "炫彩圖片")}</span>
+      <button
+        type="button"
+        id="card-cosmetic-switch"
+        class="card-cosmetic-switch ${enabled ? "on" : "off"}"
+        role="switch"
+        aria-checked="${enabled ? "true" : "false"}"
+        data-card-id="${escapeAttr(cardId)}"
+      >
+        <span class="card-cosmetic-switch-track"><span class="card-cosmetic-switch-thumb"></span></span>
+        <span class="card-cosmetic-switch-state">${enabled ? "使用中" : "未使用"}</span>
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Toggle whether the player displays a 炫彩 they own. Optimistic: flips the
+ * local selection and re-renders immediately, then persists via the
+ * set_user_card_art RPC and reconciles from the reloaded profile. On failure it
+ * reverts and surfaces the error. Selection is DB truth, so it follows the
+ * account across devices.
+ */
+async function toggleCardCosmetic(cardId: string): Promise<void> {
+  if (!canToggleCardCosmetic(cardId)) return;
+  const next = !isCardCosmeticEnabled(cardId);
+  applyCardCosmeticSelection(cardId, next);
+  render();
+  if (!supabase || !view.session?.user) return;
+  try {
+    const { error } = await supabase.rpc("set_user_card_art", { p_card_id: cardId, p_enabled: next });
+    if (error) throw error;
+    await loadAccountDataRaw();
+  } catch (error) {
+    applyCardCosmeticSelection(cardId, !next);
+    showToast(`炫彩切換失敗：${errorMessage(error)}`);
+  } finally {
+    render();
+  }
 }
 
 function renderDeckEditorScreen(): string {
@@ -1780,7 +1844,7 @@ function renderCollectionDeckColumnContent(): string {
 
 function renderDeckCoverThumb(deck: { cover_card_id?: string | null; card_ids: readonly string[] }): string {
   const coverCard = resolveDeckCoverCard(deck);
-  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  const coverUrl = coverCard ? assetUrl(cosmeticCardImage(coverCard)) : "/images/ui/collection_logo.webp";
   return `
     <button type="button" id="edit-cover-thumb" class="deck-cover-thumb" title="編輯封面" ${deck.card_ids.length === 0 ? "disabled" : ""}>
       <span class="deck-cover-thumb-art" style="background-image:url('${escapeAttr(coverUrl)}')"></span>
@@ -1806,7 +1870,7 @@ function renderCoverPicker(deck: { cover_card_id?: string | null; card_ids: read
         <div class="cover-picker-grid" data-preserve-scroll>
           ${cards.length === 0 ? `<p class="muted">牌組內沒有卡片。</p>` : cards.map((card) => `
             <button type="button" class="cover-picker-tile ${card.id === activeCover ? "selected" : ""}" data-cover-card="${escapeAttr(card.id)}" title="${escapeAttr(card.name)}">
-              <span class="cover-picker-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+              <span class="cover-picker-art" style="background-image:url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></span>
               <span class="cover-picker-name">${escapeHtml(card.name)}</span>
             </button>
           `).join("")}
@@ -1831,7 +1895,7 @@ function resolveDeckCoverCard(deck: { cover_card_id?: string | null; card_ids: r
 function renderCollectionDeckBanner(deck: DeckRow): string {
   const selected = deck.id === view.editingDeck?.id;
   const coverCard = resolveDeckCoverCard(deck);
-  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  const coverUrl = coverCard ? assetUrl(cosmeticCardImage(coverCard)) : "/images/ui/collection_logo.webp";
   const incomplete = deck.card_ids.length !== 30;
   return `
     <div class="deck-banner ${selected ? "selected" : ""}">
@@ -1858,7 +1922,7 @@ function renderCurrentDeckCards(cardIds: readonly string[]): string {
   return rows.map(({ card, count }) => `
     <div class="deck-current-row">
       <span class="deck-row-cost">${card.cost}</span>
-      <span class="deck-row-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+      <span class="deck-row-art" style="background-image:url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></span>
       <span class="deck-row-name">${escapeHtml(card.name)}</span>
       <span class="deck-row-count">x${count}</span>
       <button type="button" data-remove-card="${escapeAttr(card.id)}" title="移除">-</button>
@@ -2146,7 +2210,7 @@ function renderBattlecryPreview(cardId: string): string {
   const domKey = battlecry ? `battlecry-preview-${battlecry.handInstanceId}` : `battlecry-preview-${cardId}`;
   return `
     <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-dom-key="${escapeAttr(domKey)}" data-testid="battlecry-preview">
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <small class="keyword-row"></small>
       <div class="minion-stats">
@@ -2193,7 +2257,7 @@ function renderSummonPreview(cue: AnimationCue): string {
       data-seat="${cue.seat}"
       data-testid="summon-preview"
     >
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <div class="minion-stats">
         <span class="stat-atk"><span>${attack}</span></span>
@@ -2463,7 +2527,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
       data-testid="board-minion"
       aria-pressed="${view.selectedAttackerId === minion.instanceId || sameTarget(view.selectedTarget, target) ? "true" : "false"}"
     >
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard ? cosmeticCardImage(catalogCard) : ""))}')"></div>
       ${minion.hasOngoing ? `<span class="ongoing-aura" aria-hidden="true"><i></i><i></i></span>` : ""}
       ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
@@ -2590,7 +2654,7 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
     name: card.name,
     category: card.category,
     description: card.description,
-    image: card.image,
+    image: cosmeticCardImage(card),
     cost: card.cost,
     baseCost: card.cost,
     type: card.type,
@@ -4193,6 +4257,10 @@ function bindStaticActions(): void {
       view.pinnedCollectionCardId = undefined;
       render();
     }
+  });
+  on(document.querySelector<HTMLButtonElement>("#card-cosmetic-switch"), "click", "card-cosmetic-switch", (event) => {
+    const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
+    if (cardId) void toggleCardCosmetic(cardId);
   });
   on(document.querySelector<HTMLButtonElement>("#card-op-disenchant"), "click", "card-op-disenchant", (event) => {
     const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
@@ -7484,6 +7552,7 @@ async function initializeAccount(): Promise<void> {
       view.matchHistory = [];
       view.friends = [];
       view.friendRequests = [];
+      clearCosmeticState();
       remoteTrainingCompletions = new Set();
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
@@ -7689,6 +7758,9 @@ async function loadAccountDataRaw(): Promise<void> {
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
   view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
+  // 炫彩 ownership + display selection are DB truth, mirroring card ownership.
+  setOwnedCardCosmetics(view.profile.owned_card_arts ?? []);
+  setSelectedCardCosmetics(view.profile.selected_card_arts ?? []);
   syncRemoteTrainingCompletions(trainingResult.data);
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;

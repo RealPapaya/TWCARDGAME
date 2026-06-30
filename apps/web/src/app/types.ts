@@ -363,6 +363,8 @@ export type ProfileRow = {
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string | null;
+  owned_card_arts?: string[];
+  selected_card_arts?: string[];
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;
