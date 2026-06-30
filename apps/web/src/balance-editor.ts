@@ -802,7 +802,8 @@ function render() {
   if (changeCount > 0) badge.style.display = "inline-flex";
 
   const actions = h("div", { class: "be-actions" });
-  const exportJsonBtn = h("button", { class: "be-btn be-btn--primary" }, "📦 匯出 JSON");
+  const applyBtn = h("button", { class: "be-btn be-btn--primary", title: "直接寫入原始碼，不需手動貼上（需在 npm run dev:web 下開啟）" }, "✅ 套用到原始碼");
+  const exportJsonBtn = h("button", { class: "be-btn" }, "📦 匯出 JSON");
 
   const dropdown = h("div", { class: "be-dropdown" });
   const exportTsBtn = h("button", { class: "be-btn" }, "📄 匯出 TS 檔案 ▾");
@@ -820,7 +821,7 @@ function render() {
   dropdown.append(exportTsBtn, dropdownMenu);
 
   const resetBtn = h("button", { class: "be-btn be-btn--danger" }, "🔄 重置");
-  actions.append(badge, exportJsonBtn, dropdown, resetBtn);
+  actions.append(badge, applyBtn, exportJsonBtn, dropdown, resetBtn);
   headerInner.append(actions);
   header.append(headerInner);
 
@@ -854,6 +855,7 @@ function render() {
   }
 
   // button handlers
+  applyBtn.addEventListener("click", () => applyToSource(applyBtn));
   exportJsonBtn.addEventListener("click", exportJson);
 
   exportTsBtn.addEventListener("click", (e) => {
@@ -2182,6 +2184,50 @@ function buildQuestEditor(q: QuestDefinitionDraft): HTMLElement {
 }
 
 // ── EXPORT ──────────────────────────────────────────────────────────
+// ── apply directly to source files (dev server) ─────────────────────
+function toast(message: string, ok: boolean) {
+  const el = h("div", {
+    style:
+      "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;" +
+      "padding:12px 20px;border-radius:10px;font-size:0.9rem;font-weight:600;" +
+      "box-shadow:0 8px 24px rgba(0,0,0,0.5);max-width:80vw;text-align:center;" +
+      (ok
+        ? "background:rgba(34,197,94,0.95);color:#04210f;"
+        : "background:rgba(239,68,68,0.95);color:#fff;")
+  }, message);
+  document.body.append(el);
+  setTimeout(() => el.remove(), ok ? 3200 : 6000);
+}
+
+async function applyToSource(btn: HTMLButtonElement) {
+  const label = btn.textContent;
+  btn.textContent = "⏳ 寫入中…";
+  (btn as HTMLButtonElement).disabled = true;
+  try {
+    const res = await fetch("/__apply-balance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // Card/augment/event/AI-deck/progression edits write straight to source.
+      // 任務 (quests) and 卡包 (packs) are Supabase seeds, not code — keep using
+      // the SQL export for those.
+      body: JSON.stringify({ cards, amps, votes, aiThemes, aiDecks, progression: prog })
+    });
+    const result = (await res.json()) as { ok: boolean; written?: string[]; error?: string };
+    if (result.ok) {
+      changeCount = 0;
+      bumpChanges();
+      toast(`✅ 已寫入 ${result.written?.length ?? 0} 個原始檔，Vite 會自動重新載入。`, true);
+    } else {
+      toast(`❌ 套用失敗：${result.error ?? "未知錯誤"}`, false);
+    }
+  } catch {
+    toast("❌ 無法連線到開發伺服器。請用「npm run dev:web」開啟編輯器後再套用。", false);
+  } finally {
+    btn.textContent = label;
+    (btn as HTMLButtonElement).disabled = false;
+  }
+}
+
 function exportJson() {
   const data = {
     cards,
