@@ -52,7 +52,7 @@ export const PATCH_NOTES: PatchNoteVersion[] = [
   {
     version: "v0.6.0", date: "2026-01-15",
     items: [
-      { title: "[新卡片] 沉默不是金", desc: "", cardIds: ["S027"] },
+      { title: "[新卡片] 封口令", desc: "", cardIds: ["S027"] },
       { title: "[新增] 預設牌組、對戰紀錄", desc: "提供多個預設牌組，對戰中可查看對戰紀錄以供玩家參考" },
       { title: "[視覺優化] 更新與AI對戰的選擇畫面", desc: "將難度以及牌組整合在同一個畫面" }
     ]

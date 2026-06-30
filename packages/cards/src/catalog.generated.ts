@@ -1295,7 +1295,7 @@ export const CARD_CATALOG_GENERATED = [
   },
   {
     "id": "S027",
-    "name": "沉默不是金",
+    "name": "封口令",
     "category": "新聞",
     "cost": 1,
     "type": "NEWS",
@@ -1330,7 +1330,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/s028.webp"
+    "image": "assets/images/cards/S028.webp"
   },
   {
     "id": "S029",

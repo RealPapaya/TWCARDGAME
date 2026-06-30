@@ -176,6 +176,8 @@ import { startDragDemo, stopDragDemo } from "./app/training-demo.js";
 
 const PROFILE_SELECT =
   "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,owned_emotes,selected_emotes,login_days,current_login_streak,longest_login_streak,last_login_date";
+const PROFILE_SELECT_LEGACY =
+  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,login_days,current_login_streak,longest_login_streak,last_login_date";
 // Match-history columns + jsonb sub-objects from final_state (opponent display
 // names and turn count). created_at carries the match start time (see persistence.ts).
 const MATCH_HISTORY_SELECT =
@@ -305,6 +307,47 @@ const AI_DIFFICULTY_REWARDS: Record<AiDifficulty, number> = {
   normal: 200,
   hard: 300
 };
+
+function isMissingProfileEmoteColumnError(error: unknown): boolean {
+  if (!error || typeof error !== "object") return false;
+  const record = error as Record<string, unknown>;
+  const text = [record.message, record.details, record.hint, record.code]
+    .filter((value): value is string => typeof value === "string")
+    .join(" ")
+    .toLowerCase();
+  return (
+    (text.includes("owned_emotes") || text.includes("selected_emotes")) &&
+    (text.includes("schema cache") || text.includes("column"))
+  );
+}
+
+function normalizeProfileRow(profile: ProfileRow): ProfileRow {
+  return {
+    ...profile,
+    owned_emotes: profile.owned_emotes ?? [],
+    selected_emotes: profile.selected_emotes ?? []
+  };
+}
+
+async function loadCurrentUserProfile(userId: string): Promise<ProfileRow> {
+  if (!supabase) throw new Error("Supabase is not configured.");
+  const profileResult = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT)
+    .eq("user_id", userId)
+    .single();
+  if (!profileResult.error) return normalizeProfileRow(profileResult.data as ProfileRow);
+  if (!isMissingProfileEmoteColumnError(profileResult.error)) throw profileResult.error;
+
+  console.warn("profiles battle emote columns are missing; falling back to legacy profile select", profileResult.error);
+  const legacyResult = await supabase
+    .from("profiles")
+    .select(PROFILE_SELECT_LEGACY)
+    .eq("user_id", userId)
+    .single();
+  if (legacyResult.error) throw legacyResult.error;
+  return normalizeProfileRow(legacyResult.data as ProfileRow);
+}
 
 function createClientId(): string {
   const cryptoApi = globalThis.crypto;
@@ -7915,12 +7958,8 @@ async function loadAccountData(): Promise<void> {
     await recordDailyLoginIfAvailable();
 
     const userId = view.session!.user.id;
-    const [profileResult, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
-      supabase
-        .from("profiles")
-        .select(PROFILE_SELECT)
-        .eq("user_id", userId)
-        .single(),
+    const [profile, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
+      loadCurrentUserProfile(userId),
       supabase
         .from("decks")
         .select("id,user_id,name,card_catalog_version,card_ids,cover_card_id,updated_at")
@@ -7942,13 +7981,12 @@ async function loadAccountData(): Promise<void> {
         .eq("user_id", userId)
     ]);
 
-    if (profileResult.error) throw profileResult.error;
     if (decksResult.error) throw decksResult.error;
     if (collectionResult.error) throw collectionResult.error;
     if (historyResult.error) throw historyResult.error;
     if (trainingResult.error) throw trainingResult.error;
 
-    view.profile = profileResult.data as ProfileRow;
+    view.profile = profile;
     view.decks = (decksResult.data ?? []) as DeckRow[];
     view.collection = (collectionResult.data ?? []) as CollectionRow[];
     view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
@@ -7979,12 +8017,8 @@ async function syncCollection(): Promise<void> {
 async function loadAccountDataRaw(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const userId = view.session.user.id;
-  const [profileResult, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select(PROFILE_SELECT)
-      .eq("user_id", userId)
-      .single(),
+  const [profile, decksResult, collectionResult, historyResult, trainingResult] = await Promise.all([
+    loadCurrentUserProfile(userId),
     supabase
       .from("decks")
       .select("id,user_id,name,card_catalog_version,card_ids,cover_card_id,updated_at")
@@ -8006,13 +8040,12 @@ async function loadAccountDataRaw(): Promise<void> {
       .eq("user_id", userId)
   ]);
 
-  if (profileResult.error) throw profileResult.error;
   if (decksResult.error) throw decksResult.error;
   if (collectionResult.error) throw collectionResult.error;
   if (historyResult.error) throw historyResult.error;
   if (trainingResult.error) throw trainingResult.error;
 
-  view.profile = profileResult.data as ProfileRow;
+  view.profile = profile;
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
   view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
@@ -8053,23 +8086,29 @@ async function ensureProfile(): Promise<void> {
   if (!supabase || !view.session?.user) return;
   const user = view.session.user;
   const avatarUrl = googleProfileAvatarUrl() ?? FALLBACK_PROFILE_AVATAR_URL;
+  const profilePayload = {
+    user_id: user.id,
+    display_name: "Player",
+    display_name_set: false,
+    avatar_url: avatarUrl,
+    owned_avatars: ["avatar1"],
+    owned_titles: ["beginner"],
+    selected_title: "beginner",
+    owned_emotes: [],
+    selected_emotes: []
+  };
   const { error } = await supabase
     .from("profiles")
-    .upsert(
-      {
-        user_id: user.id,
-        display_name: "Player",
-        display_name_set: false,
-        avatar_url: avatarUrl,
-        owned_avatars: ["avatar1"],
-        owned_titles: ["beginner"],
-        selected_title: "beginner",
-        owned_emotes: [],
-        selected_emotes: []
-      },
-      { onConflict: "user_id", ignoreDuplicates: true }
-    );
-  if (error) throw error;
+    .upsert(profilePayload, { onConflict: "user_id", ignoreDuplicates: true });
+  if (!error) return;
+  if (!isMissingProfileEmoteColumnError(error)) throw error;
+
+  const { owned_emotes: _ownedEmotes, selected_emotes: _selectedEmotes, ...legacyProfilePayload } = profilePayload;
+  console.warn("profiles battle emote columns are missing; falling back to legacy profile upsert", error);
+  const retry = await supabase
+    .from("profiles")
+    .upsert(legacyProfilePayload, { onConflict: "user_id", ignoreDuplicates: true });
+  if (retry.error) throw retry.error;
 }
 
 async function saveEditingDeck(event: Event): Promise<void> {
