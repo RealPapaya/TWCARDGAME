@@ -1380,7 +1380,7 @@ body.hand-dragging .hand-row .card {
   box-shadow: 0 0 20px rgba(255, 51, 51, 0.45), 0 8px 20px rgba(0, 0, 0, 0.55);
 }
 
-/* 教召 / Discover picker — cards are click-to-pick, so highlight on hover. */
+/* 起底 / Discover picker — cards are click-to-pick, so highlight on hover. */
 .card.channel-card {
   cursor: pointer;
 }
@@ -1432,7 +1432,7 @@ body.hand-dragging .hand-row .card {
 /* The mulligan chassis is larger than an in-game hand card, but the cost/title/
    category/stats otherwise stay at the small base size and read as out of scale.
    Scale those up to match the in-game card proportions, centre the name, and tuck
-   a smaller cost pill into the corner. (Also covers the 教召 discover cards, which
+   a smaller cost pill into the corner. (Also covers the 起底 discover cards, which
    share `.mulligan-card`; amp/vote options don't use these inner elements.) */
 .mulligan-card .card-title {
   width: 100%;

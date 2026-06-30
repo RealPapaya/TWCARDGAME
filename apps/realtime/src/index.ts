@@ -1,9 +1,9 @@
-import type { DevTestMatchSetup } from "@twcardgame/shared";
+import { parseWsProtocols, type DevTestMatchSetup } from "@twcardgame/shared";
 import { isDevTestAllowed } from "./devTest.js";
 import { GameDurableObject, type Env } from "./GameDurableObject.js";
 import { LobbyDurableObject } from "./LobbyDurableObject.js";
 import { normalizeJoinCode } from "./lobbyState.js";
-import { decodeReconnectToken, type RealtimeMode } from "./tokens.js";
+import { reconnectKeyFor, verifyReconnectToken, type RealtimeMode } from "./tokens.js";
 
 // The Durable Object class must be exported from the Worker entry so Wrangler can
 // bind it (see wrangler.jsonc `durable_objects` + `migrations`).
@@ -38,11 +38,11 @@ export default {
     }
 
     if (url.pathname === "/matchmaking/public" && request.method === "POST") {
-      return withCors(await lobbyFetch(env, "/matchmaking/public", { method: "POST" }));
+      return withCors(await lobbyFetch(env, "/matchmaking/public", { method: "POST" }, clientIp(request)));
     }
 
     if (url.pathname === "/private" && request.method === "POST") {
-      return withCors(await lobbyFetch(env, "/private", { method: "POST" }));
+      return withCors(await lobbyFetch(env, "/private", { method: "POST" }, clientIp(request)));
     }
 
     // Localhost-only dev-test PvE: stage a scripted board in a fresh DO, then the
@@ -80,20 +80,43 @@ export default {
     const modeMatch = url.pathname.match(/^\/(pvp|pve)\/?$/);
     if (modeMatch) {
       const mode = modeMatch[1] as RealtimeMode;
-      const token = url.searchParams.get("token") || url.searchParams.get("reconnectToken");
-      const decodedToken = token ? decodeReconnectToken(token) : null;
+      // The reconnect token rides the WS subprotocol; the query params are a
+      // transitional fallback for older clients during rollout.
+      const token =
+        parseWsProtocols(request.headers.get("sec-websocket-protocol")).reconnectToken ||
+        url.searchParams.get("token") ||
+        url.searchParams.get("reconnectToken");
+      const key = token ? await reconnectKeyFor(env.RECONNECT_TOKEN_SECRET ?? env.SUPABASE_SERVICE_ROLE_KEY) : null;
+      const decodedToken = token ? await verifyReconnectToken(token, key, Date.now()) : null;
       if (token && (!decodedToken || decodedToken.mode !== mode)) {
         return new Response("Invalid reconnect token.", { status: 400, headers: CORS_HEADERS });
       }
 
       const joinCode = url.searchParams.get("joinCode");
-      let room = decodedToken?.room || url.searchParams.get("room");
+      const explicitRoom = url.searchParams.get("room");
+
+      // Rate-limit connects that spawn a fresh game DO by an arbitrary identity
+      // (every PvE, or a client-named PvP room). Reconnects and join-code joins
+      // target existing rooms; fresh public PvP is limited via matchmaking below.
+      if (!decodedToken && !joinCode && (mode === "pve" || explicitRoom)) {
+        const limited = await enforceConnectLimit(env, clientIp(request));
+        if (limited) return limited;
+      }
+
+      let room = decodedToken?.room || explicitRoom;
       if (!room && mode === "pvp" && joinCode) {
         room = await lookupPrivateRoom(env, joinCode);
         if (!room) return new Response("Join code not found.", { status: 404, headers: CORS_HEADERS });
       }
       if (!room) {
-        room = mode === "pvp" ? (await claimPublicRoom(env)).room : crypto.randomUUID();
+        if (mode === "pvp") {
+          const claim = await lobbyFetch(env, "/matchmaking/public", { method: "POST" }, clientIp(request));
+          if (claim.status === 429) return withCors(claim);
+          if (!claim.ok) throw new Error(`Lobby matchmaking failed: ${claim.status}`);
+          room = ((await claim.json()) as { room: string }).room;
+        } else {
+          room = crypto.randomUUID();
+        }
       }
       // PvE is single-human, so default to a unique room per connection; PvP
       // defaults to Lobby DO matchmaking unless a room / private join code /
@@ -113,10 +136,27 @@ export default {
   }
 };
 
-async function claimPublicRoom(env: Env): Promise<{ room: string; status: "waiting" | "matched" }> {
-  const response = await lobbyFetch(env, "/matchmaking/public", { method: "POST" });
-  if (!response.ok) throw new Error(`Lobby matchmaking failed: ${response.status}`);
-  return (await response.json()) as { room: string; status: "waiting" | "matched" };
+/** Charge one DO-spawning connect against the client IP; returns a 429 Response when over budget. */
+async function enforceConnectLimit(env: Env, ip: string): Promise<Response | null> {
+  try {
+    const response = await lobbyFetch(env, "/ratelimit", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ bucket: "connect", key: ip })
+    });
+    if (response.status !== 429) return null;
+    return new Response("Too many requests. Slow down and try again shortly.", {
+      status: 429,
+      headers: { ...CORS_HEADERS, "retry-after": response.headers.get("retry-after") ?? "60" }
+    });
+  } catch {
+    // Fail open: a limiter hiccup must never block legitimate play.
+    return null;
+  }
+}
+
+function clientIp(request: Request): string {
+  return request.headers.get("cf-connecting-ip") || "unknown";
 }
 
 async function lookupPrivateRoom(env: Env, joinCode: string): Promise<string | null> {
@@ -127,9 +167,12 @@ async function lookupPrivateRoom(env: Env, joinCode: string): Promise<string | n
   return payload.room;
 }
 
-async function lobbyFetch(env: Env, path: string, init: RequestInit): Promise<Response> {
+async function lobbyFetch(env: Env, path: string, init: RequestInit, ip?: string): Promise<Response> {
   const id = env.LOBBY.idFromName("global");
-  return env.LOBBY.get(id).fetch(`https://lobby${path}`, init);
+  const headers = new Headers(init.headers);
+  // cf-connecting-ip is stripped on the internal worker→DO hop, so forward it explicitly.
+  if (ip) headers.set("x-client-ip", ip);
+  return env.LOBBY.get(id).fetch(`https://lobby${path}`, { ...init, headers });
 }
 
 function withCors(response: Response): Response {

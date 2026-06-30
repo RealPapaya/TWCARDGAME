@@ -187,6 +187,7 @@ export function drawCards(state: MatchState, player: PlayerState, count: number,
     }
     player.hand.push(card);
     addEvent(state, events, "CARD_DRAWN", { cardId: card.cardId, handCount: player.hand.length }, player.seat);
+    handleDrawTriggers(state, player, events);
   }
   // 疲勞可能致死。drawCards 被許多路徑呼叫,其中回合開始的固定抽牌之後不會再經過
   // resolvePostAction,所以這裡自行收尾結算(finishIfHeroDead 對已結束狀態為冪等)。
@@ -213,6 +214,12 @@ export function applyDamage(
     // Carry the authoritative post-hit health so the client can drop the HP digit
     // AT impact without waiting for (or racing) the held publicSync flush.
     addEvent(state, events, "DAMAGE", { target: minion.instanceId, amount, remainingHealth: minion.currentHealth, ...payload }, ref.owner.seat);
+    // 每當此隨從受到傷害時觸發 (陳菊: ON_DAMAGE → 抽一張卡). Fires per damage instance that
+    // got past the divine shield; a lethal hit still draws since death resolves later.
+    const onDamage = minion.keywords.triggered;
+    if (onDamage?.type === "ON_DAMAGE" && (!onDamage.action || onDamage.action === "DRAW")) {
+      drawCards(state, ref.owner, onDamage.value ?? 1, events);
+    }
   } else {
     // 減稅: reduce every hero damage instance by the bound amount (floored at 0).
     const reduction = ref.owner.augmentFlags?.damageReductionPerInstance ?? 0;
@@ -399,6 +406,14 @@ export function handlePlayNews(state: MatchState, player: PlayerState, events: E
     if (trigger.action === "HEAL") {
       healUnit(state, { owner: player, kind: "MINION", unit: minion }, trigger.value ?? 1, events);
     }
+  }
+  // Cards that cheapen themselves while held (新聞龍捲風: 每打出一張新聞 費用-1).
+  for (const card of player.hand) {
+    const trigger = card.keywords.triggered;
+    if (trigger?.type !== "ON_PLAY_NEWS" || trigger.action !== "SELF_COST_REDUCE") continue;
+    const old = card.cost;
+    card.cost = Math.max(0, card.cost - (trigger.value ?? 1));
+    if (card.cost !== old) card.isReduced = true;
   }
 }
 
@@ -740,6 +755,24 @@ export function drawEffect(effect: EffectDefinition, context: EffectContext): vo
   drawCards(context.state, context.state.players[context.activeSeat], effect.value ?? 1, context.events);
 }
 
+// 陳致中: draw `value` cards, or `bonus_value` instead when the referenced card
+// (effect.cardId, e.g. 陳水扁) is on the caster's own board.
+export function drawIfCardOnBoard(effect: EffectDefinition, context: EffectContext): void {
+  const player = context.state.players[context.activeSeat];
+  const hasCard = !!effect.cardId && player.board.some((minion) => minion.cardId === effect.cardId);
+  const count = hasCard ? (effect.bonus_value ?? effect.value ?? 1) : (effect.value ?? 1);
+  drawCards(context.state, player, count, context.events);
+}
+
+// 抄底: draw `value` cards normally, or `bonus_value` instead when the caster's
+// hand is empty (this card was their last — 如果你完全沒有牌，改抽三張). The played
+// card is already spliced out of hand before the battlecry resolves.
+export function drawIfHandEmpty(effect: EffectDefinition, context: EffectContext): void {
+  const player = context.state.players[context.activeSeat];
+  const count = player.hand.length === 0 ? (effect.bonus_value ?? effect.value ?? 1) : (effect.value ?? 1);
+  drawCards(context.state, player, count, context.events);
+}
+
 export function drawMinionReduceCost(effect: EffectDefinition, context: EffectContext): void {
   const player = context.state.players[context.activeSeat];
   const index = player.deck.findIndex((card) => card.type === "MINION");
@@ -916,6 +949,46 @@ function resolveDeathrattle(
       }
     }
   }
+  if (deathrattle.type === "ADD_RANDOM_CATEGORY_FROM_DECK") {
+    addRandomCategoryFromDeck(state, player, deathrattle, events);
+  }
+}
+
+/**
+ * 遺志: 起底一張<類別>. Non-interactive discover for the deathrattle slot — a
+ * deathrattle can fire on the opponent's turn, where opening a CHANNEL pick
+ * prompt for the (inactive) owner would deadlock the turn. Instead this pulls a
+ * random matching card from the OWNER's deck straight to hand (seeded RNG → still
+ * deterministic/replayable). Filters by `target_category_includes`/`target_category`
+ * and optional `poolCardType`. No-op when the deck has no match.
+ */
+function addRandomCategoryFromDeck(
+  state: MatchState,
+  player: PlayerState,
+  effect: EffectDefinition,
+  events: EffectContext["events"]
+): void {
+  const typeFilter = effect.poolCardType;
+  const categoryFilter = effect.target_category_includes ?? effect.target_category;
+  const eligible: number[] = [];
+  player.deck.forEach((card, index) => {
+    if (typeFilter && card.type !== typeFilter) return;
+    if (categoryFilter && !card.category.includes(categoryFilter)) return;
+    eligible.push(index);
+  });
+  if (eligible.length === 0) return;
+
+  const pick = nextInt(state.private.rngState, eligible.length);
+  state.private.rngState = pick.state;
+  const [card] = player.deck.splice(eligible[pick.value], 1);
+
+  if (player.hand.length >= 10) {
+    player.graveyard.push(card);
+    addEvent(state, events, "CARD_BURNED", { cardId: card.cardId }, player.seat);
+  } else {
+    player.hand.push(card);
+    addEvent(state, events, "CARD_DRAWN", { cardId: card.cardId, handCount: player.hand.length, channeled: true }, player.seat);
+  }
 }
 
 function grantCategoryDeathMana(
@@ -986,6 +1059,16 @@ function shuffleDeadMinionIntoDeck(
   if (!card) return;
   player.deck.push(card);
   state.private.rngState = shuffleInPlace(player.deck, state.private.rngState);
+}
+
+// 陳水扁: each successful draw buffs every board minion carrying an ON_DRAW
+// trigger by `value` (stat defaults to ALL → +value/+value).
+function handleDrawTriggers(state: MatchState, player: PlayerState, events: EffectContext["events"]): void {
+  for (const minion of player.board) {
+    const triggered = minion.keywords.triggered;
+    if (triggered?.type !== "ON_DRAW") continue;
+    buffMinion(state, player, minion, triggered.stat ?? "ALL", triggered.value ?? 1, events);
+  }
 }
 
 function handleDiscard(state: MatchState, player: PlayerState, discarded: RuntimeCard, catalog: Map<string, CardDefinition>, events: EffectContext["events"]): void {

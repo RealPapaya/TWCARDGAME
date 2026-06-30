@@ -2,8 +2,44 @@ import { defineConfig, type Plugin } from "vite";
 import { resolve, dirname, posix } from "node:path";
 import { fileURLToPath, URL } from "node:url";
 import { writeFileSync, readdirSync } from "node:fs";
+// @ts-expect-error — plain-JS sibling module, intentionally untyped here.
+import { applyChangeset } from "./balance-apply.mjs";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const repoRoot = resolve(__dirname, "../..");
+
+// ── Balance-editor "Apply to source" endpoint (dev only) ───────────────
+// The editor POSTs a minimal changeset (only the values that differ from the
+// on-disk baseline) to /__apply-balance; applyChangeset (balance-apply.mjs)
+// patches just those spans so untouched entries stay byte-identical. Gated to
+// `apply: "serve"` so it never ships in the static build.
+function balanceApplyPlugin(): Plugin {
+  return {
+    name: "twcardgame-balance-apply",
+    apply: "serve",
+    configureServer(server) {
+      server.middlewares.use("/__apply-balance", (req, res) => {
+        if (req.method !== "POST") {
+          res.statusCode = 405;
+          res.end("POST only");
+          return;
+        }
+        let body = "";
+        req.on("data", (chunk) => (body += chunk));
+        req.on("end", () => {
+          res.setHeader("Content-Type", "application/json");
+          try {
+            const written = applyChangeset(repoRoot, JSON.parse(body));
+            res.end(JSON.stringify({ ok: true, written }));
+          } catch (err) {
+            res.statusCode = 500;
+            res.end(JSON.stringify({ ok: false, error: (err as Error).message }));
+          }
+        });
+      });
+    }
+  };
+}
 
 // Boot-time asset manifest (see apps/web/src/app/preloader.ts):
 // scans public/ at config time and exposes a categorised list of media URLs as a
@@ -112,7 +148,7 @@ function cloudflarePagesFiles(): Plugin {
 
 export default defineConfig({
   publicDir: "public",
-  plugins: [cloudflarePagesFiles(), assetManifestPlugin()],
+  plugins: [cloudflarePagesFiles(), assetManifestPlugin(), balanceApplyPlugin()],
   resolve: {
     alias: [
       {

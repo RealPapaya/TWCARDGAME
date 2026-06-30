@@ -183,7 +183,7 @@ export function toHandView(state: MatchState, seat: Seat): HandCardView[] {
 }
 
 /**
- * Per-seat projection of an open 教召 / Discover choice, for the private direct
+ * Per-seat projection of an open 起底 / Discover choice, for the private direct
  * message. Returns undefined unless `seat` is the prompted seat. Card identities are
  * delivered only here — never in `toPublicState` — so deck order isn't leaked.
  */

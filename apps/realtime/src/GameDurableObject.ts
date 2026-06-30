@@ -1,5 +1,14 @@
 import type { MatchState } from "@twcardgame/rules";
-import { SEATS, type AiDifficulty, type AiTheme, type DevTestMatchSetup, type RewardSummary, type Seat } from "@twcardgame/shared";
+import {
+  negotiatedWsProtocol,
+  parseWsProtocols,
+  SEATS,
+  type AiDifficulty,
+  type AiTheme,
+  type DevTestMatchSetup,
+  type RewardSummary,
+  type Seat
+} from "@twcardgame/shared";
 import { createAccountStore, type AccountStore } from "./accounts.js";
 import { BotGameSession } from "./BotGameSession.js";
 import {
@@ -11,7 +20,7 @@ import {
 import { createMatchServices, type MatchMetadata, type MatchServices } from "./matchServices.js";
 import { serverMessage, type ClientMessage, type ServerMessage } from "./protocol.js";
 import { restoreSession } from "./restore.js";
-import { encodeReconnectToken, type RealtimeMode } from "./tokens.js";
+import { reconnectKeyFor, signReconnectToken, type RealtimeMode } from "./tokens.js";
 
 export interface Env {
   GAME_ROOM: DurableObjectNamespace;
@@ -19,6 +28,8 @@ export interface Env {
   /** Optional: when set, match results persist + grant rewards via Supabase (Plan B). */
   SUPABASE_URL?: string;
   SUPABASE_SERVICE_ROLE_KEY?: string;
+  /** Optional HMAC secret for signing reconnect tokens; falls back to the service-role key. */
+  RECONNECT_TOKEN_SECRET?: string;
 }
 
 /** Per-connection state stored on the hibernatable socket via serializeAttachment. */
@@ -117,6 +128,10 @@ export class GameDurableObject {
     await this.ensureSession(url);
     const session = this.session!;
 
+    // Bearer auth (the Supabase JWT) rides the WS subprotocol, not the URL.
+    const wsProtocolHeader = request.headers.get("sec-websocket-protocol");
+    const accessToken = parseWsProtocols(wsProtocolHeader).accessToken;
+
     const sessionId = url.searchParams.get("sessionId") || crypto.randomUUID();
     const resolved = session.resolveSeat(sessionId);
     if (!resolved) return new Response("Room is full.", { status: 409 });
@@ -131,7 +146,7 @@ export class GameDurableObject {
     // Mirror GameRoom.onJoin: tell the client its seat, and the private join code
     // to the room creator (first seat).
     this.sendToSocket(server, serverMessage("seat", { seat }));
-    this.sendToSocket(server, serverMessage("reconnectToken", { token: this.createReconnectToken(url, sessionId) }));
+    this.sendToSocket(server, serverMessage("reconnectToken", { token: await this.createReconnectToken(url, sessionId) }));
     if (session.joinCode && seat === "player1" && !reconnect) {
       this.sendToSocket(server, serverMessage("joinCode", { code: session.joinCode }));
     }
@@ -144,11 +159,14 @@ export class GameDurableObject {
       session.markReconnected(seat);
     } else {
       // setPlayer broadcasts the initial match state to both seats once full.
-      session.setPlayer(seat, sessionId, await this.resolveSetup(url, sessionId));
+      session.setPlayer(seat, sessionId, await this.resolveSetup(url, sessionId, accessToken));
     }
 
     await this.flush();
-    return new Response(null, { status: 101, webSocket: client });
+    // Echo the negotiated subprotocol so the browser handshake completes cleanly.
+    const negotiated = negotiatedWsProtocol(wsProtocolHeader);
+    const responseHeaders = negotiated ? { "Sec-WebSocket-Protocol": negotiated } : undefined;
+    return new Response(null, { status: 101, webSocket: client, headers: responseHeaders });
   }
 
   /* --------------------------------- WebSocket handlers --------------------------------- */
@@ -168,6 +186,8 @@ export class GameDurableObject {
 
     if (parsed?.type === "command") {
       this.session.applyClientCommand(attachment.seat, parsed.payload);
+    } else if (parsed?.type === "battleEmote") {
+      this.session.applyBattleEmote(attachment.seat, parsed.payload);
     } else if (parsed?.type === "getJoinCode") {
       const code = this.session.joinCode;
       if (code) this.sendToSocket(ws, serverMessage("joinCode", { code }));
@@ -255,28 +275,33 @@ export class GameDurableObject {
     }
   }
 
-  private async resolveSetup(url: URL, sessionId: string): Promise<PlayerSetup> {
+  private async resolveSetup(url: URL, sessionId: string, accessToken: string | undefined): Promise<PlayerSetup> {
     const params = url.searchParams;
     const deckParam = params.get("deck");
     // The account store validates the deck (dev or Supabase) and resolves identity;
     // an absent/invalid deck falls back to the dev deck rather than entering illegally.
+    // accessToken comes from the WS subprotocol; the query param is a rollout fallback.
     return this.accounts.resolvePlayerSetup(sessionId, {
       userId: params.get("userId") || undefined,
       displayName: params.get("name") || undefined,
       deckIds: deckParam ? deckParam.split(",").filter(Boolean) : undefined,
       deckId: params.get("deckId") || undefined,
-      accessToken: params.get("accessToken") || undefined
+      accessToken: accessToken || params.get("accessToken") || undefined
     });
   }
 
-  private createReconnectToken(url: URL, sessionId: string): string {
-    return encodeReconnectToken({
-      v: 1,
-      mode: (url.searchParams.get("mode") as RealtimeMode | null) ?? "pvp",
-      room: url.searchParams.get("room") || this.state.id.toString(),
-      sessionId,
-      issuedAtMs: Date.now()
-    });
+  private async createReconnectToken(url: URL, sessionId: string): Promise<string> {
+    const key = await reconnectKeyFor(this.env.RECONNECT_TOKEN_SECRET ?? this.env.SUPABASE_SERVICE_ROLE_KEY);
+    return signReconnectToken(
+      {
+        v: 1,
+        mode: (url.searchParams.get("mode") as RealtimeMode | null) ?? "pvp",
+        room: url.searchParams.get("room") || this.state.id.toString(),
+        sessionId,
+        issuedAtMs: Date.now()
+      },
+      key
+    );
   }
 
   private async releaseJoinCode(joinCode: string): Promise<void> {

@@ -290,16 +290,16 @@ export interface PendingPrompt {
   sourceInstanceId: string;
   validTargets: TargetRef[];
   /**
-   * Choice prompts (教召 / Discover): how many cards are offered. PUBLIC count only —
+   * Choice prompts (起底 / Discover): how many cards are offered. PUBLIC count only —
    * the candidate card identities are private and delivered per-seat via
    * {@link PromptChoiceOffer}, never in the synced state (they would leak deck order).
    */
   choiceCount?: number;
-  /** Choice prompts: short label for the picker UI, e.g. "教召". */
+  /** Choice prompts: short label for the picker UI, e.g. "起底". */
   label?: string;
 }
 
-/** One offered card in a 教召 / Discover choice prompt (private per-seat). */
+/** One offered card in a 起底 / Discover choice prompt (private per-seat). */
 export interface PromptChoiceCardView {
   instanceId: string;
   cardId: string;
@@ -309,7 +309,7 @@ export interface PromptChoiceCardView {
   health?: number;
 }
 
-/** Private direct message delivering a seat's 教召 / Discover candidate cards. */
+/** Private direct message delivering a seat's 起底 / Discover candidate cards. */
 export interface PromptChoiceOffer {
   promptId: string;
   label?: string;
@@ -376,6 +376,20 @@ export interface ClientCommandMessage {
   command: GameCommand;
 }
 
+export interface BattleEmoteRequest {
+  emoteId?: string;
+  label?: string;
+  assetPath?: string | null;
+}
+
+export interface BattleEmotePayload {
+  seat: Seat;
+  emoteId: string;
+  label?: string;
+  assetPath?: string | null;
+  sentAtMs: number;
+}
+
 export interface CommandEnvelope {
   commandId: string;
   seat: Seat;
@@ -432,3 +446,4 @@ export interface GameEvent {
 export * from "./animationTiming.js";
 export * from "./progression.js";
 export * from "./questEvents.js";
+export * from "./wsAuth.js";

@@ -11,6 +11,8 @@ import {
 } from "@twcardgame/rules";
 import {
   SEATS,
+  type BattleEmotePayload,
+  type BattleEmoteRequest,
   type ClientCommandMessage,
   type CommandEnvelope,
   type GameEvent,
@@ -28,6 +30,7 @@ import type { MatchMetadata } from "./matchServices.js";
 import { serverMessage, type ServerMessage } from "./protocol.js";
 
 export const DEFAULT_RECONNECT_WINDOW_MS = 30_000;
+const BATTLE_EMOTE_COOLDOWN_MS = 5000;
 
 /** Deck/identity for one seat. The host resolves this from join options / Supabase. */
 export interface PlayerSetup {
@@ -80,6 +83,7 @@ export interface GameSessionSnapshot {
   seatOwner: Partial<Record<Seat, string>>;
   reconnectBudgetMs: Partial<Record<Seat, number>>;
   disconnectedAtMs: Partial<Record<Seat, number>>;
+  battleEmoteCooldownUntilMs?: Partial<Record<Seat, number>>;
   matchStartedAtMs?: number;
   serverCommandSeq: number;
   /** Subclass-specific persisted state (e.g. bot RNG / pacing — see BotGameSession). */
@@ -101,6 +105,7 @@ export class GameSession {
   private readonly seatOwner: Partial<Record<Seat, string>> = {};
   private readonly reconnectBudgetMs: Partial<Record<Seat, number>> = {};
   private readonly disconnectedAtMs: Partial<Record<Seat, number>> = {};
+  private readonly battleEmoteCooldownUntilMs: Partial<Record<Seat, number>> = {};
   private matchStartedAtMs?: number;
   private serverCommandSeq = 0;
 
@@ -255,6 +260,26 @@ export class GameSession {
     });
   }
 
+  applyBattleEmote(seat: Seat, message: BattleEmoteRequest): void {
+    if (!this.match) {
+      this.sendError(seat, "對局尚未準備完成。");
+      return;
+    }
+    if (isMatchComplete(this.match)) return;
+    const now = this.host.now();
+    const cooldownUntil = this.battleEmoteCooldownUntilMs[seat] ?? 0;
+    if (cooldownUntil > now) {
+      this.sendError(seat, "表情冷卻中。");
+      return;
+    }
+    const payload = createBattleEmotePayload(seat, message, now);
+    if (!payload) {
+      this.sendError(seat, "表情資料無效。");
+      return;
+    }
+    this.battleEmoteCooldownUntilMs[seat] = now + BATTLE_EMOTE_COOLDOWN_MS;
+    this.broadcast(serverMessage("battleEmote", payload));
+  }
   /** Port of GameRoom.applyEnvelope: the single reduce → sync → events → private path. */
   private applyEnvelope(envelope: CommandEnvelope): void {
     if (!this.match) return;
@@ -490,7 +515,7 @@ export class GameSession {
         serverMessage("amplificationOptions", { options: this.match.specialPhase.amplificationOptions[seat] ?? [] })
       );
     }
-    // 教召 / Discover candidates are private to the prompted seat (would leak deck order).
+    // 起底 / Discover candidates are private to the prompted seat (would leak deck order).
     const promptChoice = toPromptChoiceOffer(this.match, seat);
     if (promptChoice) this.host.sendToSeat(seat, serverMessage("promptChoice", promptChoice));
   }
@@ -537,6 +562,7 @@ export class GameSession {
       seatOwner: { ...this.seatOwner },
       reconnectBudgetMs: { ...this.reconnectBudgetMs },
       disconnectedAtMs: { ...this.disconnectedAtMs },
+      battleEmoteCooldownUntilMs: { ...this.battleEmoteCooldownUntilMs },
       matchStartedAtMs: this.matchStartedAtMs,
       serverCommandSeq: this.serverCommandSeq,
       extra: this.snapshotExtra()
@@ -550,6 +576,7 @@ export class GameSession {
     Object.assign(this.seatOwner, snapshot.seatOwner);
     Object.assign(this.reconnectBudgetMs, snapshot.reconnectBudgetMs);
     Object.assign(this.disconnectedAtMs, snapshot.disconnectedAtMs);
+    Object.assign(this.battleEmoteCooldownUntilMs, snapshot.battleEmoteCooldownUntilMs ?? {});
     this.matchStartedAtMs = snapshot.matchStartedAtMs;
     this.serverCommandSeq = snapshot.serverCommandSeq;
     this.restoreExtra(snapshot.extra ?? {});
@@ -567,4 +594,30 @@ export class GameSession {
     session.applySnapshot(snapshot);
     return session;
   }
+}
+
+function createBattleEmotePayload(seat: Seat, message: BattleEmoteRequest, sentAtMs: number): BattleEmotePayload | undefined {
+  if (!message || typeof message !== "object") return undefined;
+  const emoteId = sanitizeBattleEmoteText(message.emoteId, 64);
+  if (!emoteId || !/^[A-Za-z0-9_.:-]+$/.test(emoteId)) return undefined;
+  return {
+    seat,
+    emoteId,
+    label: sanitizeBattleEmoteText(message.label, 18),
+    assetPath: sanitizeBattleEmoteAssetPath(message.assetPath) ?? null,
+    sentAtMs
+  };
+}
+
+function sanitizeBattleEmoteText(value: unknown, maxLength: number): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const text = value.replace(/[\u0000-\u001f\u007f]/g, "").trim().replace(/\s+/g, " ").slice(0, maxLength);
+  return text || undefined;
+}
+
+function sanitizeBattleEmoteAssetPath(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const path = value.trim();
+  if (!path.startsWith("/") || /[\s"'<>]/.test(path)) return undefined;
+  return path.slice(0, 180);
 }

@@ -29,6 +29,15 @@ import {
   type QuestRecurrence
 } from "./balance-editor-quests.js";
 import { renderCardPreview, renderAugmentPreview, renderVoteEventPreview } from "./balance-editor-preview.js";
+import {
+  SHOP_PACK_SEED,
+  PACK_RARITIES,
+  computePackOdds,
+  validatePackDrafts,
+  generatePackSeedSql,
+  type ShopPackDraft,
+  type PackRarity
+} from "./balance-editor-packs.js";
 
 // ── deep clone helpers ──────────────────────────────────────────────
 function deepClone<T>(obj: T): T {
@@ -42,6 +51,7 @@ const votes: VoteEventDbEntry[] = deepClone(VOTE_EVENT_DB);
 const aiDecks: Record<string, string[]> = deepClone(AI_THEME_DECKS as Record<string, string[]>);
 const aiThemes = deepClone(AI_THEMES as any[]);
 const quests: QuestDefinitionDraft[] = deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]);
+const packs: ShopPackDraft[] = deepClone(SHOP_PACK_SEED as ShopPackDraft[]);
 
 const KNOWN_AUGMENT_IMAGE_IDS = new Set([
   "AMP_INVOICE_200",
@@ -93,13 +103,18 @@ const prog = {
 
 // ── change tracking ─────────────────────────────────────────────────
 let changeCount = 0;
-function bumpChanges() {
-  changeCount++;
+function setChangeBadge(n: number) {
+  changeCount = n;
   const badge = document.getElementById("change-badge");
   if (badge) {
-    badge.textContent = String(changeCount);
-    badge.style.display = changeCount > 0 ? "inline-flex" : "none";
+    badge.textContent = String(n);
+    badge.style.display = n > 0 ? "inline-flex" : "none";
   }
+}
+// Recompute the REAL number of pending changes (vs the imported baseline) so the
+// badge counts actual diffs — touching a field then setting it back is 0, not +2.
+function bumpChanges() {
+  setChangeBadge(buildChangeset().count);
 }
 
 // ── inject styles ───────────────────────────────────────────────────
@@ -332,6 +347,14 @@ main#app {
   outline: none; border-color: var(--primary);
 }
 .be-field textarea { resize: vertical; min-height: 60px; }
+.be-input {
+  padding: 8px 10px; border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: rgba(0,0,0,0.3); color: var(--text);
+  font-family: var(--font); font-size: 0.85rem;
+  transition: border-color 0.2s;
+}
+.be-input:focus { outline: none; border-color: var(--primary); }
 
 /* in-game card / augment / event preview — uses the live game's .card markup + CSS */
 .be-preview {
@@ -354,6 +377,39 @@ main#app {
 }
 /* neutralise the hand fan transform so the preview sits upright and centered */
 .be-preview .card { transform: none !important; margin: 0 !important; }
+
+/* card editor: left = big preview + image/category, right = detail tuning */
+.be-card-editor {
+  display: grid;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  gap: 24px;
+  align-items: start;
+}
+@media (max-width: 820px) {
+  .be-card-editor { grid-template-columns: 1fr; }
+}
+.be-card-editor-left { display: flex; flex-direction: column; gap: 14px; }
+.be-card-editor-right { margin: 0; }
+/* enlarge the preview so the artwork is legible, and vertically centre it
+   (the base .be-preview pins to flex-start, which left the card glued to the top). */
+.be-card-preview-lg {
+  align-items: center;
+  justify-content: center;
+  min-height: 300px;
+  padding: 28px 16px;
+  /* visible so the augment art (taller than a card) isn't clipped top/bottom */
+  overflow: visible;
+}
+/* cards and vote options share the .card box → one rule scales both */
+.be-card-preview-lg .card {
+  transform: scale(1.45) !important;
+  transform-origin: center center;
+  margin: 40px 0 !important;
+}
+/* augment previews are the small hero dot pair — scale them up a touch */
+.be-card-preview-lg .be-augment-preview-pair .hero-augment-dot {
+  transform: scale(1.6);
+}
 /* the preview is display-only; keep it inert without the game's disabled
    greyscale (base.css button:disabled { filter: grayscale; opacity }). */
 .be-preview { pointer-events: none; }
@@ -560,18 +616,20 @@ main#app {
 document.head.appendChild(style);
 
 // ── tab IDs ─────────────────────────────────────────────────────────
-type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks" | "tasks";
+type TabId = "cards" | "amps" | "votes" | "progression" | "aidecks" | "tasks" | "packs";
 const TABS: { id: TabId; label: string }[] = [
   { id: "cards", label: "卡牌" },
   { id: "amps", label: "增幅" },
   { id: "votes", label: "事件" },
   { id: "progression", label: "進度" },
   { id: "aidecks", label: "AI牌組" },
-  { id: "tasks", label: "任務/成就" }
+  { id: "tasks", label: "任務/成就" },
+  { id: "packs", label: "卡包" }
 ];
 let activeTab: TabId = "cards";
 let expandedThemeId: string | null = null;
 let expandedQuestId: string | null = null;
+let expandedPackId: string | null = null;
 
 // ── utility helpers ─────────────────────────────────────────────────
 function h<K extends keyof HTMLElementTagNameMap>(
@@ -782,7 +840,8 @@ function render() {
   if (changeCount > 0) badge.style.display = "inline-flex";
 
   const actions = h("div", { class: "be-actions" });
-  const exportJsonBtn = h("button", { class: "be-btn be-btn--primary" }, "📦 匯出 JSON");
+  const applyBtn = h("button", { class: "be-btn be-btn--primary", title: "直接寫入原始碼，不需手動貼上（需在 npm run dev:web 下開啟）" }, "✅ 套用到原始碼");
+  const exportJsonBtn = h("button", { class: "be-btn" }, "📦 匯出 JSON");
 
   const dropdown = h("div", { class: "be-dropdown" });
   const exportTsBtn = h("button", { class: "be-btn" }, "📄 匯出 TS 檔案 ▾");
@@ -794,12 +853,13 @@ function render() {
   const expAi = h("button", { class: "be-dropdown-item" }, "AI 牌組 TS (aiDecks.generated.ts)");
   const expProg = h("button", { class: "be-dropdown-item" }, "進度 TS (progression.generated.ts)");
   const expTasks = h("button", { class: "be-dropdown-item" }, "任務/成就 SQL (tasks_achievements_seed.sql)");
+  const expPacks = h("button", { class: "be-dropdown-item" }, "商店卡包 SQL (card_packs_seed.sql)");
 
-  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg, expTasks);
+  dropdownMenu.append(expCards, expAmps, expVotes, expAi, expProg, expTasks, expPacks);
   dropdown.append(exportTsBtn, dropdownMenu);
 
   const resetBtn = h("button", { class: "be-btn be-btn--danger" }, "🔄 重置");
-  actions.append(badge, exportJsonBtn, dropdown, resetBtn);
+  actions.append(badge, applyBtn, exportJsonBtn, dropdown, resetBtn);
   headerInner.append(actions);
   header.append(headerInner);
 
@@ -823,7 +883,8 @@ function render() {
     votes: renderVotesPanel(),
     progression: renderProgressionPanel(),
     aidecks: renderAiDecksPanel(),
-    tasks: renderTasksPanel()
+    tasks: renderTasksPanel(),
+    packs: renderPacksPanel()
   };
   for (const [id, panel] of Object.entries(panels)) {
     panel.classList.add("be-panel");
@@ -832,6 +893,7 @@ function render() {
   }
 
   // button handlers
+  applyBtn.addEventListener("click", () => applyToSource(applyBtn));
   exportJsonBtn.addEventListener("click", exportJson);
 
   exportTsBtn.addEventListener("click", (e) => {
@@ -848,6 +910,7 @@ function render() {
   expAi.addEventListener("click", exportAiDecksTs);
   expProg.addEventListener("click", exportProgressionTs);
   expTasks.addEventListener("click", exportTasksSql);
+  expPacks.addEventListener("click", exportPacksSql);
 
   resetBtn.addEventListener("click", () => {
     if (!confirm("確定要重置所有修改？")) return;
@@ -861,7 +924,9 @@ function render() {
     }
     Object.assign(aiDecks, deepClone(AI_THEME_DECKS as Record<string, string[]>));
     quests.splice(0, quests.length, ...deepClone(QUEST_DEFINITIONS_SEED as QuestDefinitionDraft[]));
+    packs.splice(0, packs.length, ...deepClone(SHOP_PACK_SEED as ShopPackDraft[]));
     expandedQuestId = null;
+    expandedPackId = null;
     prog.MAX_LEVEL = MAX_LEVEL;
     prog.LEVEL_UP_GOLD = LEVEL_UP_GOLD;
     prog.MAX_LEVEL_XP_REQUIREMENT = MAX_LEVEL_XP_REQUIREMENT;
@@ -1013,13 +1078,51 @@ function renderCardsPanel(): HTMLElement {
 }
 
 function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large card preview + image / category metadata,
+  // right = the numeric / keyword detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
-  // in-game preview (mirrors the live card face)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  // ── LEFT: large in-game preview (mirrors the live card face) ──
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderCardPreview(card);
-  grid.append(preview);
+  left.append(preview);
 
+  const imageField = h("div", { class: "be-field" });
+  imageField.append(h("label", {}, "圖片路徑"));
+  const imageInp = h("input", { type: "text", value: card.image });
+  imageInp.addEventListener("change", () => {
+    card.image = imageInp.value.trim();
+    bumpChanges();
+    refresh();
+  });
+  imageField.append(imageInp);
+  left.append(imageField);
+
+  // category
+  const catField = h("div", { class: "be-field" });
+  catField.append(h("label", {}, "分類"));
+  const catInp = h("input", { type: "text", value: card.category });
+  catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
+  catField.append(catInp);
+  left.append(catField);
+
+  // hidden category (optional — not shown on the card face)
+  const hiddenCatField = h("div", { class: "be-field" });
+  hiddenCatField.append(h("label", {}, "隱藏分類"));
+  const hiddenCatInp = h("input", { type: "text", value: card.hiddenCategory ?? "", placeholder: "（選填）" });
+  hiddenCatInp.addEventListener("change", () => {
+    const v = hiddenCatInp.value.trim();
+    card.hiddenCategory = v || undefined;
+    bumpChanges();
+    refresh();
+  });
+  hiddenCatField.append(hiddenCatInp);
+  left.append(hiddenCatField);
+
+  // ── RIGHT: detail tuning ──
   // name
   const nameField = h("div", { class: "be-field" });
   nameField.append(h("label", {}, "名稱"));
@@ -1060,40 +1163,8 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   rarField.append(rarSel);
   grid.append(rarField);
 
-  // category
-  const catField = h("div", { class: "be-field" });
-  catField.append(h("label", {}, "分類"));
-  const catInp = h("input", { type: "text", value: card.category });
-  catInp.addEventListener("change", () => { card.category = catInp.value; bumpChanges(); refresh(); });
-  catField.append(catInp);
-  grid.append(catField);
-
-  // hidden category (optional — not shown on the card face)
-  const hiddenCatField = h("div", { class: "be-field" });
-  hiddenCatField.append(h("label", {}, "隱藏分類"));
-  const hiddenCatInp = h("input", { type: "text", value: card.hiddenCategory ?? "", placeholder: "（選填）" });
-  hiddenCatInp.addEventListener("change", () => {
-    const v = hiddenCatInp.value.trim();
-    card.hiddenCategory = v || undefined;
-    bumpChanges();
-    refresh();
-  });
-  hiddenCatField.append(hiddenCatInp);
-  grid.append(hiddenCatField);
-
-  const imageField = h("div", { class: "be-field" });
-  imageField.append(h("label", {}, "圖片路徑"));
-  const imageInp = h("input", { type: "text", value: card.image });
-  imageInp.addEventListener("change", () => {
-    card.image = imageInp.value.trim();
-    bumpChanges();
-    refresh();
-  });
-  imageField.append(imageInp);
-  grid.append(imageField);
-
   // description
-  const descField = h("div", { class: "be-field", style: "grid-column: span 2;" });
+  const descField = h("div", { class: "be-field", style: "grid-column: 1 / -1;" });
   descField.append(h("label", {}, "描述"));
   const descInp = h("textarea", {}, card.description);
   descInp.addEventListener("change", () => { card.description = descInp.value; bumpChanges(); });
@@ -1153,7 +1224,7 @@ function buildCardEditor(card: CardDefinition, refresh: () => void): HTMLElement
   }
 
   grid.append(kwSection);
-  return grid;
+  return wrap;
 }
 
 function buildEffectEditor(ef: EffectDefinition, refresh: () => void): HTMLElement {
@@ -1269,12 +1340,16 @@ function renderAmpsPanel(): HTMLElement {
 }
 
 function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large preview, right = detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
   // in-game preview (mirrors the live augment option)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderAugmentPreview(amp);
-  grid.append(preview);
+  left.append(preview);
 
   const nameF = h("div", { class: "be-field" });
   nameF.append(h("label", {}, "名稱"));
@@ -1319,7 +1394,7 @@ function buildAmpEditor(amp: AmplificationDbEntry): HTMLElement {
   efDiv.append(buildEffectEditor(amp.effect, () => {}));
   grid.append(efDiv);
 
-  return grid;
+  return wrap;
 }
 
 // ── VOTES PANEL ─────────────────────────────────────────────────────
@@ -1370,12 +1445,16 @@ function renderVotesPanel(): HTMLElement {
 }
 
 function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
-  const grid = h("div", { class: "be-editor-inner" });
+  // Two-pane layout: left = large preview, right = detail tuning.
+  const wrap = h("div", { class: "be-card-editor" });
+  const left = h("div", { class: "be-card-editor-left" });
+  const grid = h("div", { class: "be-editor-inner be-card-editor-right" });
+  wrap.append(left, grid);
 
   // in-game preview (mirrors the live vote option)
-  const preview = h("div", { class: "be-preview", style: "grid-column: 1 / -1;" });
+  const preview = h("div", { class: "be-preview be-card-preview-lg" });
   preview.innerHTML = renderVoteEventPreview(ve);
-  grid.append(preview);
+  left.append(preview);
 
   const nameF = h("div", { class: "be-field" });
   nameF.append(h("label", {}, "名稱"));
@@ -1439,7 +1518,7 @@ function buildVoteEditor(ve: VoteEventDbEntry): HTMLElement {
   efDiv.append(buildEffectEditor(ve.apply.effect, () => {}));
   grid.append(efDiv);
 
-  return grid;
+  return wrap;
 }
 
 // ── PROGRESSION PANEL ───────────────────────────────────────────────
@@ -2157,6 +2236,150 @@ function buildQuestEditor(q: QuestDefinitionDraft): HTMLElement {
 }
 
 // ── EXPORT ──────────────────────────────────────────────────────────
+// ── apply directly to source files (dev server) ─────────────────────
+function toast(message: string, ok: boolean) {
+  const el = h("div", {
+    style:
+      "position:fixed;left:50%;bottom:28px;transform:translateX(-50%);z-index:9999;" +
+      "padding:12px 20px;border-radius:10px;font-size:0.9rem;font-weight:600;" +
+      "box-shadow:0 8px 24px rgba(0,0,0,0.5);max-width:80vw;text-align:center;" +
+      (ok
+        ? "background:rgba(34,197,94,0.95);color:#04210f;"
+        : "background:rgba(239,68,68,0.95);color:#fff;")
+  }, message);
+  document.body.append(el);
+  setTimeout(() => el.remove(), ok ? 3200 : 6000);
+}
+
+// Minimal-diff change detection: the server only edits the spans we send, so we
+// send ONLY what differs from the imported baseline. Untouched entries are never
+// transmitted and therefore stay byte-for-byte identical on disk.
+type Leaf = { path: (string | number)[]; value: unknown };
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+// JSON round-trip so undefined-valued keys (e.g. `newsPower = v || undefined`)
+// don't register as differences — they vanish in the serialised source too.
+function normalize<T>(v: T): T {
+  return JSON.parse(JSON.stringify(v ?? null));
+}
+function jsonEq(a: unknown, b: unknown): boolean {
+  return JSON.stringify(normalize(a)) === JSON.stringify(normalize(b));
+}
+
+// Collect scalar/array/object leaf edits between baseline and current. Returns
+// false if a key was added or removed (or an object↔non-object swap) — the caller
+// then falls back to re-serialising that whole entry.
+function collectLeaves(base: unknown, cur: unknown, path: (string | number)[], out: Leaf[]): boolean {
+  if (jsonEq(base, cur)) return true;
+  if (isPlainObject(base) && isPlainObject(cur)) {
+    const bk = Object.keys(base);
+    const ck = Object.keys(cur);
+    if (bk.length !== ck.length || !bk.every((k) => k in cur)) return false;
+    for (const k of ck) if (!collectLeaves(base[k], cur[k], [...path, k], out)) return false;
+    return true;
+  }
+  if (isPlainObject(base) !== isPlainObject(cur)) return false;
+  // primitive or array value at an existing key → patch this single span
+  out.push({ path, value: cur });
+  return true;
+}
+
+type EntryChange = { id: string; leaves?: Leaf[]; entry?: unknown };
+function sectionChanges<T extends { id: string }>(base: readonly T[], cur: readonly T[]): EntryChange[] {
+  const baseById = new Map(base.map((e) => [e.id, e]));
+  const changed: EntryChange[] = [];
+  for (const entry of cur) {
+    const b = baseById.get(entry.id);
+    if (b && jsonEq(b, entry)) continue;
+    if (!b) { changed.push({ id: entry.id, entry }); continue; }
+    const leaves: Leaf[] = [];
+    if (collectLeaves(normalize(b), normalize(entry), [], leaves) && leaves.length) {
+      changed.push({ id: entry.id, leaves });
+    } else {
+      changed.push({ id: entry.id, entry });
+    }
+  }
+  return changed;
+}
+
+function buildChangeset() {
+  const sections: Record<string, EntryChange[]> = {};
+  const add = (name: string, ch: EntryChange[]) => { if (ch.length) sections[name] = ch; };
+  add("cards", sectionChanges(CARD_CATALOG as readonly { id: string }[], cards as { id: string }[]));
+  add("amps", sectionChanges(AMPLIFICATION_DB as readonly { id: string }[], amps as { id: string }[]));
+  add("votes", sectionChanges(VOTE_EVENT_DB as readonly { id: string }[], votes as { id: string }[]));
+  add("aiThemes", sectionChanges(AI_THEMES as readonly { id: string }[], aiThemes as { id: string }[]));
+
+  const aiDecksChanged: { key: string; value: string[] }[] = [];
+  for (const key of Object.keys(aiDecks)) {
+    const baseDeck = (AI_THEME_DECKS as Record<string, readonly string[]>)[key];
+    if (!baseDeck || !jsonEq(baseDeck, aiDecks[key])) aiDecksChanged.push({ key, value: aiDecks[key] });
+  }
+
+  const progression: Record<string, number> = {};
+  if (prog.MAX_LEVEL !== MAX_LEVEL) progression.MAX_LEVEL = prog.MAX_LEVEL;
+  if (prog.LEVEL_UP_GOLD !== LEVEL_UP_GOLD) progression.LEVEL_UP_GOLD = prog.LEVEL_UP_GOLD;
+  if (prog.MAX_LEVEL_XP_REQUIREMENT !== MAX_LEVEL_XP_REQUIREMENT) progression.MAX_LEVEL_XP_REQUIREMENT = prog.MAX_LEVEL_XP_REQUIREMENT;
+
+  // Shop packs: add/remove/rename rewrites the whole SHOP_PACK_SEED array;
+  // pure field edits go through the precise per-entry section path.
+  let packsFull: ShopPackDraft[] | undefined;
+  if (!jsonEq(SHOP_PACK_SEED, packs)) {
+    const baseIds = new Set(SHOP_PACK_SEED.map((p) => p.id));
+    const curIds = new Set(packs.map((p) => p.id));
+    const structural = packs.some((p) => !baseIds.has(p.id)) || SHOP_PACK_SEED.some((p) => !curIds.has(p.id));
+    if (structural) packsFull = packs;
+    else add("packs", sectionChanges(SHOP_PACK_SEED as readonly { id: string }[], packs as { id: string }[]));
+  }
+
+  const changeset: {
+    sections: typeof sections;
+    aiDecks: typeof aiDecksChanged;
+    progression: typeof progression;
+    packsFull?: ShopPackDraft[];
+  } = { sections, aiDecks: aiDecksChanged, progression, packsFull };
+  const count =
+    Object.values(sections).reduce((n, c) => n + c.length, 0) +
+    aiDecksChanged.length +
+    Object.keys(progression).length +
+    (packsFull ? packsFull.length : 0);
+  return { changeset, count };
+}
+
+async function applyToSource(btn: HTMLButtonElement) {
+  const { changeset, count } = buildChangeset();
+  if (count === 0) {
+    toast("沒有偵測到任何變更。", true);
+    return;
+  }
+  const label = btn.textContent;
+  btn.textContent = "⏳ 寫入中…";
+  btn.disabled = true;
+  try {
+    // 任務 (quests) and 卡包 (packs) are Supabase seeds, not code — they stay on
+    // the SQL export path; everything else is patched straight into source.
+    const res = await fetch("/__apply-balance", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(changeset)
+    });
+    const result = (await res.json()) as { ok: boolean; written?: string[]; error?: string };
+    if (result.ok) {
+      setChangeBadge(0);
+      toast(`✅ 已精準套用 ${count} 項變更到 ${result.written?.length ?? 0} 個檔案，Vite 會自動重新載入。`, true);
+    } else {
+      toast(`❌ 套用失敗：${result.error ?? "未知錯誤"}`, false);
+    }
+  } catch {
+    toast("❌ 無法連線到開發伺服器。請用「npm run dev:web」開啟編輯器後再套用。", false);
+  } finally {
+    btn.textContent = label;
+    btn.disabled = false;
+  }
+}
+
 function exportJson() {
   const data = {
     cards,
@@ -2256,6 +2479,252 @@ function exportAiDecksTs() {
   ];
   const blob = new Blob([lines.join("\n")], { type: "text/plain" });
   downloadBlob(blob, "aiDecks.generated.ts");
+}
+
+// ── PACKS PANEL ─────────────────────────────────────────────────────
+function renderPacksPanel(): HTMLElement {
+  const panel = h("div");
+
+  // datalist of catalog categories (faction picker hints), from the working copy
+  const categories = [...new Set(cards.map((c) => c.category).filter(Boolean))].sort();
+  const datalist = h("datalist", { id: "pack-faction-categories" });
+  for (const cat of categories) datalist.append(h("option", { value: cat }));
+  panel.append(datalist);
+
+  // intro / explanation of how the odds work
+  const intro = h("div", {
+    style: "margin-bottom:16px;padding:12px 14px;background:var(--glass);border:1px solid var(--glass-border);border-radius:var(--radius-sm);color:var(--text-dim);font-size:0.8rem;line-height:1.6;"
+  });
+  intro.innerHTML =
+    "每抽一張卡分兩步：先依 <b>掉落率</b> 抽稀有度，再於該稀有度的卡池中挑卡。" +
+    "陣營卡會獲得 <b>陣營權重</b> 倍的選中權重（其餘等權重）。下方「命中率」依目前卡牌分頁的卡池即時計算 —— " +
+    "<b>權重越低、卡池越大，目標陣營的命中率就越低</b>。";
+  panel.append(intro);
+
+  // validation banner
+  const issues = validatePackDrafts(packs);
+  if (issues.length) {
+    const warn = h("div", {
+      style: "margin-bottom:16px;padding:10px 14px;background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:var(--radius-sm);color:var(--danger);font-size:0.8rem;"
+    });
+    const lines = issues.map((issue) =>
+      issue.type === "empty_id"
+        ? `第 ${issue.index + 1} 列的 ID 為空`
+        : issue.type === "duplicate_id"
+          ? `重複的 ID：${issue.id}`
+          : `${issue.id} 的掉落率加總為 ${issue.total}%（應為 100%）`
+    );
+    warn.innerHTML = `⚠ ${lines.join("；")}`;
+    panel.append(warn);
+  }
+
+  const titleRow = h("div", { style: "display:flex;align-items:center;gap:12px;margin:8px 0 12px;" });
+  titleRow.append(h("div", { class: "be-section-title", style: "margin:0;border:none;flex:1;" }, `商店卡包（${packs.length}）`));
+  const addBtn = h("button", { class: "be-btn be-btn--primary", type: "button" }, "＋ 新增卡包");
+  addBtn.addEventListener("click", addPack);
+  titleRow.append(addBtn);
+  panel.append(titleRow);
+
+  const table = h("table", { class: "be-table" });
+  const thead = h("thead");
+  thead.innerHTML = `<tr><th>ID</th><th>名稱</th><th>價格</th><th>張數</th><th>目標陣營</th><th>權重</th><th>每張命中率</th></tr>`;
+  table.append(thead);
+  const tbody = h("tbody");
+
+  if (packs.length === 0) {
+    const emptyRow = h("tr");
+    emptyRow.innerHTML = `<td colspan="7" style="color:var(--text-muted);padding:16px 12px;">尚無卡包，點「＋ 新增卡包」建立。</td>`;
+    tbody.append(emptyRow);
+  }
+
+  for (const pack of packs) {
+    const expanded = expandedPackId === pack.id;
+    const odds = computePackOdds(pack, cards);
+    const hitCell = odds.hasFaction
+      ? `<span style="color:var(--primary);font-weight:700">${(odds.perCardFactionChance * 100).toFixed(1)}%</span> <span style="color:var(--text-muted);font-size:0.75rem">(${odds.expectedFactionCards.toFixed(2)} 張/包)</span>`
+      : `<span style="color:var(--text-muted)">均等</span>`;
+    const tr = h("tr", { class: `be-row ${expanded ? "be-row--expanded" : ""}` });
+    tr.innerHTML = `
+      <td style="font-family:monospace;color:var(--text-muted)">${escapeHtmlText(pack.id)}</td>
+      <td style="font-weight:600">${escapeHtmlText(pack.display_name)}</td>
+      <td style="color:var(--warning);font-weight:600">💰${pack.price_gold}</td>
+      <td>${pack.cardCount}</td>
+      <td style="font-size:0.8rem;color:var(--text-dim)">${escapeHtmlText(pack.faction ?? "—")}</td>
+      <td>${odds.hasFaction ? `${pack.factionWeight}×` : "—"}</td>
+      <td>${hitCell}</td>
+    `;
+    tr.addEventListener("click", () => {
+      expandedPackId = expanded ? null : pack.id;
+      render();
+    });
+    tbody.append(tr);
+
+    if (expanded) {
+      const edRow = h("tr", { class: "be-editor be-editor--open" });
+      const edTd = h("td", { colspan: "7" });
+      edTd.append(buildPackEditor(pack));
+      edRow.append(edTd);
+      tbody.append(edRow);
+    }
+  }
+  table.append(tbody);
+  panel.append(table);
+
+  return panel;
+}
+
+function buildPackEditor(pack: ShopPackDraft): HTMLElement {
+  const wrap = h("div", { style: "padding:16px;display:flex;flex-direction:column;gap:16px;" });
+
+  const field = (label: string, input: HTMLElement): HTMLElement => {
+    const f = h("label", { style: "display:flex;flex-direction:column;gap:4px;font-size:0.75rem;color:var(--text-muted);" });
+    f.append(document.createTextNode(label), input);
+    return f;
+  };
+
+  const grid = h("div", { style: "display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;" });
+
+  const idInput = h("input", { class: "be-input", type: "text", value: pack.id });
+  idInput.addEventListener("input", () => { pack.id = idInput.value; bumpChanges(); });
+
+  const nameInput = h("input", { class: "be-input", type: "text", value: pack.display_name });
+  nameInput.addEventListener("input", () => { pack.display_name = nameInput.value; bumpChanges(); });
+
+  const priceInput = h("input", { class: "be-input", type: "number", value: String(pack.price_gold), min: "0" });
+  priceInput.addEventListener("input", () => { pack.price_gold = Number(priceInput.value) || 0; bumpChanges(); });
+
+  const countInput = h("input", { class: "be-input", type: "number", value: String(pack.cardCount), min: "1" });
+  countInput.addEventListener("input", () => { pack.cardCount = Number(countInput.value) || 0; render(); bumpChanges(); });
+
+  const factionInput = h("input", { class: "be-input", type: "text", value: pack.faction ?? "", list: "pack-faction-categories", placeholder: "（無，均等）" });
+  factionInput.addEventListener("input", () => { pack.faction = factionInput.value.trim() || undefined; render(); bumpChanges(); });
+
+  const weightInput = h("input", { class: "be-input", type: "number", value: String(pack.factionWeight), min: "1", step: "0.5" });
+  weightInput.addEventListener("input", () => { pack.factionWeight = Number(weightInput.value) || 1; render(); bumpChanges(); });
+
+  grid.append(
+    field("ID", idInput),
+    field("名稱", nameInput),
+    field("價格 (gold)", priceInput),
+    field("每包張數", countInput),
+    field("目標陣營 (category)", factionInput),
+    field("陣營權重 (×)", weightInput)
+  );
+  wrap.append(grid);
+
+  const descInput = h("textarea", { class: "be-input", rows: "2", style: "resize:vertical;width:100%;" });
+  descInput.value = pack.description;
+  descInput.addEventListener("input", () => { pack.description = descInput.value; bumpChanges(); });
+  wrap.append(field("描述", descInput));
+
+  // drop-rates editor
+  wrap.append(h("div", { class: "be-section-title", style: "margin:8px 0 0;border:none;" }, "稀有度掉落率 (%)"));
+  const drTable = h("table", { class: "be-table", style: "max-width:420px;" });
+  drTable.innerHTML = `<thead><tr><th>稀有度</th><th>掉落率 (%)</th></tr></thead>`;
+  const drBody = h("tbody");
+  for (const rarity of PACK_RARITIES) {
+    let dr = pack.dropRates.find((r) => r.rarity === rarity.value);
+    const row = h("tr");
+    const labelTd = h("td", {}, `${rarity.label} (${rarity.value})`);
+    const valTd = h("td");
+    const rateInput = h("input", { class: "be-input", type: "number", min: "0", step: "0.1", value: dr ? String(dr.rate) : "0", style: "width:100px;" });
+    rateInput.addEventListener("input", () => {
+      const v = Number(rateInput.value) || 0;
+      if (!dr) {
+        dr = { label: rarity.label, rarity: rarity.value as PackRarity, rate: v };
+        pack.dropRates.push(dr);
+      } else {
+        dr.rate = v;
+      }
+      render();
+      bumpChanges();
+    });
+    valTd.append(rateInput);
+    row.append(labelTd, valTd);
+    drBody.append(row);
+  }
+  drTable.append(drBody);
+  const total = pack.dropRates.reduce((s, r) => s + (Number.isFinite(r.rate) ? r.rate : 0), 0);
+  const totalNote = h("div", {
+    style: `font-size:0.75rem;margin-top:6px;color:${Math.abs(total - 100) < 0.01 ? "var(--success)" : "var(--danger)"};`
+  }, `加總：${total}%`);
+  wrap.append(drTable, totalNote);
+
+  // computed odds breakdown
+  const odds = computePackOdds(pack, cards);
+  wrap.append(h("div", { class: "be-section-title", style: "margin:8px 0 0;border:none;" }, "命中率分析（依目前卡池即時計算）"));
+  if (!odds.hasFaction) {
+    wrap.append(h("div", { style: "font-size:0.8rem;color:var(--text-dim);" }, "此卡包無目標陣營，所有卡牌於各稀有度內等機率。"));
+  } else {
+    const oddsTable = h("table", { class: "be-table" });
+    oddsTable.innerHTML = `<thead><tr><th>稀有度</th><th>掉落率</th><th>陣營卡</th><th>其他卡</th><th>該稀有度命中率</th></tr></thead>`;
+    const oBody = h("tbody");
+    for (const r of odds.perRarity) {
+      const tr = h("tr");
+      tr.innerHTML = `
+        <td>${r.rarity}</td>
+        <td>${r.rate}%</td>
+        <td>${r.factionCount}</td>
+        <td>${r.otherCount}</td>
+        <td style="color:var(--primary);font-weight:600">${(r.pFactionGivenRarity * 100).toFixed(1)}%</td>
+      `;
+      oBody.append(tr);
+    }
+    oddsTable.append(oBody);
+    wrap.append(oddsTable);
+    const summary = h("div", {
+      style: "margin-top:8px;font-size:0.85rem;color:var(--text);"
+    });
+    summary.innerHTML =
+      `每抽一張卡，是「${escapeHtmlText(pack.faction ?? "")}」的機率為 ` +
+      `<b style="color:var(--primary)">${(odds.perCardFactionChance * 100).toFixed(1)}%</b>` +
+      `，整包平均拿到 <b style="color:var(--primary)">${odds.expectedFactionCards.toFixed(2)}</b> 張。`;
+    wrap.append(summary);
+  }
+
+  // delete
+  const actions = h("div", { style: "display:flex;justify-content:flex-end;margin-top:8px;" });
+  const delBtn = h("button", { class: "be-btn be-btn--danger", type: "button" }, "🗑 刪除此卡包");
+  delBtn.addEventListener("click", () => {
+    if (!confirm(`確定要刪除「${pack.display_name}」？`)) return;
+    const idx = packs.indexOf(pack);
+    if (idx >= 0) packs.splice(idx, 1);
+    expandedPackId = null;
+    render();
+    bumpChanges();
+  });
+  actions.append(delBtn);
+  wrap.append(actions);
+
+  return wrap;
+}
+
+function addPack() {
+  let n = packs.length + 1;
+  let id = `pack-new-${n}`;
+  while (packs.some((p) => p.id === id)) id = `pack-new-${++n}`;
+  packs.push({
+    id,
+    display_name: "新卡包",
+    description: "包含 5 張隨機卡牌。",
+    price_gold: 100,
+    cardCount: 5,
+    factionWeight: 3,
+    dropRates: [
+      { label: "普通", rarity: "COMMON", rate: 60 },
+      { label: "精良", rarity: "RARE", rate: 30 },
+      { label: "史詩", rarity: "EPIC", rate: 7 },
+      { label: "傳說", rarity: "LEGENDARY", rate: 3 }
+    ]
+  });
+  expandedPackId = id;
+  render();
+  bumpChanges();
+}
+
+function exportPacksSql() {
+  const blob = new Blob([generatePackSeedSql(packs)], { type: "text/plain" });
+  downloadBlob(blob, "card_packs_seed.sql");
 }
 
 function exportProgressionTs() {

@@ -52,10 +52,16 @@ export function createAccountStore(env: RealtimeEnv): AccountStore {
   return {
     enabled: true,
     async resolvePlayerSetup(sessionId, options) {
-      // A connection without auth context (e.g. a quick room-code PoC join) stays
-      // playable via the dev path rather than being rejected.
+      // A connection without verified auth context (e.g. a quick room-code PoC
+      // join, or a signed-out client) stays playable via the dev path rather than
+      // being rejected — but its identity is DOWNGRADED to a non-UUID guest id.
+      // Trusting the client-supplied `?userId` here would let an unauthenticated
+      // connection credit XP/gold to any account and bypass deck-ownership checks,
+      // since rewards/finalize attribute by userId and `isHumanUser` only checks
+      // the UUID shape. A guest id can never be mistaken for a real account.
       if (!options.accessToken || !options.deckId) {
-        return devAccountStore.resolvePlayerSetup(sessionId, options);
+        const fallback = await devAccountStore.resolvePlayerSetup(sessionId, options);
+        return { ...fallback, userId: guestUserId(sessionId) };
       }
       const user = await getAuthenticatedUser(client, options.accessToken);
       const deck = await getOwnedDeck(client, { userId: user.id, deckId: options.deckId });
@@ -74,6 +80,16 @@ export function createAccountStore(env: RealtimeEnv): AccountStore {
       };
     }
   };
+}
+
+/**
+ * A non-UUID identity for an unauthenticated connection. The `guest:` prefix
+ * guarantees `isHumanUser` (a UUID-shape check in matchServices) rejects it, so
+ * no rewards, quest events, or match-history attribution can ever land on a real
+ * account through the dev fallback path.
+ */
+function guestUserId(sessionId: string): string {
+  return `guest:${sessionId}`;
 }
 
 function resolveDisplayName(input: string | undefined, metadata: Record<string, unknown> | undefined): string {

@@ -4,6 +4,8 @@ import type {
   AiDifficulty,
   AmplificationOption,
   AmplificationSelection,
+  BattleEmotePayload,
+  BattleEmoteRequest,
   ClientCommandMessage,
   DevTestMatchSetup,
   FriendRow,
@@ -85,6 +87,16 @@ import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snaps
 import { renderCardFaceMarkup, renderAugmentOptionMarkup, renderVoteOptionMarkup } from "./app/card-markup.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
 import {
+  cosmeticCardImage,
+  getCardCosmetic,
+  canToggleCardCosmetic,
+  isCardCosmeticEnabled,
+  applyCardCosmeticSelection,
+  setOwnedCardCosmetics,
+  setSelectedCardCosmetics,
+  clearCosmeticState
+} from "./app/card-cosmetics.js";
+import {
   clearActiveMatch,
   isActiveMatchFresh,
   readActiveMatch,
@@ -163,7 +175,7 @@ import {
 import { startDragDemo, stopDragDemo } from "./app/training-demo.js";
 
 const PROFILE_SELECT =
-  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,login_days,current_login_streak,longest_login_streak,last_login_date";
+  "user_id,display_name,display_name_set,avatar_url,gold,vouchers,xp,level,owned_avatars,owned_titles,selected_title,owned_card_arts,selected_card_arts,owned_emotes,selected_emotes,login_days,current_login_streak,longest_login_streak,last_login_date";
 // Match-history columns + jsonb sub-objects from final_state (opponent display
 // names and turn count). created_at carries the match start time (see persistence.ts).
 const MATCH_HISTORY_SELECT =
@@ -185,6 +197,30 @@ const TITLE_LABELS: Record<string, string> = {
   duck_blood_tofu: "鴨血豆腐鴨血豆腐",
   taoyuan_hsinchu: "你從桃園新竹"
 };
+const BATTLE_EMOTE_FRAME_URL = "/images/ui/battle_emote_frame.webp";
+const BATTLE_EMOTE_DISPLAY_MS = 2000;
+const BATTLE_EMOTE_COOLDOWN_MS = 5000;
+const MAX_BATTLE_EMOTES = 4;
+
+type BattleEmoteOption = {
+  id: string;
+  label: string;
+  assetPath?: string | null;
+};
+
+const BATTLE_EMOTE_LABELS: Record<string, string> = {
+  emote_cheer: "漂亮",
+  emote_think: "思考",
+  emote_shock: "震驚",
+  emote_taunt: "來戰"
+};
+
+const DEFAULT_BATTLE_EMOTES: BattleEmoteOption[] = [
+  { id: "emote_cheer", label: BATTLE_EMOTE_LABELS.emote_cheer },
+  { id: "emote_think", label: BATTLE_EMOTE_LABELS.emote_think },
+  { id: "emote_shock", label: BATTLE_EMOTE_LABELS.emote_shock },
+  { id: "emote_taunt", label: BATTLE_EMOTE_LABELS.emote_taunt }
+];
 const TURN_ANNOUNCEMENT_LOCK_MS = 1650;
 // Keep in sync with the `attack-lunge`/`hero-attack-lunge` CSS animation
 // durations in styles/battle-fx.css (.minion.lunging / .hero.lunging). The
@@ -291,6 +327,8 @@ const view: ClientViewState = {
   events: [],
   battleLog: [],
   animationCues: [],
+  battleEmoteMenuOpen: false,
+  activeBattleEmotes: [],
   joining: false,
   accountLoading: false,
   authMode: "signin",
@@ -1689,6 +1727,7 @@ function renderPinnedCardDetail(cardId: string): string {
           <div class="card-op-side">
             ${renderKeywordGlossary(card.id, "right")}
             <p class="card-op-count">${owned > 0 ? `擁有數量：<strong>${owned}</strong>` : `<span class="card-op-unowned">未擁有</span>`}</p>
+            ${renderCardCosmeticToggle(card.id)}
             ${collectible ? `
               <div class="card-op-actions">
                 <button type="button" id="card-op-disenchant" class="card-op-btn disenchant" data-card-id="${escapeAttr(card.id)}" ${canDisenchant ? "" : "disabled"}>
@@ -1707,6 +1746,59 @@ function renderPinnedCardDetail(cardId: string): string {
       </div>
     </div>
   `;
+}
+
+/**
+ * 炫彩 (special card-art) toggle for the card-detail modal. Only rendered when
+ * the card has a 炫彩 in the registry AND the player owns it — otherwise nothing
+ * (the framework registry is empty until a 炫彩包 ships). The switch persists the
+ * player's choice and re-renders so the new art shows everywhere immediately.
+ */
+function renderCardCosmeticToggle(cardId: string): string {
+  if (!canToggleCardCosmetic(cardId)) return "";
+  const cosmetic = getCardCosmetic(cardId);
+  const enabled = isCardCosmeticEnabled(cardId);
+  return `
+    <div class="card-cosmetic-toggle">
+      <span class="card-cosmetic-label">${escapeHtml(cosmetic?.label ?? "炫彩圖片")}</span>
+      <button
+        type="button"
+        id="card-cosmetic-switch"
+        class="card-cosmetic-switch ${enabled ? "on" : "off"}"
+        role="switch"
+        aria-checked="${enabled ? "true" : "false"}"
+        data-card-id="${escapeAttr(cardId)}"
+      >
+        <span class="card-cosmetic-switch-track"><span class="card-cosmetic-switch-thumb"></span></span>
+        <span class="card-cosmetic-switch-state">${enabled ? "使用中" : "未使用"}</span>
+      </button>
+    </div>
+  `;
+}
+
+/**
+ * Toggle whether the player displays a 炫彩 they own. Optimistic: flips the
+ * local selection and re-renders immediately, then persists via the
+ * set_user_card_art RPC and reconciles from the reloaded profile. On failure it
+ * reverts and surfaces the error. Selection is DB truth, so it follows the
+ * account across devices.
+ */
+async function toggleCardCosmetic(cardId: string): Promise<void> {
+  if (!canToggleCardCosmetic(cardId)) return;
+  const next = !isCardCosmeticEnabled(cardId);
+  applyCardCosmeticSelection(cardId, next);
+  render();
+  if (!supabase || !view.session?.user) return;
+  try {
+    const { error } = await supabase.rpc("set_user_card_art", { p_card_id: cardId, p_enabled: next });
+    if (error) throw error;
+    await loadAccountDataRaw();
+  } catch (error) {
+    applyCardCosmeticSelection(cardId, !next);
+    showToast(`炫彩切換失敗：${errorMessage(error)}`);
+  } finally {
+    render();
+  }
 }
 
 function renderDeckEditorScreen(): string {
@@ -1780,7 +1872,7 @@ function renderCollectionDeckColumnContent(): string {
 
 function renderDeckCoverThumb(deck: { cover_card_id?: string | null; card_ids: readonly string[] }): string {
   const coverCard = resolveDeckCoverCard(deck);
-  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  const coverUrl = coverCard ? assetUrl(cosmeticCardImage(coverCard)) : "/images/ui/collection_logo.webp";
   return `
     <button type="button" id="edit-cover-thumb" class="deck-cover-thumb" title="編輯封面" ${deck.card_ids.length === 0 ? "disabled" : ""}>
       <span class="deck-cover-thumb-art" style="background-image:url('${escapeAttr(coverUrl)}')"></span>
@@ -1806,7 +1898,7 @@ function renderCoverPicker(deck: { cover_card_id?: string | null; card_ids: read
         <div class="cover-picker-grid" data-preserve-scroll>
           ${cards.length === 0 ? `<p class="muted">牌組內沒有卡片。</p>` : cards.map((card) => `
             <button type="button" class="cover-picker-tile ${card.id === activeCover ? "selected" : ""}" data-cover-card="${escapeAttr(card.id)}" title="${escapeAttr(card.name)}">
-              <span class="cover-picker-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+              <span class="cover-picker-art" style="background-image:url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></span>
               <span class="cover-picker-name">${escapeHtml(card.name)}</span>
             </button>
           `).join("")}
@@ -1831,7 +1923,7 @@ function resolveDeckCoverCard(deck: { cover_card_id?: string | null; card_ids: r
 function renderCollectionDeckBanner(deck: DeckRow): string {
   const selected = deck.id === view.editingDeck?.id;
   const coverCard = resolveDeckCoverCard(deck);
-  const coverUrl = coverCard ? assetUrl(coverCard.image) : "/images/ui/collection_logo.webp";
+  const coverUrl = coverCard ? assetUrl(cosmeticCardImage(coverCard)) : "/images/ui/collection_logo.webp";
   const incomplete = deck.card_ids.length !== 30;
   return `
     <div class="deck-banner ${selected ? "selected" : ""}">
@@ -1858,7 +1950,7 @@ function renderCurrentDeckCards(cardIds: readonly string[]): string {
   return rows.map(({ card, count }) => `
     <div class="deck-current-row">
       <span class="deck-row-cost">${card.cost}</span>
-      <span class="deck-row-art" style="background-image:url('${escapeAttr(assetUrl(card.image))}')"></span>
+      <span class="deck-row-art" style="background-image:url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></span>
       <span class="deck-row-name">${escapeHtml(card.name)}</span>
       <span class="deck-row-count">x${count}</span>
       <button type="button" data-remove-card="${escapeAttr(card.id)}" title="移除">-</button>
@@ -2146,7 +2238,7 @@ function renderBattlecryPreview(cardId: string): string {
   const domKey = battlecry ? `battlecry-preview-${battlecry.handInstanceId}` : `battlecry-preview-${cardId}`;
   return `
     <button class="minion battlecry-preview" type="button" tabindex="-1" aria-hidden="true" data-card-type="MINION" data-dom-key="${escapeAttr(domKey)}" data-testid="battlecry-preview">
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <small class="keyword-row"></small>
       <div class="minion-stats">
@@ -2193,7 +2285,7 @@ function renderSummonPreview(cue: AnimationCue): string {
       data-seat="${cue.seat}"
       data-testid="summon-preview"
     >
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(card.image))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(cosmeticCardImage(card)))}')"></div>
       <strong class="card-title">${escapeHtml(card.name)}</strong>
       <div class="minion-stats">
         <span class="stat-atk"><span>${attack}</span></span>
@@ -2229,10 +2321,11 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
     hasCue(targetKey, "heal") && "receiving-heal",
     seat === shatteringHeroSeat && "hero-shattering"
   ]);
+  const emoteToggleAttr = role === "player" && seat === view.mySeat ? ' data-battle-emote-toggle="1"' : "";
 
   return `
     <div class="hero-frame" data-seat="${seat}">
-      <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}" aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
+      <button class="${heroClasses}" data-target='${target}' data-target-key="${escapeAttr(targetKey)}" data-testid="${role}-hero" data-seat="${seat}"${emoteToggleAttr} aria-label="${escapeAttr(name)} ${hp}/${maxHp}">
         <span class="avatar" aria-hidden="true"></span>
         <strong>${escapeHtml(name)}</strong>
         <span class="hero-hp">${hp}/${maxHp}</span>
@@ -2241,10 +2334,60 @@ function renderHero(seat: Seat, player: PublicPlayer | undefined, role: "player"
       </button>
       ${renderHeroEventBadge()}
       ${renderAmplificationBadge(player)}
+      ${renderBattleEmoteMenu(seat, role)}
+      ${renderBattleEmoteBubble(seat)}
     </div>
   `;
 }
 
+function renderBattleEmoteMenu(seat: Seat, role: "player" | "opponent"): string {
+  if (role !== "player" || seat !== view.mySeat || !view.battleEmoteMenuOpen) return "";
+  const options = battleEmoteOptions();
+  const cooldownMs = Math.max(0, (view.battleEmoteCooldownUntilMs ?? 0) - performance.now());
+  const cooling = cooldownMs > 0;
+  const cooldownLabel = cooling ? ` (${Math.ceil(cooldownMs / 1000)}s)` : "";
+  return `
+    <div class="battle-emote-menu" role="menu" aria-label="戰鬥表情">
+      ${options.map((option) => `
+        <button
+          type="button"
+          class="battle-emote-choice ${cooling ? "cooling" : ""}"
+          data-battle-emote-id="${escapeAttr(option.id)}"
+          data-tooltip="${escapeAttr(option.label + cooldownLabel)}"
+          aria-label="${escapeAttr(option.label + cooldownLabel)}"
+          ${cooling ? "disabled" : ""}
+        >
+          ${renderBattleEmoteOptionVisual(option)}
+        </button>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderBattleEmoteOptionVisual(option: BattleEmoteOption): string {
+  const path = sanitizeBattleEmoteAssetPath(option.assetPath);
+  if (path) {
+    return `<img class="battle-emote-choice-img" src="${escapeAttr(path)}" alt="" aria-hidden="true" onerror="this.style.display='none'">`;
+  }
+  return `<span class="battle-emote-choice-label">${escapeHtml(compactEmoteLabel(option.label))}</span>`;
+}
+
+function renderBattleEmoteBubble(seat: Seat): string {
+  const now = performance.now();
+  const emote = [...(view.activeBattleEmotes ?? [])]
+    .filter((item) => item.seat === seat && item.untilMs > now)
+    .sort((a, b) => b.createdAtMs - a.createdAtMs)[0];
+  if (!emote) return "";
+  const path = sanitizeBattleEmoteAssetPath(emote.assetPath);
+  const content = path
+    ? `<img class="battle-emote-bubble-img" src="${escapeAttr(path)}" alt="" aria-hidden="true" onerror="this.style.display='none'">`
+    : `<span class="battle-emote-bubble-label">${escapeHtml(emote.label)}</span>`;
+  return `
+    <div class="battle-emote-bubble" aria-hidden="true" style="--battle-emote-frame: url('${escapeAttr(BATTLE_EMOTE_FRAME_URL)}')">
+      <div class="battle-emote-bubble-content">${content}</div>
+    </div>
+  `;
+}
 /**
  * The active 公投 venue/field effect, shown to the LEFT of each hero avatar (the
  * effect is global, so it mirrors on both sides). Renders nothing when no
@@ -2463,7 +2606,7 @@ function renderMinion(seat: Seat, minion: PublicMinion, index = -1): string {
       data-testid="board-minion"
       aria-pressed="${view.selectedAttackerId === minion.instanceId || sameTarget(view.selectedTarget, target) ? "true" : "false"}"
     >
-      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard?.image ?? ""))}')"></div>
+      <div class="minion-art" style="background-image: url('${escapeAttr(assetUrl(catalogCard ? cosmeticCardImage(catalogCard) : ""))}')"></div>
       ${minion.hasOngoing ? `<span class="ongoing-aura" aria-hidden="true"><i></i><i></i></span>` : ""}
       ${renderCountdownBadges(minion)}
       <strong class="card-title">${escapeHtml(catalogCard?.name ?? minion.cardId)}</strong>
@@ -2590,7 +2733,7 @@ function resolveCatalogCard(card: CardDefinition, instanceId: string): ResolvedC
     name: card.name,
     category: card.category,
     description: card.description,
-    image: card.image,
+    image: cosmeticCardImage(card),
     cost: card.cost,
     baseCost: card.cost,
     type: card.type,
@@ -3029,7 +3172,7 @@ function renderAmplificationOverlay(): string {
 }
 
 /**
- * 教召 / Discover picker — the privately-delivered candidate cards, presented
+ * 起底 / Discover picker — the privately-delivered candidate cards, presented
  * mulligan-style. Shown only while this seat owns the open choice prompt; clicking
  * a card sends `resolvePrompt` to add it to hand.
  */
@@ -3039,7 +3182,7 @@ function renderChannelOverlay(): string {
   return `
     <section id="channel-modal" class="mulligan-overlay channel-overlay" data-testid="channel-overlay">
       <div class="mulligan-content channel-content">
-        <h2>${escapeHtml(offer.label ?? "教召")}</h2>
+        <h2>${escapeHtml(offer.label ?? "起底")}</h2>
         <p>從卡池中選擇 1 張加入手牌</p>
         <div class="mulligan-card-area channel-card-area">
           ${offer.cards.map((card) => renderChannelCard(offer.promptId, card)).join("")}
@@ -3066,7 +3209,7 @@ function renderChannelCard(promptId: string, card: PromptChoiceOffer["cards"][nu
   `;
 }
 
-/** This seat's live 教召 offer, or undefined once the prompt is resolved/cleared. */
+/** This seat's live 起底 offer, or undefined once the prompt is resolved/cleared. */
 function currentPromptChoice(): PromptChoiceOffer | undefined {
   const offer = view.promptChoice;
   if (!offer) return undefined;
@@ -4194,6 +4337,10 @@ function bindStaticActions(): void {
       render();
     }
   });
+  on(document.querySelector<HTMLButtonElement>("#card-cosmetic-switch"), "click", "card-cosmetic-switch", (event) => {
+    const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
+    if (cardId) void toggleCardCosmetic(cardId);
+  });
   on(document.querySelector<HTMLButtonElement>("#card-op-disenchant"), "click", "card-op-disenchant", (event) => {
     const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
     if (cardId) void disenchantCard(cardId, 1);
@@ -5099,7 +5246,10 @@ function legacyShopDropRates(kind: string): NonNullable<ShopItemRow["contents"][
   }
   if (kind === "COSMETIC_PACK") {
     return [
-      { label: "未擁有內容等機率", type: "cosmetic", rate: 100 }
+      { label: "個人頭像", type: "avatar", rate: 35 },
+      { label: "專屬稱號", type: "title", rate: 35 },
+      { label: "戰鬥表情", type: "emote", rate: 20 },
+      { label: "特殊卡", type: "card_art", rate: 10 }
     ];
   }
   return [];
@@ -5186,6 +5336,13 @@ function renderRewardVisual(reward: PackOpeningReward): string {
   if (reward.type === "title") {
     return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-title-badge">#${escapeHtml(reward.name)}</span></div>`;
   }
+  if (reward.type === "card_art") {
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><img class="reward-card-art-img" src="${escapeAttr(assetUrl(reward.path))}" alt="${escapeAttr(reward.name)}" onerror="this.style.display='none'"></div>`;
+  }
+  if (reward.type === "emote") {
+    const label = compactEmoteLabel(reward.label ?? reward.name);
+    return `<div class="pack-card-img-wrap reward-cosmetic-wrap reward-emote-wrap"><img class="reward-emote-frame" src="${escapeAttr(BATTLE_EMOTE_FRAME_URL)}" alt="" aria-hidden="true"><span class="reward-emote-label">${escapeHtml(label)}</span></div>`;
+  }
   return `<div class="pack-card-img-wrap reward-cosmetic-wrap"><span class="reward-voucher-badge"><span class="voucher-icon" aria-hidden="true"></span>${reward.amount}</span></div>`;
 }
 
@@ -5198,6 +5355,8 @@ function rewardLabel(reward: PackOpeningReward): string {
   if (reward.type === "card") return rarityLabel[reward.rarity] ?? reward.rarity;
   if (reward.type === "avatar") return "個人頭像";
   if (reward.type === "title") return "專屬稱號";
+  if (reward.type === "card_art") return "特殊卡";
+  if (reward.type === "emote") return "戰鬥表情";
   return reward.name;
 }
 
@@ -5549,6 +5708,140 @@ function googleProfileAvatarUrl(): string | undefined {
   return typeof avatarUrl === "string" && avatarUrl.trim() ? avatarUrl : undefined;
 }
 
+let battleEmoteSeq = 0;
+const battleEmoteTimers = new Map<string, number>();
+let battleEmoteCooldownTimer: number | undefined;
+
+function battleEmoteOptions(): BattleEmoteOption[] {
+  const selected = sanitizeBattleEmoteIds(view.profile?.selected_emotes);
+  const owned = sanitizeBattleEmoteIds(view.profile?.owned_emotes);
+  const ids = selected.length > 0 ? selected : owned;
+  if (ids.length === 0) return DEFAULT_BATTLE_EMOTES;
+  return ids.slice(0, MAX_BATTLE_EMOTES).map((id) => ({ id, label: battleEmoteLabel(id) }));
+}
+
+function sanitizeBattleEmoteIds(ids: readonly string[] | undefined): string[] {
+  if (!Array.isArray(ids)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const raw of ids) {
+    const id = sanitizeBattleEmoteId(raw);
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    result.push(id);
+    if (result.length >= MAX_BATTLE_EMOTES) break;
+  }
+  return result;
+}
+
+function sanitizeBattleEmoteId(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const id = value.trim().slice(0, 64);
+  if (!id || !/^[A-Za-z0-9_.:-]+$/.test(id)) return undefined;
+  return id;
+}
+
+function battleEmoteLabel(id: string): string {
+  return BATTLE_EMOTE_LABELS[id] ?? (id.replace(/^emote[_:-]?/, "").replace(/[_:-]+/g, " ").slice(0, 16) || id);
+}
+
+function compactEmoteLabel(label: string): string {
+  const chars = Array.from(label.trim());
+  return chars.slice(0, chars.length > 2 ? 2 : chars.length).join("") || "表情";
+}
+
+function sanitizeBattleEmoteAssetPath(path: unknown): string | undefined {
+  if (typeof path !== "string") return undefined;
+  const trimmed = path.trim();
+  if (!trimmed.startsWith("/") || /[\s"'<>]/.test(trimmed)) return undefined;
+  return trimmed.slice(0, 180);
+}
+
+function resolveBattleEmoteOption(id: string): BattleEmoteOption | undefined {
+  return battleEmoteOptions().find((option) => option.id === id);
+}
+
+function sendBattleEmote(emoteId: string): void {
+  const option = resolveBattleEmoteOption(emoteId);
+  if (!option || !view.mySeat) return;
+  const now = performance.now();
+  const cooldownUntil = view.battleEmoteCooldownUntilMs ?? 0;
+  if (cooldownUntil > now) {
+    showBattleToast("表情冷卻中。");
+    view.battleEmoteMenuOpen = false;
+    render();
+    return;
+  }
+
+  view.battleEmoteMenuOpen = false;
+  view.battleEmoteCooldownUntilMs = now + BATTLE_EMOTE_COOLDOWN_MS;
+  scheduleBattleEmoteCooldownRender();
+
+  const request: BattleEmoteRequest = {
+    emoteId: option.id,
+    label: option.label,
+    assetPath: option.assetPath ?? null
+  };
+  if (view.room) {
+    view.room.send("battleEmote", request);
+    render();
+    return;
+  }
+  handleBattleEmoteMessage({ seat: view.mySeat, emoteId: option.id, label: option.label, assetPath: option.assetPath ?? null, sentAtMs: Date.now() });
+}
+
+function handleBattleEmoteMessage(message: BattleEmotePayload): void {
+  const seat = message?.seat;
+  if (seat !== "player1" && seat !== "player2") return;
+  const emoteId = sanitizeBattleEmoteId(message.emoteId);
+  if (!emoteId) return;
+  const label = typeof message.label === "string" && message.label.trim()
+    ? message.label.trim().slice(0, 18)
+    : battleEmoteLabel(emoteId);
+  const now = performance.now();
+  const id = `${seat}-${emoteId}-${message.sentAtMs || Date.now()}-${++battleEmoteSeq}`;
+  const popup = {
+    id,
+    seat,
+    emoteId,
+    label,
+    assetPath: sanitizeBattleEmoteAssetPath(message.assetPath) ?? null,
+    createdAtMs: now,
+    untilMs: now + BATTLE_EMOTE_DISPLAY_MS
+  };
+  view.activeBattleEmotes = [
+    ...(view.activeBattleEmotes ?? []).filter((item) => item.seat !== seat && item.untilMs > now),
+    popup
+  ];
+  const timer = window.setTimeout(() => {
+    battleEmoteTimers.delete(id);
+    view.activeBattleEmotes = (view.activeBattleEmotes ?? []).filter((item) => item.id !== id);
+    render();
+  }, BATTLE_EMOTE_DISPLAY_MS + 80);
+  battleEmoteTimers.set(id, timer);
+  render();
+}
+
+function scheduleBattleEmoteCooldownRender(): void {
+  if (battleEmoteCooldownTimer !== undefined) window.clearTimeout(battleEmoteCooldownTimer);
+  const delay = Math.max(0, (view.battleEmoteCooldownUntilMs ?? 0) - performance.now()) + 60;
+  battleEmoteCooldownTimer = window.setTimeout(() => {
+    battleEmoteCooldownTimer = undefined;
+    render();
+  }, delay);
+}
+
+function clearBattleEmoteState(): void {
+  for (const timer of battleEmoteTimers.values()) window.clearTimeout(timer);
+  battleEmoteTimers.clear();
+  if (battleEmoteCooldownTimer !== undefined) {
+    window.clearTimeout(battleEmoteCooldownTimer);
+    battleEmoteCooldownTimer = undefined;
+  }
+  view.battleEmoteMenuOpen = false;
+  view.battleEmoteCooldownUntilMs = undefined;
+  view.activeBattleEmotes = [];
+}
 function mountPackOpeningOverlay(): void {
   const html = renderLegacyShopPackOverlay();
   if (!html) return;
@@ -5584,6 +5877,12 @@ function normalizeShopRewards(result: PurchaseShopResult | null): PackOpeningRew
       }
       if (reward.type === "title" && reward.id && reward.name) {
         return { type: "title", id: reward.id, name: reward.name };
+      }
+      if (reward.type === "card_art" && reward.id && reward.name && reward.path) {
+        return { type: "card_art", id: reward.id, cardId: reward.cardId ?? reward.id, name: reward.name, path: reward.path };
+      }
+      if (reward.type === "emote" && reward.id && reward.name) {
+        return { type: "emote", id: reward.id, name: reward.name, path: reward.path ?? null, label: reward.label ?? reward.name };
       }
       if (reward.type === "voucher" && typeof reward.amount === "number") {
         return { type: "voucher", amount: reward.amount, name: reward.name ?? "重複補償" };
@@ -5629,6 +5928,7 @@ function startLocalTrainingMatch(levelId: TrainingLevelId): void {
   view.eventStatus = "in_progress";
   view.amplificationOptions = undefined;
   resetSpecialPhaseUiState();
+  clearBattleEmoteState();
   view.selectedHandId = undefined;
   view.selectedAttackerId = undefined;
   view.selectedTarget = undefined;
@@ -6048,6 +6348,7 @@ function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolea
   view.publicSync = undefined;
   view.amplificationOptions = undefined;
   resetSpecialPhaseUiState();
+  clearBattleEmoteState();
   view.presence.clear();
   stopOpponentDisconnectTick();
   view.rejectedHandIds.clear();
@@ -6104,6 +6405,9 @@ function bindRoomMessages(joined: GameTransportRoom, options: { persist?: boolea
   });
   joined.onMessage("events", (message: GameEvent[]) => {
     handleEvents(message);
+  });
+  joined.onMessage("battleEmote", (message: BattleEmotePayload) => {
+    handleBattleEmoteMessage(message);
   });
   joined.onMessage("error", (message: { message?: string }) => {
     showAlert(message?.message ?? "Room error.");
@@ -6361,7 +6665,7 @@ function activateRoomStateWhenReady(nextState: any): boolean {
   return true;
 }
 
-/** Drop a stored 教召 offer once its prompt has been resolved/cleared (or replaced). */
+/** Drop a stored 起底 offer once its prompt has been resolved/cleared (or replaced). */
 function syncPromptChoiceState(): void {
   const promptId = (view.state?.pendingPromptId as string | undefined) ?? "";
   if (view.promptChoice && view.promptChoice.promptId !== promptId) {
@@ -6629,6 +6933,27 @@ function bindSelectionActions(): void {
     });
   }
 
+  for (const el of document.querySelectorAll<HTMLElement>("[data-battle-emote-toggle]")) {
+    on(el, "click", "battle-emote-toggle", (event) => {
+      if (activeTargeting()) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      view.battleEmoteMenuOpen = !view.battleEmoteMenuOpen;
+      render();
+    });
+  }
+
+  for (const el of document.querySelectorAll<HTMLElement>("[data-battle-emote-id]")) {
+    on(el, "pointerdown", "battle-emote-pointer-isolate", (event) => {
+      event.stopPropagation();
+    });
+    on(el, "click", "battle-emote-select", (event) => {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      const emoteId = el.dataset.battleEmoteId;
+      if (emoteId) sendBattleEmote(emoteId);
+    });
+  }
   for (const el of document.querySelectorAll<HTMLElement>("[data-target]")) {
     on(el, "click", "target-select", () => {
       if (isBattleActionLocked() || view.pendingBattlecry) return;
@@ -7396,6 +7721,7 @@ async function backToLobby(): Promise<void> {
   view.events = [];
   resetBattleLog();
   view.animationCues = [];
+  clearBattleEmoteState();
   resetMinionVisualTracking();
   resetCardPlayCues();
   view.eventStatus = undefined;
@@ -7484,6 +7810,7 @@ async function initializeAccount(): Promise<void> {
       view.matchHistory = [];
       view.friends = [];
       view.friendRequests = [];
+      clearCosmeticState();
       remoteTrainingCompletions = new Set();
       view.selectedDeckId = undefined;
       view.editingDeck = undefined;
@@ -7689,6 +8016,9 @@ async function loadAccountDataRaw(): Promise<void> {
   view.decks = (decksResult.data ?? []) as DeckRow[];
   view.collection = (collectionResult.data ?? []) as CollectionRow[];
   view.matchHistory = (historyResult.data ?? []) as unknown as MatchHistoryRow[];
+  // 炫彩 ownership + display selection are DB truth, mirroring card ownership.
+  setOwnedCardCosmetics(view.profile.owned_card_arts ?? []);
+  setSelectedCardCosmetics(view.profile.selected_card_arts ?? []);
   syncRemoteTrainingCompletions(trainingResult.data);
   if (!view.selectedDeckId || !view.decks.some((deck) => deck.id === view.selectedDeckId)) {
     view.selectedDeckId = view.decks[0]?.id;
@@ -7733,7 +8063,9 @@ async function ensureProfile(): Promise<void> {
         avatar_url: avatarUrl,
         owned_avatars: ["avatar1"],
         owned_titles: ["beginner"],
-        selected_title: "beginner"
+        selected_title: "beginner",
+        owned_emotes: [],
+        selected_emotes: []
       },
       { onConflict: "user_id", ignoreDuplicates: true }
     );
@@ -8418,6 +8750,12 @@ function battleLogEntryFor(event: GameEvent, ctx: BattleLogContext): BattleLogEn
         return { ...base, kind: "damage", tile: actor, flowTo: targetRef, badge: "burst", amount, label: `${actor.name} 對 ${targetRef.name} 造成 ${amount ?? 0} 點傷害` };
       }
       return { ...base, kind: "damage", tile: targetRef, badge: "burst", amount, label: `${targetRef.name} 受到 ${amount ?? 0} 點傷害` };
+    }
+    case "FATIGUE": {
+      // 牌庫抽乾的疲勞傷害。沒有來源卡,單獨成一條紀錄,用骷髏徽記讓玩家知道
+      // 「為什麼莫名其妙被扣血」——牌庫已空,每次強迫抽牌都對自身英雄造成累加傷害。
+      const heroRef = battleLogHeroRef(event.seat);
+      return { ...base, kind: "damage", tile: heroRef, badge: "skull", amount, label: `牌庫已抽乾！疲勞對 ${heroRef.name} 造成 ${amount ?? 0} 點傷害` };
     }
     case "DESTROY": {
       const destroyedCardId = cardId ?? (target ? battleLogUnit(target).cardId : undefined);
@@ -9377,13 +9715,19 @@ function enqueueEventCues(events: GameEvent[]): AnimationCue[] {
   if (fatigueCues.length > 0) {
     const now = performance.now();
     // 每張骷髏卡各自飛行、命中時間錯開 FATIGUE_STAGGER_MS;applyFatigueDraw 依 readyAtMs
-    // 反推起飛時間,所以兩次抽空會看到兩張骷髏卡與兩次掉血(各帶自己的 remainingHealth)。
+    // 反推起飛時間,所以每次抽空都看到一張骷髏卡與一次掉血(各帶自己的 remainingHealth)。
+    //
+    // 重點:錨點必須是「既有的最大 delay」(出牌動畫造成的 post-play 延遲對所有疲勞
+    // cue 都一樣),再往後逐張累加固定間隔。早期版本用 Math.max(delay, FATIGUE_DRAW_MS +
+    // i*STAGGER),當 post-play 延遲大於前幾個 offset 時,前幾張骷髏會被壓到同一時間點而
+    // 「擠在一起」(陳致中抽三張時只看得到兩次動畫),所以這裡改成在錨點上均勻分散。
+    const anchor = Math.max(FATIGUE_DRAW_MS, ...fatigueCues.map((cue) => cue.delayMs ?? 0));
     fatigueCues.forEach((cue, i) => {
-      const offset = FATIGUE_DRAW_MS + i * FATIGUE_STAGGER_MS;
-      cue.delayMs = Math.max(cue.delayMs ?? 0, offset);
-      cue.readyAtMs = Math.max(cue.readyAtMs ?? 0, now + offset);
+      const offset = anchor + i * FATIGUE_STAGGER_MS;
+      cue.delayMs = offset;
+      cue.readyAtMs = now + offset;
     });
-    const lastOffset = FATIGUE_DRAW_MS + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
+    const lastOffset = anchor + (fatigueCues.length - 1) * FATIGUE_STAGGER_MS;
     holdPendingPublicSyncFor(lastOffset + POST_PLAY_STATE_SYNC_LAG_MS);
   }
   // Part A: when a turn-20 referendum is resolving, hold the public sync and push

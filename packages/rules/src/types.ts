@@ -238,7 +238,7 @@ export interface PrivateMatchState {
   turnTimeLimitMs: number;
   devTestInfiniteMana?: Partial<Record<Seat, boolean>>;
   /**
-   * 教召 / Discover candidates pulled out of the prompted seat's deck while
+   * 起底 / Discover candidates pulled out of the prompted seat's deck while
    * `pendingPrompt` is open. Private — never projected to public state (it would
    * leak deck order). On resolve the chosen card goes to hand and the rest are
    * shuffled back into the deck.
@@ -252,6 +252,12 @@ export interface PendingChoice {
   sourceInstanceId: string;
   label?: string;
   cards: RuntimeCard[];
+  /** True when candidates were pulled from the graveyard (陣亡區) instead of the deck. */
+  fromGraveyard?: boolean;
+  /** The originating CHANNEL effect, retained so a multi-pick (起底兩張) can re-open. */
+  channelEffect?: EffectDefinition;
+  /** Remaining pick-one rounds including this one; a value > 1 chains another reveal. */
+  remainingPicks?: number;
 }
 
 export interface MatchState {

@@ -2299,6 +2299,17 @@
   color: var(--wood-dark, #5d2e17);
 }
 
+/* Fatigue (牌庫抽乾) badge — a bone-white skull on a dark blood disc so the
+   "why am I losing HP" entry reads as a danger marker, not a gold action badge. */
+.log-badge-skull {
+  background: radial-gradient(circle at 35% 30%, #6b1414, #3a0606 70%, #1a0202);
+  border-color: #2a0303;
+}
+
+.log-badge-skull svg {
+  color: #f4e4bc;
+}
+
 /* Hero log tile backed by a player avatar photo — centre-crop, circular-ish feel. */
 .log-card-hero-avatar {
   background-position: center center;
@@ -2830,5 +2841,148 @@
 
   .turn-counter {
     width: 175px;
+  }
+}
+
+/* Battle emotes */
+.battle-surface .battle-emote-menu {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 12px);
+  z-index: 78;
+  display: grid;
+  grid-template-columns: repeat(4, 48px);
+  gap: 8px;
+  padding: 7px;
+  border: 2px solid rgba(71, 40, 18, 0.78);
+  border-radius: 8px;
+  background: rgba(24, 18, 14, 0.86);
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.42), inset 0 0 0 1px rgba(255, 238, 188, 0.18);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.battle-surface .battle-emote-choice {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent url("/images/ui/battle_emote_frame.webp") center / 118% 118% no-repeat;
+  color: #2e180b;
+  filter: drop-shadow(0 4px 5px rgba(0, 0, 0, 0.42));
+  transition: transform 140ms ease, filter 140ms ease, opacity 140ms ease;
+}
+
+.battle-surface .battle-emote-choice:hover:not(:disabled) {
+  transform: translateY(-3px) scale(1.05);
+  filter: drop-shadow(0 7px 9px rgba(0, 0, 0, 0.48)) brightness(1.08);
+}
+
+.battle-surface .battle-emote-choice:disabled {
+  cursor: wait;
+  opacity: 0.46;
+  filter: grayscale(0.45) drop-shadow(0 3px 4px rgba(0, 0, 0, 0.35));
+}
+
+.battle-emote-choice-label {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 24px;
+  overflow: hidden;
+  color: #21110a;
+  font-family: var(--font-display);
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 248, 217, 0.85);
+}
+
+.battle-emote-choice-img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.battle-surface .battle-emote-bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 28px);
+  z-index: 74;
+  display: grid;
+  place-items: center;
+  width: 176px;
+  height: 104px;
+  padding: 18px 24px 24px;
+  background: var(--battle-emote-frame) center / 100% 100% no-repeat;
+  filter: drop-shadow(0 10px 12px rgba(0, 0, 0, 0.46));
+  pointer-events: none;
+  transform: translateX(-50%) scale(0.92);
+  transform-origin: 50% 100%;
+  animation: battle-emote-pop 2s cubic-bezier(0.2, 0.9, 0.22, 1) forwards;
+}
+
+.battle-emote-bubble-content {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-width: 0;
+  height: 100%;
+}
+
+.battle-emote-bubble-label {
+  max-width: 116px;
+  overflow: hidden;
+  color: #1f120a;
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 1000;
+  line-height: 1.05;
+  text-align: center;
+  text-overflow: ellipsis;
+  text-shadow: 0 1px 0 rgba(255, 246, 208, 0.95);
+  white-space: nowrap;
+}
+
+.battle-emote-bubble-img {
+  width: 72px;
+  height: 58px;
+  object-fit: contain;
+}
+
+@keyframes battle-emote-pop {
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.72); }
+  14% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1.04); }
+  24% { transform: translateX(-50%) translateY(0) scale(1); }
+  78% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-8px) scale(0.96); }
+}
+
+@media (max-width: 760px) {
+  .battle-surface .battle-emote-menu {
+    grid-template-columns: repeat(4, 40px);
+    gap: 6px;
+    padding: 6px;
+  }
+
+  .battle-surface .battle-emote-choice {
+    width: 40px;
+    height: 40px;
+  }
+
+  .battle-surface .battle-emote-bubble {
+    width: 142px;
+    height: 86px;
+    padding: 14px 20px 20px;
+  }
+
+  .battle-emote-bubble-label {
+    max-width: 92px;
+    font-size: 18px;
   }
 }

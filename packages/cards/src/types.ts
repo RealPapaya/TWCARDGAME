@@ -18,11 +18,28 @@ export interface EffectDefinition {
   target_category_includes?: string;
   excluded_categories?: string[];
   /**
-   * 教召 / Discover (CHANNEL): restricts the candidate pool to this card type. When
+   * 起底 / Discover (CHANNEL): restricts the candidate pool to this card type. When
    * omitted, any deck card qualifies. Combine with `target_category_includes` for a
    * category filter and `count` for how many cards are revealed (default 3).
    */
   poolCardType?: CardType;
+  /**
+   * 起底 / Discover (CHANNEL): when true, restricts the candidate pool to cards that
+   * carry a 遺志 (deathrattle) keyword. Combines with `poolCardType` /
+   * `target_category_includes` as an additional AND filter.
+   */
+  poolHasDeathrattle?: boolean;
+  /**
+   * 起底 / Discover (CHANNEL): when true, the candidate pool is drawn from the active
+   * seat's own graveyard (陣亡區) instead of its deck — e.g. 靈媒 起底一張已陣亡隨從.
+   * Picked cards leave the graveyard; unpicked ones return to it (no shuffle).
+   */
+  poolFromGraveyard?: boolean;
+  /**
+   * 起底 / Discover (CHANNEL): how many sequential pick-one rounds to run (default 1).
+   * 起底兩張 = `picks: 2` opens a second reveal-and-pick once the first resolves.
+   */
+  picks?: number;
   buff_stat?: StatName;
   buff_value?: number;
   keyword?: string;
@@ -126,6 +143,8 @@ export const SUPPORTED_BATTLECRY_EFFECTS = [
   "DISCARD_DRAW",
   "DISCARD_RANDOM",
   "DRAW",
+  "DRAW_IF_CARD_ON_BOARD",
+  "DRAW_IF_HAND_EMPTY",
   "DRAW_MINION_REDUCE_COST",
   "DRAW_NEWS",
   "EAT_FRIENDLY",
@@ -153,6 +172,7 @@ export const SUPPORTED_BATTLECRY_EFFECTS = [
 ] as const;
 
 export const SUPPORTED_DEATHRATTLE_EFFECTS = [
+  "ADD_RANDOM_CATEGORY_FROM_DECK",
   "BUFF_ADJACENT_HEALTH",
   "BOUNCE_SELF",
   "DAMAGE_OWN_HERO",
@@ -165,7 +185,7 @@ export const SUPPORTED_ONGOING_EFFECTS = [
   "ADJACENT_BUFF_STATS",
   "REDUCE_NEWS_COST"
 ] as const;
-export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS"] as const;
+export const SUPPORTED_TRIGGERED_EFFECTS = ["ON_DISCARD", "ON_PLAY_NEWS", "ON_DRAW", "ON_DAMAGE"] as const;
 export const SUPPORTED_ENRAGE_EFFECTS = ["BUFF_STAT"] as const;
 export const SUPPORTED_QUEST_EFFECTS = ["DAMAGE_ALL_MINIONS"] as const;
 export const SUPPORTED_ON_DISCARD_ACTIONS = ["SUMMON"] as const;

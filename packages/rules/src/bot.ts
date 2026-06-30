@@ -19,7 +19,7 @@ export interface BotRngState {
  *               the search when the kill is on.
  *
  * Deeper engines only kick in during regular play on `seat`'s own turn; mulligan
- * and the amplification / voting / 教召 prompt phases use the greedy pick so their
+ * and the amplification / voting / 起底 prompt phases use the greedy pick so their
  * behaviour stays simple and deterministic.
  *
  * Pure: no `Math.random`, no `Date.now`. The caller threads a seeded RNG, and any

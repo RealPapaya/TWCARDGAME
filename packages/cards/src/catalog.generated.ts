@@ -547,7 +547,7 @@ export const CARD_CATALOG_GENERATED = [
     "name": "勞工局",
     "category": "建築",
     "hiddenCategory": "政府機關",
-    "cost": 5,
+    "cost": 4,
     "attack": 0,
     "health": 5,
     "type": "MINION",
@@ -1976,5 +1976,205 @@ export const CARD_CATALOG_GENERATED = [
       }
     },
     "image": "assets/images/cards/server.webp"
+  },
+  {
+    "id": "TW080",
+    "name": "陳水扁",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 4,
+    "health": 4,
+    "type": "MINION",
+    "rarity": "LEGENDARY",
+    "description": "每當你抽一張牌，獲得 +1/+1",
+    "keywords": {
+      "triggered": {
+        "type": "ON_DRAW",
+        "stat": "ALL",
+        "value": 1
+      }
+    },
+    "image": "assets/images/cards/chen_shui_bian.webp"
+  },
+  {
+    "id": "TW081",
+    "name": "陳致中",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 2,
+    "health": 2,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "觸發: 抽兩張牌。若陳水扁在你的場上，改為抽三張",
+    "keywords": {
+      "battlecry": {
+        "type": "DRAW_IF_CARD_ON_BOARD",
+        "value": 2,
+        "bonus_value": 3,
+        "cardId": "TW080"
+      }
+    },
+    "image": "assets/images/cards/chen_chih_chung.webp"
+  },
+  {
+    "id": "TW082",
+    "name": "狗仔隊",
+    "category": "勞工",
+    "cost": 3,
+    "attack": 2,
+    "health": 3,
+    "type": "MINION",
+    "rarity": "COMMON",
+    "description": "觸發: 起底一張政治人物或公眾人物",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolCardType": "MINION",
+        "target_category_includes": "人物",
+        "count": 3
+      }
+    },
+    "image": "assets/images/cards/paparazzi.webp"
+  },
+  {
+    "id": "S030",
+    "name": "觀落陰",
+    "category": "新聞",
+    "cost": 1,
+    "type": "NEWS",
+    "rarity": "COMMON",
+    "description": "起底一張遺志牌",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolHasDeathrattle": true,
+        "count": 3
+      }
+    },
+    "image": "assets/images/cards/guan_luo_yin.webp"
+  },
+  {
+    "id": "S031",
+    "name": "戰地記者",
+    "category": "勞工",
+    "cost": 2,
+    "attack": 1,
+    "health": 1,
+    "type": "MINION",
+    "rarity": "COMMON",
+    "description": "觸發: 起底一張新聞牌",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolCardType": "NEWS",
+        "count": 3
+      }
+    },
+    "image": "assets/images/cards/S031.webp"
+  },
+  {
+    "id": "S032",
+    "name": "新聞龍捲風",
+    "category": "新聞",
+    "cost": 7,
+    "type": "NEWS",
+    "rarity": "RARE",
+    "description": "當此卡在手牌中，每打出一張新聞，費用-1。\n起底兩張新聞牌",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolCardType": "NEWS",
+        "count": 3,
+        "picks": 2
+      },
+      "triggered": {
+        "type": "ON_PLAY_NEWS",
+        "action": "SELF_COST_REDUCE",
+        "value": 1
+      }
+    },
+    "image": "assets/images/cards/news_tornado.webp"
+  },
+  {
+    "id": "S033",
+    "name": "抄底",
+    "category": "新聞",
+    "cost": 2,
+    "type": "NEWS",
+    "rarity": "RARE",
+    "description": "抽一張牌\n如果你完全沒有牌，改抽三張",
+    "keywords": {
+      "battlecry": {
+        "type": "DRAW_IF_HAND_EMPTY",
+        "value": 1,
+        "bonus_value": 3
+      }
+    },
+    "image": "assets/images/cards/chao_di.webp"
+  },
+  {
+    "id": "TW083",
+    "name": "靈媒",
+    "category": "平民",
+    "cost": 6,
+    "attack": 4,
+    "health": 5,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "觸發: 起底一張已經陣亡的隨從",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolFromGraveyard": true,
+        "poolCardType": "MINION",
+        "count": 3
+      }
+    },
+    "image": "assets/images/cards/ling_mei.webp"
+  },
+  {
+    "id": "TW084",
+    "name": "陳菊",
+    "category": "民進黨政治人物",
+    "cost": 7,
+    "attack": 4,
+    "health": 8,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "沙包\n每當此隨從受到傷害，抽一張卡",
+    "keywords": {
+      "taunt": true,
+      "triggered": {
+        "type": "ON_DAMAGE",
+        "action": "DRAW",
+        "value": 1
+      }
+    },
+    "image": "assets/images/cards/chen_chu.webp"
+  },
+  {
+    "id": "TW085",
+    "name": "呂秀蓮",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 2,
+    "health": 2,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "觸發: 起底一張民進黨政治人物\n遺志: 抽取一張民進黨政治人物",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolCardType": "MINION",
+        "target_category_includes": "民進黨政治人物",
+        "count": 3
+      },
+      "deathrattle": {
+        "type": "ADD_RANDOM_CATEGORY_FROM_DECK",
+        "poolCardType": "MINION",
+        "target_category_includes": "民進黨政治人物"
+      }
+    },
+    "image": "assets/images/cards/lu_hsiu_lien.webp"
   }
 ] as const satisfies readonly CardDefinition[];

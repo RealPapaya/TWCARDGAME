@@ -56,7 +56,7 @@ export type AnimationSweepVariant = "damage" | "heal" | "buff" | "destroy" | "lo
 /** One entry in the Hearthstone-style battle log, derived from a GameEvent. */
 export type BattleLogKind = "summon" | "play" | "attack" | "damage" | "heal" | "buff" | "silence" | "bounce" | "death";
 /** Corner badge / action icon drawn on a log entry and inside its tooltip. */
-export type BattleLogBadge = "sword" | "burst" | "heart" | "arrow" | "sparkle" | "silence" | "bounce";
+export type BattleLogBadge = "sword" | "burst" | "heart" | "arrow" | "sparkle" | "silence" | "bounce" | "skull";
 
 /** A card (or hero) shown as art in a log entry's tile and rich tooltip. */
 export interface BattleLogCardRef {
@@ -183,6 +183,16 @@ export type AnimationCue = {
   variant?: AnimationSweepVariant;
 };
 
+export type BattleEmotePopup = {
+  id: string;
+  seat: Seat;
+  emoteId: string;
+  label: string;
+  assetPath?: string | null;
+  createdAtMs: number;
+  untilMs: number;
+};
+
 export type ClientViewState = {
   room?: GameTransportRoom;
   mySeat?: Seat;
@@ -204,7 +214,7 @@ export type ClientViewState = {
   };
   /** This seat's privately-delivered amplification options (turn 7/14). */
   amplificationOptions?: AmplificationOption[];
-  /** This seat's privately-delivered 教召 / Discover candidate cards, while a choice prompt is open. */
+  /** This seat's privately-delivered 起底 / Discover candidate cards, while a choice prompt is open. */
   promptChoice?: PromptChoiceOffer;
   specialPhasePeek?: boolean;
   amplificationRerollStage?: "out" | "in";
@@ -217,6 +227,9 @@ export type ClientViewState = {
   mulliganSelection: Set<string>;
   selectedAttackerId?: string;
   selectedTarget?: TargetRef;
+  battleEmoteMenuOpen?: boolean;
+  battleEmoteCooldownUntilMs?: number;
+  activeBattleEmotes?: BattleEmotePopup[];
   /**
    * A targeted-battlecry card mid two-stage play (v1 parity). It plays
    * exactly like any other card — drop, card-play animation, land on the field —
@@ -363,6 +376,10 @@ export type ProfileRow = {
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string | null;
+  owned_card_arts?: string[];
+  selected_card_arts?: string[];
+  owned_emotes?: string[];
+  selected_emotes?: string[];
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;
@@ -472,6 +489,8 @@ export type PackOpeningReward =
     }
   | { type: "avatar"; id: string; name: string; path: string }
   | { type: "title"; id: string; name: string }
+  | { type: "card_art"; id: string; cardId: string; name: string; path: string }
+  | { type: "emote"; id: string; name: string; path?: string | null; label?: string }
   | { type: "voucher"; amount: number; name: string };
 
 export type PurchaseShopResult = {
@@ -479,5 +498,5 @@ export type PurchaseShopResult = {
   kind: string;
   priceGold: number;
   remainingGold: number;
-  rewards: Array<{ type: string; cardId?: string; id?: string; name?: string; path?: string; amount?: number }>;
+  rewards: Array<{ type: string; cardId?: string; id?: string; name?: string; path?: string; label?: string; amount?: number }>;
 };

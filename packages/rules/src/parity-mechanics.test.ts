@@ -42,6 +42,7 @@ const DIRECT_CARD_COVERAGE = new Set([
 
 const EFFECT_FAMILY_COVERAGE = new Set([
   "ADD_CARD_TO_HAND",
+  "ADD_RANDOM_CATEGORY_FROM_DECK",
   "ADJACENT_BUFF_CATEGORY_ATTRS",
   "ADJACENT_BUFF_STATS",
   "BOUNCE",
@@ -57,6 +58,7 @@ const EFFECT_FAMILY_COVERAGE = new Set([
   "BUFF_HEALTH_AND_TAUNT_TARGET",
   "BUFF_STAT_TARGET_CATEGORY_BONUS",
   "BUFF_STAT_TARGET_TEMP",
+  "CHANNEL",
   "DAMAGE",
   "DAMAGE_ALL_ENEMY_MINIONS",
   "DAMAGE_ALL_NON_CATEGORIES",
@@ -73,6 +75,8 @@ const EFFECT_FAMILY_COVERAGE = new Set([
   "DISCARD_DRAW",
   "DISCARD_RANDOM",
   "DRAW",
+  "DRAW_IF_CARD_ON_BOARD",
+  "DRAW_IF_HAND_EMPTY",
   "DRAW_MINION_REDUCE_COST",
   "DRAW_NEWS",
   "EAT_FRIENDLY",
@@ -92,8 +96,10 @@ const EFFECT_FAMILY_COVERAGE = new Set([
   "LOCK_SELF",
   "MULTI_DAMAGE",
   "NEWS_POWER",
+  "ON_DAMAGE",
   "ON_DISCARD",
   "ON_DISCARD_CARD",
+  "ON_DRAW",
   "ON_PLAY_NEWS",
   "QUEST",
   "REDUCE_COST_ALL_HAND",
@@ -389,6 +395,29 @@ describe("phase 2 parity mechanics", () => {
     const reduceHand = putInHand(afterDraw, seat, "S007");
     const afterReduce = reduce(afterDraw, envelope(afterDraw, seat, "news-power-reduce", { type: "playCard", handInstanceId: reduceHand.instanceId }), CARD_CATALOG).state;
     expect(afterReduce.players[seat].hand.find((handCard) => handCard.instanceId === reducedCard.instanceId)?.cost).toBe(card("TW002").cost - 1);
+  });
+
+  it("ON_DAMAGE (陳菊) draws a card for its owner whenever the minion takes damage", () => {
+    const { state } = parityMatch();
+    const attackerSeat = state.turn.activeSeat;
+    const ownerSeat = enemy(attackerSeat);
+    const chenChu = placeMinion(state, ownerSeat, "TW084"); // 沙包 4/8, ON_DAMAGE → draw 1
+    const attacker = placeMinion(state, attackerSeat, "TW001"); // 窮酸大學生 1/3 vanilla
+    const handBefore = state.players[ownerSeat].hand.length;
+
+    const result = reduce(
+      state,
+      envelope(state, attackerSeat, "chenchu-hit", {
+        type: "attack",
+        attackerInstanceId: attacker.instanceId,
+        target: { type: "MINION", side: ownerSeat, instanceId: chenChu.instanceId }
+      }),
+      CARD_CATALOG
+    );
+
+    const damaged = result.state.players[ownerSeat].board.find((minion) => minion.instanceId === chenChu.instanceId)!;
+    expect(damaged.currentHealth).toBe(card("TW084").health! - card("TW001").attack!); // took the hit and survived
+    expect(result.state.players[ownerSeat].hand.length).toBe(handBefore + 1); // ON_DAMAGE drew exactly one
   });
 
   it("every behavioral catalog card is covered by a direct test or an explicit effect-family test", () => {

@@ -230,7 +230,41 @@ describe("rules architecture", () => {
     expect(result.state.turn.activeSeat).toBe(activeSeat);
     expect(result.state.turn.number).toBe(state.turn.number);
   });
+
+  it("陳致中 with 陳水扁 on board draws three from an empty deck (three fatigue hits)", () => {
+    const state = startMatch(31337);
+    const seat = state.turn.activeSeat;
+    const player = state.players[seat];
+    player.mana = { current: 10, max: 10 };
+
+    // 陳水扁 onto the board exactly as the real game would summon it.
+    const bian = createRuntimeCard(getCard("TW080"), seat, nextInstanceId(state, "card"));
+    player.hand = [bian];
+    let next = reduce(state, { commandId: "play-bian", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: bian.instanceId } }, CARD_CATALOG).state;
+    expect(next.players[seat].board.some((m) => m.cardId === "TW080")).toBe(true);
+
+    // Empty the deck and give the hero plenty of HP so fatigue won't end the match.
+    next.players[seat].deck = [];
+    next.players[seat].hero.hp = 100;
+    next.players[seat].hero.maxHp = 100;
+    next.players[seat].mana = { current: 10, max: 10 };
+
+    const chih = createRuntimeCard(getCard("TW081"), seat, nextInstanceId(next, "card"));
+    next.players[seat].hand = [chih];
+    const result = reduce(next, { commandId: "play-chih", seat, nowMs: 2100, command: { type: "playCard", handInstanceId: chih.instanceId } }, CARD_CATALOG);
+
+    const fatigueHits = result.events.filter((event) => event.type === "FATIGUE");
+    expect(fatigueHits).toHaveLength(3);
+    // Fatigue damage ramps 1 → 2 → 3 across the three forced draws.
+    expect(fatigueHits.map((event) => event.payload?.amount)).toEqual([1, 2, 3]);
+  });
 });
+
+function getCard(id: string): CardDefinition {
+  const found = CARD_CATALOG.find((card) => card.id === id);
+  if (!found) throw new Error(`missing card ${id}`);
+  return found;
+}
 
 function createSeededMatch(seed: number) {
   return createInitialMatch({
@@ -483,11 +517,11 @@ describe("target legality", () => {
   });
 });
 
-describe("教召 / Discover (CHANNEL)", () => {
+describe("起底 / Discover (CHANNEL)", () => {
   function channelDef(): CardDefinition {
     return {
       id: "TEST_CHANNEL",
-      name: "教召測試",
+      name: "起底測試",
       category: "新聞",
       cost: 0,
       type: "NEWS",
@@ -576,6 +610,248 @@ describe("教召 / Discover (CHANNEL)", () => {
     expect(state.pendingPrompt).toBeUndefined();
     expect(state.private.pendingChoice).toBeUndefined();
   });
+
+  it("poolHasDeathrattle restricts candidates to 遺志 cards only", () => {
+    const deathrattleDef: CardDefinition = {
+      id: "DR_MINION",
+      name: "遺志隨從",
+      category: "勞工",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "遺志: 抽一張牌",
+      image: "test.webp",
+      keywords: { deathrattle: { type: "DRAW", value: 1, target: { side: "FRIENDLY" } } }
+    };
+    const plainDef: CardDefinition = {
+      id: "PLAIN_MINION",
+      name: "普通隨從",
+      category: "勞工",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+
+    const state = startMatch(2468);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    // Deterministic deck: a few 遺志 minions mixed with plain ones.
+    state.players[seat].deck = [
+      createRuntimeCard(deathrattleDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(deathrattleDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, seat, nextInstanceId(state, "card"))
+    ];
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, poolHasDeathrattle: true };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const result = reduce(
+      state,
+      { commandId: "ch-dr", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    );
+
+    const candidates = result.state.private.pendingChoice?.cards ?? [];
+    expect(candidates.length).toBe(2); // only the two 遺志 minions qualify
+    expect(candidates.every((c) => c.keywords?.deathrattle)).toBe(true);
+  });
+
+  it("poolFromGraveyard reveals own dead minions and returns the unpicked to the graveyard", () => {
+    const deadDef: CardDefinition = {
+      id: "DEAD_MINION",
+      name: "亡魂",
+      category: "平民",
+      cost: 2,
+      attack: 1,
+      health: 1,
+      type: "MINION",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(1357);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 6;
+    state.players[seat].graveyard = [
+      createRuntimeCard(deadDef, seat, nextInstanceId(state, "card")),
+      createRuntimeCard(deadDef, seat, nextInstanceId(state, "card"))
+    ];
+    const deckBefore = state.players[seat].deck.length;
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, poolFromGraveyard: true, poolCardType: "MINION" };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const opened = reduce(
+      state,
+      { commandId: "gy-open", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(opened.private.pendingChoice?.fromGraveyard).toBe(true);
+    expect(opened.private.pendingChoice?.cards.length).toBe(2);
+    expect(opened.players[seat].graveyard.length).toBe(0); // candidates held privately
+    expect(opened.players[seat].deck.length).toBe(deckBefore); // deck untouched
+
+    const chosen = opened.private.pendingChoice!.cards[0];
+    const promptId = opened.pendingPrompt!.promptId;
+    const resolved = reduce(
+      opened,
+      { commandId: "gy-res", seat, nowMs: 2100, command: { type: "resolvePrompt", promptId, choiceInstanceId: chosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(resolved.players[seat].hand.some((c) => c.instanceId === chosen.instanceId)).toBe(true);
+    expect(resolved.players[seat].graveyard.length).toBe(1); // the unpicked minion went back to the grave
+    expect(resolved.players[seat].deck.length).toBe(deckBefore); // never reshuffled into the deck
+  });
+
+  it("picks:2 (起底兩張) opens a fresh reveal after the first pick resolves", () => {
+    const newsDef: CardDefinition = {
+      id: "POOL_NEWS",
+      name: "池新聞",
+      category: "新聞",
+      cost: 1,
+      type: "NEWS",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(2024);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 9;
+    state.players[seat].deck = Array.from({ length: 6 }, () => createRuntimeCard(newsDef, seat, nextInstanceId(state, "card")));
+    const def = channelDef();
+    def.keywords!.battlecry = { type: "CHANNEL", count: 3, picks: 2, poolCardType: "NEWS" };
+    const card = createRuntimeCard(def, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [card];
+
+    const first = reduce(
+      state,
+      { commandId: "p2-open", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: card.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(first.pendingPrompt).toBeDefined();
+    const firstChosen = first.private.pendingChoice!.cards[0];
+    const second = reduce(
+      first,
+      { commandId: "p2-res1", seat, nowMs: 2100, command: { type: "resolvePrompt", promptId: first.pendingPrompt!.promptId, choiceInstanceId: firstChosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    // A second prompt opens automatically for the second pick.
+    expect(second.pendingPrompt).toBeDefined();
+    expect(second.private.pendingChoice?.promptId).not.toBe(first.pendingPrompt!.promptId);
+
+    const secondChosen = second.private.pendingChoice!.cards[0];
+    const done = reduce(
+      second,
+      { commandId: "p2-res2", seat, nowMs: 2200, command: { type: "resolvePrompt", promptId: second.pendingPrompt!.promptId, choiceInstanceId: secondChosen.instanceId } },
+      CARD_CATALOG
+    ).state;
+    expect(done.pendingPrompt).toBeUndefined();
+    expect(done.players[seat].hand.filter((c) => c.cardId === "POOL_NEWS").length).toBe(2);
+  });
+});
+
+describe("ON_PLAY_NEWS / SELF_COST_REDUCE (新聞龍捲風)", () => {
+  it("cheapens a held card by 1 each time a NEWS is played, flooring at 0", () => {
+    const tornadoDef: CardDefinition = {
+      id: "TEST_TORNADO",
+      name: "龍捲風測試",
+      category: "新聞",
+      cost: 7,
+      type: "NEWS",
+      rarity: "RARE",
+      description: "",
+      image: "test.webp",
+      keywords: { triggered: { type: "ON_PLAY_NEWS", action: "SELF_COST_REDUCE", value: 1 } }
+    };
+    const simpleNews: CardDefinition = {
+      id: "SIMPLE_NEWS",
+      name: "簡單新聞",
+      category: "新聞",
+      cost: 0,
+      type: "NEWS",
+      rarity: "COMMON",
+      description: "",
+      image: "test.webp"
+    };
+    const state = startMatch(99);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const tornado = createRuntimeCard(tornadoDef, seat, nextInstanceId(state, "card"));
+    const news = createRuntimeCard(simpleNews, seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [tornado, news];
+
+    const after = reduce(
+      state,
+      { commandId: "tor-news", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: news.instanceId } },
+      CARD_CATALOG
+    ).state;
+    const heldTornado = after.players[seat].hand.find((c) => c.instanceId === tornado.instanceId)!;
+    expect(heldTornado.cost).toBe(6);
+    expect(heldTornado.isReduced).toBe(true);
+  });
+});
+
+describe("DRAW_IF_HAND_EMPTY (抄底)", () => {
+  function chaodiDef(): CardDefinition {
+    return {
+      id: "TEST_CHAODI",
+      name: "抄底測試",
+      category: "新聞",
+      cost: 2,
+      type: "NEWS",
+      rarity: "RARE",
+      description: "",
+      image: "test.webp",
+      keywords: { battlecry: { type: "DRAW_IF_HAND_EMPTY", value: 1, bonus_value: 3 } }
+    };
+  }
+
+  it("draws 1 when other cards remain in hand", () => {
+    const state = startMatch(4242);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const chaodi = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    const filler = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [chaodi, filler];
+    const deckBefore = state.players[seat].deck.length;
+
+    const after = reduce(
+      state,
+      { commandId: "cd-some", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: chaodi.instanceId } },
+      CARD_CATALOG
+    ).state;
+
+    // filler stays + 1 drawn = 2 in hand; deck down by 1.
+    expect(after.players[seat].hand.length).toBe(2);
+    expect(after.players[seat].deck.length).toBe(deckBefore - 1);
+  });
+
+  it("draws 3 when it was the last card in hand", () => {
+    const state = startMatch(4243);
+    const seat = state.turn.activeSeat;
+    state.players[seat].mana.current = 5;
+    const chaodi = createRuntimeCard(chaodiDef(), seat, nextInstanceId(state, "card"));
+    state.players[seat].hand = [chaodi];
+    const deckBefore = state.players[seat].deck.length;
+
+    const after = reduce(
+      state,
+      { commandId: "cd-empty", seat, nowMs: 2000, command: { type: "playCard", handInstanceId: chaodi.instanceId } },
+      CARD_CATALOG
+    ).state;
+
+    expect(after.players[seat].hand.length).toBe(3);
+    expect(after.players[seat].deck.length).toBe(deckBefore - 3);
+  });
 });
 
 describe("tech enforcement vote environment", () => {
@@ -631,5 +907,138 @@ describe("tech enforcement vote environment", () => {
     expect(damageEvents.map((event) => event.payload?.target)).toEqual(["tech_defender", "tech_attacker", "tech_attacker"]);
     expect(damageEvents.map((event) => event.payload?.remainingHealth)).toEqual([2, 1, 0]);
     expect(damageEvents[2].payload?.source).toBe("TECH_ENFORCEMENT");
+  });
+});
+
+describe("遺志: 起底 (ADD_RANDOM_CATEGORY_FROM_DECK)", () => {
+  const dppDef: CardDefinition = {
+    id: "TEST_DPP",
+    name: "測試民進黨",
+    category: "民進黨政治人物",
+    cost: 1,
+    attack: 1,
+    health: 1,
+    type: "MINION",
+    rarity: "COMMON",
+    description: "",
+    image: "test.webp"
+  };
+  const plainDef: CardDefinition = {
+    id: "TEST_PLAIN",
+    name: "測試平民",
+    category: "勞工",
+    cost: 1,
+    attack: 1,
+    health: 1,
+    type: "MINION",
+    rarity: "COMMON",
+    description: "",
+    image: "test.webp"
+  };
+
+  function minion(instanceId: string, ownerSeat: Seat, overrides: Record<string, unknown>) {
+    return {
+      instanceId,
+      cardId: "TEST_PLAIN",
+      ownerSeat,
+      name: "M",
+      category: "test",
+      cost: 1,
+      type: "MINION" as const,
+      rarity: "COMMON" as const,
+      attack: 1,
+      baseAttack: 1,
+      health: 1,
+      currentHealth: 1,
+      keywords: {},
+      sleeping: false,
+      canAttack: true,
+      isEnraged: false,
+      lockedTurns: 0,
+      auraAttack: 0,
+      auraHealth: 0,
+      auraTaunt: false,
+      tempBuffs: [],
+      ...overrides
+    };
+  }
+
+  it("fires on the OPPONENT's turn (off-turn death) without opening a prompt, pulling a matching card from the owner's deck", () => {
+    const state = startMatch(20260630);
+    const attackerSeat = state.turn.activeSeat;
+    const ownerSeat = opponentOf(attackerSeat);
+
+    // The owner's 呂秀蓮-style minion dies to the active opponent's attack.
+    state.players[ownerSeat].board = [
+      minion("lu", ownerSeat, {
+        attack: 1,
+        health: 1,
+        currentHealth: 1,
+        canAttack: false,
+        keywords: {
+          deathrattle: {
+            type: "ADD_RANDOM_CATEGORY_FROM_DECK",
+            poolCardType: "MINION",
+            target_category_includes: "民進黨政治人物"
+          }
+        }
+      })
+    ];
+    state.players[attackerSeat].board = [minion("killer", attackerSeat, { attack: 1, health: 2, currentHealth: 2 })];
+
+    // Owner deck: exactly one matching candidate plus a non-matching one.
+    state.players[ownerSeat].deck = [
+      createRuntimeCard(dppDef, ownerSeat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, ownerSeat, nextInstanceId(state, "card"))
+    ];
+    const handBefore = state.players[ownerSeat].hand.length;
+
+    const result = reduce(
+      state,
+      { commandId: "dr1", seat: attackerSeat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "killer", target: { type: "MINION", side: ownerSeat, instanceId: "lu" } } },
+      CARD_CATALOG
+    );
+
+    // Minion died, deathrattle fired, no interactive prompt deadlocked the turn.
+    expect(result.state.players[ownerSeat].board).toHaveLength(0);
+    expect(result.events.some((e) => e.type === "DEATHRATTLE")).toBe(true);
+    expect(result.state.pendingPrompt).toBeUndefined();
+    // The only matching card moved deck → owner hand.
+    expect(result.state.players[ownerSeat].hand.some((c) => c.cardId === "TEST_DPP")).toBe(true);
+    expect(result.state.players[ownerSeat].hand.length).toBe(handBefore + 1);
+    expect(result.state.players[ownerSeat].deck.some((c) => c.cardId === "TEST_DPP")).toBe(false);
+    expect(result.state.players[ownerSeat].deck.some((c) => c.cardId === "TEST_PLAIN")).toBe(true);
+  });
+
+  it("is a no-op when the owner's deck has no matching card", () => {
+    const state = startMatch(20260631);
+    const attackerSeat = state.turn.activeSeat;
+    const ownerSeat = opponentOf(attackerSeat);
+
+    state.players[ownerSeat].board = [
+      minion("lu", ownerSeat, {
+        canAttack: false,
+        keywords: {
+          deathrattle: {
+            type: "ADD_RANDOM_CATEGORY_FROM_DECK",
+            poolCardType: "MINION",
+            target_category_includes: "民進黨政治人物"
+          }
+        }
+      })
+    ];
+    state.players[attackerSeat].board = [minion("killer", attackerSeat, { attack: 1, health: 2, currentHealth: 2 })];
+    state.players[ownerSeat].deck = [createRuntimeCard(plainDef, ownerSeat, nextInstanceId(state, "card"))];
+    const handBefore = state.players[ownerSeat].hand.length;
+
+    const result = reduce(
+      state,
+      { commandId: "dr2", seat: attackerSeat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "killer", target: { type: "MINION", side: ownerSeat, instanceId: "lu" } } },
+      CARD_CATALOG
+    );
+
+    expect(result.state.players[ownerSeat].board).toHaveLength(0);
+    expect(result.state.players[ownerSeat].hand.length).toBe(handBefore);
+    expect(result.state.pendingPrompt).toBeUndefined();
   });
 });

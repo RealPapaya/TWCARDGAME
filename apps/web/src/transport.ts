@@ -2,6 +2,7 @@ import type {
   AiDifficulty,
   AiTheme,
   AmplificationOption,
+  BattleEmotePayload,
   GameEvent,
   HandCardView,
   Phase,
@@ -11,6 +12,7 @@ import type {
   RewardSummary,
   Seat
 } from "@twcardgame/shared";
+import { buildWsProtocols } from "@twcardgame/shared";
 import { defaultServerUrl } from "./app/config.js";
 import { projectRealtimeState } from "./transport-state.js";
 
@@ -46,6 +48,7 @@ type ServerMessageMap = {
   bot: { seat: Seat; difficulty?: string; theme?: string | null };
   hand: { seat?: Seat; cards: HandCardView[] };
   presence: { seat: Seat; connected: boolean; reconnectUntilMs?: number };
+  battleEmote: BattleEmotePayload;
   publicSync: {
     status?: string;
     phase?: Phase;
@@ -103,9 +106,20 @@ async function realtimeConnect(
 ): Promise<GameTransportRoom> {
   if (mode === "pve" && options.devTest) return realtimeCreateDevTestPve(options, serverUrl);
   const url = buildRealtimeUrl(serverUrl, mode, options);
+  // Bearer secrets ride the WebSocket subprotocol, never the URL (kept out of
+  // history/Referer/edge logs). The reconnect token may arrive as `token` or
+  // `reconnectToken`; either way it routes as `rt.<token>`.
+  const protocols = buildWsProtocols({
+    accessToken: asString(options.accessToken),
+    reconnectToken: asString(options.token) ?? asString(options.reconnectToken)
+  });
   const room = new RealtimeRoom(mode, String(options.room ?? mode));
-  await room.connect(url);
+  await room.connect(url, protocols);
   return room;
+}
+
+function asString(value: unknown): string | undefined {
+  return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
 /**
@@ -131,8 +145,6 @@ function buildRealtimeUrl(serverUrl: string, mode: GameTransportMode, options: J
   url.search = "";
   appendString(url, "room", options.room);
   appendString(url, "joinCode", options.joinCode);
-  appendString(url, "token", options.token);
-  appendString(url, "reconnectToken", options.reconnectToken);
   appendString(url, "name", options.displayName ?? options.name);
   appendString(url, "userId", options.userId);
   appendString(url, "difficulty", options.difficulty);
@@ -140,8 +152,9 @@ function buildRealtimeUrl(serverUrl: string, mode: GameTransportMode, options: J
   appendString(url, "theme", options.theme);
   // Supabase-backed deck resolution (server validates ownership + legality). Sent
   // only when present; otherwise the server uses the explicit `deck` list / dev deck.
+  // NOTE: the access token + reconnect token are intentionally NOT in the URL —
+  // they travel via the WebSocket subprotocol (see realtimeConnect).
   appendString(url, "deckId", options.deckId);
-  appendString(url, "accessToken", options.accessToken);
   if (Array.isArray(options.deckIds) && options.deckIds.length > 0) url.searchParams.set("deck", options.deckIds.join(","));
   return url.toString();
 }
@@ -171,8 +184,8 @@ class RealtimeRoom implements GameTransportRoom {
     public roomId: string
   ) {}
 
-  connect(url: string): Promise<void> {
-    this.ws = new WebSocket(url);
+  connect(url: string, protocols?: string[]): Promise<void> {
+    this.ws = protocols && protocols.length > 0 ? new WebSocket(url, protocols) : new WebSocket(url);
     return new Promise((resolve, reject) => {
       let opened = false;
       this.ws!.addEventListener("open", () => {

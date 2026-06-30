@@ -40,6 +40,10 @@ export interface PlayerProfileRow {
   owned_avatars?: string[];
   owned_titles?: string[];
   selected_title?: string | null;
+  owned_card_arts?: string[];
+  selected_card_arts?: string[];
+  owned_emotes?: string[];
+  selected_emotes?: string[];
   login_days?: number;
   current_login_streak?: number;
   longest_login_streak?: number;
@@ -48,7 +52,7 @@ export interface PlayerProfileRow {
   updated_at?: string;
 }
 
-export type CosmeticKind = "avatar" | "title";
+export type CosmeticKind = "avatar" | "title" | "card_art" | "emote";
 export type CurrencyKind = "gold" | "voucher";
 
 export interface CosmeticCatalogRow {

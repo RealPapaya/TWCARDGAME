@@ -40,6 +40,32 @@ describe("card catalog", () => {
     });
   });
 
+  it("defines 陳水扁 as a legendary that buffs itself on every draw", () => {
+    const bian = CARD_CATALOG.find((card) => card.id === "TW080");
+    expect(bian).toMatchObject({
+      name: "陳水扁",
+      category: "民進黨政治人物",
+      cost: 4,
+      attack: 4,
+      health: 4,
+      rarity: "LEGENDARY",
+      keywords: { triggered: { type: "ON_DRAW", stat: "ALL", value: 1 } },
+    });
+  });
+
+  it("defines 陳致中 as an epic that draws more while 陳水扁 is on board", () => {
+    const chih = CARD_CATALOG.find((card) => card.id === "TW081");
+    expect(chih).toMatchObject({
+      name: "陳致中",
+      category: "民進黨政治人物",
+      cost: 4,
+      attack: 2,
+      health: 2,
+      rarity: "EPIC",
+      keywords: { battlecry: { type: "DRAW_IF_CARD_ON_BOARD", value: 2, bonus_value: 3, cardId: "TW080" } },
+    });
+  });
+
   it("keeps every current battlecry effect in the supported list", () => {
     const effectTypes = new Set(
       CARD_CATALOG.map((card) => card.keywords?.battlecry?.type).filter((type): type is string => !!type)
