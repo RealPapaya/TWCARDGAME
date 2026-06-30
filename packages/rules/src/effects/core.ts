@@ -949,6 +949,46 @@ function resolveDeathrattle(
       }
     }
   }
+  if (deathrattle.type === "ADD_RANDOM_CATEGORY_FROM_DECK") {
+    addRandomCategoryFromDeck(state, player, deathrattle, events);
+  }
+}
+
+/**
+ * 遺志: 起底一張<類別>. Non-interactive discover for the deathrattle slot — a
+ * deathrattle can fire on the opponent's turn, where opening a CHANNEL pick
+ * prompt for the (inactive) owner would deadlock the turn. Instead this pulls a
+ * random matching card from the OWNER's deck straight to hand (seeded RNG → still
+ * deterministic/replayable). Filters by `target_category_includes`/`target_category`
+ * and optional `poolCardType`. No-op when the deck has no match.
+ */
+function addRandomCategoryFromDeck(
+  state: MatchState,
+  player: PlayerState,
+  effect: EffectDefinition,
+  events: EffectContext["events"]
+): void {
+  const typeFilter = effect.poolCardType;
+  const categoryFilter = effect.target_category_includes ?? effect.target_category;
+  const eligible: number[] = [];
+  player.deck.forEach((card, index) => {
+    if (typeFilter && card.type !== typeFilter) return;
+    if (categoryFilter && !card.category.includes(categoryFilter)) return;
+    eligible.push(index);
+  });
+  if (eligible.length === 0) return;
+
+  const pick = nextInt(state.private.rngState, eligible.length);
+  state.private.rngState = pick.state;
+  const [card] = player.deck.splice(eligible[pick.value], 1);
+
+  if (player.hand.length >= 10) {
+    player.graveyard.push(card);
+    addEvent(state, events, "CARD_BURNED", { cardId: card.cardId }, player.seat);
+  } else {
+    player.hand.push(card);
+    addEvent(state, events, "CARD_DRAWN", { cardId: card.cardId, handCount: player.hand.length, channeled: true }, player.seat);
+  }
 }
 
 function grantCategoryDeathMana(

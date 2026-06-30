@@ -2151,5 +2151,30 @@ export const CARD_CATALOG_GENERATED = [
       }
     },
     "image": "assets/images/cards/chen_chu.webp"
+  },
+  {
+    "id": "TW085",
+    "name": "呂秀蓮",
+    "category": "民進黨政治人物",
+    "cost": 4,
+    "attack": 2,
+    "health": 2,
+    "type": "MINION",
+    "rarity": "EPIC",
+    "description": "觸發: 起底一張民進黨政治人物\n遺志: 抽取一張民進黨政治人物",
+    "keywords": {
+      "battlecry": {
+        "type": "CHANNEL",
+        "poolCardType": "MINION",
+        "target_category_includes": "民進黨政治人物",
+        "count": 3
+      },
+      "deathrattle": {
+        "type": "ADD_RANDOM_CATEGORY_FROM_DECK",
+        "poolCardType": "MINION",
+        "target_category_includes": "民進黨政治人物"
+      }
+    },
+    "image": "assets/images/cards/lu_hsiu_lien.webp"
   }
 ] as const satisfies readonly CardDefinition[];

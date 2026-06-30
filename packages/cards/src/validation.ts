@@ -176,6 +176,7 @@ function checkRequiredFields(errors: string[], cardId: string, label: string, ef
   }
 
   switch (effect.type) {
+    case "ADD_RANDOM_CATEGORY_FROM_DECK":
     case "BOUNCE_ALL_CATEGORY":
     case "BOUNCE_CATEGORY":
     case "BUFF_STAT_TARGET_CATEGORY_BONUS":

@@ -909,3 +909,136 @@ describe("tech enforcement vote environment", () => {
     expect(damageEvents[2].payload?.source).toBe("TECH_ENFORCEMENT");
   });
 });
+
+describe("遺志: 起底 (ADD_RANDOM_CATEGORY_FROM_DECK)", () => {
+  const dppDef: CardDefinition = {
+    id: "TEST_DPP",
+    name: "測試民進黨",
+    category: "民進黨政治人物",
+    cost: 1,
+    attack: 1,
+    health: 1,
+    type: "MINION",
+    rarity: "COMMON",
+    description: "",
+    image: "test.webp"
+  };
+  const plainDef: CardDefinition = {
+    id: "TEST_PLAIN",
+    name: "測試平民",
+    category: "勞工",
+    cost: 1,
+    attack: 1,
+    health: 1,
+    type: "MINION",
+    rarity: "COMMON",
+    description: "",
+    image: "test.webp"
+  };
+
+  function minion(instanceId: string, ownerSeat: Seat, overrides: Record<string, unknown>) {
+    return {
+      instanceId,
+      cardId: "TEST_PLAIN",
+      ownerSeat,
+      name: "M",
+      category: "test",
+      cost: 1,
+      type: "MINION" as const,
+      rarity: "COMMON" as const,
+      attack: 1,
+      baseAttack: 1,
+      health: 1,
+      currentHealth: 1,
+      keywords: {},
+      sleeping: false,
+      canAttack: true,
+      isEnraged: false,
+      lockedTurns: 0,
+      auraAttack: 0,
+      auraHealth: 0,
+      auraTaunt: false,
+      tempBuffs: [],
+      ...overrides
+    };
+  }
+
+  it("fires on the OPPONENT's turn (off-turn death) without opening a prompt, pulling a matching card from the owner's deck", () => {
+    const state = startMatch(20260630);
+    const attackerSeat = state.turn.activeSeat;
+    const ownerSeat = opponentOf(attackerSeat);
+
+    // The owner's 呂秀蓮-style minion dies to the active opponent's attack.
+    state.players[ownerSeat].board = [
+      minion("lu", ownerSeat, {
+        attack: 1,
+        health: 1,
+        currentHealth: 1,
+        canAttack: false,
+        keywords: {
+          deathrattle: {
+            type: "ADD_RANDOM_CATEGORY_FROM_DECK",
+            poolCardType: "MINION",
+            target_category_includes: "民進黨政治人物"
+          }
+        }
+      })
+    ];
+    state.players[attackerSeat].board = [minion("killer", attackerSeat, { attack: 1, health: 2, currentHealth: 2 })];
+
+    // Owner deck: exactly one matching candidate plus a non-matching one.
+    state.players[ownerSeat].deck = [
+      createRuntimeCard(dppDef, ownerSeat, nextInstanceId(state, "card")),
+      createRuntimeCard(plainDef, ownerSeat, nextInstanceId(state, "card"))
+    ];
+    const handBefore = state.players[ownerSeat].hand.length;
+
+    const result = reduce(
+      state,
+      { commandId: "dr1", seat: attackerSeat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "killer", target: { type: "MINION", side: ownerSeat, instanceId: "lu" } } },
+      CARD_CATALOG
+    );
+
+    // Minion died, deathrattle fired, no interactive prompt deadlocked the turn.
+    expect(result.state.players[ownerSeat].board).toHaveLength(0);
+    expect(result.events.some((e) => e.type === "DEATHRATTLE")).toBe(true);
+    expect(result.state.pendingPrompt).toBeUndefined();
+    // The only matching card moved deck → owner hand.
+    expect(result.state.players[ownerSeat].hand.some((c) => c.cardId === "TEST_DPP")).toBe(true);
+    expect(result.state.players[ownerSeat].hand.length).toBe(handBefore + 1);
+    expect(result.state.players[ownerSeat].deck.some((c) => c.cardId === "TEST_DPP")).toBe(false);
+    expect(result.state.players[ownerSeat].deck.some((c) => c.cardId === "TEST_PLAIN")).toBe(true);
+  });
+
+  it("is a no-op when the owner's deck has no matching card", () => {
+    const state = startMatch(20260631);
+    const attackerSeat = state.turn.activeSeat;
+    const ownerSeat = opponentOf(attackerSeat);
+
+    state.players[ownerSeat].board = [
+      minion("lu", ownerSeat, {
+        canAttack: false,
+        keywords: {
+          deathrattle: {
+            type: "ADD_RANDOM_CATEGORY_FROM_DECK",
+            poolCardType: "MINION",
+            target_category_includes: "民進黨政治人物"
+          }
+        }
+      })
+    ];
+    state.players[attackerSeat].board = [minion("killer", attackerSeat, { attack: 1, health: 2, currentHealth: 2 })];
+    state.players[ownerSeat].deck = [createRuntimeCard(plainDef, ownerSeat, nextInstanceId(state, "card"))];
+    const handBefore = state.players[ownerSeat].hand.length;
+
+    const result = reduce(
+      state,
+      { commandId: "dr2", seat: attackerSeat, nowMs: 2000, command: { type: "attack", attackerInstanceId: "killer", target: { type: "MINION", side: ownerSeat, instanceId: "lu" } } },
+      CARD_CATALOG
+    );
+
+    expect(result.state.players[ownerSeat].board).toHaveLength(0);
+    expect(result.state.players[ownerSeat].hand.length).toBe(handBefore);
+    expect(result.state.pendingPrompt).toBeUndefined();
+  });
+});
