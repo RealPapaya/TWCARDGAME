@@ -7,6 +7,8 @@ coverage/
 .env
 .env.*
 !.env.example
+.dev.vars
+**/.dev.vars
 .vercel/
 test-results/
 .codex-dev-*.log
