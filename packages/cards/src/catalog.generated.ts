@@ -23,7 +23,7 @@ export const CARD_CATALOG_GENERATED = [
         "target_category": "民進黨政治人物"
       }
     },
-    "image": "assets/images/cards/tw011.webp"
+    "image": "assets/images/cards/TW010.webp"
   },
   {
     "id": "TW044",
@@ -38,7 +38,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "newsPower": 1
     },
-    "image": "assets/images/cards/huang_jie.webp"
+    "image": "assets/images/cards/TW044.webp"
   },
   {
     "id": "TW045",
@@ -53,7 +53,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "newsPower": 2
     },
-    "image": "assets/images/cards/su_chiao_hui.webp"
+    "image": "assets/images/cards/TW045.webp"
   },
   {
     "id": "TW046",
@@ -68,7 +68,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "newsPower": 5
     },
-    "image": "assets/images/cards/lai_ching_te.webp"
+    "image": "assets/images/cards/TW046.webp"
   },
   {
     "id": "TW050",
@@ -86,7 +86,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/chen_chien_jen.webp"
+    "image": "assets/images/cards/TW050.webp"
   },
   {
     "id": "TW020",
@@ -107,7 +107,7 @@ export const CARD_CATALOG_GENERATED = [
         ]
       }
     },
-    "image": "assets/images/cards/tw006.webp"
+    "image": "assets/images/cards/TW020.webp"
   },
   {
     "id": "TW016",
@@ -126,7 +126,7 @@ export const CARD_CATALOG_GENERATED = [
         "stat": "ATTACK"
       }
     },
-    "image": "assets/images/cards/tw002.webp"
+    "image": "assets/images/cards/TW016.webp"
   },
   {
     "id": "TW023",
@@ -141,7 +141,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "taunt": true
     },
-    "image": "assets/images/cards/tw017.webp"
+    "image": "assets/images/cards/TW023.webp"
   },
   {
     "id": "TW024",
@@ -162,7 +162,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw012.webp"
+    "image": "assets/images/cards/TW024.webp"
   },
   {
     "id": "TW030",
@@ -180,7 +180,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/tw030.webp"
+    "image": "assets/images/cards/TW030.webp"
   },
   {
     "id": "TW032",
@@ -193,7 +193,7 @@ export const CARD_CATALOG_GENERATED = [
     "rarity": "LEGENDARY",
     "description": "發財外交！！\n(回到手牌時永久獲得 +2/+2)",
     "bounce_bonus": 2,
-    "image": "assets/images/cards/tw032.webp"
+    "image": "assets/images/cards/TW032.webp"
   },
   {
     "id": "TW031",
@@ -214,7 +214,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw031.webp"
+    "image": "assets/images/cards/TW031.webp"
   },
   {
     "id": "TW033",
@@ -227,7 +227,7 @@ export const CARD_CATALOG_GENERATED = [
     "rarity": "RARE",
     "description": "擊潰丁守中！！\n(回到手牌時永久獲得 +1/+1)",
     "bounce_bonus": 1,
-    "image": "assets/images/cards/tw033.webp"
+    "image": "assets/images/cards/TW033.webp"
   },
   {
     "id": "TW034",
@@ -249,7 +249,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw034.webp"
+    "image": "assets/images/cards/TW034.webp"
   },
   {
     "id": "TW035",
@@ -266,7 +266,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "DISCARD_RANDOM"
       }
     },
-    "image": "assets/images/cards/tw035.webp"
+    "image": "assets/images/cards/TW035.webp"
   },
   {
     "id": "TW036",
@@ -283,7 +283,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "BOUNCE_SELF"
       }
     },
-    "image": "assets/images/cards/tw036.webp"
+    "image": "assets/images/cards/TW036.webp"
   },
   {
     "id": "TW076",
@@ -321,7 +321,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "HEAL_ALL_FRIENDLY"
       }
     },
-    "image": "assets/images/cards/tw001.webp"
+    "image": "assets/images/cards/TW011.webp"
   },
   {
     "id": "TW014",
@@ -343,7 +343,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw019.webp"
+    "image": "assets/images/cards/TW014.webp"
   },
   {
     "id": "TW015",
@@ -364,7 +364,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw020.webp"
+    "image": "assets/images/cards/TW015.webp"
   },
   {
     "id": "TW019",
@@ -385,7 +385,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/peggy_chen.webp"
+    "image": "assets/images/cards/TW019.webp"
   },
   {
     "id": "TW021",
@@ -405,7 +405,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/tw018.webp"
+    "image": "assets/images/cards/TW021.webp"
   },
   {
     "id": "TW026",
@@ -462,7 +462,7 @@ export const CARD_CATALOG_GENERATED = [
         "keyword": "taunt"
       }
     },
-    "image": "assets/images/cards/kmt_hq.webp"
+    "image": "assets/images/cards/TW055.webp"
   },
   {
     "id": "TW056",
@@ -484,7 +484,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/dpp_hq.webp"
+    "image": "assets/images/cards/TW056.webp"
   },
   {
     "id": "TW028",
@@ -502,7 +502,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/tw028.webp"
+    "image": "assets/images/cards/TW028.webp"
   },
   {
     "id": "TW012",
@@ -521,7 +521,7 @@ export const CARD_CATALOG_GENERATED = [
         "stat": "HEALTH"
       }
     },
-    "image": "assets/images/cards/tw003.webp"
+    "image": "assets/images/cards/TW012.webp"
   },
   {
     "id": "TW027",
@@ -561,7 +561,7 @@ export const CARD_CATALOG_GENERATED = [
         "target_category": "勞工"
       }
     },
-    "image": "assets/images/cards/tw013.webp"
+    "image": "assets/images/cards/TW017.webp"
   },
   {
     "id": "TW018",
@@ -581,7 +581,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/tw016.webp"
+    "image": "assets/images/cards/TW018.webp"
   },
   {
     "id": "TW029",
@@ -599,7 +599,7 @@ export const CARD_CATALOG_GENERATED = [
         "keyword": "taunt"
       }
     },
-    "image": "assets/images/cards/tw029.webp"
+    "image": "assets/images/cards/TW029.webp"
   },
   {
     "id": "TW001",
@@ -611,7 +611,7 @@ export const CARD_CATALOG_GENERATED = [
     "type": "MINION",
     "rarity": "COMMON",
     "description": "一個窮學生",
-    "image": "assets/images/cards/c001.webp"
+    "image": "assets/images/cards/TW001.webp"
   },
   {
     "id": "TW052",
@@ -629,7 +629,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/bluebird_student.webp"
+    "image": "assets/images/cards/TW052.webp"
   },
   {
     "id": "TW002",
@@ -651,7 +651,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/c004.webp"
+    "image": "assets/images/cards/TW002.webp"
   },
   {
     "id": "TW003",
@@ -666,7 +666,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "taunt": true
     },
-    "image": "assets/images/cards/c002.webp"
+    "image": "assets/images/cards/TW003.webp"
   },
   {
     "id": "TW004",
@@ -678,7 +678,7 @@ export const CARD_CATALOG_GENERATED = [
     "type": "MINION",
     "rarity": "COMMON",
     "description": "五杯大冰拿",
-    "image": "assets/images/cards/tw008.webp"
+    "image": "assets/images/cards/TW004.webp"
   },
   {
     "id": "TW005",
@@ -690,7 +690,7 @@ export const CARD_CATALOG_GENERATED = [
     "type": "MINION",
     "rarity": "COMMON",
     "description": "",
-    "image": "assets/images/cards/tw010.webp"
+    "image": "assets/images/cards/TW005.webp"
   },
   {
     "id": "TW006",
@@ -702,7 +702,7 @@ export const CARD_CATALOG_GENERATED = [
     "type": "MINION",
     "rarity": "COMMON",
     "description": "",
-    "image": "assets/images/cards/c013.webp"
+    "image": "assets/images/cards/TW006.webp"
   },
   {
     "id": "TW007",
@@ -717,7 +717,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "charge": true
     },
-    "image": "assets/images/cards/tw007.webp"
+    "image": "assets/images/cards/TW007.webp"
   },
   {
     "id": "TW008",
@@ -739,7 +739,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw014.webp"
+    "image": "assets/images/cards/TW008.webp"
   },
   {
     "id": "TW009",
@@ -758,7 +758,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/tw015.webp"
+    "image": "assets/images/cards/TW009.webp"
   },
   {
     "id": "TW013",
@@ -773,7 +773,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "taunt": true
     },
-    "image": "assets/images/cards/tw009.webp"
+    "image": "assets/images/cards/TW013.webp"
   },
   {
     "id": "TW022",
@@ -805,7 +805,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "DRAW_NEWS"
       }
     },
-    "image": "assets/images/cards/old_bird.webp"
+    "image": "assets/images/cards/TW053.webp"
   },
   {
     "id": "S001",
@@ -821,7 +821,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/tw004.webp"
+    "image": "assets/images/cards/S001.webp"
   },
   {
     "id": "S002",
@@ -837,7 +837,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 10
       }
     },
-    "image": "assets/images/cards/tw005.webp"
+    "image": "assets/images/cards/S002.webp"
   },
   {
     "id": "S003",
@@ -857,7 +857,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw_recall_v2.webp"
+    "image": "assets/images/cards/S003.webp"
   },
   {
     "id": "S004",
@@ -877,7 +877,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw_rally.webp"
+    "image": "assets/images/cards/S004.webp"
   },
   {
     "id": "S005",
@@ -893,7 +893,7 @@ export const CARD_CATALOG_GENERATED = [
         "target_category_includes": "政治人物"
       }
     },
-    "image": "assets/images/cards/tw_cabinet_resignation.webp"
+    "image": "assets/images/cards/S005.webp"
   },
   {
     "id": "S006",
@@ -913,7 +913,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/tw_eggs.webp"
+    "image": "assets/images/cards/S006.webp"
   },
   {
     "id": "S007",
@@ -929,7 +929,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/tw_press_conference.webp"
+    "image": "assets/images/cards/S007.webp"
   },
   {
     "id": "S008",
@@ -945,7 +945,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/s003.webp"
+    "image": "assets/images/cards/S008.webp"
   },
   {
     "id": "S009",
@@ -962,7 +962,7 @@ export const CARD_CATALOG_GENERATED = [
         "drawCount": 2
       }
     },
-    "image": "assets/images/cards/cutting.webp"
+    "image": "assets/images/cards/S009.webp"
   },
   {
     "id": "S010",
@@ -977,7 +977,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "DESTROY_ALL_MINIONS"
       }
     },
-    "image": "assets/images/cards/e921.webp"
+    "image": "assets/images/cards/S010.webp"
   },
   {
     "id": "S011",
@@ -999,7 +999,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/mvc_vaccine.webp"
+    "image": "assets/images/cards/S011.webp"
   },
   {
     "id": "S012",
@@ -1022,7 +1022,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/s_anti_china.webp"
+    "image": "assets/images/cards/S012.webp"
   },
   {
     "id": "S013",
@@ -1042,7 +1042,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/s_dried_mango.webp"
+    "image": "assets/images/cards/S013.webp"
   },
   {
     "id": "S014",
@@ -1060,7 +1060,7 @@ export const CARD_CATALOG_GENERATED = [
         "isTemporary": true
       }
     },
-    "image": "assets/images/cards/s_wingman_sortie.webp"
+    "image": "assets/images/cards/S014.webp"
   },
   {
     "id": "S015",
@@ -1081,7 +1081,7 @@ export const CARD_CATALOG_GENERATED = [
         ]
       }
     },
-    "image": "assets/images/cards/covid19.webp"
+    "image": "assets/images/cards/S015.webp"
   },
   {
     "id": "S016",
@@ -1101,7 +1101,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/gossip.webp"
+    "image": "assets/images/cards/S016.webp"
   },
   {
     "id": "S017",
@@ -1121,7 +1121,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/scandal.webp"
+    "image": "assets/images/cards/S017.webp"
   },
   {
     "id": "S018",
@@ -1140,7 +1140,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/burn.webp"
+    "image": "assets/images/cards/S018.webp"
   },
   {
     "id": "S019",
@@ -1156,7 +1156,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/check_water_meter.webp"
+    "image": "assets/images/cards/S019.webp"
   },
   {
     "id": "S020",
@@ -1176,7 +1176,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/political_purge.webp"
+    "image": "assets/images/cards/S020.webp"
   },
   {
     "id": "S021",
@@ -1195,7 +1195,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/hamen.webp"
+    "image": "assets/images/cards/S021.webp"
   },
   {
     "id": "S022",
@@ -1215,7 +1215,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/electronic_monitoring.webp"
+    "image": "assets/images/cards/S022.webp"
   },
   {
     "id": "S023",
@@ -1235,7 +1235,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/life_imprisonment.webp"
+    "image": "assets/images/cards/S023.webp"
   },
   {
     "id": "S024",
@@ -1255,7 +1255,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/huge_bail.webp"
+    "image": "assets/images/cards/S024.webp"
   },
   {
     "id": "S025",
@@ -1272,7 +1272,7 @@ export const CARD_CATALOG_GENERATED = [
         "stat": "ALL"
       }
     },
-    "image": "assets/images/cards/cash_handout.webp"
+    "image": "assets/images/cards/S025.webp"
   },
   {
     "id": "S026",
@@ -1291,7 +1291,7 @@ export const CARD_CATALOG_GENERATED = [
         "buff_value": 2
       }
     },
-    "image": "assets/images/cards/suspension.webp"
+    "image": "assets/images/cards/S026.webp"
   },
   {
     "id": "S027",
@@ -1310,7 +1310,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/silence_is_not_gold.webp"
+    "image": "assets/images/cards/S027.webp"
   },
   {
     "id": "S028",
@@ -1352,7 +1352,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/betel_nut.webp"
+    "image": "assets/images/cards/S029.webp"
   },
   {
     "id": "TW048",
@@ -1367,7 +1367,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "charge": true
     },
-    "image": "assets/images/cards/cyber_army.webp"
+    "image": "assets/images/cards/TW048.webp"
   },
   {
     "id": "TW049",
@@ -1386,7 +1386,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/chen_shih_chung.webp"
+    "image": "assets/images/cards/TW049.webp"
   },
   {
     "id": "TW047",
@@ -1407,7 +1407,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/lien_chan.webp"
+    "image": "assets/images/cards/TW047.webp"
   },
   {
     "id": "TW059",
@@ -1428,7 +1428,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/hsieh_ho_hsien.webp"
+    "image": "assets/images/cards/TW059.webp"
   },
   {
     "id": "TW037",
@@ -1446,7 +1446,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/veteran.webp"
+    "image": "assets/images/cards/TW037.webp"
   },
   {
     "id": "TW038",
@@ -1465,7 +1465,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/fu_kun_chi.webp"
+    "image": "assets/images/cards/TW038.webp"
   },
   {
     "id": "TW039",
@@ -1483,7 +1483,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/hsu.webp"
+    "image": "assets/images/cards/TW039.webp"
   },
   {
     "id": "TW040",
@@ -1498,7 +1498,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "onDiscard": "SUMMON"
     },
-    "image": "assets/images/cards/hsieh.webp"
+    "image": "assets/images/cards/TW040.webp"
   },
   {
     "id": "TW054",
@@ -1513,7 +1513,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "onDiscard": "SUMMON"
     },
-    "image": "assets/images/cards/iron_han_fan.webp"
+    "image": "assets/images/cards/TW054.webp"
   },
   {
     "id": "TW041",
@@ -1531,7 +1531,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 3
       }
     },
-    "image": "assets/images/cards/ko_jail.webp"
+    "image": "assets/images/cards/TW041.webp"
   },
   {
     "id": "TW042",
@@ -1549,7 +1549,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/tsai_pi_ru.webp"
+    "image": "assets/images/cards/TW042.webp"
   },
   {
     "id": "TW043",
@@ -1564,7 +1564,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "divineShield": true
     },
-    "image": "assets/images/cards/tw021.webp"
+    "image": "assets/images/cards/TW043.webp"
   },
   {
     "id": "TW051",
@@ -1582,7 +1582,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/hsiao_bi_khim.webp"
+    "image": "assets/images/cards/TW051.webp"
   },
   {
     "id": "TW057",
@@ -1597,7 +1597,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "charge": true
     },
-    "image": "assets/images/cards/tsai_lele.webp"
+    "image": "assets/images/cards/TW057.webp"
   },
   {
     "id": "TW058",
@@ -1612,7 +1612,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "divineShield": true
     },
-    "image": "assets/images/cards/tsai_xiangxiang.webp"
+    "image": "assets/images/cards/TW058.webp"
   },
   {
     "id": "TW060",
@@ -1634,7 +1634,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/su_tseng_chang.webp"
+    "image": "assets/images/cards/TW060.webp"
   },
   {
     "id": "TW061",
@@ -1656,7 +1656,7 @@ export const CARD_CATALOG_GENERATED = [
         "cardId": "TW062"
       }
     },
-    "image": "assets/images/cards/chen_chi_mai.webp"
+    "image": "assets/images/cards/TW061.webp"
   },
   {
     "id": "TW062",
@@ -1674,7 +1674,7 @@ export const CARD_CATALOG_GENERATED = [
         "summonCardId": "TW061"
       }
     },
-    "image": "assets/images/cards/lan_yi_ming.webp"
+    "image": "assets/images/cards/TW062.webp"
   },
   {
     "id": "TW063",
@@ -1695,7 +1695,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/nuclear_power_plant.webp"
+    "image": "assets/images/cards/TW063.webp"
   },
   {
     "id": "TW064",
@@ -1717,7 +1717,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/zheng_wen_tsan.webp"
+    "image": "assets/images/cards/TW064.webp"
   },
   {
     "id": "TW065",
@@ -1732,7 +1732,7 @@ export const CARD_CATALOG_GENERATED = [
     "keywords": {
       "charge": true
     },
-    "image": "assets/images/cards/8plus9.webp"
+    "image": "assets/images/cards/TW065.webp"
   },
   {
     "id": "TW066",
@@ -1752,7 +1752,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/wang_ting_yu.webp"
+    "image": "assets/images/cards/TW066.webp"
   },
   {
     "id": "TW067",
@@ -1771,7 +1771,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/cho_jung_tai.webp"
+    "image": "assets/images/cards/TW067.webp"
   },
   {
     "id": "TW068",
@@ -1789,7 +1789,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/justice.webp"
+    "image": "assets/images/cards/TW068.webp"
   },
   {
     "id": "TW069",
@@ -1807,7 +1807,7 @@ export const CARD_CATALOG_GENERATED = [
         "type": "BOUNCE_RANDOM_ENEMY"
       }
     },
-    "image": "assets/images/cards/lin_chia_lung.webp"
+    "image": "assets/images/cards/TW069.webp"
   },
   {
     "id": "TW070",
@@ -1826,7 +1826,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/bull.webp"
+    "image": "assets/images/cards/TW070.webp"
   },
   {
     "id": "TW071",
@@ -1846,7 +1846,7 @@ export const CARD_CATALOG_GENERATED = [
         }
       }
     },
-    "image": "assets/images/cards/death_grip.webp"
+    "image": "assets/images/cards/TW071.webp"
   },
   {
     "id": "TW072",
@@ -1864,7 +1864,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 6
       }
     },
-    "image": "assets/images/cards/toyz.webp"
+    "image": "assets/images/cards/TW072.webp"
   },
   {
     "id": "TW073",
@@ -1938,7 +1938,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/nuclear_waste.webp",
+    "image": "assets/images/cards/TW077.webp",
     "collectible": false
   },
   {
@@ -1957,7 +1957,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/operator.webp"
+    "image": "assets/images/cards/TW078.webp"
   },
   {
     "id": "TW079",
@@ -1975,7 +1975,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 2
       }
     },
-    "image": "assets/images/cards/server.webp"
+    "image": "assets/images/cards/TW079.webp"
   },
   {
     "id": "TW080",
@@ -1994,7 +1994,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/chen_shui_bian.webp"
+    "image": "assets/images/cards/TW080.webp"
   },
   {
     "id": "TW081",
@@ -2014,7 +2014,7 @@ export const CARD_CATALOG_GENERATED = [
         "cardId": "TW080"
       }
     },
-    "image": "assets/images/cards/chen_chih_chung.webp"
+    "image": "assets/images/cards/TW081.webp"
   },
   {
     "id": "TW082",
@@ -2034,7 +2034,7 @@ export const CARD_CATALOG_GENERATED = [
         "count": 3
       }
     },
-    "image": "assets/images/cards/paparazzi.webp"
+    "image": "assets/images/cards/TW082.webp"
   },
   {
     "id": "S030",
@@ -2051,7 +2051,7 @@ export const CARD_CATALOG_GENERATED = [
         "count": 3
       }
     },
-    "image": "assets/images/cards/guan_luo_yin.webp"
+    "image": "assets/images/cards/S030.webp"
   },
   {
     "id": "S031",
@@ -2093,7 +2093,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/news_tornado.webp"
+    "image": "assets/images/cards/S032.webp"
   },
   {
     "id": "S033",
@@ -2110,7 +2110,7 @@ export const CARD_CATALOG_GENERATED = [
         "bonus_value": 3
       }
     },
-    "image": "assets/images/cards/chao_di.webp"
+    "image": "assets/images/cards/S033.webp"
   },
   {
     "id": "TW083",
@@ -2130,7 +2130,7 @@ export const CARD_CATALOG_GENERATED = [
         "count": 3
       }
     },
-    "image": "assets/images/cards/ling_mei.webp"
+    "image": "assets/images/cards/TW083.webp"
   },
   {
     "id": "TW084",
@@ -2150,7 +2150,7 @@ export const CARD_CATALOG_GENERATED = [
         "value": 1
       }
     },
-    "image": "assets/images/cards/chen_chu.webp"
+    "image": "assets/images/cards/TW084.webp"
   },
   {
     "id": "TW085",
@@ -2175,6 +2175,6 @@ export const CARD_CATALOG_GENERATED = [
         "target_category_includes": "民進黨政治人物"
       }
     },
-    "image": "assets/images/cards/lu_hsiu_lien.webp"
+    "image": "assets/images/cards/TW085.webp"
   }
 ] as const satisfies readonly CardDefinition[];

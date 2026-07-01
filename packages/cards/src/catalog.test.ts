@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { CARD_CATALOG } from "./catalog.js";
+import { CARD_CATALOG, cardImagePath } from "./catalog.js";
 import { SUPPORTED_BATTLECRY_EFFECTS, type CardDefinition } from "./types.js";
 import { validateCatalog } from "./validation.js";
 
@@ -64,6 +64,13 @@ describe("card catalog", () => {
       rarity: "EPIC",
       keywords: { battlecry: { type: "DRAW_IF_CARD_ON_BOARD", value: 2, bonus_value: 3, cardId: "TW080" } },
     });
+  });
+
+  it("names every card art by its id (image === cardImagePath(id))", () => {
+    const drifted = CARD_CATALOG.filter((card) => card.image !== cardImagePath(card.id)).map(
+      (card) => `${card.id}: ${card.image}`
+    );
+    expect(drifted).toEqual([]);
   });
 
   it("keeps every current battlecry effect in the supported list", () => {
