@@ -9,6 +9,7 @@
     "check": "tsc -b --pretty false",
     "assets:bucket": "wrangler r2 bucket create twcardgame-assets",
     "assets:upload": "node scripts/upload-assets.mjs",
+    "assets:upload:s3": "node scripts/upload-assets-s3.mjs",
     "pages:dev": "wrangler pages dev",
     "pages:deploy": "wrangler pages deploy"
   },

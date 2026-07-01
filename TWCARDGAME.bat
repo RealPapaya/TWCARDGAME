@@ -53,8 +53,8 @@ try {
     @{ Label = '-- 部署上線 --------------------------------';   Separator = $true }
     @{ Label = '部署 前端 Pages  (build + pages deploy)';        Pause = $true;  Action = { Run-Inline 'npm run build && npm run pages:deploy -w @twcardgame/web -- --branch=main' } }
     @{ Label = '部署 後端 Worker (realtime deploy)';            Pause = $true;  Action = { Run-Inline 'npm run deploy -w @twcardgame/realtime' } }
-    @{ Label = '上傳 R2 資產     (assets upload)';              Pause = $true;  Action = { Run-Inline 'npm run assets:upload -w @twcardgame/web' } }
-    @{ Label = '一鍵部署全部     (前端 + 後端 + 資產)';         Pause = $true;  Action = { Run-Inline 'npm run build && npm run pages:deploy -w @twcardgame/web -- --branch=main && npm run deploy -w @twcardgame/realtime && npm run assets:upload -w @twcardgame/web' } }
+    @{ Label = '上傳 R2 資產     (assets upload, S3 直傳)';       Pause = $true;  Action = { Run-Inline 'npm run assets:upload:s3 -w @twcardgame/web -- --all' } }
+    @{ Label = '一鍵部署全部     (前端 + 後端 + 資產)';         Pause = $true;  Action = { Run-Inline 'npm run build && npm run pages:deploy -w @twcardgame/web -- --branch=main && npm run deploy -w @twcardgame/realtime && npm run assets:upload:s3 -w @twcardgame/web -- --all' } }
     @{ Label = '-- 其他 ------------------------------------';   Separator = $true }
     @{ Label = '測試 + 型別檢查  (npm test && npm run check)';  Pause = $true;  Action = { Run-Inline 'npm test && npm run check' } }
   )
