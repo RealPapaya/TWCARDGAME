@@ -94,7 +94,8 @@ import {
   applyCardCosmeticSelection,
   setOwnedCardCosmetics,
   setSelectedCardCosmetics,
-  clearCosmeticState
+  clearCosmeticState,
+  ownedCardCosmetics
 } from "./app/card-cosmetics.js";
 import {
   clearActiveMatch,
@@ -1588,6 +1589,9 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
               ${renderCollectionFilterButton("all", "全部", "filter-all")}
               ${renderCollectionFilterButton("owned", "已擁有", "filter-owned")}
               ${renderCollectionFilterButton("missing", "未擁有", "filter-missing")}
+              ${backScreen === "main" && accountMode
+                ? `<button type="button" class="collection-cosmetics-btn" id="open-card-cosmetics" data-testid="open-card-cosmetics">✨ 特殊卡皮</button>`
+                : ""}
             </div>
             <div class="collection-grid" data-testid="collection-grid" data-preserve-scroll>
               ${filtered.length === 0 ? `<p class="muted collection-empty">沒有符合條件的卡牌。</p>` : filtered.map((card) => {
@@ -1602,6 +1606,7 @@ function renderCollectionWorkspace(backScreen: MenuScreen, title: string): strin
         ${renderCollectionDeckColumnContent()}
       </aside>
       ${view.pinnedCollectionCardId ? renderPinnedCardDetail(view.pinnedCollectionCardId) : ""}
+      ${backScreen === "main" && accountMode && view.collectionCosmeticsOpen ? renderCardCosmeticsOverlay() : ""}
     </section>
   `;
 }
@@ -1806,7 +1811,7 @@ function renderCardCosmeticToggle(cardId: string): string {
       <span class="card-cosmetic-label">${escapeHtml(cosmetic?.label ?? "炫彩圖片")}</span>
       <button
         type="button"
-        id="card-cosmetic-switch"
+        data-cosmetic-switch="1"
         class="card-cosmetic-switch ${enabled ? "on" : "off"}"
         role="switch"
         aria-checked="${enabled ? "true" : "false"}"
@@ -1815,6 +1820,43 @@ function renderCardCosmeticToggle(cardId: string): string {
         <span class="card-cosmetic-switch-track"><span class="card-cosmetic-switch-thumb"></span></span>
         <span class="card-cosmetic-switch-state">${enabled ? "使用中" : "未使用"}</span>
       </button>
+    </div>
+  `;
+}
+
+/**
+ * Collection "特殊卡皮" gallery, shown as a dismissable overlay (opened by the
+ * 特殊卡皮 button) so it never pushes or covers the card grid / deck column below.
+ * Lists the 炫彩 skins the player owns, each with a preview and the same on/off
+ * toggle as the card-detail modal. When the player owns none, a hint points them
+ * at the 炫彩包 so the panel still explains what it is.
+ */
+function renderCardCosmeticsOverlay(): string {
+  const owned = ownedCardCosmetics();
+  const body = owned.length === 0
+    ? `<p class="muted card-cosmetics-empty">尚未擁有特殊卡皮，可在商店開「炫彩包」取得。</p>`
+    : `<div class="card-cosmetics-grid">
+        ${owned.map((cosmetic) => {
+          const card = CARD_CATALOG.find((c) => c.id === cosmetic.cardId);
+          const name = cosmetic.label ?? card?.name ?? cosmetic.cardId;
+          return `
+            <div class="card-cosmetic-item">
+              <span class="card-cosmetic-preview" style="background-image:url('${escapeAttr(assetUrl(cosmetic.image))}')" role="img" aria-label="${escapeAttr(name)}"></span>
+              <span class="card-cosmetic-name">${escapeHtml(name)}</span>
+              ${renderCardCosmeticToggle(cosmetic.cardId)}
+            </div>
+          `;
+        }).join("")}
+      </div>`;
+  return `
+    <div class="card-cosmetics-overlay" id="card-cosmetics-overlay" data-testid="card-cosmetics-overlay">
+      <div class="card-cosmetics-modal">
+        <header class="card-cosmetics-header">
+          <h3 class="card-cosmetics-title">特殊卡皮</h3>
+          <button type="button" id="card-cosmetics-close" class="settings-close-btn" title="關閉" aria-label="關閉">✕</button>
+        </header>
+        <div class="card-cosmetics-body">${body}</div>
+      </div>
     </div>
   `;
 }
@@ -4380,10 +4422,26 @@ function bindStaticActions(): void {
       render();
     }
   });
-  on(document.querySelector<HTMLButtonElement>("#card-cosmetic-switch"), "click", "card-cosmetic-switch", (event) => {
-    const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
-    if (cardId) void toggleCardCosmetic(cardId);
+  on(document.querySelector<HTMLButtonElement>("#open-card-cosmetics"), "click", "open-card-cosmetics", () => {
+    view.collectionCosmeticsOpen = true;
+    render();
   });
+  on(document.querySelector<HTMLButtonElement>("#card-cosmetics-close"), "click", "card-cosmetics-close", () => {
+    view.collectionCosmeticsOpen = false;
+    render();
+  });
+  on(document.querySelector<HTMLElement>("#card-cosmetics-overlay"), "click", "card-cosmetics-overlay", (event) => {
+    if (event.target === event.currentTarget) {
+      view.collectionCosmeticsOpen = false;
+      render();
+    }
+  });
+  for (const el of document.querySelectorAll<HTMLButtonElement>("[data-cosmetic-switch]")) {
+    on(el, "click", "card-cosmetic-switch", (event) => {
+      const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
+      if (cardId) void toggleCardCosmetic(cardId);
+    });
+  }
   on(document.querySelector<HTMLButtonElement>("#card-op-disenchant"), "click", "card-op-disenchant", (event) => {
     const cardId = (event.currentTarget as HTMLButtonElement).dataset.cardId;
     if (cardId) void disenchantCard(cardId, 1);
@@ -4709,6 +4767,7 @@ function navigateToScreen(target: MenuScreen): void {
   view.avatarPickerOpen = false;
   view.titlePickerOpen = false;
   view.pinnedCollectionCardId = undefined;
+  view.collectionCosmeticsOpen = false;
   if (target !== "profile") { view.editingDisplayName = undefined; view.editingDisplayNameActive = false; }
   if (target === "friends") void loadFriends();
   if (target === "leaderboard") void loadLeaderboard();

@@ -703,6 +703,107 @@
   color: var(--ink-muted);
 }
 
+/* 收藏庫「特殊卡皮」— a button in the filter tabs that opens a dismissable
+   overlay, so the gallery never pushes or covers the card grid / deck column. */
+.collection-cosmetics-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 215, 120, 0.55);
+  background: linear-gradient(to bottom, #5d2e17, #3f1e0d);
+  color: #ffdf8a;
+  font-weight: 800;
+  cursor: pointer;
+  transition: filter 0.15s ease;
+}
+
+.collection-cosmetics-btn:hover {
+  filter: brightness(1.15);
+}
+
+.card-cosmetics-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 5, 2, 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.card-cosmetics-modal {
+  width: min(680px, 92%);
+  max-height: 82%;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(to bottom, #2a1810, #1c0f08);
+  border: 3px solid var(--gold, #d4af37);
+  border-radius: 14px;
+  box-shadow: 0 16px 50px rgba(0, 0, 0, 0.7);
+  padding: 18px 20px;
+}
+
+.card-cosmetics-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.card-cosmetics-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.card-cosmetics-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  color: var(--ink-bright, #ffe7b0);
+}
+
+.card-cosmetics-empty {
+  margin: 0;
+}
+
+.card-cosmetics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.card-cosmetic-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: rgba(255, 215, 120, 0.06);
+  border: 1px solid rgba(255, 215, 120, 0.3);
+}
+
+.card-cosmetic-preview {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+.card-cosmetic-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink-bright, #ffe7b0);
+}
+
+.card-cosmetic-item .card-cosmetic-toggle {
+  padding: 6px 8px;
+}
+
 /* Deck cover thumbnail + picker */
 .deck-cover-thumb {
   display: flex;

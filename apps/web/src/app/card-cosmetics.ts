@@ -45,6 +45,16 @@ export function getCardCosmetic(cardId: string): CardCosmetic | undefined {
   return CARD_COSMETICS[cardId];
 }
 
+/** All registered 炫彩 arts (for a gallery listing). */
+export function allCardCosmetics(): CardCosmetic[] {
+  return Object.values(CARD_COSMETICS);
+}
+
+/** The 炫彩 arts the player currently owns — the collection "特殊卡皮" gallery. */
+export function ownedCardCosmetics(): CardCosmetic[] {
+  return allCardCosmetics().filter((cosmetic) => ownsCardCosmetic(cosmetic.cardId));
+}
+
 export function hasCardCosmetic(cardId: string): boolean {
   return cardId in CARD_COSMETICS;
 }

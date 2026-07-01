@@ -96,7 +96,9 @@
       "Bash(codex.cmd --version)",
       "Bash(codex.cmd exec *)",
       "Bash(mv 1.webp chen_shui_bian.webp)",
-      "Bash(mv 2.webp chen_chih_chung.webp)"
+      "Bash(mv 2.webp chen_chih_chung.webp)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(node apps/web/scripts/upload-assets-s3.mjs --dry-run)"
     ],
     "additionalDirectories": [
       "\\tmp"
