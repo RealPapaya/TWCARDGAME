@@ -100,18 +100,32 @@ const hex = (buf) => Buffer.from(buf).toString("hex");
 const sha256 = (data) => hex(createHash("sha256").update(data).digest());
 const hmac = (key, data) => createHmac("sha256", key).update(data).digest();
 
-// AWS SigV4 for a single S3 PutObject against R2.
+const endpointHost = new URL(endpoint).host;
+
+// AWS UriEncode for a single path segment: RFC 3986 unreserved stay literal,
+// everything else percent-encoded. encodeURIComponent leaves !*'() alone, so
+// encode those too. `/` is handled by the caller (segments are joined, not encoded).
+function awsUriEncode(segment) {
+  return encodeURIComponent(segment).replace(
+    /[!*'()]/g,
+    (c) => "%" + c.charCodeAt(0).toString(16).toUpperCase()
+  );
+}
+
+// AWS SigV4 for a single S3 PutObject against R2. The wire URL and the canonical
+// URI are built from the SAME encoding so filenames with spaces/() still verify.
 function sign({ key, body, ct }) {
-  const url = new URL(`${endpoint}/${bucket}/${key}`);
+  const encodedPath = `${bucket}/${key}`.split("/").map(awsUriEncode).join("/");
+  const requestUrl = `${endpoint.replace(/\/$/, "")}/${encodedPath}`;
   const now = new Date();
   const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, ""); // YYYYMMDDTHHMMSSZ
   const dateStamp = amzDate.slice(0, 8);
   const payloadHash = sha256(body);
-  const canonicalUri = url.pathname.split("/").map(encodeURIComponent).join("/");
+  const canonicalUri = `/${encodedPath}`;
   const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
   const canonicalHeaders =
     `content-type:${ct}\n` +
-    `host:${url.host}\n` +
+    `host:${endpointHost}\n` +
     `x-amz-content-sha256:${payloadHash}\n` +
     `x-amz-date:${amzDate}\n`;
   const canonicalRequest = `PUT\n${canonicalUri}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
@@ -123,7 +137,7 @@ function sign({ key, body, ct }) {
   const kSigning = hmac(kService, "aws4_request");
   const signature = hex(hmac(kSigning, stringToSign));
   return {
-    url: url.toString(),
+    url: requestUrl,
     headers: {
       "content-type": ct,
       "x-amz-content-sha256": payloadHash,
