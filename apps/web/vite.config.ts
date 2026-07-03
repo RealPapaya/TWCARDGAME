@@ -163,10 +163,10 @@ export default defineConfig({
   },
   build: {
     outDir: "dist-public",
-    // Media (129MB across images/audio/video) is served from R2 by the Pages
-    // Functions, so it must NOT be copied into the static deploy. The dev server
-    // still serves public/ from disk, so local play is unaffected.
-    copyPublicDir: false,
+    // Cloudflare Pages serves media from R2 via Pages Functions, so the Pages
+    // deploy must not include public/. Vercel has no matching R2 function layer,
+    // so its build needs public/ copied into dist-public for /images/* to work.
+    copyPublicDir: process.env.VERCEL === "1",
     rollupOptions: {
       input: {
         main: resolve(__dirname, "index.html"),
