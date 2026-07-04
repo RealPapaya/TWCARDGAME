@@ -4398,6 +4398,18 @@ function bindStaticActions(): void {
     view.publicPlayerProfile = undefined;
     render();
   });
+  for (const el of document.querySelectorAll<HTMLButtonElement>("[data-public-profile-add-friend]")) {
+    on(el, "click", "public-profile-add-friend", () => {
+      const displayName = el.dataset.publicProfileAddFriend;
+      if (displayName) void sendFriendRequest(displayName);
+    });
+  }
+  for (const el of document.querySelectorAll<HTMLButtonElement>("[data-public-profile-accept-friend]")) {
+    on(el, "click", "public-profile-accept-friend", () => {
+      const requestId = el.dataset.publicProfileAcceptFriend;
+      if (requestId) void respondFriendRequest("accept", requestId);
+    });
+  }
   on(document.querySelector<HTMLInputElement>("#collection-search-input"), "input", "collection-search-input", (event) => {
     const input = event.currentTarget as HTMLInputElement;
     view.collectionSearch = input.value;
@@ -4772,7 +4784,10 @@ function navigateToScreen(target: MenuScreen): void {
   view.collectionCosmeticsOpen = false;
   if (target !== "profile") { view.editingDisplayName = undefined; view.editingDisplayNameActive = false; }
   if (target === "friends") void loadFriends();
-  if (target === "leaderboard") void loadLeaderboard();
+  if (target === "leaderboard") {
+    void loadLeaderboard();
+    void loadFriends();
+  }
   if (target === "shop") void loadShopItems();
   if (target === "tasks" || target === "achievements") void loadTasks();
   if (target === "main") {
@@ -4957,6 +4972,7 @@ function renderPublicPlayerProfileModal(): string {
   if (!player) return "";
   const avatarUrl = player.avatarUrl || DEFAULT_AVATAR_URL;
   const level = player.level ?? deriveLbLevel(player.winsCount);
+  const friendAction = renderPublicProfileFriendAction(player);
   const rankText = player.rank ? `#${player.rank}` : "—";
   return `
     <section id="public-profile-backdrop" class="public-profile-backdrop" role="dialog" aria-modal="true" aria-label="玩家個人頁面">
@@ -4975,9 +4991,43 @@ function renderPublicPlayerProfileModal(): string {
           <div><span>勝場</span><strong>${player.winsCount}</strong></div>
           <div><span>排行</span><strong>${escapeHtml(rankText)}</strong></div>
         </div>
+        ${friendAction}
       </div>
     </section>
   `;
+}
+
+function renderPublicProfileFriendAction(player: NonNullable<typeof view.publicPlayerProfile>): string {
+  if (!supabase || !view.session || player.userId === view.session.user.id) return "";
+  const friendship = publicProfileFriendshipState(player.userId);
+  if (friendship.friendshipStatus === "friend") {
+    return `<div class="public-profile-actions"><button type="button" class="public-profile-friend-btn" disabled>已是好友</button></div>`;
+  }
+  if (friendship.friendshipStatus === "outgoing") {
+    return `<div class="public-profile-actions"><button type="button" class="public-profile-friend-btn" disabled>邀請已送出</button></div>`;
+  }
+  if (friendship.friendshipStatus === "incoming" && friendship.friendRequestId) {
+    return `
+      <div class="public-profile-actions">
+        <button type="button" class="public-profile-friend-btn" data-public-profile-accept-friend="${escapeAttr(friendship.friendRequestId)}">接受好友邀請</button>
+      </div>
+    `;
+  }
+  return `
+    <div class="public-profile-actions">
+      <button type="button" class="public-profile-friend-btn" data-public-profile-add-friend="${escapeAttr(player.displayName)}">加入好友</button>
+    </div>
+  `;
+}
+
+function publicProfileFriendshipState(userId: string): Pick<NonNullable<typeof view.publicPlayerProfile>, "friendshipStatus" | "friendRequestId"> {
+  if (view.friends.some((row) => row.friend_user_id === userId)) return { friendshipStatus: "friend" };
+  const request = view.friendRequests.find((row) => row.other_user_id === userId);
+  if (!request) return { friendshipStatus: "none" };
+  return {
+    friendshipStatus: request.direction,
+    friendRequestId: request.request_id
+  };
 }
 
 function openPublicPlayerProfile(userId: string): void {

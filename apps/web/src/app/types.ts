@@ -118,6 +118,8 @@ export type PublicPlayerProfile = {
   level?: number;
   source: string;
   rank?: number;
+  friendshipStatus?: "friend" | "incoming" | "outgoing" | "none";
+  friendRequestId?: string;
 };
 
 export type MatchmakingState = {

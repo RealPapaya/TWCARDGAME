@@ -108,6 +108,20 @@
   font-size: 24px;
 }
 
+.public-profile-actions {
+  display: flex;
+  justify-content: center;
+}
+
+.public-profile-friend-btn {
+  min-width: 170px;
+  padding: 10px 18px;
+}
+
+.public-profile-friend-btn:disabled {
+  opacity: 0.75;
+}
+
 @media (max-width: 720px) {
   .profile-panel {
     margin-inline: 10px;
