@@ -76,7 +76,9 @@ export function setOwnedCardCosmetics(cardIds: Iterable<string>): void {
 
 /** Feed displayed 炫彩 cardIds (profiles.selected_card_arts) on account load. */
 export function setSelectedCardCosmetics(cardIds: Iterable<string>): void {
-  selectedCosmetics = new Set(cardIds);
+  selectedCosmetics = new Set(
+    [...cardIds].filter((cardId) => hasCardCosmetic(cardId) && ownsCardCosmetic(cardId))
+  );
 }
 
 /** Clear in-memory cosmetic state (call on sign-out). */
@@ -95,7 +97,7 @@ export function canToggleCardCosmetic(cardId: string): boolean {
 }
 
 export function isCardCosmeticEnabled(cardId: string): boolean {
-  return selectedCosmetics.has(cardId);
+  return ownsCardCosmetic(cardId) && selectedCosmetics.has(cardId);
 }
 
 /**
@@ -104,7 +106,7 @@ export function isCardCosmeticEnabled(cardId: string): boolean {
  * from the reloaded profile (reverting this on RPC failure).
  */
 export function applyCardCosmeticSelection(cardId: string, enabled: boolean): void {
-  if (enabled) selectedCosmetics.add(cardId);
+  if (enabled && canToggleCardCosmetic(cardId)) selectedCosmetics.add(cardId);
   else selectedCosmetics.delete(cardId);
 }
 

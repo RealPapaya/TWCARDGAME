@@ -325,6 +325,8 @@ function isMissingProfileEmoteColumnError(error: unknown): boolean {
 function normalizeProfileRow(profile: ProfileRow): ProfileRow {
   return {
     ...profile,
+    owned_card_arts: profile.owned_card_arts ?? [],
+    selected_card_arts: profile.selected_card_arts ?? [],
     owned_emotes: profile.owned_emotes ?? [],
     selected_emotes: profile.selected_emotes ?? []
   };
@@ -5108,10 +5110,53 @@ function renderShopScreen(): string {
   `;
 }
 
+function renderShopDropRates(item: ShopItemRow): string {
+  const rates = item.contents?.dropRates ?? [];
+  if (rates.length === 0) return "";
+  return `
+    <div class="product-rates-side">
+      <div class="rates-title">內容機率</div>
+      <div class="product-drop-rates">
+        ${rates.map((rate) => `
+          <div class="rate-row ${escapeAttr(rate.rarity?.toLowerCase() ?? rate.type ?? "")}">
+            <span>${escapeHtml(rate.label)}</span>
+            <span class="rate-val">${rate.rate}%</span>
+          </div>
+        `).join("")}
+      </div>
+      ${item.contents?.note ? `<small class="product-note">${escapeHtml(item.contents.note)}</small>` : ""}
+    </div>
+  `;
+}
+
 function renderShopItem(item: ShopItemRow): string {
   const cardIds = item.contents?.cards ?? [];
   const cards = cardIds.map((id) => cardCatalog.get(id)).filter(Boolean) as CardDefinition[];
   const icon = shopItemIcon(item);
+  const dropRatesHtml = renderShopDropRates(item);
+
+  if (dropRatesHtml) {
+    return `
+      <section class="product-card" data-testid="shop-item">
+        <div class="product-top-row">
+          <div class="product-image">${icon}</div>
+          <h3>${escapeHtml(item.display_name)}</h3>
+        </div>
+        <div class="product-details-bottom">
+          <div class="product-info-side">
+            ${item.description ? `<p class="product-desc">${escapeHtml(item.description)}</p>` : ""}
+            <div class="product-price">
+              <img class="price-coin" src="/images/ui/Coin.webp" alt="金幣"
+                onerror="this.style.display='none'">
+              <span>${item.price_gold}</span>
+            </div>
+            <button class="btn-buy" data-claim-shop="${escapeAttr(item.id)}" data-testid="claim-shop">購買</button>
+          </div>
+          ${dropRatesHtml}
+        </div>
+      </section>
+    `;
+  }
 
   const ratesHtml = cards.length > 0 ? `
     <div class="product-rates-side">
