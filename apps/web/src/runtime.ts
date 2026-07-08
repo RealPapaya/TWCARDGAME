@@ -86,6 +86,7 @@ import { bindOnce, patchHtml } from "./app/dom-patch.js";
 import { captureRenderSnapshot, restoreRenderSnapshot } from "./app/render-snapshot.js";
 import { renderCardFaceMarkup, renderAugmentOptionMarkup, renderVoteOptionMarkup } from "./app/card-markup.js";
 import { readStoredBool, readStoredNumber } from "./app/storage.js";
+import { claimLoginWindow, keepLoginWindow, releaseLoginWindow } from "./app/single-login.js";
 import {
   cosmeticCardImage,
   getCardCosmetic,
@@ -268,8 +269,13 @@ function blog(label: string, data?: Record<string, unknown>): void {
 
 const app = document.querySelector<HTMLDivElement>("#app")!;
 const supabase = configuredSupabase;
+const LOGIN_WINDOW_HEARTBEAT_MS = 15_000;
 const devTestModeAvailable = import.meta.env.DEV && isLocalDevHost();
 let devTestPanel: typeof import("./app/dev-test.js") | undefined;
+let loginWindowHeartbeatTimer: number | undefined;
+let loginWindowHeartbeatBusy = false;
+let loginWindowClaimPromise: Promise<boolean> | undefined;
+let forcedLoginWindowLogout = false;
 const cardCatalog = new Map<string, CardDefinition>(CARD_CATALOG.map((card) => [card.id, card]));
 const amplificationCatalog = new Map(AMPLIFICATION_DB.map((augment) => [augment.id, augment]));
 const voteEventCatalog = new Map(VOTE_EVENT_DB.map((event) => [event.id, event]));
@@ -643,8 +649,20 @@ async function bootAndReveal(): Promise<void> {
   // Prompt to resume a match only once account/auth load has genuinely finished
   // (so view.session is populated) — never on the reveal timeout, or a slow load
   // would make maybePromptResumeMatch discard a valid PvP reconnect token.
-  void account.then(() => {
-    void maybePromptResumeMatch();
+  void account.then(async () => {
+    let loginWindowClaimed = true;
+    if (supabase && view.session) {
+      try {
+        loginWindowClaimed = await ensureCurrentLoginWindow({ promptOnConflict: true });
+      } catch (error) {
+        console.warn("single-login claim failed after boot", error);
+      }
+    }
+    if (!loginWindowClaimed) {
+      await abandonLocalSessionAfterLoginWindowConflict();
+      return;
+    }
+    await maybePromptResumeMatch();
   });
 }
 
@@ -7892,7 +7910,7 @@ function parseTargetAttr(el: HTMLElement | null): TargetRef | undefined {
   }
 }
 
-async function backToLobby(): Promise<void> {
+async function backToLobby(options: { refreshAccount?: boolean } = {}): Promise<void> {
   const room = view.room;
   if (rewardFallbackTimer !== undefined) {
     window.clearTimeout(rewardFallbackTimer);
@@ -7939,7 +7957,7 @@ async function backToLobby(): Promise<void> {
       // The room may already be closed after match cleanup.
     }
   }
-  if (supabase && view.session) {
+  if (options.refreshAccount !== false && supabase && view.session) {
     await loadAccountData();
     void loadTasks();
     void loadFriends();
@@ -7994,10 +8012,16 @@ async function initializeAccount(): Promise<void> {
     const previousUserId = view.session?.user?.id;
     const nextUserId = session?.user?.id;
     view.session = session;
+    if (!session) stopLoginWindowHeartbeat();
     if (event === "INITIAL_SESSION" || event === "TOKEN_REFRESHED") return;
-    if (event === "SIGNED_IN" && previousUserId === nextUserId) return;
+    if (event === "SIGNED_IN" && previousUserId === nextUserId && view.profile) return;
     if (session) {
       if (previousUserId !== nextUserId) view.menuScreen = "main";
+      void ensureCurrentLoginWindow({ promptOnConflict: true })
+        .then((claimed) => {
+          if (!claimed) void abandonLocalSessionAfterLoginWindowConflict();
+        })
+        .catch((error) => console.warn("single-login claim failed after auth change", error));
       void loadAccountData();
       preloadMenuData();
     } else {
@@ -8050,8 +8074,14 @@ async function signInWithPassword(): Promise<void> {
   const credentials = readAuthFields();
   if (!credentials) return;
   await withAccountLoading(async () => {
-    const { error } = await supabase.auth.signInWithPassword(credentials);
+    const { data, error } = await supabase.auth.signInWithPassword(credentials);
     if (error) throw error;
+    if (data.session) view.session = data.session;
+    const claimed = await ensureCurrentLoginWindow({ promptOnConflict: true });
+    if (!claimed) {
+      await abandonLocalSessionAfterLoginWindowConflict();
+      return;
+    }
     pendingWelcomeToast = true;
   });
 }
@@ -8068,7 +8098,7 @@ async function signUpWithPassword(): Promise<void> {
       options: { data: { display_name: email.split("@")[0] || "Player" } }
     });
     if (error) throw error;
-    const signOutResult = await supabase.auth.signOut();
+    const signOutResult = await supabase.auth.signOut({ scope: "local" });
     if (signOutResult.error) console.warn("sign out after sign-up failed", signOutResult.error);
     view.session = undefined;
     view.authMode = "signin";
@@ -8090,10 +8120,100 @@ async function signInWithGoogle(): Promise<void> {
 async function signOut(): Promise<void> {
   if (!supabase) return;
   await withAccountLoading(async () => {
-    const { error } = await supabase.auth.signOut();
+    try {
+      await releaseLoginWindow(supabase);
+    } catch (error) {
+      console.warn("release login window failed during sign out", error);
+    }
+    stopLoginWindowHeartbeat();
+    const { error } = await supabase.auth.signOut({ scope: "local" });
     if (error) throw error;
     showToast("已登出。");
   });
+}
+
+async function ensureCurrentLoginWindow(options: { promptOnConflict: boolean }): Promise<boolean> {
+  if (!supabase || !view.session) return true;
+  if (loginWindowClaimPromise) return loginWindowClaimPromise;
+
+  loginWindowClaimPromise = (async () => {
+    const claim = await claimLoginWindow(supabase, false);
+    if (claim.status === "claimed") {
+      startLoginWindowHeartbeat();
+      return true;
+    }
+
+    if (!options.promptOnConflict) return false;
+    const takeover = await themedConfirm({
+      title: "帳號已在其他地方登入",
+      message: "這個帳號正在另一個裝置或網址使用。要改在這裡登入嗎？確認後，另一邊會被登出。",
+      confirmLabel: "在這裡登入",
+      cancelLabel: "取消",
+      danger: true,
+      dismissOnBackdrop: false
+    });
+    if (!takeover) return false;
+
+    const takeoverClaim = await claimLoginWindow(supabase, true);
+    if (takeoverClaim.status !== "claimed") return false;
+    startLoginWindowHeartbeat();
+    showToast("已在此登入，其他裝置或網址將自動登出。");
+    return true;
+  })();
+
+  try {
+    return await loginWindowClaimPromise;
+  } finally {
+    loginWindowClaimPromise = undefined;
+  }
+}
+
+function startLoginWindowHeartbeat(): void {
+  if (!supabase || !view.session || loginWindowHeartbeatTimer !== undefined) return;
+  loginWindowHeartbeatTimer = window.setInterval(() => {
+    void verifyLoginWindowStillActive();
+  }, LOGIN_WINDOW_HEARTBEAT_MS);
+}
+
+function stopLoginWindowHeartbeat(): void {
+  if (loginWindowHeartbeatTimer === undefined) return;
+  window.clearInterval(loginWindowHeartbeatTimer);
+  loginWindowHeartbeatTimer = undefined;
+}
+
+async function verifyLoginWindowStillActive(): Promise<void> {
+  if (!supabase || !view.session || loginWindowHeartbeatBusy || forcedLoginWindowLogout) return;
+  loginWindowHeartbeatBusy = true;
+  try {
+    const active = await keepLoginWindow(supabase);
+    if (!active) await forceLogoutAfterLoginWindowTakeover();
+  } catch (error) {
+    console.warn("single-login heartbeat failed", error);
+  } finally {
+    loginWindowHeartbeatBusy = false;
+  }
+}
+
+async function abandonLocalSessionAfterLoginWindowConflict(): Promise<void> {
+  if (!supabase) return;
+  stopLoginWindowHeartbeat();
+  const { error } = await supabase.auth.signOut({ scope: "local" });
+  if (error) console.warn("local sign out after login conflict failed", error);
+  showToast("已取消登入。");
+}
+
+async function forceLogoutAfterLoginWindowTakeover(): Promise<void> {
+  if (!supabase || forcedLoginWindowLogout) return;
+  forcedLoginWindowLogout = true;
+  stopLoginWindowHeartbeat();
+  try {
+    showAlert("你的帳號已從另一個裝置或網址登入，這裡已自動登出。", "登入已被接管");
+    await backToLobby({ refreshAccount: false });
+    const { error } = await supabase.auth.signOut({ scope: "local" });
+    if (error) console.warn("local sign out after login takeover failed", error);
+  } finally {
+    forcedLoginWindowLogout = false;
+  }
 }
 
 async function recordDailyLoginIfAvailable(): Promise<void> {

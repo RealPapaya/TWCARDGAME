@@ -32,6 +32,7 @@ const trainingLegendaryRewardMigration = readFileSync(new URL("../migrations/002
 const trainingRewardGoldTuningMigration = readFileSync(new URL("../migrations/0029_training_reward_gold_tuning.sql", import.meta.url), "utf8");
 const cosmeticPackUniformMigration = readFileSync(new URL("../migrations/0031_cosmetic_pack_uniform_titles.sql", import.meta.url), "utf8");
 const cosmeticPackEmotesMigration = readFileSync(new URL("../migrations/0035_cosmetic_pack_emotes.sql", import.meta.url), "utf8");
+const singleLoginMigration = readFileSync(new URL("../migrations/0036_single_login_window.sql", import.meta.url), "utf8");
 const tasksMigration = readFileSync(new URL("../migrations/0023_tasks_achievements.sql", import.meta.url), "utf8");
 
 describe("Supabase RLS migration coverage", () => {
@@ -201,6 +202,25 @@ describe("Supabase RLS migration coverage", () => {
     expect(userDataMigration).toContain("revoke all on function public.emit_user_event(uuid, text, text, text, jsonb) from public;");
     expect(userDataMigration).toContain("revoke all on function public.adjust_user_currency(uuid, text, integer, text, text, text, jsonb) from public;");
     expect(userDataMigration).toContain("revoke all on function public.grant_user_cosmetic(uuid, text, text, text, text, jsonb) from public;");
+  });
+
+  it("enforces one active login window per authenticated user through RPCs", () => {
+    expect(singleLoginMigration).toContain("create table if not exists public.user_login_windows");
+    expect(singleLoginMigration).toContain("user_id uuid primary key references auth.users(id) on delete cascade");
+    expect(singleLoginMigration).toContain("alter table public.user_login_windows enable row level security;");
+    expect(singleLoginMigration).toContain("using (auth.uid() = user_id)");
+    expect(singleLoginMigration).toContain("create or replace function public.claim_login_window");
+    expect(singleLoginMigration).toContain("returns table(status text, active_client_id text, active_at timestamptz)");
+    expect(singleLoginMigration).toContain("or p_takeover then");
+    expect(singleLoginMigration).toContain("return query select 'conflict'::text");
+    expect(singleLoginMigration).toContain("create or replace function public.keep_login_window");
+    expect(singleLoginMigration).toContain("and client_id = normalized_client_id");
+    expect(singleLoginMigration).toContain("create or replace function public.release_login_window");
+    expect(singleLoginMigration).toContain("revoke all on function public.claim_login_window(text, boolean) from public;");
+    expect(singleLoginMigration).toContain("grant execute on function public.claim_login_window(text, boolean) to authenticated;");
+    expect(singleLoginMigration).toContain("grant execute on function public.keep_login_window(text) to authenticated;");
+    expect(singleLoginMigration).toContain("grant execute on function public.release_login_window(text) to authenticated;");
+    expect(singleLoginMigration).not.toContain("to anon");
   });
 
   it("records Taipei daily login events idempotently and prepares quest progress", () => {
